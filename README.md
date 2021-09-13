@@ -1,7 +1,7 @@
 ## DAQP 
 DAQP is a dual active-set solver for convex quadratic programming. 
 
-:warning: The project is currently under development.
+:warning: The project is currently under development.\ 
 :warning: [Documentation](/) for the project is also under development. 
 
 ## Building from source 
