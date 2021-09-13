@@ -1,0 +1,185 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include "daqp_prox.h"
+
+int daqp_prox(ProxWorkspace *prox_work){
+  int i,j,disp;
+  const int nx=prox_work->n;
+  int exitflag,fixpoint;
+  c_float sum, *swp_pointer;
+  Workspace *work = prox_work->work;
+
+  while(prox_work->outer_iterations++<PROX_ITER_LIMIT){
+
+	// ** Perturb problem **
+	
+	// Perturb v (v= b- Rinv'*x) 
+	for(i = 0; i<prox_work->n;i++) 
+	  prox_work->v[i] = prox_work->f[i]-prox_work->x[i];
+
+	// Compute Rinv'*(f-eps*x) (Skiped if LP since Rinv = I) 
+	if(prox_work->Rinv != NULL){ 
+	  // Use xold as temporary buffer for result since it will be overwritten anyways...
+	  // (f-eps*x) is stored in v
+	  for(i=0;i<nx;i++)
+		prox_work->xold[i] = 0; 
+	  for(i = 0,disp=0; i<nx;i++)
+		for(j=i;j<nx;j++)
+		  prox_work->xold[j] -= prox_work->Rinv[disp++]*prox_work->v[i];
+	  swp_pointer=prox_work->v;
+	  prox_work->v= prox_work->xold;
+	  prox_work->xold = swp_pointer;
+	} 
+
+	// Perturb d (d = b+M*v)
+	for(i = 0,disp=0; i<prox_work->m;i++){
+	  sum = prox_work->b[i];
+	  for(j=0; j<nx;j++)
+		sum += prox_work->M[disp++]*prox_work->v[j]; 
+	  prox_work->d[i] = sum;
+	}
+
+	// xold <-- x
+	swp_pointer = prox_work->xold;
+	prox_work->xold = prox_work->x;
+	prox_work->x = swp_pointer;
+	
+	
+	// ** Solve least-distance problem **
+	work->M = prox_work->M;
+	work->d = prox_work->d;
+	work->reuse_ind = 0;
+	work->iterations = 0;
+	work->fval= -1;
+	
+	exitflag = daqp(work);
+	
+	prox_work->inner_iterations+=work->iterations;
+
+	if(exitflag!=EXIT_OPTIMAL) return exitflag; // least-distance problem not solved
+
+	// Compute primal solution
+	if(prox_work->Rinv == NULL) //LP (Rinv = I)
+	  for(i=0;i<nx;i++)
+		prox_work->x[i] = -(work->u[i]+prox_work->v[i]);
+	else{// QP
+	  for(i=0,disp=0;i<nx;i++){
+		sum = 0; 
+		for(j=i;j<nx;j++)
+		  sum-=prox_work->Rinv[disp++]*(work->u[j]+prox_work->v[j]);
+		prox_work->x[i] = sum;
+	  }
+	}
+	
+	if(prox_work->epsilon == 0) return EXIT_OPTIMAL; // No regularization...
+
+	
+	//Check convergence
+	if(work->iterations==1 && prox_work->outer_iterations%2){ // No changes to the working set 
+	  fixpoint = 1;
+
+	  for(i=0;i<nx;i++){
+		prox_work->xold[i]= prox_work->x[i] - prox_work->xold[i];
+		if((prox_work->xold[i]> ETA) || (prox_work->xold[i]< -ETA)) // ||x_old - x|| > eta 
+		  fixpoint = 0;
+	  }
+	  if(fixpoint==1) return EXIT_OPTIMAL; // Fix point reached
+	  if(work->n_active != work->n){ // Only take gradient step for non-vertices 
+		if(gradient_step(prox_work,work)==EMPTY_IND) return EXIT_UNBOUNDED; // Take gradient step 
+	  }
+	}
+	// Compute objective function value 
+	sum = 0;
+	for(i=0;i<nx;i++)
+	  sum+=prox_work->f[i]*prox_work->x[i];
+	if(sum>prox_work->fval){ 
+	  if(prox_work->cycle_counter++ > 10)
+		return EXIT_OPTIMAL; // No progress implies fix-point -> optimal point
+	}
+	else{ // Progress -> update objective function value
+	  prox_work->fval = sum;
+	  prox_work->cycle_counter=0;
+	}
+  }
+  return EXIT_ITERLIMIT;
+}
+
+// Gradient step 
+int gradient_step(ProxWorkspace* prox_work, Workspace* work){
+  int j,k,disp,add_ind=EMPTY_IND;
+  const int nx=prox_work->n;
+  c_float delta_s,alpha, min_alpha=INF;
+  // Find constraint j to add: j =  argmin_j s_j 
+  for(j=0, disp=0;j<prox_work->m;j++){
+	if(work->sense[j]!=INACTIVE_INEQUALITY){
+	  disp+=nx;// Skip ahead in A 
+	  continue;
+	}
+	//delta_s[j] = A[j,:]*delta_x
+	delta_s= 0; 
+	for(k=0;k<nx;k++) // 
+	  delta_s+=work->M[disp++]*prox_work->xold[k];
+	if(delta_s>0){
+	  // Compute alphaj = (b[j]-A[j,:]*x]/delta_s
+	  alpha = prox_work->b[j];
+	  for(k=0, disp-=nx;k<nx;k++) // 
+		alpha-=work->M[disp++]*prox_work->x[k];
+	  alpha/=delta_s;
+	  if(alpha<min_alpha&&alpha>0){
+		add_ind = j;
+		min_alpha= alpha;
+	  }
+	}
+  }
+  if(add_ind == EMPTY_IND) return EMPTY_IND;
+  // Maybe don't add to AS?
+  work->add_ind = add_ind;
+  add_constraint(work); // Update working set and LDL'
+  if(work->sing_ind!=EMPTY_IND){// Remove constraint if basis becomes singular 
+	work->rm_ind = work->sing_ind;
+	remove_constraint(work);
+	work->sing_ind = EMPTY_IND;
+  }
+  else{
+  for(k=0;k<nx;k++) // x <-- x+alpha deltax 
+	prox_work->x[k]+=min_alpha*prox_work->xold[k];
+  }
+  return add_ind;
+}
+		
+// Utils
+void allocate_prox_workspace(ProxWorkspace *prox_work, int n, int m){
+  prox_work->d= malloc(m*sizeof(c_float));
+  prox_work->v= malloc(n*sizeof(c_float));
+  
+  prox_work->x= malloc(n*sizeof(c_float));
+  prox_work->xold= malloc(n*sizeof(c_float));
+
+  prox_work->n=n;
+  prox_work->m=m;
+  reset_prox_workspace(prox_work);
+
+  // Setup daqp workspace
+  prox_work->work=malloc(sizeof(Workspace));
+  allocate_daqp_workspace(prox_work->work, n);
+  prox_work->work->m=m;
+}
+
+void free_prox_workspace(ProxWorkspace *prox_work){
+  free(prox_work->d);
+  free(prox_work->v);
+
+  free(prox_work->x);
+  free(prox_work->xold);
+  free_daqp_workspace(prox_work->work);
+} 
+
+void reset_prox_workspace(ProxWorkspace *prox_work){
+  for(int i=0;i<prox_work->n;i++) // x0 = 0
+	prox_work->x[i] = 0; 
+  prox_work->inner_iterations=0;
+  prox_work->outer_iterations=0;
+  prox_work->fval=INF;
+  prox_work->cycle_counter=0;
+}
+
