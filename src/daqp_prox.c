@@ -46,11 +46,9 @@ int daqp_prox(ProxWorkspace *prox_work){
 	
 	
 	// ** Solve least-distance problem **
+	reset_daqp_workspace_warm(work);
 	work->M = prox_work->M;
 	work->d = prox_work->d;
-	work->reuse_ind = 0;
-	work->iterations = 0;
-	work->fval= -1;
 	
 	exitflag = daqp(work);
 	

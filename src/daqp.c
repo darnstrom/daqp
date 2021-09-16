@@ -132,3 +132,10 @@ void reset_daqp_workspace(Workspace *work){
   work->fval= -1;
   work->fval_bound= INF;
 }
+
+// Reset workspace in a state that allows for warmstarting
+void reset_daqp_workspace_warm(Workspace *work){
+  work->iterations=0;
+  work->reuse_ind=0;
+  work->fval= -1;
+}
