@@ -116,7 +116,6 @@ void free_daqp_workspace(Workspace *work){
 
   // Important that M and d has been cleared before running this!
   // or that pointers to M and d are retained outside the work-struct.
-  free(work);
 }
 
 // Reset workspace to default values
