@@ -75,7 +75,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 
   // Allocate final value
   for(int i =0;i<n;i++)
-	x_star[i] = -work.u[i];
+	x_star[i] = work.u[i];
   
   // Free memory
   //freeWorkspaceIters(&work);
