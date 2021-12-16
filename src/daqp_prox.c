@@ -18,14 +18,19 @@ int daqp_prox(ProxWorkspace *prox_work){
 	  prox_work->v[i] = prox_work->f[i]-prox_work->x[i];
 
 	// Compute Rinv'*(f-eps*x) (Skiped if LP since Rinv = I) 
-	if(prox_work->Rinv != NULL){ 
+	if(prox_work->Rinv == NULL) 
+	  for(i = 0; i<prox_work->n;i++) 
+		prox_work->v[i] = prox_work->f[i]-prox_work->x[i];
+	else{
+	  for(i = 0; i<prox_work->n;i++) 
+		prox_work->v[i] = prox_work->f[i]-prox_work->epsilon*prox_work->x[i];
 	  // Use xold as temporary buffer for result since it will be overwritten anyways...
 	  // (f-eps*x) is stored in v
 	  for(i=0;i<nx;i++)
 		prox_work->xold[i] = 0; 
 	  for(i = 0,disp=0; i<nx;i++)
 		for(j=i;j<nx;j++)
-		  prox_work->xold[j] -= prox_work->Rinv[disp++]*prox_work->v[i];
+		  prox_work->xold[j] += prox_work->Rinv[disp++]*prox_work->v[i];
 	  swp_pointer=prox_work->v;
 	  prox_work->v= prox_work->xold;
 	  prox_work->xold = swp_pointer;
@@ -82,7 +87,7 @@ int daqp_prox(ProxWorkspace *prox_work){
 		  fixpoint = 0;
 	  }
 	  if(fixpoint==1) return EXIT_OPTIMAL; // Fix point reached
-	  if(work->n_active != work->n){ // Only take gradient step for non-vertices 
+	  if((prox_work->Rinv == NULL)&&(work->n_active != work->n)){ // Only take gradient step for non-vertices 
 		if(gradient_step(prox_work,work)==EMPTY_IND) return EXIT_UNBOUNDED; // Take gradient step 
 	  }
 	}
