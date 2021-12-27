@@ -11,7 +11,6 @@ void find_blocking_constraints(Workspace *work);
 void compute_alpha_and_rm_blocking(Workspace *work);
 void compute_CSP(Workspace *work);
 void compute_singular_direction(Workspace *work);
-int validate_farkas(Workspace *work);
 void reorder_LDL(Workspace *work);
 void pivot_last(Workspace *work);
 void add_equality_constraints(Workspace *work);

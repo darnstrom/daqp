@@ -1,7 +1,5 @@
 #include "auxiliary.h"
 #include "factorization.h"
-//TODO: create macro (x)(x+1)/2
-//TODO: Use registers in for loop.
 void remove_constraint(Workspace* work){
   int i;
   update_LDL_remove(work);
@@ -156,30 +154,6 @@ void compute_singular_direction(Workspace *work){
 	work->lam_star[i] = 0;
 }
 
-int validate_farkas(Workspace *work){
-  int i,j,disp=0;
-  //Primal null vector candidate is stored in u
-  for(j=0;j<NX;j++)
-	work->u[j]=0;
-  for(i=0;i<work->n_active;i++){
-	disp = NX*work->WS[i];
-	for(j=0;j<NX;j++)
-	  work->u[j]+=work->M[disp++]*work->lam_star[i];
-  }
-  // Check if small enough |Mk'p| <= FARKAS_TOL 
-  for(j=0;j<NX;j++){
-	if(work->u[j]<-FARKAS_TOL || work->u[j]>FARKAS_TOL)
-	  return 0;
-  }
-
-  // Ensure descent direction
-  c_float dtp = 0;
-  for(i=0; i<work->n_active; i++)
-	dtp+=work->d[work->WS[i]]*work->lam_star[i];
-  if(dtp>0) return 0; 
-
-  return 1; 
-}
 
 void reorder_LDL(Workspace *work){
   // Extract first column l1,: of  L 

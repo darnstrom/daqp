@@ -6,6 +6,7 @@ void printvector(c_float* vec, int row);
 void printWS(int* WS, int row);
 void print_L(c_float* L, int n);
 
+int validate_farkas(Workspace *work);
 int daqp_debug(Workspace *work);
 #endif //ifndef DAQP_DEBUG_H
 

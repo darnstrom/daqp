@@ -1,8 +1,4 @@
 #include "factorization.h"
-//#include "linear_algebra.h" //TODO remove this
-#define SQUARE(x) ((x)*(x))
-#include <stdio.h>
-//TODO add can be done clear with disp e.t.c.
 void update_LDL_add(Workspace *work){
   work->sing_ind = EMPTY_IND;
   int i,j,disp,disp2;
@@ -31,7 +27,6 @@ void update_LDL_add(Workspace *work){
 	work->L[new_L_start+i] = sum;
   }
   //Forward substitution: l <-- L\(Mk*m)  
-  // TODO sum is superflous (can work directly on L[new...] (But maybe ok becouse of register block..)
   for(i=0,disp=0; i<work->n_active; i++){
 	sum = work->L[new_L_start+i];
 	for(j=0; j<i; j++)
@@ -76,7 +71,7 @@ void update_LDL_remove(Workspace *work){
 	}
   // Algorithm C1 in Gill 1974 for low-rank update of LDL 
   // (L2 block...)
-  // TODO the DISP can most likely be done cleaner...
+  // TODO the disp can most likely be done cleaner...
   c_float p,beta,d_bar,alpha=work->D[work->rm_ind];
   // i - Element/row to update|j - Column which is looped over|r - Row to loop over
   old_disp=(work->rm_ind)*(work->rm_ind+1)/2+work->rm_ind;
@@ -86,7 +81,6 @@ void update_LDL_remove(Workspace *work){
 	beta = p*alpha/d_bar;
 	alpha =work->D[i+1]*alpha/d_bar;
 	work->D[i] = d_bar;
-	// TODO is this valid?
 	// This means that singularity was not detected correctly before (numerical erros)
 	// TODO Do some kind of "repair" step. 
 	if(d_bar<ZERO_TOL){

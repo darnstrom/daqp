@@ -95,7 +95,8 @@ int daqp_prox(ProxWorkspace *prox_work){
   return EXIT_ITERLIMIT;
 }
 
-// Gradient step 
+// Gradient step
+// TODO: could probably reuse code from daqp 
 int gradient_step(ProxWorkspace* prox_work, Workspace* work){
   int j,k,disp,add_ind=EMPTY_IND;
   const int nx=prox_work->n;

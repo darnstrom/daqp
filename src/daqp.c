@@ -53,8 +53,6 @@ int daqp(Workspace *work){
 	  if(work->n_blocking==0){
 		// Infeasible problem
 		return EXIT_INFEASIBLE;
-		//if(validate_farkas(work)==1) return EXIT_INFEASIBLE;
-		//if(work->tried_repair==1) return EXIT_INFEASIBLE;
 	  }
 	  else{
 		compute_alpha_and_rm_blocking(work);
