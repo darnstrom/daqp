@@ -16,7 +16,7 @@ M = A/R;
 v = R'\f;
 d = b+M*v;
 
-% Solve and compare with quadprog solition
+% Solve and compare with quadprog solution
 sense = zeros(m,1,'int32') ;
 [u_daqp,fval_u_daqp, flag, time] =  daqpmex(M',d,sense);
 x_daqp = -(R\(u_daqp+v));
