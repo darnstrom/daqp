@@ -12,28 +12,19 @@ int daqp_prox(ProxWorkspace *prox_work){
   while(prox_work->outer_iterations++<PROX_ITER_LIMIT){
 
 	// ** Perturb problem **
-	
-	// Perturb v (v= b- Rinv'*x) 
-	for(i = 0; i<prox_work->n;i++) 
-	  prox_work->v[i] = prox_work->f[i]-prox_work->x[i];
 
-	// Compute Rinv'*(f-eps*x) (Skiped if LP since Rinv = I) 
+	// Compute v = Rinv'*(f-eps*x) (FWS Skipped if LP since Rinv = I) 
 	if(prox_work->Rinv == NULL) 
-	  for(i = 0; i<prox_work->n;i++) 
+	  for(i = 0; i<nx;i++) 
 		prox_work->v[i] = prox_work->f[i]-prox_work->x[i];
 	else{
-	  for(i = 0; i<prox_work->n;i++) 
+	  for(i = 0; i<nx;i++) 
 		prox_work->v[i] = prox_work->f[i]-prox_work->epsilon*prox_work->x[i];
-	  // Use xold as temporary buffer for result since it will be overwritten anyways...
-	  // (f-eps*x) is stored in v
-	  for(i=0;i<nx;i++)
-		prox_work->xold[i] = 0; 
-	  for(i = 0,disp=0; i<nx;i++)
-		for(j=i;j<nx;j++)
-		  prox_work->xold[j] += prox_work->Rinv[disp++]*prox_work->v[i];
-	  swp_pointer=prox_work->v;
-	  prox_work->v= prox_work->xold;
-	  prox_work->xold = swp_pointer;
+	  for(i = 0,disp=0; i<nx;i++){
+		prox_work->v[i]*=prox_work->Rinv[disp++];
+		for(j=i+1;j<nx;j++)
+		  prox_work->v[j] -= prox_work->Rinv[disp++]*prox_work->v[i];
+	  }
 	} 
 
 	// Perturb d (d = b+M*v)
@@ -61,18 +52,15 @@ int daqp_prox(ProxWorkspace *prox_work){
 
 	if(exitflag!=EXIT_OPTIMAL) return exitflag; // least-distance problem not solved
 
-	// Compute primal solution
-	if(prox_work->Rinv == NULL) //LP (Rinv = I)
-	  for(i=0;i<nx;i++)
-		prox_work->x[i] = -(work->u[i]+prox_work->v[i]);
-	else{// QP
-	  for(i=0,disp=0;i<nx;i++){
-		sum = 0; 
-		for(j=i;j<nx;j++)
-		  sum-=prox_work->Rinv[disp++]*(work->u[j]+prox_work->v[j]);
-		prox_work->x[i] = sum;
+	// Compute primal solution x = -R\(u+v)
+	for(i=0;i<nx;i++)
+	  prox_work->x[i] = -(work->u[i]+prox_work->v[i]);
+	if(prox_work->Rinv != NULL) // Skip if LP since Rinv = I
+	  for(i=nx-1,disp=(nx+1)*nx/2-1;i>=0;i--){
+		for(j=nx-1;j>i;j--)
+		  prox_work->x[i]-=prox_work->Rinv[disp--]*prox_work->x[j];
+		prox_work->x[i]*=prox_work->Rinv[disp--];
 	  }
-	}
 	
 	if(prox_work->epsilon == 0) return EXIT_OPTIMAL; // No regularization...
 
