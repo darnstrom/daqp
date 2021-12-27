@@ -95,7 +95,7 @@ int daqp_minHRep(Workspace* work, c_float* A, c_float*b, int *sense, const int m
 // LP API
 void daqp_lp_setup(ProxWorkspace** pws_ptr, double* f, double* A,double* b, int n, int m){
   ProxWorkspace* pws=malloc(sizeof(ProxWorkspace));
-  pws->Rinv = NULL;
+  pws->R = NULL;
   pws->epsilon=1;
   pws->f = f;
   pws->M = A;

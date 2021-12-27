@@ -10,7 +10,7 @@ typedef struct{
   c_float* M;
   c_float* f;
   c_float* b;
-  c_float* Rinv;
+  c_float* R;
   
   c_float* d;
   c_float* v;

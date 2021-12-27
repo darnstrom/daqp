@@ -13,17 +13,17 @@ int daqp_prox(ProxWorkspace *prox_work){
 
 	// ** Perturb problem **
 
-	// Compute v = Rinv'*(f-eps*x) (FWS Skipped if LP since Rinv = I) 
-	if(prox_work->Rinv == NULL) 
+	// Compute v = R'\(f-eps*x) (FWS Skipped if LP since R = I) 
+	if(prox_work->R== NULL) 
 	  for(i = 0; i<nx;i++) 
 		prox_work->v[i] = prox_work->f[i]-prox_work->x[i];
 	else{
 	  for(i = 0; i<nx;i++) 
 		prox_work->v[i] = prox_work->f[i]-prox_work->epsilon*prox_work->x[i];
 	  for(i = 0,disp=0; i<nx;i++){
-		prox_work->v[i]*=prox_work->Rinv[disp++];
+		prox_work->v[i]*=prox_work->R[disp++];
 		for(j=i+1;j<nx;j++)
-		  prox_work->v[j] -= prox_work->Rinv[disp++]*prox_work->v[i];
+		  prox_work->v[j] -= prox_work->R[disp++]*prox_work->v[i];
 	  }
 	} 
 
@@ -55,11 +55,11 @@ int daqp_prox(ProxWorkspace *prox_work){
 	// Compute primal solution x = -R\(u+v)
 	for(i=0;i<nx;i++)
 	  prox_work->x[i] = -(work->u[i]+prox_work->v[i]);
-	if(prox_work->Rinv != NULL) // Skip if LP since Rinv = I
+	if(prox_work->R != NULL) // Skip if LP since R = I
 	  for(i=nx-1,disp=(nx+1)*nx/2-1;i>=0;i--){
 		for(j=nx-1;j>i;j--)
-		  prox_work->x[i]-=prox_work->Rinv[disp--]*prox_work->x[j];
-		prox_work->x[i]*=prox_work->Rinv[disp--];
+		  prox_work->x[i]-=prox_work->R[disp--]*prox_work->x[j];
+		prox_work->x[i]*=prox_work->R[disp--];
 	  }
 	
 	if(prox_work->epsilon == 0) return EXIT_OPTIMAL; // No regularization...
@@ -75,7 +75,7 @@ int daqp_prox(ProxWorkspace *prox_work){
 		  fixpoint = 0;
 	  }
 	  if(fixpoint==1) return EXIT_OPTIMAL; // Fix point reached
-	  if((prox_work->Rinv == NULL)&&(work->n_active != work->n)){ // Only take gradient step for non-vertices 
+	  if((prox_work->R == NULL)&&(work->n_active != work->n)){ // Only take gradient step for non-vertices 
 		if(gradient_step(prox_work,work)==EMPTY_IND) return EXIT_UNBOUNDED; // Take gradient step 
 	  }
 	}

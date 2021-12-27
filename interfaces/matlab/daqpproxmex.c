@@ -19,25 +19,25 @@ void mexFunction( int nlhs, mxArray *plhs[],
 
   int n = mxGetM(prhs[0]);
   int m = mxGetN(prhs[0]);
-  int n_Rinv = mxGetN(prhs[2]);
+  int n_R= mxGetN(prhs[2]);
   ProxWorkspace prox_work;
   /* create a pointer to the real data in the input matrix  */
 #if MX_HAS_INTERLEAVED_COMPLEX
   prox_work.M=mxGetDoubles(prhs[0]);
   prox_work.b = mxGetDoubles(prhs[1]);
-  if(n_Rinv>0)
-	prox_work.Rinv = mxGetDoubles(prhs[2]);
+  if(n_R>0)
+	prox_work.R= mxGetDoubles(prhs[2]);
   else
-	prox_work.Rinv = NULL; 
+	prox_work.R= NULL; 
   prox_work.f= mxGetDoubles(prhs[3]);
   prox_work.epsilon = mxGetDoubles(prhs[4])[0];
 #else
   prox_work.M= (c_float *)mxGetPr(prhs[0]);
   prox_work.b= (c_float *)mxGetPr(prhs[1]);
-  if(n_Rinv>0)
-	prox_work.Rinv= (c_float *)mxGetPr(prhs[2]);
+  if(n_R>0)
+	prox_work.R= (c_float *)mxGetPr(prhs[2]);
   else
-	prox_work.Rinv = NULL;
+	prox_work.R= NULL;
   prox_work.f= (c_float *)mxGetPr(prhs[3]);
   prox_work.epsilon = mxGetPr(prhs[4])[0];
 #endif
