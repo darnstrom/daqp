@@ -96,6 +96,7 @@ void allocate_daqp_workspace(Workspace *work, int n){
   reset_daqp_workspace(work);
 }
 
+
 // Free memory for iterates
 void free_daqp_workspace(Workspace *work){
   free(work->lam);
@@ -111,9 +112,6 @@ void free_daqp_workspace(Workspace *work){
   free(work->zldl);
 
   free(work->u);
-
-  // Important that M and d has been cleared before running this!
-  // or that pointers to M and d are retained outside the work-struct.
 }
 
 // Reset workspace to default values
@@ -136,4 +134,22 @@ void reset_daqp_workspace_warm(Workspace *work){
   work->iterations=0;
   work->reuse_ind=0;
   work->fval= -1;
+}
+
+// Allocate memory for problem data
+void allocate_daqp_ldp(LDP *ldp, int n, int m){
+  ldp->n = n;
+  ldp->m = m; 
+  ldp->R = malloc(((n+1)*n/2)*sizeof(c_float));
+  ldp->M = malloc(n*m*sizeof(c_float));
+  ldp->d = malloc(m*sizeof(c_float));
+  ldp->v = malloc(n*sizeof(c_float));
+}
+
+// Free data for problem data
+void free_daqp_ldp(LDP *ldp){
+  free(ldp->R);
+  free(ldp->M);
+  free(ldp->d);
+  free(ldp->v);
 }

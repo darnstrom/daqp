@@ -4,11 +4,11 @@
 typedef struct{
  int n; // Number of primal variable  
  int m; // Number of constraints  
+ c_float *R; // Upper cholesky factor of primal Hessian (Diagonals inverse to avoid division)
  c_float *M; // M' M is the Hessian of the dual objective function (dimensions: n x m)  
  c_float *d; // Lienar part of dual objective function (dimensions: m x 1) 
- c_float *u; // Unconstrained primal solution
- c_float *H_chol_inv; // H = H_chol * H_chol' (Diagonals inverse to avoid division)
-}QPData; // TODO Use H,f,A,b instead...
+ c_float *v; // v = R'\f 
+}LDP;
 
 typedef struct{
 }SolverSettings;
