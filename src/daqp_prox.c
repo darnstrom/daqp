@@ -55,12 +55,11 @@ int daqp_prox(ProxWorkspace *prox_work){
 	// Compute QP solution x = -R\(u+v)
 	ldp2qp_solution(prox_work->x,prox_work->R,work->u,prox_work->v,nx);
 	
-	if(prox_work->epsilon == 0) return EXIT_OPTIMAL; // No regularization...
+	if(prox_work->epsilon == 0) return EXIT_OPTIMAL; // No regularization -> optimal solution
 	
 	//Check convergence
 	if(work->iterations==1 && prox_work->outer_iterations%2){ // No changes to the working set 
 	  fixpoint = 1;
-
 	  for(i=0;i<nx;i++){
 		prox_work->xold[i]= prox_work->x[i] - prox_work->xold[i];
 		if((prox_work->xold[i]> ETA) || (prox_work->xold[i]< -ETA)) // ||x_old - x|| > eta 
