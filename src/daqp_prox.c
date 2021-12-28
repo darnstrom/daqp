@@ -52,18 +52,10 @@ int daqp_prox(ProxWorkspace *prox_work){
 
 	if(exitflag!=EXIT_OPTIMAL) return exitflag; // least-distance problem not solved
 
-	// Compute primal solution x = -R\(u+v)
-	for(i=0;i<nx;i++)
-	  prox_work->x[i] = -(work->u[i]+prox_work->v[i]);
-	if(prox_work->R != NULL) // Skip if LP since R = I
-	  for(i=nx-1,disp=(nx+1)*nx/2-1;i>=0;i--){
-		for(j=nx-1;j>i;j--)
-		  prox_work->x[i]-=prox_work->R[disp--]*prox_work->x[j];
-		prox_work->x[i]*=prox_work->R[disp--];
-	  }
+	// Compute QP solution x = -R\(u+v)
+	ldp2qp_solution(prox_work->x,prox_work->R,work->u,prox_work->v,nx);
 	
 	if(prox_work->epsilon == 0) return EXIT_OPTIMAL; // No regularization...
-
 	
 	//Check convergence
 	if(work->iterations==1 && prox_work->outer_iterations%2){ // No changes to the working set 

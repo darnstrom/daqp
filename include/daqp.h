@@ -6,8 +6,9 @@
 #include "auxiliary.h"
 
 int daqp(Workspace *work);
-void warmstart_workspace(Workspace* work, int* WS, const int n_active); 
+void ldp2qp_solution(double *x, double *R, double *u, double *v, int nx);
 
+void warmstart_workspace(Workspace* work, int* WS, const int n_active); 
 void allocate_daqp_workspace(Workspace *work, int n);
 void free_daqp_workspace(Workspace *work);
 void reset_daqp_workspace(Workspace *work);

@@ -63,6 +63,19 @@ int daqp(Workspace *work){
   }
 }
 
+// Compute x = -R\(u+v)
+void ldp2qp_solution(double *x, double *R, double *u, double *v, int nx){
+  int i,j,disp;
+  for(i=0;i<nx;i++)
+	x[i] = -(u[i]+v[i]);
+  if(R != NULL) // Backwards substitution (Skip if LP since R = I)
+	for(i=nx-1,disp=(nx+1)*nx/2-1;i>=0;i--){
+	  for(j=nx-1;j>i;j--)
+		x[i]-=R[disp--]*x[j];
+	  x[i]*=R[disp--];
+	}
+}
+
 void warmstart_workspace(Workspace* work, int* WS, const int n_active){
   // TODO, will probably be error with equality constraints here... (Make sure reorder always adds inequality constraints...)
   reset_daqp_workspace(work); // Reset workspace
@@ -153,3 +166,5 @@ void free_daqp_ldp(LDP *ldp){
   free(ldp->d);
   free(ldp->v);
 }
+
+
