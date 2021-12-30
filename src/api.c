@@ -1,6 +1,6 @@
 #include "api.h" 
 #include <stdlib.h>
-//#include <stdio.h>
+#include <stdio.h>
 #include <math.h>
 // Check feasibility of Ax <=b 
 // (ret = 1 if feasible) 
@@ -55,43 +55,65 @@ void daqp_setup(Workspace** ws_ptr, double* M, double* d, int n){
   *ws_ptr = work;
 }
 
-void daqp_quadprog(DAQPResult *res, double* H, double* f, double *A, double *b, int* sense, int n, int m, int packed){
-  Workspace work;
+void daqp_quadprog(DAQPResult *res, double* H, double* f, double *A, double *b, int* sense, int n, int m, int packed, double eps){
   struct timespec tstart,tsetup,tsol;
+  int i;
   // TIC start
   clock_gettime(CLOCK_MONOTONIC, &tstart);
 
   // Transform QP to ldp (R,v,M,d is stored inplace of H,f,A,b)
   if(!packed) pack_symmetric(H,H,n); 
-  qp2ldp(H,f,A,b,n,m,0);
+  qp2ldp(H,f,A,b,n,m,eps);
 
-  // Setup daqp workspace 
-  allocate_daqp_workspace(&work,n);
-  work.n = n; work.m = m;
-  work.R = H; work.v = f;
-  work.M = A; work.d = b;
-  work.x = res->x;
-  work.sense = sense;
-  add_equality_constraints(&work);
-  clock_gettime(CLOCK_MONOTONIC, &tsetup);
-
-  
-  // Solve LDP
-  res->exitflag = daqp(&work);
-  clock_gettime(CLOCK_MONOTONIC, &tsol);
-  // Correct fval (More accurate if primal objective is evaluated in x)
-  for(int i=0;i<work.n;i++)
-	work.fval-=work.v[i]*work.v[i];// 
-  work.fval *=0.5;
+  if(eps==0){
+	printf("====Running daqp!====\n");
+	// Setup daqp workspace 
+	Workspace work;
+	allocate_daqp_workspace(&work,n);
+	work.n = n; work.m = m;
+	work.R = H; work.v = f;
+	work.M = A; work.d = b;
+	work.x = res->x;
+	work.sense = sense;
+	add_equality_constraints(&work);
+	clock_gettime(CLOCK_MONOTONIC, &tsetup);
 
 
+	// Solve LDP
+	res->exitflag = daqp(&work);
+	clock_gettime(CLOCK_MONOTONIC, &tsol);
+	// Correct fval (More accurate if primal objective is evaluated in x)
+	for(i=0;i<n;i++)
+	  work.fval-=work.v[i]*work.v[i];// 
+	work.fval *=0.5;
+	res->fval = work.fval;
+	
+	free_daqp_workspace(&work);
+  }
+  else{
+	ProxWorkspace prox_work;
+	allocate_prox_workspace(&prox_work,n,m);
+	prox_work.work->R=H; prox_work.work->M=A; 
+	prox_work.b = b; prox_work.f = f;
+	prox_work.work->sense = sense;
+	prox_work.epsilon = eps;
+	add_equality_constraints(prox_work.work);
+	clock_gettime(CLOCK_MONOTONIC, &tsetup);
 
-  // Summarize result and cleanup 
-  res->fval = work.fval;
+	res->exitflag = daqp_prox(&prox_work);
+	clock_gettime(CLOCK_MONOTONIC, &tsol);
+
+	for(i=0;i<n;i++) // Extract solution
+	  res->x[i]=prox_work.x[i];
+	res->fval = 0; // TODO: correct this
+
+	free_prox_workspace(&prox_work);
+  }
+
+  // Append time 
   res->solve_time = time_diff(tsetup,tsol);
   res->setup_time = time_diff(tstart,tsetup);
 
-  free_daqp_workspace(&work);
 }
 
 int qp2ldp(double *R, double *v, double* M, double* d, int n, int m, double eps)
@@ -101,6 +123,13 @@ int qp2ldp(double *R, double *v, double* M, double* d, int n, int m, double eps)
   //  A is stored in M; b is stored in d
   int i, j, k;
   int disp,disp2;
+  
+  // If LP -> no cholesky, just scale f with eps
+  if(R==NULL){ 
+	for(i=0;i<n;i++)
+	  v[i]/=eps;
+	return -1; 
+  }
 
   // Cholesky
   for (i=0,disp=0; i<n; disp+=n-i,i++) {
@@ -129,6 +158,8 @@ int qp2ldp(double *R, double *v, double* M, double* d, int n, int m, double eps)
 	  for(j=1;j<n-i;j++)
 		M[disp+j] -= R[disp2++]*M[disp];
 	}
+
+  if(eps != 0) return  0; // No need to compute v & d for prox
   // Compute v = R'\f  
   for(i = 0,disp=0;i<n;i++){
 	v[i]*=R[disp++];
