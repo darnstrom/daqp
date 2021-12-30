@@ -28,6 +28,8 @@ int daqp(Workspace *work){
 		find_constraint_to_add(work);
 		if(work->add_ind == EMPTY_IND){ //mu >= (i.e., primal feasible)
 		  // All KKT-conditions satisfied -> optimum found 
+		  // LDP-> QP solution (x* stored in u)
+		  ldp2qp_solution(work->x,work->R,work->u,work->v,work->n); 
 		  return EXIT_OPTIMAL; 
 		}
 		else{
@@ -93,6 +95,9 @@ void warmstart_workspace(Workspace* work, int* WS, const int n_active){
 // Allocate memory for iterates  
 void allocate_daqp_workspace(Workspace *work, int n){
   work->n = n;
+  work->R = NULL;
+  work->v = NULL;
+
   work->lam = malloc((n+1)*sizeof(c_float));
   work->lam_star = malloc((n+1)*sizeof(c_float));
   
@@ -106,6 +111,8 @@ void allocate_daqp_workspace(Workspace *work, int n){
   work->zldl= malloc((n+1)*sizeof(c_float));
   
   work->u= malloc(n*sizeof(c_float));
+  work->x = work->u; 
+
   reset_daqp_workspace(work);
 }
 

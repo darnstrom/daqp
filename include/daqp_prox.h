@@ -7,13 +7,9 @@
 
 
 typedef struct{
-  c_float* M;
   c_float* f;
   c_float* b;
-  c_float* R;
   
-  c_float* d;
-  c_float* v;
   c_float* xold;
   c_float* x;
 

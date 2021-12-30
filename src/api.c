@@ -57,33 +57,25 @@ void daqp_setup(Workspace** ws_ptr, double* M, double* d, int n){
 
 int daqp_quadprog(double* x, double* H, double* f, double *A, double *b, int* sense, int n, int m, int packed){
   int ret; 
-  LDP ldp;
   Workspace work;
 
-  // Prepare problem
-  ldp.R=H;
-  if(!packed) pack_H(ldp.R,ldp.R,n); 
-  ldp.v = f;
-  ldp.M = A;
-  ldp.d = b;
-  // Transform QP to ldp   
-  // NOTE: R,v,M,d is stored inplace of H,f,A,b 
-  qp2ldp(ldp.R,ldp.v,ldp.M,ldp.d,n,m,0);
+  // Transform QP to ldp (R,v,M,d is stored inplace of H,f,A,b)
+  if(!packed) pack_symmetric(H,H,n); 
+  qp2ldp(H,f,A,b,n,m,0);
 
   // Setup daqp workspace 
   allocate_daqp_workspace(&work,n);
-  work.n = n;
-  work.m = m;
-  work.M = ldp.M;
-  work.d = ldp.d;
+  work.n = n; work.m = m;
+  work.R = H; work.v = f;
+  work.M = A; work.d = b;
+  work.x = x;
   work.sense = sense;
-  
   add_equality_constraints(&work);
   
+  // Solve LDP
   ret = daqp(&work);
-  if(ret==EXIT_OPTIMAL) 
-	ldp2qp_solution(x,ldp.R,work.u,ldp.v,n);
 
+  // Copy solution and cleanup
   free_daqp_workspace(&work);
   return ret;
 }
@@ -140,10 +132,10 @@ int qp2ldp(double *R, double *v, double* M, double* d, int n, int m, double eps)
   return 0;
 }
 
-void pack_H(double *H, double *R, int n){
+void pack_symmetric(double *S, double *Sp, int n){
   int i,j,disp,disp2;
   for(i=0,disp=0,disp2=0;i<n;i++,disp2+=i)
 	for(j=i;j<n;j++){
-	  R[disp++] = H[disp2++];
+	  Sp[disp++] = S[disp2++];
 	}
 }

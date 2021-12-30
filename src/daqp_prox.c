@@ -14,16 +14,16 @@ int daqp_prox(ProxWorkspace *prox_work){
 	// ** Perturb problem **
 
 	// Compute v = R'\(f-eps*x) (FWS Skipped if LP since R = I) 
-	if(prox_work->R== NULL) 
+	if(work->R== NULL) 
 	  for(i = 0; i<nx;i++) 
-		prox_work->v[i] = prox_work->f[i]-prox_work->x[i];
+		work->v[i] = prox_work->f[i]-prox_work->x[i];
 	else{
 	  for(i = 0; i<nx;i++) 
-		prox_work->v[i] = prox_work->f[i]-prox_work->epsilon*prox_work->x[i];
+		work->v[i] = prox_work->f[i]-prox_work->epsilon*prox_work->x[i];
 	  for(i = 0,disp=0; i<nx;i++){
-		prox_work->v[i]*=prox_work->R[disp++];
+		work->v[i]*=work->R[disp++];
 		for(j=i+1;j<nx;j++)
-		  prox_work->v[j] -= prox_work->R[disp++]*prox_work->v[i];
+		  work->v[j] -= work->R[disp++]*work->v[i];
 	  }
 	} 
 
@@ -31,8 +31,8 @@ int daqp_prox(ProxWorkspace *prox_work){
 	for(i = 0,disp=0; i<prox_work->m;i++){
 	  sum = prox_work->b[i];
 	  for(j=0; j<nx;j++)
-		sum += prox_work->M[disp++]*prox_work->v[j]; 
-	  prox_work->d[i] = sum;
+		sum += work->M[disp++]*work->v[j]; 
+	  work->d[i] = sum;
 	}
 
 	// xold <-- x
@@ -43,18 +43,11 @@ int daqp_prox(ProxWorkspace *prox_work){
 	
 	// ** Solve least-distance problem **
 	reset_daqp_workspace_warm(work);
-	work->M = prox_work->M;
-	work->d = prox_work->d;
-	
+	work->x = prox_work->x;
 	exitflag = daqp(work);
 	
 	prox_work->inner_iterations+=work->iterations;
-
-	if(exitflag!=EXIT_OPTIMAL) return exitflag; // least-distance problem not solved
-
-	// Compute QP solution x = -R\(u+v)
-	ldp2qp_solution(prox_work->x,prox_work->R,work->u,prox_work->v,nx);
-	
+	if(exitflag!=EXIT_OPTIMAL) return exitflag;
 	if(prox_work->epsilon == 0) return EXIT_OPTIMAL; // No regularization -> optimal solution
 	
 	//Check convergence
@@ -66,17 +59,18 @@ int daqp_prox(ProxWorkspace *prox_work){
 		  fixpoint = 0;
 	  }
 	  if(fixpoint==1) return EXIT_OPTIMAL; // Fix point reached
-	  if((prox_work->R == NULL)&&(work->n_active != work->n)){ // Only take gradient step for non-vertices 
-		if(gradient_step(prox_work,work)==EMPTY_IND) return EXIT_UNBOUNDED; // Take gradient step 
+	  // Take gradient step if LP (and we are not constrained to a vertex) 
+	  if((work->R == NULL)&&(work->n_active != work->n)){ 
+		if(gradient_step(prox_work,work)==EMPTY_IND) return EXIT_UNBOUNDED;
 	  }
 	}
-	// Compute objective function value 
+	// Compute objective function value to detect progress
 	sum = 0;
 	for(i=0;i<nx;i++)
 	  sum+=prox_work->f[i]*prox_work->x[i];
 	if(sum>prox_work->fval){ 
 	  if(prox_work->cycle_counter++ > 10)
-		return EXIT_OPTIMAL; // No progress implies fix-point -> optimal point
+		return EXIT_OPTIMAL; // No progress -> fix-point
 	}
 	else{ // Progress -> update objective function value
 	  prox_work->fval = sum;
@@ -132,8 +126,6 @@ int gradient_step(ProxWorkspace* prox_work, Workspace* work){
 		
 // Utils
 void allocate_prox_workspace(ProxWorkspace *prox_work, int n, int m){
-  prox_work->d= malloc(m*sizeof(c_float));
-  prox_work->v= malloc(n*sizeof(c_float));
   
   prox_work->x= malloc(n*sizeof(c_float));
   prox_work->xold= malloc(n*sizeof(c_float));
@@ -146,15 +138,17 @@ void allocate_prox_workspace(ProxWorkspace *prox_work, int n, int m){
   prox_work->work=malloc(sizeof(Workspace));
   allocate_daqp_workspace(prox_work->work, n);
   prox_work->work->m=m;
+  prox_work->work->d= malloc(m*sizeof(c_float));
+  prox_work->work->v= malloc(n*sizeof(c_float));
 }
 
 void free_prox_workspace(ProxWorkspace *prox_work){
-  free(prox_work->d);
-  free(prox_work->v);
-
   free(prox_work->x);
   free(prox_work->xold);
+
   free_daqp_workspace(prox_work->work);
+  free(prox_work->work->d);
+  free(prox_work->work->v);
 } 
 
 void reset_prox_workspace(ProxWorkspace *prox_work){
