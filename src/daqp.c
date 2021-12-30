@@ -157,21 +157,17 @@ void reset_daqp_workspace_warm(Workspace *work){
 }
 
 // Allocate memory for problem data
-void allocate_daqp_ldp(LDP *ldp, int n, int m){
-  ldp->n = n;
-  ldp->m = m; 
-  ldp->R = malloc(((n+1)*n/2)*sizeof(c_float));
-  ldp->M = malloc(n*m*sizeof(c_float));
-  ldp->d = malloc(m*sizeof(c_float));
-  ldp->v = malloc(n*sizeof(c_float));
+void allocate_daqp_ldp(Workspace *work,int n, int m){
+  work->R = malloc(((n+1)*n/2)*sizeof(c_float));
+  work->M = malloc(n*m*sizeof(c_float));
+  work->d = malloc(m*sizeof(c_float));
+  work->v = malloc(n*sizeof(c_float));
 }
 
 // Free data for problem data
-void free_daqp_ldp(LDP *ldp){
-  free(ldp->R);
-  free(ldp->M);
-  free(ldp->d);
-  free(ldp->v);
+void free_daqp_ldp(Workspace *work){
+  free(work->R);
+  free(work->M);
+  free(work->d);
+  free(work->v);
 }
-
-

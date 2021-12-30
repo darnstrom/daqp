@@ -1,14 +1,6 @@
 #ifndef DAQP_TYPES_H
 # define DAQP_TYPES_H
 #include "constants.h"
-typedef struct{
- int n; // Number of primal variable  
- int m; // Number of constraints  
- c_float *R; // Upper cholesky factor of primal Hessian (Diagonals inverse to avoid division)
- c_float *M; // M' M is the Hessian of the dual objective function (dimensions: n x m)  
- c_float *d; // Lienar part of dual objective function (dimensions: m x 1) 
- c_float *v; // v = R'\f 
-}LDP;
 
 typedef struct{
 }SolverSettings;
