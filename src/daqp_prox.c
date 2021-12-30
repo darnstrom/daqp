@@ -149,6 +149,7 @@ void free_prox_workspace(ProxWorkspace *prox_work){
   free_daqp_workspace(prox_work->work);
   free(prox_work->work->d);
   free(prox_work->work->v);
+  free(prox_work->work);
 } 
 
 void reset_prox_workspace(ProxWorkspace *prox_work){
