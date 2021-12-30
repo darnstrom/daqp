@@ -66,7 +66,6 @@ void daqp_quadprog(DAQPResult *res, double* H, double* f, double *A, double *b, 
   qp2ldp(H,f,A,b,n,m,eps);
 
   if(eps==0){
-	printf("====Running daqp!====\n");
 	// Setup daqp workspace 
 	Workspace work;
 	allocate_daqp_workspace(&work,n);
@@ -176,6 +175,7 @@ int qp2ldp(double *R, double *v, double* M, double* d, int n, int m, double eps)
 }
 
 void pack_symmetric(double *S, double *Sp, int n){
+  if(S==NULL) return;
   int i,j,disp,disp2;
   for(i=0,disp=0,disp2=0;i<n;i++,disp2+=i)
 	for(j=i;j<n;j++){

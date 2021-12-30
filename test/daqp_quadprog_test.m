@@ -16,7 +16,7 @@ M = A/R;
 v = R'\f;
 d = b+M*v;
 
-epsilon = 1e-8;
+epsilon = 1e-6;
 %epsilon =  0;
 % Solve and compare with quadprog solution
 
@@ -31,3 +31,18 @@ fval_prox = 0.5*x_prox'*H*x_prox+f'*x_prox;
 
 time_daqp-time_prox
 fval_daqp-fval_prox
+%% Random lp 
+%Generate problem 
+n=10;
+m = 100;
+
+f = randn(n,1);
+A = randn(m,n);
+b = rand(m,1);
+
+epsilon = 1;
+
+sense = zeros(m,1,'int32') ;
+[x_daqp,fval_x_daqp, flag, time_daqp] =  daqpmex_quadprog([],f,A',b,sense,epsilon);
+[xref,fval_ref] = linprog(f,A,b);
+err=norm(x_daqp-xref)

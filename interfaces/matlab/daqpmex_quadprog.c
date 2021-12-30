@@ -21,7 +21,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
   int m = mxGetN(prhs[2]);
 
   // RHS
-  H= mxGetPr(prhs[0]);
+  if(mxIsEmpty(prhs[0])) H=NULL; else H= mxGetPr(prhs[0]);
   f= mxGetPr(mxDuplicateArray(prhs[1]));
   A= mxGetPr(prhs[2]);
   b= mxGetPr(mxDuplicateArray(prhs[3]));
