@@ -1,6 +1,5 @@
 #include "mex.h"
 #include "api.h"
-#include <time.h>
 
 /* The gateway function */
 void mexFunction( int nlhs, mxArray *plhs[],
@@ -9,6 +8,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
   double *x_star, *cpuTime, *fval;
   double *H,*f,*A,*b;
   int *exitflag, *sense;
+  DAQPResult res;
   /* check for proper number of arguments */
   if(nrhs!=5) {
 	mexErrMsgIdAndTxt("DAQP:nrhs","5 inputs required.");
@@ -39,34 +39,18 @@ void mexFunction( int nlhs, mxArray *plhs[],
   plhs[2] = mxCreateNumericMatrix(1, 1, mxINT32_CLASS, mxREAL); //Exit flag
   plhs[3] = mxCreateDoubleMatrix(1,1,mxREAL); //CPU time
 #if MX_HAS_INTERLEAVED_COMPLEX
-  x_star = mxGetDoubles(plhs[0]);
+  res.x = mxGetDoubles(plhs[0]);
 #else
-  x_star = mxGetPr(plhs[0]);
+  res.x = mxGetPr(plhs[0]);
 #endif
   fval= mxGetPr(plhs[1]);
   exitflag = (int *)mxGetPr(plhs[2]);
   cpuTime = mxGetPr(plhs[3]);
   
-  //TIC
-  struct timespec tic,toc;
-  clock_gettime(CLOCK_MONOTONIC, &tic);
   
-  exitflag[0] = daqp_quadprog(x_star,H,f,A,b,sense,n,m,0);
+  daqp_quadprog(&res,H,f,A,b,sense,n,m,0);
   
-  //TOC
-  clock_gettime(CLOCK_MONOTONIC, &toc);
-
-  struct timespec diff;
-  if ((toc.tv_nsec - tic.tv_nsec) < 0) {
-    diff.tv_sec  = toc.tv_sec - tic.tv_sec - 1;
-    diff.tv_nsec = 1e9 + toc.tv_nsec - tic.tv_nsec;
-  } else {
-    diff.tv_sec  = toc.tv_sec - tic.tv_sec;
-    diff.tv_nsec = toc.tv_nsec - tic.tv_nsec;
-  }
-  double solve_time = (double)diff.tv_sec + (double )diff.tv_nsec / 1e9;
-  cpuTime[0] = solve_time;
-
-  // TODO compute fval
-  fval[0] = 0;
+  exitflag[0] = res.exitflag; 
+  fval[0] = res.fval;
+  cpuTime[0] = res.solve_time; 
 }

@@ -55,9 +55,11 @@ void daqp_setup(Workspace** ws_ptr, double* M, double* d, int n){
   *ws_ptr = work;
 }
 
-int daqp_quadprog(double* x, double* H, double* f, double *A, double *b, int* sense, int n, int m, int packed){
-  int ret; 
+void daqp_quadprog(DAQPResult *res, double* H, double* f, double *A, double *b, int* sense, int n, int m, int packed){
   Workspace work;
+  struct timespec tstart,tsetup,tsol;
+  // TIC start
+  clock_gettime(CLOCK_MONOTONIC, &tstart);
 
   // Transform QP to ldp (R,v,M,d is stored inplace of H,f,A,b)
   if(!packed) pack_symmetric(H,H,n); 
@@ -68,25 +70,35 @@ int daqp_quadprog(double* x, double* H, double* f, double *A, double *b, int* se
   work.n = n; work.m = m;
   work.R = H; work.v = f;
   work.M = A; work.d = b;
-  work.x = x;
+  work.x = res->x;
   work.sense = sense;
   add_equality_constraints(&work);
+  clock_gettime(CLOCK_MONOTONIC, &tsetup);
+
   
   // Solve LDP
-  ret = daqp(&work);
+  res->exitflag = daqp(&work);
+  clock_gettime(CLOCK_MONOTONIC, &tsol);
+  // Correct fval (More accurate if primal objective is evaluated in x)
+  for(int i=0;i<work.n;i++)
+	work.fval-=work.v[i]*work.v[i];// 
+  work.fval *=0.5;
 
-  // Copy solution and cleanup
+
+
+  // Summarize result and cleanup 
+  res->fval = work.fval;
+  res->solve_time = time_diff(tsetup,tsol);
+  res->setup_time = time_diff(tstart,tsetup);
+
   free_daqp_workspace(&work);
-  return ret;
 }
 
 int qp2ldp(double *R, double *v, double* M, double* d, int n, int m, double eps)
 {
-  // Assumption: 
-  //  H is stored in R (in packed form)
-  //  A is stored in M
-  //  f is stored in v 
-  //  b is stored in d
+  // Assumptions: 
+  //  H stored in R (in packed form); f is stored in v 
+  //  A is stored in M; b is stored in d
   int i, j, k;
   int disp,disp2;
 
@@ -138,4 +150,16 @@ void pack_symmetric(double *S, double *Sp, int n){
 	for(j=i;j<n;j++){
 	  Sp[disp++] = S[disp2++];
 	}
+}
+
+double time_diff(struct timespec tic, struct timespec toc){
+  struct timespec diff;
+  if ((toc.tv_nsec - tic.tv_nsec) < 0) {
+    diff.tv_sec  = toc.tv_sec - tic.tv_sec - 1;
+    diff.tv_nsec = 1e9 + toc.tv_nsec - tic.tv_nsec;
+  } else {
+    diff.tv_sec  = toc.tv_sec - tic.tv_sec;
+    diff.tv_nsec = toc.tv_nsec - tic.tv_nsec;
+  }
+  return (double)diff.tv_sec + (double )diff.tv_nsec / 1e9;
 }
