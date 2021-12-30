@@ -13,8 +13,10 @@
 #define FARKAS_TOL 1e-7
 #define PIVOT_TOL 1e-2
 #define CYCLE_TOL 10
+#define ETA 1e-6
 
 #define MAX_ITER 1000 
+#define PROX_ITER_LIMIT 1000 
 #define SQUARE(x) ((x)*(x))
 #define ARSUM(x) ((x)*(x+1)/2)
 

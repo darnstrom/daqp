@@ -213,3 +213,17 @@ void add_equality_constraints(Workspace *work){
 	}
   }
 }
+
+void daqp_default_settings(DAQPSettings* settings){
+  settings->primal_tol = INFEAS_TOL;
+  settings->dual_tol = DUAL_TOL; 
+  settings->zero_tol = ZERO_TOL;
+  settings->pivot_tol = PIVOT_TOL;
+
+  settings->cycle_tol = CYCLE_TOL;
+  settings->iter_limit = MAX_ITER;
+
+  settings->eps_prox = 0;
+  settings->eta_prox = ETA;
+  settings->prox_iter_limit = PROX_ITER_LIMIT; 
+}

@@ -32,6 +32,4 @@ void allocate_prox_workspace(ProxWorkspace *prox_work, int n, int m);
 void free_prox_workspace(ProxWorkspace *prox_work);
 void reset_prox_workspace(ProxWorkspace *prox_work);
 
-#define ETA 1e-6
-#define PROX_ITER_LIMIT 1000 
 #endif //ifndef DAQP_PROX_H 
