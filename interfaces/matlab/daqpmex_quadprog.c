@@ -11,7 +11,7 @@ const char* INFO_FIELDS[] = {
 void mexFunction( int nlhs, mxArray *plhs[],
 				  int nrhs, const mxArray *prhs[])
 {
-  double *x_star, *cpuTime, *fval;
+  double *x_star, *fval;
   double *H,*f,*A,*b;
   int *exitflag, *sense;
   DAQPResult res;
@@ -42,10 +42,8 @@ void mexFunction( int nlhs, mxArray *plhs[],
   res.x = mxGetPr(plhs[0]);
   fval= mxGetPr(plhs[1]);
   exitflag = (int *)mxGetPr(plhs[2]);
-  cpuTime = mxGetPr(plhs[3]);
 
   // Setup settings
-  printf("Setup settings\n");
   DAQPSettings settings;
   if(mxIsEmpty(prhs[5]))
 	daqp_default_settings(&settings);
@@ -62,13 +60,12 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	settings.prox_iter_limit= (int)mxGetScalar(mxGetField(prhs[5], 0, "prox_iter_limit"));
   }
 
-  
-  printf("Run daqp_quadprog\n");
+  // Solve problem 
   daqp_quadprog(&res,H,f,A,b,sense,n,m,0,&settings);
   
+  // Extract info
   exitflag[0] = res.exitflag; 
   fval[0] = res.fval;
-  cpuTime[0] = res.solve_time; 
 
   // Create info struct
   int n_info = sizeof(INFO_FIELDS)/sizeof(INFO_FIELDS[0]);
