@@ -81,7 +81,7 @@ void daqp_quadprog(DAQPResult *res, double* H, double* f, double *A, double *b, 
 	// Solve LDP
 	res->exitflag = daqp(&work);
 	clock_gettime(CLOCK_MONOTONIC, &tsol);
-	// Correct fval (More accurate if primal objective is evaluated in x)
+	// Correct offset in fval 
 	for(i=0;i<n;i++)
 	  work.fval-=work.v[i]*work.v[i];// 
 	work.fval *=0.5;

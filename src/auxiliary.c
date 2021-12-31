@@ -46,7 +46,7 @@ void find_constraint_to_add(Workspace *work){
 	  work->u[j]+=work->M[disp++]*work->lam_star[i];
   }
   // Check for progress 
-  float fval_diff=work->fval;
+  c_float fval_diff=work->fval;
   for(j=0;j<NX;j++)
 	fval_diff-=work->u[j]*work->u[j];
   if(fval_diff<-OBJ_PROG_TOL){
@@ -219,6 +219,7 @@ void daqp_default_settings(DAQPSettings* settings){
   settings->dual_tol = DUAL_TOL; 
   settings->zero_tol = ZERO_TOL;
   settings->pivot_tol = PIVOT_TOL;
+  settings->progress_tol= OBJ_PROG_TOL;
 
   settings->cycle_tol = CYCLE_TOL;
   settings->iter_limit = MAX_ITER;

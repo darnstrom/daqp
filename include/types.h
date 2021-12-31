@@ -7,6 +7,7 @@ typedef struct{
   c_float dual_tol; 
   c_float zero_tol; 
   c_float pivot_tol;
+  c_float progress_tol;
   
   int cycle_tol;
   int iter_limit;
