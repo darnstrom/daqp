@@ -7,6 +7,8 @@ typedef struct{
   c_float *x;
   c_float fval;
   int exitflag; 
+  int iter;
+  int outer_iter;
   double solve_time;
   double setup_time; 
 }DAQPResult;

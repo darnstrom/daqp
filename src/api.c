@@ -86,6 +86,8 @@ void daqp_quadprog(DAQPResult *res, double* H, double* f, double *A, double *b, 
 	  work.fval-=work.v[i]*work.v[i];// 
 	work.fval *=0.5;
 	res->fval = work.fval;
+	res->iter = work.iterations;
+	res->outer_iter = 0;
 	
 	free_daqp_workspace(&work);
   }
@@ -105,6 +107,8 @@ void daqp_quadprog(DAQPResult *res, double* H, double* f, double *A, double *b, 
 	for(i=0;i<n;i++) // Extract solution
 	  res->x[i]=prox_work.x[i];
 	res->fval = 0; // TODO: correct this
+	res->iter = prox_work.inner_iterations;
+	res->outer_iter = prox_work.outer_iterations;
 
 	free_prox_workspace(&prox_work);
   }
