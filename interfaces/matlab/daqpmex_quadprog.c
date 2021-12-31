@@ -1,6 +1,12 @@
 #include "mex.h"
 #include "api.h"
 
+const char* INFO_FIELDS[] = {
+  "setup_time",           
+  "solve_time",           
+  "iter",           
+  "outer_iter"}; 
+
 /* The gateway function */
 void mexFunction( int nlhs, mxArray *plhs[],
 				  int nrhs, const mxArray *prhs[])
@@ -45,4 +51,13 @@ void mexFunction( int nlhs, mxArray *plhs[],
   exitflag[0] = res.exitflag; 
   fval[0] = res.fval;
   cpuTime[0] = res.solve_time; 
+
+  // Create info struct
+  int n_info = sizeof(INFO_FIELDS)/sizeof(INFO_FIELDS[0]);
+  mxArray* info_struct = mxCreateStructMatrix(1,1,n_info,INFO_FIELDS);
+  mxSetField(info_struct, 0, "solve_time", mxCreateDoubleScalar(res.solve_time));
+  mxSetField(info_struct, 0, "setup_time", mxCreateDoubleScalar(res.setup_time));
+  mxSetField(info_struct, 0, "iter", mxCreateDoubleScalar(res.iter));
+  mxSetField(info_struct, 0, "outer_iter", mxCreateDoubleScalar(res.outer_iter));
+  plhs[3] = info_struct;
 }
