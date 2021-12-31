@@ -12,7 +12,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 				  int nrhs, const mxArray *prhs[])
 {
   double *x_star, *cpuTime, *fval;
-  double *H,*f,*A,*b, *eps;
+  double *H,*f,*A,*b;
   int *exitflag, *sense;
   DAQPResult res;
   /* check for proper number of arguments */
@@ -32,7 +32,6 @@ void mexFunction( int nlhs, mxArray *plhs[],
   A= mxGetPr(prhs[2]);
   b= mxGetPr(mxDuplicateArray(prhs[3]));
   sense= (int *)mxGetPr(mxDuplicateArray(prhs[4]));
-  eps = mxGetPr(mxDuplicateArray(prhs[5]));
   
   // LHS
   plhs[0] = mxCreateDoubleMatrix((mwSize)n,1,mxREAL); // x_star
@@ -44,9 +43,28 @@ void mexFunction( int nlhs, mxArray *plhs[],
   fval= mxGetPr(plhs[1]);
   exitflag = (int *)mxGetPr(plhs[2]);
   cpuTime = mxGetPr(plhs[3]);
+
+  // Setup settings
+  printf("Setup settings\n");
+  DAQPSettings settings;
+  if(mxIsEmpty(prhs[5]))
+	daqp_default_settings(&settings);
+  else{
+	settings.primal_tol = (c_float)mxGetScalar(mxGetField(prhs[5], 0, "primal_tol"));
+	settings.dual_tol =  (c_float)mxGetScalar(mxGetField(prhs[5], 0, "dual_tol"));
+	settings.zero_tol = (c_float)mxGetScalar(mxGetField(prhs[5], 0, "zero_tol"));
+	settings.pivot_tol = (c_float)mxGetScalar(mxGetField(prhs[5], 0, "pivot_tol"));
+	settings.progress_tol = (c_float)mxGetScalar(mxGetField(prhs[5], 0, "progress_tol"));
+	settings.cycle_tol = (int)mxGetScalar(mxGetField(prhs[5], 0, "cycle_tol"));
+	settings.iter_limit= (int)mxGetScalar(mxGetField(prhs[5], 0, "iter_limit"));
+	settings.eps_prox = (c_float)mxGetScalar(mxGetField(prhs[5], 0, "eps_prox"));
+	settings.eta_prox= (c_float)mxGetScalar(mxGetField(prhs[5], 0, "eta_prox"));
+	settings.prox_iter_limit= (int)mxGetScalar(mxGetField(prhs[5], 0, "prox_iter_limit"));
+  }
+
   
-  
-  daqp_quadprog(&res,H,f,A,b,sense,n,m,0,eps[0]);
+  printf("Run daqp_quadprog\n");
+  daqp_quadprog(&res,H,f,A,b,sense,n,m,0,&settings);
   
   exitflag[0] = res.exitflag; 
   fval[0] = res.fval;

@@ -16,15 +16,18 @@ M = A/R;
 v = R'\f;
 d = b+M*v;
 
-epsilon = 1e-6;
-%epsilon =  0;
 % Solve and compare with quadprog solution
 
+daqp_opts = daqp_options();
+
 sense = zeros(m,1,'int32') ;
-[x_daqp,fval_x_daqp, flag, info_daqp] =  daqpmex_quadprog(H',f,A',b,sense,0);
-[x_prox,fval_x_prox, flag, info_prox] =  daqpmex_quadprog(H',f,A',b,sense,epsilon);
+[x_daqp,fval_x_daqp, flag, info_daqp] =  daqpmex_quadprog(H',f,A',b,sense,daqp_opts);
 [xref,fval_ref] = quadprog(H,f,A,b);
 err=norm(x_daqp-xref)
+
+daqp_opts.eps_prox = 1e-6;
+[x_prox,fval_x_prox, flag, info_prox] =  daqpmex_quadprog(H',f,A',b,sense,daqp_opts);
+
 
 fval_daqp = 0.5*x_daqp'*H*x_daqp+f'*x_daqp;
 fval_prox = 0.5*x_prox'*H*x_prox+f'*x_prox;
@@ -40,9 +43,11 @@ f = randn(n,1);
 A = randn(m,n);
 b = rand(m,1);
 
-epsilon = 1;
 
+daqp_opts = daqp_options();
+daqp_opts.eps_prox=1;
 sense = zeros(m,1,'int32') ;
-[x_daqp,fval_x_daqp, flag, time_daqp] =  daqpmex_quadprog([],f,A',b,sense,epsilon);
+[x_daqp,fval_x_daqp, flag, daqp_info] =  daqpmex_quadprog([],f,A',b,sense,daqp_opts);
 [xref,fval_ref] = linprog(f,A,b);
 err=norm(x_daqp-xref)
+daqp_info
