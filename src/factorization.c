@@ -45,7 +45,7 @@ void update_LDL_add(Workspace *work){
   work->D[work->n_active]=sum;
 
   // Check for singularity
-  if(work->D[work->n_active]<ZERO_TOL||work->n_active==work->n){
+  if(work->D[work->n_active]<work->settings->zero_tol||work->n_active==work->n){
 	work->sing_ind=work->n_active;
 	work->D[work->n_active]=0;
   }
@@ -83,7 +83,7 @@ void update_LDL_remove(Workspace *work){
 	work->D[i] = d_bar;
 	// This means that singularity was not detected correctly before (numerical erros)
 	// TODO Do some kind of "repair" step. 
-	if(d_bar<ZERO_TOL){
+	if(d_bar<work->settings->zero_tol){
 	  //work->D[i]=0;
 	  work->sing_ind=i;
 	}

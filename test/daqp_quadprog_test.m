@@ -30,6 +30,7 @@ fval_daqp = 0.5*x_daqp'*H*x_daqp+f'*x_daqp;
 fval_prox = 0.5*x_prox'*H*x_prox+f'*x_prox;
 
 fval_daqp-fval_prox
+info_daqp
 %% Random lp 
 %Generate problem 
 n=10;

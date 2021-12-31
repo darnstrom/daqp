@@ -14,4 +14,5 @@ void compute_singular_direction(Workspace *work);
 void reorder_LDL(Workspace *work);
 void pivot_last(Workspace *work);
 void add_equality_constraints(Workspace *work);
+void daqp_default_settings(DAQPSettings *settings);
 #endif //ifndef DAQP_AUX_H

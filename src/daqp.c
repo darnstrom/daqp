@@ -4,13 +4,13 @@
 
 int daqp(Workspace *work){
   while(1){
-	if(work->iterations++>MAX_ITER)
+	if(work->iterations++>work->settings->iter_limit)
 	  return EXIT_ITERLIMIT;
 	if(work->sing_ind==EMPTY_IND){ 
 	  compute_CSP(work);
 	  if(work->fval > work->fval_bound)
 		return EXIT_INFEASIBLE;
-	  if(work->cycle_counter > CYCLE_TOL){
+	  if(work->cycle_counter > work->settings->cycle_tol){
 		if(work->tried_repair==1)
 		  return EXIT_CYCLE;
 		else{

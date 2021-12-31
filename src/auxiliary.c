@@ -33,7 +33,7 @@ void add_constraint(Workspace *work){
 
 void find_constraint_to_add(Workspace *work){
   int i,j,k,disp;
-  c_float min_val = -INFEAS_TOL;
+  c_float min_val = -work->settings->primal_tol;
   c_float mu;
   int add_ind=EMPTY_IND;
   // Reset u
@@ -49,7 +49,7 @@ void find_constraint_to_add(Workspace *work){
   c_float fval_diff=work->fval;
   for(j=0;j<NX;j++)
 	fval_diff-=work->u[j]*work->u[j];
-  if(fval_diff<-OBJ_PROG_TOL){
+  if(fval_diff<-work->settings->progress_tol){
 	work->fval -= fval_diff;
 	work->cycle_counter=0;
   }else work->cycle_counter++;
@@ -85,7 +85,7 @@ void find_blocking_constraints(Workspace *work){
   work->n_blocking=0;
   for(int i=0;i<work->n_active;i++){
 	if(work->sense[work->WS[i]]==EQUALITY) continue; //Equality constraint are never blocking
-	if(work->lam_star[i]<-DUAL_TOL)
+	if(work->lam_star[i]<-work->settings->dual_tol)
 	  work->BS[work->n_blocking++]=i;
   }
 }
@@ -184,7 +184,8 @@ void reorder_LDL(Workspace *work){
 }
 
 void pivot_last(Workspace *work){
-  if(work->n_active > 1 && work->D[work->n_active-2] < PIVOT_TOL && work->D[work->n_active-2] < work->D[work->n_active-1]){
+  if(work->n_active > 1 && work->D[work->n_active-2] < work->settings->pivot_tol && 
+	 work->D[work->n_active-2] < work->D[work->n_active-1]){
 	work->rm_ind = work->n_active-2; 
 	int ind_old = work->WS[work->rm_ind];
 	int old_sense =work->sense[ind_old]; // Make sure that equality constraints are retained... 
@@ -215,16 +216,16 @@ void add_equality_constraints(Workspace *work){
 }
 
 void daqp_default_settings(DAQPSettings* settings){
-  settings->primal_tol = INFEAS_TOL;
-  settings->dual_tol = DUAL_TOL; 
-  settings->zero_tol = ZERO_TOL;
-  settings->pivot_tol = PIVOT_TOL;
-  settings->progress_tol= OBJ_PROG_TOL;
+  settings->primal_tol = DEFAULT_PRIM_TOL;
+  settings->dual_tol = DEFAULT_DUAL_TOL; 
+  settings->zero_tol = DEFAULT_ZERO_TOL;
+  settings->pivot_tol = DEFAULT_PIVOT_TOL;
+  settings->progress_tol= DEFAULT_PROG_TOL;
 
-  settings->cycle_tol = CYCLE_TOL;
-  settings->iter_limit = MAX_ITER;
+  settings->cycle_tol = DEFAULT_CYCLE_TOL;
+  settings->iter_limit = DEFAULT_ITER_LIMIT;
 
   settings->eps_prox = 0;
-  settings->eta_prox = ETA;
-  settings->prox_iter_limit = PROX_ITER_LIMIT; 
+  settings->eta_prox = DEFAULT_ETA;
+  settings->prox_iter_limit = DEFAULT_PROX_ITER_LIMIT; 
 }

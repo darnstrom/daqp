@@ -5,7 +5,7 @@ set(
     "${CMAKE_CURRENT_SOURCE_DIR}/constants.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/daqp.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/daqp_prox.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/debug.h"
+	#"${CMAKE_CURRENT_SOURCE_DIR}/debug.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/factorization.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/types.h"
 )

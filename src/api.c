@@ -57,6 +57,8 @@ void daqp_setup(Workspace** ws_ptr, double* M, double* d, int n){
 
 void daqp_quadprog(DAQPResult *res, double* H, double* f, double *A, double *b, int* sense, int n, int m, int packed, double eps){
   struct timespec tstart,tsetup,tsol;
+  DAQPSettings settings;
+  daqp_default_settings(&settings);
   int i;
   // TIC start
   clock_gettime(CLOCK_MONOTONIC, &tstart);
@@ -74,6 +76,7 @@ void daqp_quadprog(DAQPResult *res, double* H, double* f, double *A, double *b, 
 	work.M = A; work.d = b;
 	work.x = res->x;
 	work.sense = sense;
+	work.settings = &settings;
 	add_equality_constraints(&work);
 	clock_gettime(CLOCK_MONOTONIC, &tsetup);
 
@@ -92,15 +95,18 @@ void daqp_quadprog(DAQPResult *res, double* H, double* f, double *A, double *b, 
 	free_daqp_workspace(&work);
   }
   else{
+	// Setup workspace
 	ProxWorkspace prox_work;
 	allocate_prox_workspace(&prox_work,n,m);
 	prox_work.work->R=H; prox_work.work->M=A; 
 	prox_work.b = b; prox_work.f = f;
 	prox_work.work->sense = sense;
 	prox_work.epsilon = eps;
+	prox_work.work->settings= &settings;
 	add_equality_constraints(prox_work.work);
 	clock_gettime(CLOCK_MONOTONIC, &tsetup);
 
+	// Solve problem
 	res->exitflag = daqp_prox(&prox_work);
 	clock_gettime(CLOCK_MONOTONIC, &tsol);
 

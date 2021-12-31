@@ -9,7 +9,7 @@ int daqp_prox(ProxWorkspace *prox_work){
   c_float sum, *swp_pointer;
   Workspace *work = prox_work->work;
 
-  while(prox_work->outer_iterations++<PROX_ITER_LIMIT){
+  while(prox_work->outer_iterations++<work->settings->prox_iter_limit){
 
 	// ** Perturb problem **
 
@@ -55,7 +55,8 @@ int daqp_prox(ProxWorkspace *prox_work){
 	  fixpoint = 1;
 	  for(i=0;i<nx;i++){
 		prox_work->xold[i]= prox_work->x[i] - prox_work->xold[i];
-		if((prox_work->xold[i]> ETA) || (prox_work->xold[i]< -ETA)) // ||x_old - x|| > eta 
+		if((prox_work->xold[i]> work->settings->eta_prox) || // ||x_old - x|| > eta 
+		   (prox_work->xold[i]< -work->settings->eta_prox)) 
 		  fixpoint = 0;
 	  }
 	  if(fixpoint==1) return EXIT_OPTIMAL; // Fix point reached
@@ -69,7 +70,7 @@ int daqp_prox(ProxWorkspace *prox_work){
 	for(i=0;i<nx;i++)
 	  sum+=prox_work->f[i]*prox_work->x[i];
 	if(sum>prox_work->fval){ 
-	  if(prox_work->cycle_counter++ > 10)
+	  if(prox_work->cycle_counter++ > work->settings->cycle_tol)
 		return EXIT_OPTIMAL; // No progress -> fix-point
 	}
 	else{ // Progress -> update objective function value
