@@ -37,7 +37,6 @@ int daqp(Workspace *work){
 		  work->swp_pointer=work->lam;
 		  work->lam = work->lam_star;
 		  work->lam_star=work->swp_pointer;
-		  work->swp_pointer = NULL;
 
 		  add_constraint(work);
 		}
