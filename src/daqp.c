@@ -86,7 +86,7 @@ void warmstart_workspace(Workspace* work, int* WS, const int n_active){
 	  add_constraint(work);
 	  work->lam[i] = 1;
 	}else{ //Make sure that the unadded constraints are inactive in sense
-	  work->sense[work->WS[i]]=INACTIVE_INEQUALITY;
+	  SET_INACTIVE(work->sense[work->WS[i]]);
 	}
   }
 }

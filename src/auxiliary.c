@@ -5,7 +5,7 @@ void remove_constraint(Workspace* work){
   update_LDL_remove(work);
   
   // Update data structures
-  work->sense[work->WS[work->rm_ind]] = INACTIVE_INEQUALITY;
+  SET_INACTIVE(work->sense[work->WS[work->rm_ind]]); 
   (work->n_active)--;
   for(i=work->rm_ind;i<work->n_active;i++){
 	work->WS[i] = work->WS[i+1]; 
@@ -22,7 +22,7 @@ void remove_constraint(Workspace* work){
 void add_constraint(Workspace *work){
   update_LDL_add(work);
   // Update data structures  
-  work->sense[work->add_ind]=ACTIVE_INEQUALITY;
+  SET_ACTIVE(work->sense[work->add_ind]);
   work->WS[work->n_active] = work->add_ind;
   work->lam[work->n_active] = 0;
   work->n_active++;
@@ -64,7 +64,7 @@ void find_constraint_to_add(Workspace *work){
   }
   else{// Non-empty working set 
 	for(j=0, disp=0;j<N_CONSTR;j++){
-	  if(work->sense[j]!=INACTIVE_INEQUALITY){
+	  if(IS_ACTIVE(work->sense[j])){
 		disp+=NX;// Skip ahead in M
 		continue;
 	  }
@@ -84,7 +84,7 @@ void find_constraint_to_add(Workspace *work){
 void find_blocking_constraints(Workspace *work){
   work->n_blocking=0;
   for(int i=0;i<work->n_active;i++){
-	if(work->sense[work->WS[i]]==EQUALITY) continue; //Equality constraint are never blocking
+	if(IS_IMMUTABLE(work->sense[work->WS[i]])) continue;
 	if(work->lam_star[i]<-work->settings->dual_tol)
 	  work->BS[work->n_blocking++]=i;
   }
@@ -205,7 +205,8 @@ void pivot_last(Workspace *work){
 
 void add_equality_constraints(Workspace *work){
   for(int i =0;i<N_CONSTR;i++){
-	if(work->sense[i]==EQUALITY){
+	//TODO prioritize inequalities?
+	if(IS_ACTIVE(work->sense[i])){
 	  work->add_ind=i; 
 	  update_LDL_add(work);
 	  work->WS[work->n_active] = i;

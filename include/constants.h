@@ -20,18 +20,33 @@
 
 #define SQUARE(x) ((x)*(x))
 #define ARSUM(x) ((x)*(x+1)/2)
+#define INF ((c_float)1e30)
 
+// EXIT FLAGS
 #define EXIT_OPTIMAL 1
 #define EXIT_INFEASIBLE -1
 #define EXIT_CYCLE -2
 #define EXIT_UNBOUNDED -3
 #define EXIT_ITERLIMIT -4
 
-#define INACTIVE_INEQUALITY 0
-#define EQUALITY 1
-#define ACTIVE_INEQUALITY 2
-#define FREE_CONSTRAINT 3
+// CONSTRAINT MASKS 
+#define INACTIVE 1
+#define ACTIVE 1
+#define IS_ACTIVE(x) (x&1)
+#define SET_ACTIVE(x) (x|=1)
+#define SET_INACTIVE(x) (x&=~1)
 
-#define INF ((c_float)1e30)
+#define UPPER 0
+#define LOWER 2 
+#define IS_LOWER(x) (x&2)
+#define SET_UPPER(x) (x|=2)
+#define SET_LOWER(x) (x&=~2)
+
+#define MUTABLE 0
+#define IMMUTABLE 4 
+#define IS_IMMUTABLE(x) (x&4)
+#define SET_IMMUTABLE(x) (x|=4)
+#define SET_MUTABLE(x) (x&=~4)
+
 
 #endif //ifndef DAQP_CONSTANTS_H

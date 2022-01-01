@@ -14,8 +14,10 @@ int daqp_feas(Workspace* work, c_float* A, c_float*b, int *sense, const int m, c
   work->fval_bound = fval_bound;
   ret = daqp(work);
   // Cleanup sense for reuse...
-  for(int j=0;j<work->n_active;j++)
-	work->sense[work->WS[j]]=INACTIVE_INEQUALITY; // TODO handle equality constraints...
+  for(int j=0;j<work->n_active;j++){
+	if(IS_IMMUTABLE(work->sense[work->WS[j]])) continue;
+	SET_INACTIVE(work->sense[work->WS[j]]); 
+  }
   return ret;
 }
 
@@ -39,8 +41,11 @@ int daqp_feas_warmstart(Workspace* work, c_float* A, c_float*b, int *sense, cons
   }
   WS[work->n] = work->n_active; // Number of active in last element
   
-  for(int j=0;j<work->n_active;j++)
-	work->sense[work->WS[j]]=INACTIVE_INEQUALITY; // TODO handle equality constraints...
+  // Cleanup sense for reuse...
+  for(int j=0;j<work->n_active;j++){
+	if(IS_IMMUTABLE(work->sense[work->WS[j]])) continue;
+	SET_INACTIVE(work->sense[work->WS[j]]); 
+  }
   return ret;
 }
 

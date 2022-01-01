@@ -89,7 +89,7 @@ int gradient_step(ProxWorkspace* prox_work, Workspace* work){
   c_float delta_s,alpha, min_alpha=INF;
   // Find constraint j to add: j =  argmin_j s_j 
   for(j=0, disp=0;j<prox_work->m;j++){
-	if(work->sense[j]!=INACTIVE_INEQUALITY){
+	if(IS_ACTIVE(work->sense[j])){
 	  disp+=nx;// Skip ahead in A 
 	  continue;
 	}
