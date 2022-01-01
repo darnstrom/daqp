@@ -29,10 +29,10 @@ int daqp_prox(ProxWorkspace *prox_work){
 
 	// Perturb d (d = b+M*v)
 	for(i = 0,disp=0; i<prox_work->m;i++){
-	  sum = prox_work->b[i];
-	  for(j=0; j<nx;j++)
+	  for(j=0,sum=0; j<nx;j++)
 		sum += work->M[disp++]*work->v[j]; 
-	  work->d[i] = sum;
+	  work->dupper[i] = prox_work->bupper[i]+sum;
+	  work->dlower[i] = -(prox_work->blower[i]+sum);
 	}
 
 	// xold <-- x
@@ -99,7 +99,9 @@ int gradient_step(ProxWorkspace* prox_work, Workspace* work){
 	  delta_s+=work->M[disp++]*prox_work->xold[k];
 	if(delta_s>0){
 	  // Compute alphaj = (b[j]-A[j,:]*x]/delta_s
-	  alpha = prox_work->b[j];
+	  alpha = prox_work->bupper[j];
+	  // TODO: ALSO include blower here...
+	  // (Note that bounded constraints->always bounded)
 	  for(k=0, disp-=nx;k<nx;k++) // 
 		alpha-=work->M[disp++]*prox_work->x[k];
 	  alpha/=delta_s;
@@ -139,7 +141,8 @@ void allocate_prox_workspace(ProxWorkspace *prox_work, int n, int m){
   prox_work->work=malloc(sizeof(Workspace));
   allocate_daqp_workspace(prox_work->work, n);
   prox_work->work->m=m;
-  prox_work->work->d= malloc(m*sizeof(c_float));
+  prox_work->work->dupper= malloc(m*sizeof(c_float));
+  prox_work->work->dlower= malloc(m*sizeof(c_float));
   prox_work->work->v= malloc(n*sizeof(c_float));
 }
 
@@ -148,7 +151,8 @@ void free_prox_workspace(ProxWorkspace *prox_work){
   free(prox_work->xold);
 
   free_daqp_workspace(prox_work->work);
-  free(prox_work->work->d);
+  free(prox_work->work->dupper);
+  free(prox_work->work->dlower);
   free(prox_work->work->v);
   free(prox_work->work);
 } 

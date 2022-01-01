@@ -24,6 +24,7 @@ void update_LDL_add(Workspace *work){
 	sum=0;
 	for(j=0;j<NX;j++,disp++,disp2++)
 	  sum +=work->M[disp2]*work->M[disp];
+	// flip sign if one is lower since minus*plus=minus 
 	work->L[new_L_start+i] = sum;
   }
   //Forward substitution: l <-- L\(Mk*m)  

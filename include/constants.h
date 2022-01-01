@@ -39,8 +39,8 @@
 #define UPPER 0
 #define LOWER 2 
 #define IS_LOWER(x) (x&2)
-#define SET_UPPER(x) (x|=2)
-#define SET_LOWER(x) (x&=~2)
+#define SET_LOWER(x) (x|=2)
+#define SET_UPPER(x) (x&=~2)
 
 #define MUTABLE 0
 #define IMMUTABLE 4 

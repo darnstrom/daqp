@@ -9,7 +9,8 @@ int daqp_feas(Workspace* work, c_float* A, c_float*b, int *sense, const int m, c
   reset_daqp_workspace(work); // Reset workspace
   work->m = m;
   work->M = A;
-  work->d = b;
+  work->dupper = b;
+  //TODO: dlower...
   work->sense = sense;
   work->fval_bound = fval_bound;
   ret = daqp(work);
@@ -28,7 +29,8 @@ int daqp_feas_warmstart(Workspace* work, c_float* A, c_float*b, int *sense, cons
   reset_daqp_workspace(work); // Reset workspace
   work->m = m;
   work->M = A;
-  work->d = b;
+  work->dupper = b;
+  //TODO: set dlower...
   work->sense = sense;
   warmstart_workspace(work,WS,n_active);
   work->fval_bound = fval_bound;
@@ -55,12 +57,13 @@ void daqp_setup(Workspace** ws_ptr, double* M, double* d, int n){
   Workspace* work=malloc(sizeof(Workspace));
   work->n = n;
   work->M = M;
-  work->d = d;
+  work->dupper = d;
+  // TODO: setup dlower...
   allocate_daqp_workspace(work, n);
   *ws_ptr = work;
 }
 
-void daqp_quadprog(DAQPResult *res, double* H, double* f, double *A, double *b, int* sense, int n, int m, int packed, DAQPSettings *settings){
+void daqp_quadprog(DAQPResult *res, double* H, double* f, double *A, double *bupper, double* blower, int* sense, int n, int m, int packed, DAQPSettings *settings){
   struct timespec tstart,tsetup,tsol;
   //DAQPSettings settings;
   //daqp_default_settings(&settings);
@@ -70,7 +73,7 @@ void daqp_quadprog(DAQPResult *res, double* H, double* f, double *A, double *b, 
 
   // Transform QP to ldp (R,v,M,d is stored inplace of H,f,A,b)
   if(!packed) pack_symmetric(H,H,n); 
-  qp2ldp(H,f,A,b,n,m,settings->eps_prox);
+  qp2ldp(H,f,A,bupper,blower,n,m,settings->eps_prox);
 
   if(settings->eps_prox==0){
 	// Setup daqp workspace 
@@ -78,7 +81,7 @@ void daqp_quadprog(DAQPResult *res, double* H, double* f, double *A, double *b, 
 	allocate_daqp_workspace(&work,n);
 	work.n = n; work.m = m;
 	work.R = H; work.v = f;
-	work.M = A; work.d = b;
+	work.M = A; work.dupper = bupper; work.dlower = blower;
 	work.x = res->x;
 	work.sense = sense;
 	work.settings = settings;
@@ -104,7 +107,7 @@ void daqp_quadprog(DAQPResult *res, double* H, double* f, double *A, double *b, 
 	ProxWorkspace prox_work;
 	allocate_prox_workspace(&prox_work,n,m);
 	prox_work.work->R=H; prox_work.work->M=A; 
-	prox_work.b = b; prox_work.f = f;
+	prox_work.bupper = bupper; prox_work.blower=blower; prox_work.f = f;
 	prox_work.work->sense = sense;
 	prox_work.epsilon = settings->eps_prox;
 	prox_work.work->settings= settings;
@@ -130,13 +133,14 @@ void daqp_quadprog(DAQPResult *res, double* H, double* f, double *A, double *b, 
 
 }
 
-int qp2ldp(double *R, double *v, double* M, double* d, int n, int m, double eps)
+int qp2ldp(double *R, double *v, double* M, double* dupper, double*  dlower, int n, int m, double eps)
 {
   // Assumptions: 
   //  H stored in R (in packed form); f is stored in v 
   //  A is stored in M; b is stored in d
   int i, j, k;
   int disp,disp2;
+  c_float sum;
   
   // If LP -> no cholesky, just scale f with eps
   if(R==NULL){ 
@@ -182,9 +186,13 @@ int qp2ldp(double *R, double *v, double* M, double* d, int n, int m, double eps)
   }
 
   // Compute d  = b+M*v
-  for(i = 0, disp=0;i<m;i++)
+  for(i = 0, disp=0;i<m;i++){
+	sum = 0;
 	for(j=0;j<n;j++)
-	  d[i]+=M[disp++]*v[j];
+	  sum+=M[disp++]*v[j];
+	dupper[i]+=sum;
+	dlower[i]+=sum;
+  }
 
   return 0;
 }

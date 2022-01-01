@@ -23,6 +23,10 @@ void add_constraint(Workspace *work){
   update_LDL_add(work);
   // Update data structures  
   SET_ACTIVE(work->sense[work->add_ind]);
+  if(work->add_isupper)
+	SET_UPPER(work->sense[work->add_ind]);
+  else
+	SET_LOWER(work->sense[work->add_ind]);
   work->WS[work->n_active] = work->add_ind;
   work->lam[work->n_active] = 0;
   work->n_active++;
@@ -34,8 +38,8 @@ void add_constraint(Workspace *work){
 void find_constraint_to_add(Workspace *work){
   int i,j,k,disp;
   c_float min_val = -work->settings->primal_tol;
-  c_float mu;
-  int add_ind=EMPTY_IND;
+  c_float Mu;
+  int isupper=0, add_ind=EMPTY_IND;
   // Reset u
   for(j=0;j<NX;j++)
 	work->u[j]=0;
@@ -57,9 +61,15 @@ void find_constraint_to_add(Workspace *work){
   // If empty working mu = d
   if(work->n_active==0){  
 	for(j=0;j<N_CONSTR;j++)
-	  if(work->d[j]<min_val){//dupper
+	  if(work->dupper[j]<min_val){//dupper
 		add_ind = j;
-		min_val = work->d[j]; 
+		isupper = 1; 
+		min_val = work->dupper[j]; 
+	  }
+	  else if(-work->dlower[j]<min_val){//dlower
+		add_ind = j;
+		isupper = 0;
+		min_val = -work->dlower[j];
 	  }
   }
   else{// Non-empty working set 
@@ -69,23 +79,35 @@ void find_constraint_to_add(Workspace *work){
 		continue;
 	  }
 	  //mu[j] = d[j] + M[j,:]*u
-	  mu=work->d[j];
+	  Mu=0;
 	  for(k=0;k<NX;k++) // 
-		mu+=work->M[disp++]*work->u[k];
+		Mu+=work->M[disp++]*work->u[k];
 	  // Dantzig's rule
-	  if(mu<min_val){
+	  if(work->dupper[j]+Mu<min_val){
 		add_ind = j;
-		min_val = mu;
+		isupper = 1;
+		min_val = work->dupper[j]+Mu;
+	  }
+	  else if(-(work->dlower[j]+Mu)<min_val){
+		add_ind = j;
+		isupper = 0;
+		min_val = -(work->dlower[j]+Mu);
 	  }
 	}
   }
   work->add_ind = add_ind;
+  work->add_isupper = isupper;
 }
 void find_blocking_constraints(Workspace *work){
+  c_float violation;
   work->n_blocking=0;
   for(int i=0;i<work->n_active;i++){
 	if(IS_IMMUTABLE(work->sense[work->WS[i]])) continue;
-	if(work->lam_star[i]<-work->settings->dual_tol)
+	if(IS_LOWER(work->sense[work->WS[i]])) 
+	  violation = work->lam_star[i]-work->settings->dual_tol;
+	else
+	  violation = -work->lam_star[i]-work->settings->dual_tol;
+	if(violation>0)
 	  work->BS[work->n_blocking++]=i;
   }
 }
@@ -111,7 +133,11 @@ void compute_CSP(Workspace *work){
   double sum;
   // Forward substitution (xi <-- L\d)
   for(i=work->reuse_ind,disp=ARSUM(work->reuse_ind); i<work->n_active; i++){
-	sum = -work->d[work->WS[i]]; //dplus
+	// Setup RHS
+	if(IS_LOWER(work->sense[work->WS[i]])) 
+	  sum = -work->dlower[work->WS[i]];
+	else 
+	  sum = -work->dupper[work->WS[i]];
 	for(j=0; j<i; j++)
 	  sum -= work->L[disp++]*work->xldl[j];
 	disp++; //Skip 1 in L 

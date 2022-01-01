@@ -8,7 +8,8 @@
 
 typedef struct{
   c_float* f;
-  c_float* b;
+  c_float* bupper;
+  c_float* blower;
   
   c_float* xold;
   c_float* x;

@@ -22,7 +22,8 @@ typedef struct{
   int n; // Number of primal variable  
   int m; // Number of constraints  
   c_float *M; // M' M is the Hessian of the dual objective function (dimensions: n x m)  
-  c_float *d; // Linear part of dual objective function (dimensions: m x 1) 
+  c_float *dupper; // Linear part of dual objective function (dimensions: m x 1) 
+  c_float *dlower; // Linear part of dual objective function (dimensions: m x 1) 
   c_float *R; // Upper cholesky factor of primal Hessian (Diagonals inverse to avoid division)
   c_float *v; // v = R'\f (used to transform QP to LDP 
   int *sense; // Denotes inequality or equality constraints
@@ -45,6 +46,7 @@ typedef struct{
   int iterations;
   int sing_ind; // Flag for denoting whether Mk Mk' is singular or not 
   int add_ind; // Index to add to the working set
+  int add_isupper; // Marks if index to add is upper or lower 
   int rm_ind; // Index to remove from the working set
   int n_active; // Number of active contraints 
   int n_blocking; // Number of blocking constraints  

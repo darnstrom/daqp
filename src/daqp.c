@@ -159,7 +159,8 @@ void reset_daqp_workspace_warm(Workspace *work){
 void allocate_daqp_ldp(Workspace *work,int n, int m){
   work->R = malloc(((n+1)*n/2)*sizeof(c_float));
   work->M = malloc(n*m*sizeof(c_float));
-  work->d = malloc(m*sizeof(c_float));
+  work->dupper = malloc(m*sizeof(c_float));
+  work->dlower = malloc(m*sizeof(c_float));
   work->v = malloc(n*sizeof(c_float));
 }
 
@@ -167,6 +168,7 @@ void allocate_daqp_ldp(Workspace *work,int n, int m){
 void free_daqp_ldp(Workspace *work){
   free(work->R);
   free(work->M);
-  free(work->d);
+  free(work->dupper);
+  free(work->dlower);
   free(work->v);
 }

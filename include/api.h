@@ -20,9 +20,9 @@ int daqp_feas(Workspace* work, c_float* A, c_float*b, int *sense, const int m, c
 int daqp_feas_warmstart(Workspace* work, c_float* A, c_float*b, int *sense, const int m, c_float fval_bound, int* WS, const int n_active);
 
 
-void daqp_quadprog(DAQPResult* res, double* H, double* f, double *A, double *b, int* sense, int n, int m, int packed,DAQPSettings* settings);
+void daqp_quadprog(DAQPResult* res, double* H, double* f, double *A, double *bupper, double *blower, int* sense, int n, int m, int packed,DAQPSettings* settings);
 
-int qp2ldp(double *R, double *v, double* M, double* d, int n, int m, double eps);
+int qp2ldp(double *R, double *v, double* M, double* dupper, double* dlower, int n, int m, double eps);
 void pack_symmetric(double *S, double *Sp, int n);
 
 double time_diff(struct timespec tic, struct timespec toc);
