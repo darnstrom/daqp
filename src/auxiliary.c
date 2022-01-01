@@ -109,7 +109,8 @@ void compute_alpha_and_rm_blocking(Workspace *work){
 void compute_CSP(Workspace *work){
   int i,j,disp,start_disp;
   double sum;
-  for(i=work->reuse_ind,disp=(work->reuse_ind)*(work->reuse_ind+1)/2; i<work->n_active; i++){
+  // Forward substitution (xi <-- L\d)
+  for(i=work->reuse_ind,disp=ARSUM(work->reuse_ind); i<work->n_active; i++){
 	sum = -work->d[work->WS[i]]; //dplus
 	for(j=0; j<i; j++)
 	  sum -= work->L[disp++]*work->xldl[j];
@@ -120,7 +121,7 @@ void compute_CSP(Workspace *work){
   for(i=work->reuse_ind; i<work->n_active; i++)
 	work->zldl[i] = work->xldl[i]/work->D[i];
   //Backward substitution  (lam_star <-- L'\z)
-  start_disp = (work->n_active)*(work->n_active+1)/2-1;
+  start_disp = ARSUM(work->n_active)-1;
   for(i = work->n_active-1;i>=0;i--){
 	sum=work->zldl[i];
 	disp = start_disp--;
@@ -131,13 +132,13 @@ void compute_CSP(Workspace *work){
 	work->lam_star[i] = sum;
   }
   
-  work->reuse_ind = work->n_active; // Save forwardsubstitution information 
+  work->reuse_ind = work->n_active; // Save forward substitution information 
 }
 
 //TODO this could probably be directly calculated in L
 void compute_singular_direction(Workspace *work){
   // Step direction is stored in lam_star
-  int i,j,disp,offset_L= work->sing_ind*(work->sing_ind+1)/2;
+  int i,j,disp,offset_L= ARSUM(work->sing_ind);
   int start_disp= offset_L-1;
 
   // Backwards substitution (p_tidle <-- L'\(-l))

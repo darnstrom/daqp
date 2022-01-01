@@ -3,7 +3,7 @@ void update_LDL_add(Workspace *work){
   work->sing_ind = EMPTY_IND;
   int i,j,disp,disp2;
   int add_offset = (NX)*(work->add_ind);
-  int new_L_start= (work->n_active)*(work->n_active+1)/2;
+  int new_L_start= ARSUM(work->n_active);
   c_float sum;
 
   // di <-- Mi' Mi
@@ -57,8 +57,8 @@ void update_LDL_remove(Workspace *work){
   int i, j, r, old_disp, new_disp, w_count, n_update=work->n_active-work->rm_ind-1;
   c_float* w = &work->zldl[work->rm_ind]; // Since zldl will be obsolete use that memory to save some allocations..
   // Extract parts to keep/update in L & D
-  old_disp=(work->rm_ind+1)*(work->rm_ind+2)/2;
-  new_disp=work->rm_ind*(work->rm_ind+1)/2;
+  new_disp=ARSUM(work->rm_ind);
+  old_disp=new_disp+(work->rm_ind+1);
   w_count= 0;
   // Remove column rm_ind (and add parts of L in its new place)
   // I.e., copy row i into i-1
@@ -74,7 +74,7 @@ void update_LDL_remove(Workspace *work){
   // TODO the disp can most likely be done cleaner...
   c_float p,beta,d_bar,alpha=work->D[work->rm_ind];
   // i - Element/row to update|j - Column which is looped over|r - Row to loop over
-  old_disp=(work->rm_ind)*(work->rm_ind+1)/2+work->rm_ind;
+  old_disp=ARSUM(work->rm_ind)+work->rm_ind;
   for(j = 0, i=work->rm_ind; j<n_update;j++,i++){
 	p=w[j];
 	d_bar = work->D[i+1]+alpha*p*p; 
@@ -88,7 +88,6 @@ void update_LDL_remove(Workspace *work){
 	  work->sing_ind=i;
 	}
 	old_disp+=i+1; 
-	//new_disp= (i+2)*(i+1)/2+work->rm_ind+j; 
 	for(r=j+1, new_disp=old_disp+j;r<n_update;r++){
 	  w[r] -= p*work->L[new_disp];//instead, initialize new_disp+j
 	  work->L[new_disp]+= beta*w[r]; //Use sum to block register
