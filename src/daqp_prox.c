@@ -32,7 +32,7 @@ int daqp_prox(ProxWorkspace *prox_work){
 	  for(j=0,sum=0; j<nx;j++)
 		sum += work->M[disp++]*work->v[j]; 
 	  work->dupper[i] = prox_work->bupper[i]+sum;
-	  work->dlower[i] = -(prox_work->blower[i]+sum);
+	  work->dlower[i] = prox_work->blower[i]+sum;
 	}
 
 	// xold <-- x
