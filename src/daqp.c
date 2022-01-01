@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include "daqp.h" 
 
+
 int daqp(Workspace *work){
   while(1){
 	if(work->iterations++>work->settings->iter_limit)

@@ -10,7 +10,7 @@ void update_LDL_add(Workspace *work){
   // If normalized this will always be 1...
   sum=0;
   if(IS_SIMPLE(work->add_ind)){
-	if(work->Rinv=NULL) sum=1; // Hessian is identity
+	if(work->Rinv==NULL) sum=1; // Hessian is identity
 	else 
 	  for(i=0,disp= add_offset;i<NX;i++,disp++)
 		sum+=(work->Rinv[disp])*(work->Rinv[disp]);

@@ -5,18 +5,18 @@ addpath ../interfaces/matlab/
 n=2;
 m = 10;
 
-%Mr = randn(n);
-%H =  Mr'*Mr;
-%f = randn(n,1);
-%A = randn(m,n);
-%bupper = rand(m,1);
-%blower = -rand(m,1);
-%
-%R = chol(H);
-%M = A/R;
-%v = R'\f;
-%dupper = bupper+M*v;
-%dlower= blower+M*v;
+Mr = randn(n);
+H =  Mr'*Mr;
+f = randn(n,1);
+A = randn(m,n);
+bupper = rand(m,1);
+blower = -rand(m,1);
+
+R = chol(H);
+M = A/R;
+v = R'\f;
+dupper = bupper+M*v;
+dlower= blower+M*v;
 
 % Solve and compare with quadprog solution
 
@@ -37,6 +37,7 @@ fval_prox = 0.5*x_prox'*H*x_prox+f'*x_prox;
 
 fval_daqp-fval_prox
 info_daqp
+err
 %% Random qp 
 %Generate problem 
 n=10;

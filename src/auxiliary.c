@@ -202,6 +202,11 @@ void compute_singular_direction(Workspace *work){
 	} 
   }
   work->lam_star[work->sing_ind]=1;
+
+  if(IS_LOWER(work->WS[work->sing_ind])) //Flip to ensure descent direction 
+	for(i=0;i<=work->sing_ind;i++)
+	  work->lam_star[i] =-work->lam_star[i];
+
   for(i =work->sing_ind+1;i<work->n_active;i++) //Probably uneccesary...
 	work->lam_star[i] = 0;
 }
