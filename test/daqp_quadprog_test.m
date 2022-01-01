@@ -2,33 +2,34 @@
 addpath ../interfaces/matlab/
 %% Random qp  bounds
 %Generate problem 
-n=10;
-m = 50;
+n=2;
+m = 10;
 
-Mr = randn(n);
-H =  Mr'*Mr;
-f = randn(n,1);
-A = randn(m,n);
-bupper = rand(m,1);
-blower = -rand(m,1);
-
-R = chol(H);
-M = A/R;
-v = R'\f;
-dupper = bupper+M*v;
-dlower= blower+M*v;
+%Mr = randn(n);
+%H =  Mr'*Mr;
+%f = randn(n,1);
+%A = randn(m,n);
+%bupper = rand(m,1);
+%blower = -rand(m,1);
+%
+%R = chol(H);
+%M = A/R;
+%v = R'\f;
+%dupper = bupper+M*v;
+%dlower= blower+M*v;
 
 % Solve and compare with quadprog solution
 
 daqp_opts = daqp_options();
+daqp_opts.progress_tol =1e-6;
 
 sense = zeros(m,1,'int32') ;
-[x_daqp,fval_x_daqp, flag, info_daqp] =  daqpmex_quadprog(H',f,A',bupper,blower,sense,daqp_opts);
+[x_daqp,fval_x_daqp, flag_daqp, info_daqp] =  daqpmex_quadprog(H',f,A',bupper,blower,sense,daqp_opts);
 [xref,fval_ref] = quadprog(H,f,[A;-A],[bupper;-blower]);
 err=norm(x_daqp-xref)
 
 daqp_opts.eps_prox = 1e-6;
-[x_prox,fval_x_prox, flag, info_prox] =  daqpmex_quadprog(H',f,A',bupper,blower,sense,daqp_opts);
+[x_prox,fval_x_prox, flag_prox, info_prox] =  daqpmex_quadprog(H',f,A',bupper,blower,sense,daqp_opts);
 
 
 fval_daqp = 0.5*x_daqp'*H*x_daqp+f'*x_daqp;

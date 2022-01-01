@@ -20,10 +20,17 @@ int daqp_prox(ProxWorkspace *prox_work){
 	else{
 	  for(i = 0; i<nx;i++) 
 		work->v[i] = prox_work->f[i]-prox_work->epsilon*prox_work->x[i];
+
+	  //for(j=nx-1,disp=ARSUM(nx);j>=0;j--){
+	  //  for(i=nx-1;i>j;i--)
+	  //    work->v[i] +=work->R[--disp]*work->v[j];
+	  //  work->v[j]*=work->R[--disp];
+	  //}
+
 	  for(i = 0,disp=0; i<nx;i++){
-		work->v[i]*=work->R[disp++];
-		for(j=i+1;j<nx;j++)
-		  work->v[j] -= work->R[disp++]*work->v[i];
+	    work->v[i]*=work->R[disp++];
+	    for(j=i+1;j<nx;j++)
+	      work->v[j] -= work->R[disp++]*work->v[i];
 	  }
 	} 
 

@@ -80,6 +80,7 @@ void daqp_quadprog(DAQPResult *res, double* H, double* f, double *A, double *bup
 	Workspace work;
 	allocate_daqp_workspace(&work,n);
 	work.n = n; work.m = m;
+	work.ms = 0;
 	work.R = H; work.v = f;
 	work.M = A; work.dupper = bupper; work.dlower = blower;
 	work.x = res->x;
@@ -106,6 +107,7 @@ void daqp_quadprog(DAQPResult *res, double* H, double* f, double *A, double *bup
 	// Setup workspace
 	ProxWorkspace prox_work;
 	allocate_prox_workspace(&prox_work,n,m);
+	prox_work.work->ms = 0; // TODO: move this into allocate
 	prox_work.work->R=H; prox_work.work->M=A; 
 	prox_work.bupper = bupper; prox_work.blower=blower; prox_work.f = f;
 	prox_work.work->sense = sense;
@@ -193,6 +195,20 @@ int qp2ldp(double *R, double *v, double* M, double* dupper, double*  dlower, int
 	dupper[i]+=sum;
 	dlower[i]+=sum;
   }
+
+  // Compute Rinv (store in R...)
+  //for(k=0,disp=0;k<n;k++){
+  //  disp2=disp;
+  //  R[disp]=R[disp2++]; // Break out first iteration to get rhs
+  //  for(j=k+1;j<n;j++)
+  //    R[disp2++]*=-R[disp];
+  //  disp++;
+  //  for(i=k+1;i<n;i++,disp++){
+  //    R[disp]*=R[disp2++];
+  //    for(j=1;j<n-i;j++)
+  //  	R[disp+j]-=R[disp2++]*R[disp];
+  //  }
+  //}
 
   return 0;
 }

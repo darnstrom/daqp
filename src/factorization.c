@@ -7,25 +7,49 @@ void update_LDL_add(Workspace *work){
   c_float sum;
 
   // di <-- Mi' Mi
-  sum = 0;
-  disp = add_offset;
   // If normalized this will always be 1...
-  for(i=0;i<NX;i++,disp++)
-	sum+=(work->M[disp])*(work->M[disp]);
+  sum=0;
+  if(IS_SIMPLE(work->add_ind)){
+	if(work->Rinv=NULL) sum=1; // Hessian is identity
+	else 
+	  for(i=0,disp= add_offset;i<NX;i++,disp++)
+		sum+=(work->Rinv[disp])*(work->Rinv[disp]);
+  }
+  else{ // Mi is a general constraint
+	for(i=0,disp=add_offset;i<NX;i++,disp++)
+	  sum+=(work->M[disp])*(work->M[disp]);
+  }
   work->D[work->n_active] = sum;
   
-  if(work->n_active==0)
-	return;
+  if(work->n_active==0) return;
 
   // store l <-- Mk* m
-  for(i=0;i<work->n_active;i++){
-	disp = add_offset;
-	disp2 = NX*work->WS[i];
-	sum=0;
-	for(j=0;j<NX;j++,disp++,disp2++)
-	  sum +=work->M[disp2]*work->M[disp];
-	// flip sign if one is lower since minus*plus=minus 
-	work->L[new_L_start+i] = sum;
+  if(IS_SIMPLE(work->add_ind)){
+	for(i=0;i<work->n_active;i++){
+	  if(IS_SIMPLE(work->WS[i])) // Simple*Simple (always orthogonal)
+		sum = 0; 
+	  else{
+		disp = add_offset; disp2 = NX*work->WS[i];
+		for(j=work->add_ind, sum = 0;j<NX;j++,disp++,disp2++)
+		  sum +=work->M[disp2]*work->Rinv[disp];
+	  }
+	  work->L[new_L_start+i] = sum;
+	}
+  }
+  else{ // mi is a general bound
+	for(i=0;i<work->n_active;i++){
+	  if(IS_SIMPLE(work->WS[i])){ // Simple * General  
+		disp = add_offset; disp2 = ARSUM(work->WS[i]);
+		for(j=work->WS[i], sum = 0;j<NX;j++,disp++,disp2++)
+		  sum +=work->Rinv[disp2]*work->M[disp];
+	  }
+	  else{// General * General 
+		disp = add_offset; disp2 = NX*work->WS[i];
+		for(j=0, sum = 0;j<NX;j++,disp++,disp2++)
+		  sum +=work->M[disp2]*work->M[disp];
+	  }
+	  work->L[new_L_start+i] = sum; // TODO: softening can be added here
+	}
   }
   //Forward substitution: l <-- L\(Mk*m)  
   for(i=0,disp=0; i<work->n_active; i++){

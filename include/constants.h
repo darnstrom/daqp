@@ -1,9 +1,12 @@
 #ifndef DAQP_CONSTANTS_H
 #define DAQP_CONSTANTS_H
 
+#include <stddef.h>
+
 #define EMPTY_IND -1 
 #define NX work->n 
 #define N_CONSTR work->m 
+#define N_SIMPLE work->ms 
 #define c_float double 
 
 #define DEFAULT_PRIM_TOL 1e-6
@@ -47,6 +50,8 @@
 #define IS_IMMUTABLE(x) (work->sense[x]&4)
 #define SET_IMMUTABLE(x) (work->sense[x]|=4)
 #define SET_MUTABLE(x) (work->sense[x]&=~4)
+
+#define IS_SIMPLE(x) (x < work->ms)
 
 
 #endif //ifndef DAQP_CONSTANTS_H

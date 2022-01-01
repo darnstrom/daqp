@@ -45,9 +45,19 @@ void find_constraint_to_add(Workspace *work){
 	work->u[j]=0;
   //u[m] <-- Mk'*lam_star (zero if empty set)
   for(i=0;i<work->n_active;i++){
-	disp = NX*work->WS[i];
-	for(j=0;j<NX;j++)
+	if(IS_SIMPLE(work->WS[i])){
+	  // Simple constraint 
+	  if(work->Rinv!=NULL){ // Hessian is not identity
+	  for(j=work->WS[i], disp=ARSUM(work->WS[i]);j<NX;j++)
+		work->u[j]+=work->Rinv[disp++]*work->lam_star[i];
+	  }
+	  else work->u[j]+=work->lam_star[work->WS[i]]; // Hessian is identity
+	}
+	else{ 
+	  // General constraint
+	for(j=0,disp=NX*work->WS[i];j<NX;j++)
 	  work->u[j]+=work->M[disp++]*work->lam_star[i];
+	}
   }
   // Check for progress 
   c_float fval_diff=work->fval;
@@ -62,35 +72,50 @@ void find_constraint_to_add(Workspace *work){
   if(work->n_active==0){  
 	for(j=0;j<N_CONSTR;j++)
 	  if(work->dupper[j]<min_val){//dupper
-		add_ind = j;
-		isupper = 1; 
+		add_ind = j; isupper = 1; 
 		min_val = work->dupper[j]; 
 	  }
 	  else if(-work->dlower[j]<min_val){//dlower
-		add_ind = j;
-		isupper = 0;
+		add_ind = j; isupper = 0;
 		min_val = -work->dlower[j];
 	  }
   }
   else{// Non-empty working set 
-	for(j=0, disp=0;j<N_CONSTR;j++){
+	for(j=0, disp=0;j<N_SIMPLE;j++){
+	  if(IS_ACTIVE(j)){
+		disp+=NX-j;
+		continue;
+	  }
+	  if(work->Rinv==NULL)// Hessian is identify
+		Mu=work->u[i];
+	  else{
+	  for(k=j,Mu=0;k<NX;k++) // 
+		Mu+=work->Rinv[disp++]*work->u[k];
+	  }
+	  if(work->dupper[j]+Mu<min_val){
+		add_ind = j; isupper = 1;
+		min_val = work->dupper[j]+Mu;
+	  }
+	  else if(-(work->dlower[j]+Mu)<min_val){
+		add_ind = j; isupper = 0;
+		min_val = -(work->dlower[j]+Mu);
+	  }
+	}
+	/* General two-sided constraints */
+	for(j=N_SIMPLE, disp=0;j<N_CONSTR;j++){
 	  if(IS_ACTIVE(j)){
 		disp+=NX;// Skip ahead in M
 		continue;
 	  }
-	  //mu[j] = d[j] + M[j,:]*u
-	  Mu=0;
-	  for(k=0;k<NX;k++) // 
+	  for(k=0,Mu=0;k<NX;k++) 
 		Mu+=work->M[disp++]*work->u[k];
-	  // Dantzig's rule
+
 	  if(work->dupper[j]+Mu<min_val){
-		add_ind = j;
-		isupper = 1;
+		add_ind = j; isupper = 1;
 		min_val = work->dupper[j]+Mu;
 	  }
 	  else if(-(work->dlower[j]+Mu)<min_val){
-		add_ind = j;
-		isupper = 0;
+		add_ind = j; isupper = 0;
 		min_val = -(work->dlower[j]+Mu);
 	  }
 	}

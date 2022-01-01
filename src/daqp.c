@@ -70,11 +70,17 @@ void ldp2qp_solution(double *x, double *R, double *u, double *v, int nx){
   for(i=0;i<nx;i++)
 	x[i] = -(u[i]+v[i]);
   if(R != NULL) // Backwards substitution (Skip if LP since R = I)
-	for(i=nx-1,disp=(nx+1)*nx/2-1;i>=0;i--){
-	  for(j=nx-1;j>i;j--)
-		x[i]-=R[disp--]*x[j];
-	  x[i]*=R[disp--];
-	}
+		for(i=nx-1,disp=(nx+1)*nx/2-1;i>=0;i--){
+		  for(j=nx-1;j>i;j--)
+			x[i]-=R[disp--]*x[j];
+		  x[i]*=R[disp--];
+		}
+	
+	//for(i=0,disp=0;i<nx;i++){
+	//  x[i]*=R[disp++];
+	//  for(j=i+1;j<nx;j++)
+	//	x[i]+=R[disp++]*x[j];
+	//}
 }
 
 void warmstart_workspace(Workspace* work, int* WS, const int n_active){
