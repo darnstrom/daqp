@@ -16,8 +16,8 @@ int daqp_feas(Workspace* work, c_float* A, c_float*b, int *sense, const int m, c
   ret = daqp(work);
   // Cleanup sense for reuse...
   for(int j=0;j<work->n_active;j++){
-	if(IS_IMMUTABLE(work->sense[work->WS[j]])) continue;
-	SET_INACTIVE(work->sense[work->WS[j]]); 
+	if(IS_IMMUTABLE(work->WS[j])) continue;
+	SET_INACTIVE(work->WS[j]); 
   }
   return ret;
 }
@@ -45,8 +45,8 @@ int daqp_feas_warmstart(Workspace* work, c_float* A, c_float*b, int *sense, cons
   
   // Cleanup sense for reuse...
   for(int j=0;j<work->n_active;j++){
-	if(IS_IMMUTABLE(work->sense[work->WS[j]])) continue;
-	SET_INACTIVE(work->sense[work->WS[j]]); 
+	if(IS_IMMUTABLE(work->WS[j])) continue;
+	SET_INACTIVE(work->WS[j]); 
   }
   return ret;
 }

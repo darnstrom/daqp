@@ -5,7 +5,7 @@ void remove_constraint(Workspace* work){
   update_LDL_remove(work);
   
   // Update data structures
-  SET_INACTIVE(work->sense[work->WS[work->rm_ind]]); 
+  SET_INACTIVE(work->WS[work->rm_ind]); 
   (work->n_active)--;
   for(i=work->rm_ind;i<work->n_active;i++){
 	work->WS[i] = work->WS[i+1]; 
@@ -22,11 +22,11 @@ void remove_constraint(Workspace* work){
 void add_constraint(Workspace *work){
   update_LDL_add(work);
   // Update data structures  
-  SET_ACTIVE(work->sense[work->add_ind]);
+  SET_ACTIVE(work->add_ind);
   if(work->add_isupper)
-	SET_UPPER(work->sense[work->add_ind]);
+	SET_UPPER(work->add_ind);
   else
-	SET_LOWER(work->sense[work->add_ind]);
+	SET_LOWER(work->add_ind);
   work->WS[work->n_active] = work->add_ind;
   work->lam[work->n_active] = 0;
   work->n_active++;
@@ -74,7 +74,7 @@ void find_constraint_to_add(Workspace *work){
   }
   else{// Non-empty working set 
 	for(j=0, disp=0;j<N_CONSTR;j++){
-	  if(IS_ACTIVE(work->sense[j])){
+	  if(IS_ACTIVE(j)){
 		disp+=NX;// Skip ahead in M
 		continue;
 	  }
@@ -102,8 +102,8 @@ void find_blocking_constraints(Workspace *work){
   c_float violation;
   work->n_blocking=0;
   for(int i=0;i<work->n_active;i++){
-	if(IS_IMMUTABLE(work->sense[work->WS[i]])) continue;
-	if(IS_LOWER(work->sense[work->WS[i]])) 
+	if(IS_IMMUTABLE(work->WS[i])) continue;
+	if(IS_LOWER(work->WS[i])) 
 	  violation = work->lam_star[i]-work->settings->dual_tol;
 	else
 	  violation = -work->lam_star[i]-work->settings->dual_tol;
@@ -134,7 +134,7 @@ void compute_CSP(Workspace *work){
   // Forward substitution (xi <-- L\d)
   for(i=work->reuse_ind,disp=ARSUM(work->reuse_ind); i<work->n_active; i++){
 	// Setup RHS
-	if(IS_LOWER(work->sense[work->WS[i]])) 
+	if(IS_LOWER(work->WS[i])) 
 	  sum = -work->dlower[work->WS[i]];
 	else 
 	  sum = -work->dupper[work->WS[i]];
@@ -232,7 +232,7 @@ void pivot_last(Workspace *work){
 void add_equality_constraints(Workspace *work){
   for(int i =0;i<N_CONSTR;i++){
 	//TODO prioritize inequalities?
-	if(IS_ACTIVE(work->sense[i])){
+	if(IS_ACTIVE(i)){
 	  work->add_ind=i; 
 	  update_LDL_add(work);
 	  work->WS[work->n_active] = i;
