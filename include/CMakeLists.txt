@@ -8,6 +8,7 @@ set(
 	#"${CMAKE_CURRENT_SOURCE_DIR}/debug.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/factorization.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/types.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/utils.h"
 )
 
 set(daqp_headers "${daqp_headers}" PARENT_SCOPE)

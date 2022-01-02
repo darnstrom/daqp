@@ -165,4 +165,3 @@ void reset_prox_workspace(ProxWorkspace *prox_work){
   prox_work->fval=INF;
   prox_work->cycle_counter=0;
 }
-
