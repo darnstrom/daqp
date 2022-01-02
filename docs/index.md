@@ -33,5 +33,5 @@ Hence, the QP in (1) is assumed to be transformed into an LDP in the form (2), w
 Finally, a solution $$ x^*$$ to (1) can be obtained by transforming a solution $$ u^*$$ to the LDP in (2) through  
 
 $$
-x^* = -R^{-1}(u^* + v).
+x^* = R^{-1}(u^* - v).
 $$

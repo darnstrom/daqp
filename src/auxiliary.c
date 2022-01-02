@@ -49,14 +49,14 @@ void find_constraint_to_add(Workspace *work){
 	  // Simple constraint 
 	  if(work->Rinv!=NULL){ // Hessian is not identity
 	  for(j=work->WS[i], disp=ARSUM(work->WS[i]);j<NX;j++)
-		work->u[j]+=work->Rinv[disp++]*work->lam_star[i];
+		work->u[j]-=work->Rinv[disp++]*work->lam_star[i];
 	  }
-	  else work->u[j]+=work->lam_star[work->WS[i]]; // Hessian is identity
+	  else work->u[j]-=work->lam_star[work->WS[i]]; // Hessian is identity
 	}
 	else{ 
 	  // General constraint
 	for(j=0,disp=NX*work->WS[i];j<NX;j++)
-	  work->u[j]+=work->M[disp++]*work->lam_star[i];
+	  work->u[j]-=work->M[disp++]*work->lam_star[i];
 	}
   }
   // Check for progress 
@@ -92,13 +92,13 @@ void find_constraint_to_add(Workspace *work){
 	  for(k=j,Mu=0;k<NX;k++) // 
 		Mu+=work->Rinv[disp++]*work->u[k];
 	  }
-	  if(work->dupper[j]+Mu<min_val){
+	  if(work->dupper[j]-Mu<min_val){
 		add_ind = j; isupper = 1;
-		min_val = work->dupper[j]+Mu;
+		min_val = work->dupper[j]-Mu;
 	  }
-	  else if(-(work->dlower[j]+Mu)<min_val){
+	  else if(-(work->dlower[j]-Mu)<min_val){
 		add_ind = j; isupper = 0;
-		min_val = -(work->dlower[j]+Mu);
+		min_val = -(work->dlower[j]-Mu);
 	  }
 	}
 	/* General two-sided constraints */
@@ -110,13 +110,13 @@ void find_constraint_to_add(Workspace *work){
 	  for(k=0,Mu=0;k<NX;k++) 
 		Mu+=work->M[disp++]*work->u[k];
 
-	  if(work->dupper[j]+Mu<min_val){
+	  if(work->dupper[j]-Mu<min_val){
 		add_ind = j; isupper = 1;
-		min_val = work->dupper[j]+Mu;
+		min_val = work->dupper[j]-Mu;
 	  }
-	  else if(-(work->dlower[j]+Mu)<min_val){
+	  else if(-(work->dlower[j]-Mu)<min_val){
 		add_ind = j; isupper = 0;
-		min_val = -(work->dlower[j]+Mu);
+		min_val = -(work->dlower[j]-Mu);
 	  }
 	}
   }

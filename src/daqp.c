@@ -30,7 +30,7 @@ int daqp(Workspace *work){
 		if(work->add_ind == EMPTY_IND){ //mu >= (i.e., primal feasible)
 		  // All KKT-conditions satisfied -> optimum found 
 		  // LDP-> QP solution (x* stored in u)
-		  ldp2qp_solution(work->x,work->Rinv,work->u,work->v,work->n); 
+		  ldp2qp_solution(work); 
 		  return EXIT_OPTIMAL; 
 		}
 		else{
@@ -66,21 +66,16 @@ int daqp(Workspace *work){
 }
 
 // Compute x = -R\(u+v)
-void ldp2qp_solution(double *x, double *R, double *u, double *v, int nx){
+void ldp2qp_solution(Workspace *work){
   int i,j,disp;
-  for(i=0;i<nx;i++)
-	x[i] = -(u[i]+v[i]);
-  if(R != NULL) // Backwards substitution (Skip if LP since R = I)
-	//	for(i=nx-1,disp=(nx+1)*nx/2-1;i>=0;i--){
-	//	  for(j=nx-1;j>i;j--)
-	//		x[i]-=R[disp--]*x[j];
-	//	  x[i]*=R[disp--];
-	//	}
-	
-	for(i=0,disp=0;i<nx;i++){
-	  x[i]*=R[disp++];
-	  for(j=i+1;j<nx;j++)
-		x[i]+=R[disp++]*x[j];
+  // x* = Rinv*(u-v)
+  for(i=0;i<work->n;i++)
+	work->x[i]=work->u[i]-work->v[i];
+  if(work->Rinv != NULL) // (Skip if LP since R = I)
+	for(i=0,disp=0;i<work->n;i++){
+	  work->x[i]*=work->Rinv[disp++];
+	  for(j=i+1;j<work->n;j++)
+		work->x[i]+=work->Rinv[disp++]*work->x[j];
 	}
 }
 
