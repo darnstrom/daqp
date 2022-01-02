@@ -57,7 +57,7 @@ void update_v_and_d(double *f, double *bupper, double *blower, Workspace *work)
   int i,j,disp;
   c_float sum;
 
-  if(f!=NULL){
+  if(f!=NULL && work->Rinv!=NULL){
 	// Compute v = R'\f  
 	for(j=work->n-1,disp=ARSUM(work->n);j>=0;j--){
 	  for(i=work->n-1;i>j;i--)
@@ -66,8 +66,16 @@ void update_v_and_d(double *f, double *bupper, double *blower, Workspace *work)
 	}
   }
 
-  // Compute d  = b+M*v
-  for(i = 0, disp=0;i<work->m;i++){
+  /* Compute d  = b+M*v */
+  // Simple bounds 
+  for(i = 0,disp=0;i<N_SIMPLE;i++){
+	for(j=i, sum=0;j<work->n;j++)
+	  sum+=work->Rinv[disp]*work->v[j];
+	work->dupper[i]=bupper[i]+sum;
+	work->dlower[i]=blower[i]+sum;
+  }
+  //General bounds
+  for(i = N_SIMPLE, disp=0;i<N_CONSTR;i++){
 	for(j=0, sum=0;j<work->n;j++)
 	  sum+=work->M[disp++]*work->v[j];
 	work->dupper[i]=bupper[i]+sum;

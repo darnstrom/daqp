@@ -24,6 +24,7 @@
 #define SQUARE(x) ((x)*(x))
 #define ARSUM(x) ((x)*(x+1)/2)
 #define INF ((c_float)1e30)
+#define R_OFFSET(X,Y) (((2*Y-X+1)*X)/2)
 
 // EXIT FLAGS
 #define EXIT_OPTIMAL 1

@@ -3,7 +3,7 @@ addpath ../interfaces/matlab/
 %% Random qp  bounds
 %Generate problem 
 n=10;
-m = 100;
+m = 50;
 
 Mr = randn(n);
 H =  Mr'*Mr;

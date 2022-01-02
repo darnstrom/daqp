@@ -48,14 +48,14 @@ void find_constraint_to_add(Workspace *work){
 	if(IS_SIMPLE(work->WS[i])){
 	  // Simple constraint 
 	  if(work->Rinv!=NULL){ // Hessian is not identity
-	  for(j=work->WS[i], disp=ARSUM(work->WS[i]);j<NX;j++)
+	  for(j=work->WS[i], disp=R_OFFSET(work->WS[i],NX);j<NX;j++)
 		work->u[j]-=work->Rinv[disp++]*work->lam_star[i];
 	  }
 	  else work->u[j]-=work->lam_star[work->WS[i]]; // Hessian is identity
 	}
 	else{ 
 	  // General constraint
-	for(j=0,disp=NX*work->WS[i];j<NX;j++)
+	for(j=0,disp=NX*(work->WS[i]-N_SIMPLE);j<NX;j++)
 	  work->u[j]-=work->M[disp++]*work->lam_star[i];
 	}
   }
