@@ -1,15 +1,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "daqp_prox.h"
+#include "utils.h"
 
 int daqp_prox(ProxWorkspace *prox_work){
-  int i,j,disp;
+  int i;
   const int nx=prox_work->n;
   int exitflag,fixpoint;
   c_float sum, *swp_pointer;
   Workspace *work = prox_work->work;
 
-  while(prox_work->outer_iterations++<work->settings->prox_iter_limit){
+  while(prox_work->outer_iterations++  <  work->settings->prox_iter_limit){
 
 	// ** Perturb problem **
 
@@ -17,23 +18,12 @@ int daqp_prox(ProxWorkspace *prox_work){
 	if(work->Rinv== NULL) 
 	  for(i = 0; i<nx;i++) 
 		work->v[i] = prox_work->f[i]-prox_work->x[i];
-	else{
+	else
 	  for(i = 0; i<nx;i++) 
 		work->v[i] = prox_work->f[i]-prox_work->epsilon*prox_work->x[i];
-	  for(j=nx-1,disp=ARSUM(nx);j>=0;j--){
-	    for(i=nx-1;i>j;i--)
-	      work->v[i] +=work->Rinv[--disp]*work->v[j];
-	    work->v[j]*=work->Rinv[--disp];
-	  }
-	} 
 
-	// Perturb d (d = b+M*v)
-	for(i = 0,disp=0; i<prox_work->m;i++){
-	  for(j=0,sum=0; j<nx;j++)
-		sum += work->M[disp++]*work->v[j]; 
-	  work->dupper[i] = prox_work->bupper[i]+sum;
-	  work->dlower[i] = prox_work->blower[i]+sum;
-	}
+	// update v and d 
+	update_v_and_d(work->v,prox_work->bupper,prox_work->blower,work);
 
 	// xold <-- x
 	swp_pointer = prox_work->xold;
@@ -53,9 +43,9 @@ int daqp_prox(ProxWorkspace *prox_work){
 	//Check convergence
 	if(work->iterations==1 && prox_work->outer_iterations%2){ // No changes to the working set 
 	  fixpoint = 1;
-	  for(i=0;i<nx;i++){
+	  for(i=0;i<nx;i++){ // ||x_old - x|| > eta  ?
 		prox_work->xold[i]= prox_work->x[i] - prox_work->xold[i];
-		if((prox_work->xold[i]> work->settings->eta_prox) || // ||x_old - x|| > eta 
+		if((prox_work->xold[i]> work->settings->eta_prox) || 
 		   (prox_work->xold[i]< -work->settings->eta_prox)) 
 		  fixpoint = 0;
 	  }
@@ -66,6 +56,7 @@ int daqp_prox(ProxWorkspace *prox_work){
 	  }
 	}
 	// Compute objective function value to detect progress
+	// (TODO: this is currently only valid for LPs...)
 	sum = 0;
 	for(i=0;i<nx;i++)
 	  sum+=prox_work->f[i]*prox_work->x[i];
