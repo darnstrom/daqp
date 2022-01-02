@@ -2,8 +2,8 @@
 addpath ../interfaces/matlab/
 %% Random qp  bounds
 %Generate problem 
-n=2;
-m = 10;
+n=10;
+m = 100;
 
 Mr = randn(n);
 H =  Mr'*Mr;

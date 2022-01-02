@@ -14,23 +14,16 @@ int daqp_prox(ProxWorkspace *prox_work){
 	// ** Perturb problem **
 
 	// Compute v = R'\(f-eps*x) (FWS Skipped if LP since R = I) 
-	if(work->R== NULL) 
+	if(work->Rinv== NULL) 
 	  for(i = 0; i<nx;i++) 
 		work->v[i] = prox_work->f[i]-prox_work->x[i];
 	else{
 	  for(i = 0; i<nx;i++) 
 		work->v[i] = prox_work->f[i]-prox_work->epsilon*prox_work->x[i];
-
-	  //for(j=nx-1,disp=ARSUM(nx);j>=0;j--){
-	  //  for(i=nx-1;i>j;i--)
-	  //    work->v[i] +=work->R[--disp]*work->v[j];
-	  //  work->v[j]*=work->R[--disp];
-	  //}
-
-	  for(i = 0,disp=0; i<nx;i++){
-	    work->v[i]*=work->R[disp++];
-	    for(j=i+1;j<nx;j++)
-	      work->v[j] -= work->R[disp++]*work->v[i];
+	  for(j=nx-1,disp=ARSUM(nx);j>=0;j--){
+	    for(i=nx-1;i>j;i--)
+	      work->v[i] +=work->Rinv[--disp]*work->v[j];
+	    work->v[j]*=work->Rinv[--disp];
 	  }
 	} 
 
@@ -68,7 +61,7 @@ int daqp_prox(ProxWorkspace *prox_work){
 	  }
 	  if(fixpoint==1) return EXIT_OPTIMAL; // Fix point reached
 	  // Take gradient step if LP (and we are not constrained to a vertex) 
-	  if((work->R == NULL)&&(work->n_active != work->n)){ 
+	  if((work->Rinv == NULL)&&(work->n_active != work->n)){ 
 		if(gradient_step(prox_work,work)==EMPTY_IND) return EXIT_UNBOUNDED;
 	  }
 	}

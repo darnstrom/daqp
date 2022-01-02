@@ -30,7 +30,7 @@ int daqp(Workspace *work){
 		if(work->add_ind == EMPTY_IND){ //mu >= (i.e., primal feasible)
 		  // All KKT-conditions satisfied -> optimum found 
 		  // LDP-> QP solution (x* stored in u)
-		  ldp2qp_solution(work->x,work->R,work->u,work->v,work->n); 
+		  ldp2qp_solution(work->x,work->Rinv,work->u,work->v,work->n); 
 		  return EXIT_OPTIMAL; 
 		}
 		else{
@@ -71,17 +71,17 @@ void ldp2qp_solution(double *x, double *R, double *u, double *v, int nx){
   for(i=0;i<nx;i++)
 	x[i] = -(u[i]+v[i]);
   if(R != NULL) // Backwards substitution (Skip if LP since R = I)
-		for(i=nx-1,disp=(nx+1)*nx/2-1;i>=0;i--){
-		  for(j=nx-1;j>i;j--)
-			x[i]-=R[disp--]*x[j];
-		  x[i]*=R[disp--];
-		}
+	//	for(i=nx-1,disp=(nx+1)*nx/2-1;i>=0;i--){
+	//	  for(j=nx-1;j>i;j--)
+	//		x[i]-=R[disp--]*x[j];
+	//	  x[i]*=R[disp--];
+	//	}
 	
-	//for(i=0,disp=0;i<nx;i++){
-	//  x[i]*=R[disp++];
-	//  for(j=i+1;j<nx;j++)
-	//	x[i]+=R[disp++]*x[j];
-	//}
+	for(i=0,disp=0;i<nx;i++){
+	  x[i]*=R[disp++];
+	  for(j=i+1;j<nx;j++)
+		x[i]+=R[disp++]*x[j];
+	}
 }
 
 void warmstart_workspace(Workspace* work, int* WS, const int n_active){
@@ -101,7 +101,7 @@ void warmstart_workspace(Workspace* work, int* WS, const int n_active){
 // Allocate memory for iterates  
 void allocate_daqp_workspace(Workspace *work, int n){
   work->n = n;
-  work->R = NULL;
+  work->Rinv = NULL;
   work->v = NULL;
 
   work->lam = malloc((n+1)*sizeof(c_float));
@@ -164,7 +164,7 @@ void reset_daqp_workspace_warm(Workspace *work){
 
 // Allocate memory for problem data
 void allocate_daqp_ldp(Workspace *work,int n, int m){
-  work->R = malloc(((n+1)*n/2)*sizeof(c_float));
+  work->Rinv = malloc(((n+1)*n/2)*sizeof(c_float));
   work->M = malloc(n*m*sizeof(c_float));
   work->dupper = malloc(m*sizeof(c_float));
   work->dlower = malloc(m*sizeof(c_float));
@@ -173,7 +173,7 @@ void allocate_daqp_ldp(Workspace *work,int n, int m){
 
 // Free data for problem data
 void free_daqp_ldp(Workspace *work){
-  free(work->R);
+  free(work->Rinv);
   free(work->M);
   free(work->dupper);
   free(work->dlower);

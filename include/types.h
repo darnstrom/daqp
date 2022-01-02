@@ -25,7 +25,6 @@ typedef struct{
   c_float *M; // M' M is the Hessian of the dual objective function (dimensions: n x m)  
   c_float *dupper; // Linear part of dual objective function (dimensions: m x 1) 
   c_float *dlower; // Linear part of dual objective function (dimensions: m x 1) 
-  c_float *R; // Upper cholesky factor of primal Hessian (Diagonals inverse to avoid division)
   c_float *Rinv; // Inverse of upper cholesky factor of primal Hessian 
   c_float *v; // v = R'\f (used to transform QP to LDP 
   int *sense; // Denotes inequality or equality constraints
