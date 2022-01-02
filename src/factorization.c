@@ -63,8 +63,17 @@ void update_LDL_add(Workspace *work){
 		disp = add_offset; disp2 = NX*(work->WS[i]-N_SIMPLE);
 		for(j=0, sum = 0;j<NX;j++,disp++,disp2++)
 		  sum +=work->M[disp2]*work->M[disp];
+		// 
+		if(IS_SOFT(work->add_ind) && IS_SOFT(work->WS[i])){
+		  if(IS_LOWER(work->add_ind)^IS_LOWER(work->add_ind))
+			sum -= SQUARE(work->settings->rho_soft);
+		  else
+			sum += SQUARE(work->settings->rho_soft);
+		}
+
 	  }
-	  work->L[new_L_start+i] = sum; // TODO: softening can be added here
+	  work->L[new_L_start+i] = sum; 
+	  // TODO: softening can be added here
 	}
   }
   //Forward substitution: l <-- L\(Mk*m)  

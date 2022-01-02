@@ -15,6 +15,8 @@ typedef struct{
   c_float eps_prox;
   c_float eta_prox;
   int prox_iter_limit;
+
+  c_float rho_soft;
 }DAQPSettings;
 
 typedef struct{
@@ -60,6 +62,9 @@ typedef struct{
   // Intermittent variables (LDL') lam_star = -dk
   c_float* xldl; // Solution to L xdldl = -dk
   c_float* zldl; // zldl_i = xldl_i/D_i
+
+  // Minimum slack for soft constraints
+  c_float soft_slack; 
 
   DAQPSettings* settings;
 }Workspace;

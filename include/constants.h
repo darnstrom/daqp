@@ -52,6 +52,12 @@
 #define SET_IMMUTABLE(x) (work->sense[x]|=4)
 #define SET_MUTABLE(x) (work->sense[x]&=~4)
 
+#define HARD 0
+#define SOFT 8 
+#define IS_SOFT(x) (work->sense[x]&8)
+#define SET_SOFT(x) (work->sense[x]|=8)
+#define SET_HARD(x) (work->sense[x]&=~8)
+
 #define IS_SIMPLE(x) (x < work->ms)
 
 

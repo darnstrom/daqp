@@ -38,13 +38,16 @@ void add_constraint(Workspace *work){
 void find_constraint_to_add(Workspace *work){
   int i,j,k,disp;
   c_float min_val = -work->settings->primal_tol;
-  c_float Mu;
+  c_float Mu,soft_slack;
   int isupper=0, add_ind=EMPTY_IND;
-  // Reset u
+  // Reset u & soft slack
   for(j=0;j<NX;j++)
 	work->u[j]=0;
+  work->soft_slack = 0;
   //u[m] <-- Mk'*lam_star (zero if empty set)
   for(i=0;i<work->n_active;i++){
+	if(IS_SOFT(work->WS[i])) 
+	  work->soft_slack+=work->settings->rho_soft*work->lam_star[i];
 	if(IS_SIMPLE(work->WS[i])){
 	  // Simple constraint 
 	  if(work->Rinv!=NULL){ // Hessian is not identity
@@ -53,11 +56,9 @@ void find_constraint_to_add(Workspace *work){
 	  }
 	  else work->u[j]-=work->lam_star[work->WS[i]]; // Hessian is identity
 	}
-	else{ 
-	  // General constraint
-	for(j=0,disp=NX*(work->WS[i]-N_SIMPLE);j<NX;j++)
-	  work->u[j]-=work->M[disp++]*work->lam_star[i];
-	}
+	else // General constraint
+	  for(j=0,disp=NX*(work->WS[i]-N_SIMPLE);j<NX;j++)
+		work->u[j]-=work->M[disp++]*work->lam_star[i];
   }
   // Check for progress 
   c_float fval_diff=work->fval;
@@ -112,13 +113,15 @@ void find_constraint_to_add(Workspace *work){
 	  for(k=0,Mu=0;k<NX;k++) 
 		Mu+=work->M[disp++]*work->u[k];
 
-	  if(work->dupper[j]-Mu<min_val){
+	  //TODO: check correct sign for slack!
+	  soft_slack= (IS_SOFT(j)) ? work->settings->rho_soft*work->soft_slack: 0;
+	  if(work->dupper[j]-Mu+soft_slack<min_val){
 		add_ind = j; isupper = 1;
-		min_val = work->dupper[j]-Mu;
+		min_val = work->dupper[j]-Mu+soft_slack;
 	  }
-	  else if(-(work->dlower[j]-Mu)<min_val){
+	  else if(-(work->dlower[j]-Mu)+soft_slack<min_val){
 		add_ind = j; isupper = 0;
-		min_val = -(work->dlower[j]-Mu);
+		min_val = -(work->dlower[j]-Mu)+soft_slack;
 	  }
 	}
   }

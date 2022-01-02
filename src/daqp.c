@@ -5,15 +5,12 @@
 
 int daqp(Workspace *work){
   while(1){
-	if(work->iterations++>work->settings->iter_limit)
-	  return EXIT_ITERLIMIT;
+	if(work->iterations++>work->settings->iter_limit) return EXIT_ITERLIMIT;
 	if(work->sing_ind==EMPTY_IND){ 
 	  compute_CSP(work);
-	  if(work->fval > work->fval_bound)
-		return EXIT_INFEASIBLE;
+	  if(work->fval > work->fval_bound) return EXIT_INFEASIBLE;
 	  if(work->cycle_counter > work->settings->cycle_tol){
-		if(work->tried_repair==1)
-		  return EXIT_CYCLE;
+		if(work->tried_repair==1) return EXIT_CYCLE;
 		else{
 		  // Cycling -> Try to reorder and refactorize LDL
 		  reorder_LDL(work);
@@ -29,7 +26,6 @@ int daqp(Workspace *work){
 		find_constraint_to_add(work);
 		if(work->add_ind == EMPTY_IND){ //mu >= (i.e., primal feasible)
 		  // All KKT-conditions satisfied -> optimum found 
-		  // LDP-> QP solution (x* stored in u)
 		  ldp2qp_solution(work); 
 		  return EXIT_OPTIMAL; 
 		}
@@ -52,10 +48,7 @@ int daqp(Workspace *work){
 	else{// Singular case
 	  compute_singular_direction(work);
 	  find_blocking_constraints(work);
-	  if(work->n_blocking==0){
-		// Infeasible problem
-		return EXIT_INFEASIBLE;
-	  }
+	  if(work->n_blocking==0) return EXIT_INFEASIBLE;
 	  else{
 		compute_alpha_and_rm_blocking(work);
 		work->sing_ind=EMPTY_IND;

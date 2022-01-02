@@ -70,7 +70,6 @@ void daqp_quadprog(DAQPResult *res, double* H, double* f, double *A, double *bup
   // TIC start
   clock_gettime(CLOCK_MONOTONIC, &tstart);
 
-  printf("Transforming QP to LDP\n");
   // Transform QP to ldp (R,v,M,d is stored inplace of H,f,A,b)
   if(!packed) pack_symmetric(H,H,n); 
   compute_Rinv_and_M(H,A,settings->eps_prox,n,m-ms);
