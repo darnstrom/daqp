@@ -86,11 +86,13 @@ void find_constraint_to_add(Workspace *work){
 		disp+=NX-j;
 		continue;
 	  }
-	  if(work->Rinv==NULL)// Hessian is identify
-		Mu=work->u[i];
+	  if(work->Rinv==NULL){// Hessian is identify
+		Mu=work->u[i]; 
+		disp+=NX-j;
+	  }
 	  else{
-	  for(k=j,Mu=0;k<NX;k++) // 
-		Mu+=work->Rinv[disp++]*work->u[k];
+		for(k=j,Mu=0;k<NX;k++) // 
+		  Mu+=work->Rinv[disp++]*work->u[k];
 	  }
 	  if(work->dupper[j]-Mu<min_val){
 		add_ind = j; isupper = 1;

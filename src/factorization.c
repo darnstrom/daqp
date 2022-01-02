@@ -8,17 +8,17 @@ void update_LDL_add(Workspace *work){
 
   // di <-- Mi' Mi
   // If normalized this will always be 1...
-  sum=0;
   if(IS_SIMPLE(work->add_ind)){
 	add_offset = R_OFFSET(work->add_ind,NX); 
-	if(work->Rinv==NULL) sum=1; // Hessian is identity
+	if(work->Rinv==NULL) 
+	  sum=1; // Hessian is identity
 	else 
-	  for(i=0,disp= add_offset;i<NX;i++,disp++)
+	  for(i=work->add_ind,disp= add_offset, sum=0;i<NX;i++,disp++)
 		sum+=(work->Rinv[disp])*(work->Rinv[disp]);
   }
   else{ // Mi is a general constraint
 	add_offset = (NX)*(work->add_ind-N_SIMPLE);
-	for(i=0,disp=add_offset;i<NX;i++,disp++)
+	for(i=0,disp=add_offset,sum=0;i<NX;i++,disp++)
 	  sum+=(work->M[disp])*(work->M[disp]);
   }
   work->D[work->n_active] = sum;
@@ -28,12 +28,26 @@ void update_LDL_add(Workspace *work){
   // store l <-- Mk* m
   if(IS_SIMPLE(work->add_ind)){
 	for(i=0;i<work->n_active;i++){
-	  if(IS_SIMPLE(work->WS[i])) // Simple*Simple (always orthogonal)
-		sum = 0; 
+	  if(IS_SIMPLE(work->WS[i])){ // Simple*Simple 
+		if(work->add_ind < work->WS[i]){
+		  disp = add_offset+(work->WS[i]-work->add_ind); 
+		  disp2 = R_OFFSET(work->WS[i],NX);
+		  for(j=work->WS[i], sum = 0;j<NX;j++,disp++,disp2++)
+			sum+=work->Rinv[disp2]*work->Rinv[disp];
+		}
+		else{
+		  disp = add_offset;
+		  disp2 = R_OFFSET(work->WS[i],NX)+(work->add_ind-work->WS[i]);
+		  for(j=work->add_ind, sum = 0;j<NX;j++,disp++,disp2++)
+			sum+=work->Rinv[disp2]*work->Rinv[disp];
+		}
+
+	  }
 	  else{ // General * Simple
-		disp = add_offset; disp2 = NX*(work->WS[i]-N_SIMPLE);
-		for(j=work->add_ind, sum = 0;j<NX;j++)
-		  sum +=work->M[disp2++]*work->Rinv[disp++];
+		disp = add_offset; disp2 = NX*(work->WS[i]-N_SIMPLE)+work->add_ind;
+		for(j=work->add_ind, sum = 0;j<NX;j++,disp++,disp2++){
+		  sum +=work->M[disp2]*work->Rinv[disp];
+		}
 	  }
 	  work->L[new_L_start+i] = sum;
 	}
@@ -41,7 +55,7 @@ void update_LDL_add(Workspace *work){
   else{ // mi is a general bound
 	for(i=0;i<work->n_active;i++){
 	  if(IS_SIMPLE(work->WS[i])){ // Simple * General  
-		disp = add_offset; disp2 = R_OFFSET(work->WS[i],NX);
+		disp = add_offset+work->WS[i]; disp2 = R_OFFSET(work->WS[i],NX);
 		for(j=work->WS[i], sum = 0;j<NX;j++,disp++,disp2++)
 		  sum +=work->Rinv[disp2]*work->M[disp];
 	  }

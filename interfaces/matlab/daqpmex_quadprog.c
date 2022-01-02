@@ -24,8 +24,8 @@ void mexFunction( int nlhs, mxArray *plhs[],
   }
 
   int n = mxGetM(prhs[2]);
-  int m = mxGetN(prhs[2]);
-  int ms = mxGetM(prhs[5]);
+  int m = mxGetM(prhs[3]);
+  int ms = m-mxGetN(prhs[2]);
 
   // RHS
   if(mxIsEmpty(prhs[0])) H=NULL; else H= mxGetPr(prhs[0]);

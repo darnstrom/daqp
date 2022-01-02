@@ -70,27 +70,32 @@ void daqp_quadprog(DAQPResult *res, double* H, double* f, double *A, double *bup
   // TIC start
   clock_gettime(CLOCK_MONOTONIC, &tstart);
 
+  printf("Transforming QP to LDP\n");
   // Transform QP to ldp (R,v,M,d is stored inplace of H,f,A,b)
   if(!packed) pack_symmetric(H,H,n); 
-  compute_Rinv_and_M(H,A,settings->eps_prox,n,m);
+  compute_Rinv_and_M(H,A,settings->eps_prox,n,m-ms);
 
   if(settings->eps_prox==0){
 	// Setup daqp workspace 
 	Workspace work;
+	printf("Allocating workspace\n");
 	allocate_daqp_workspace(&work,n);
 	work.n = n; work.m = m; work.ms = ms;
 	work.Rinv = H; work.v = f;
 	work.M = A; work.dupper = bupper; work.dlower = blower;
+	printf("Updating v and d\n");
 	update_v_and_d(f,bupper,blower,&work);
 
 	work.x = res->x;
 	work.sense = sense;
 	work.settings = settings;
+	printf("Add equality constraints\n");
 	add_equality_constraints(&work);
 	clock_gettime(CLOCK_MONOTONIC, &tsetup);
 
 
 	// Solve LDP
+	printf("Calling DAQP \n");
 	res->exitflag = daqp(&work);
 	clock_gettime(CLOCK_MONOTONIC, &tsol);
 	// Correct offset in fval 

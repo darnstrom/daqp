@@ -70,7 +70,7 @@ void update_v_and_d(double *f, double *bupper, double *blower, Workspace *work)
   // Simple bounds 
   for(i = 0,disp=0;i<N_SIMPLE;i++){
 	for(j=i, sum=0;j<work->n;j++)
-	  sum+=work->Rinv[disp]*work->v[j];
+	  sum+=work->Rinv[disp++]*work->v[j];
 	work->dupper[i]=bupper[i]+sum;
 	work->dlower[i]=blower[i]+sum;
   }
