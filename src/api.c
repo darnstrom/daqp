@@ -64,7 +64,7 @@ void daqp_setup(Workspace** ws_ptr, double* M, double* d, int n){
   *ws_ptr = work;
 }
 
-void daqp_quadprog(DAQPResult *res, double* H, double* f, double *A, double *bupper, double* blower, int* sense, int n, int m, int packed, DAQPSettings *settings){
+void daqp_quadprog(DAQPResult *res, double* H, double* f, double *A, double *bupper, double* blower, int* sense, int n, int m, int ms, int packed, DAQPSettings *settings){
   struct timespec tstart,tsetup,tsol;
   int i;
   // TIC start
@@ -78,7 +78,7 @@ void daqp_quadprog(DAQPResult *res, double* H, double* f, double *A, double *bup
 	// Setup daqp workspace 
 	Workspace work;
 	allocate_daqp_workspace(&work,n);
-	work.n = n; work.m = m; work.ms = 0;
+	work.n = n; work.m = m; work.ms = ms;
 	work.Rinv = H; work.v = f;
 	work.M = A; work.dupper = bupper; work.dlower = blower;
 	update_v_and_d(f,bupper,blower,&work);
@@ -107,7 +107,7 @@ void daqp_quadprog(DAQPResult *res, double* H, double* f, double *A, double *bup
 	// Setup workspace
 	ProxWorkspace prox_work;
 	allocate_prox_workspace(&prox_work,n,m);
-	prox_work.work->ms = 0; // TODO: move this into allocate
+	prox_work.work->ms = ms; // TODO: move this into allocate
 	prox_work.work->Rinv=H; prox_work.work->M=A; 
 	prox_work.bupper = bupper; prox_work.blower=blower; prox_work.f = f;
 	prox_work.work->sense = sense;

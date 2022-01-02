@@ -12,12 +12,12 @@ void mexFunction( int nlhs, mxArray *plhs[],
 				  int nrhs, const mxArray *prhs[])
 {
   double *x_star, *fval;
-  double *H,*f,*A,*bupper,*blower;
+  double *H,*f,*A,*bupper,*blower,*ub,*lb;
   int *exitflag, *sense;
   DAQPResult res;
   /* check for proper number of arguments */
-  if(nrhs!=7) {
-	mexErrMsgIdAndTxt("DAQP:nrhs","7 inputs required.");
+  if(nrhs!=9) {
+	mexErrMsgIdAndTxt("DAQP:nrhs","9 inputs required.");
   }
   if(nlhs!=4) {
 	mexErrMsgIdAndTxt("DAQP:nlhs","4 output required.");
@@ -25,6 +25,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 
   int n = mxGetM(prhs[2]);
   int m = mxGetN(prhs[2]);
+  int ms = mxGetM(prhs[5]);
 
   // RHS
   if(mxIsEmpty(prhs[0])) H=NULL; else H= mxGetPr(prhs[0]);
@@ -32,7 +33,9 @@ void mexFunction( int nlhs, mxArray *plhs[],
   A= mxGetPr(prhs[2]);
   bupper= mxGetPr(mxDuplicateArray(prhs[3]));
   blower= mxGetPr(mxDuplicateArray(prhs[4]));
-  sense= (int *)mxGetPr(mxDuplicateArray(prhs[5]));
+  ub= mxGetPr(mxDuplicateArray(prhs[5]));
+  lb= mxGetPr(mxDuplicateArray(prhs[6]));
+  sense= (int *)mxGetPr(mxDuplicateArray(prhs[7]));
   
   // LHS
   plhs[0] = mxCreateDoubleMatrix((mwSize)n,1,mxREAL); // x_star
@@ -46,7 +49,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 
   // Setup settings
   DAQPSettings settings;
-  const mxArray* mex_settings = prhs[6];
+  const mxArray* mex_settings = prhs[8];
   if(mxIsEmpty(mex_settings))
 	daqp_default_settings(&settings);
   else{
@@ -63,7 +66,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
   }
 
   // Solve problem 
-  daqp_quadprog(&res,H,f,A,bupper,blower,sense,n,m,0,&settings);
+  daqp_quadprog(&res,H,f,A,bupper,blower,sense,n,m,ms,0,&settings);
   
   // Extract info
   exitflag[0] = res.exitflag; 

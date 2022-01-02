@@ -24,12 +24,12 @@ daqp_opts = daqp_options();
 daqp_opts.progress_tol =1e-6;
 
 sense = zeros(m,1,'int32') ;
-[x_daqp,fval_x_daqp, flag_daqp, info_daqp] =  daqpmex_quadprog(H',f,A',bupper,blower,sense,daqp_opts);
+[x_daqp,fval_x_daqp, flag_daqp, info_daqp] =  daqpmex_quadprog(H',f,A',bupper,blower,[],[],sense,daqp_opts);
 [xref,fval_ref] = quadprog(H,f,[A;-A],[bupper;-blower]);
 err=norm(x_daqp-xref)
 
 daqp_opts.eps_prox = 1e-6;
-[x_prox,fval_x_prox, flag_prox, info_prox] =  daqpmex_quadprog(H',f,A',bupper,blower,sense,daqp_opts);
+[x_prox,fval_x_prox, flag_prox, info_prox] =  daqpmex_quadprog(H',f,A',bupper,blower,[],[],sense,daqp_opts);
 
 
 fval_daqp = 0.5*x_daqp'*H*x_daqp+f'*x_daqp;
