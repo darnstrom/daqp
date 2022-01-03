@@ -124,6 +124,7 @@ void daqp_quadprog(DAQPResult *res, double* H, double* f, double *A, double *bup
 	for(i=0;i<n;i++) // Extract solution
 	  res->x[i]=prox_work.x[i];
 	res->fval = 0; // TODO: correct this
+	res->soft_slack = prox_work.work->soft_slack;
 	res->iter = prox_work.inner_iterations;
 	res->outer_iter = prox_work.outer_iterations;
 
