@@ -6,11 +6,14 @@
 typedef struct{
   c_float *x;
   c_float fval;
+  c_float soft_slack;  
+
   int exitflag; 
   int iter;
   int outer_iter;
-  double solve_time;
-  double setup_time; 
+  c_float solve_time;
+  c_float setup_time; 
+
 }DAQPResult;
 
 void daqp_setup(Workspace** work, double* M, double* d,int n);

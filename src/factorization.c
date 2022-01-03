@@ -1,4 +1,5 @@
 #include "factorization.h"
+#include <stdio.h>
 void update_LDL_add(Workspace *work){
   work->sing_ind = EMPTY_IND;
   int add_offset;
@@ -20,6 +21,8 @@ void update_LDL_add(Workspace *work){
 	add_offset = (NX)*(work->add_ind-N_SIMPLE);
 	for(i=0,disp=add_offset,sum=0;i<NX;i++,disp++)
 	  sum+=(work->M[disp])*(work->M[disp]);
+	if(IS_SOFT(work->add_ind))
+	  sum+=SQUARE(work->settings->rho_soft);
   }
   work->D[work->n_active] = sum;
   
@@ -63,14 +66,12 @@ void update_LDL_add(Workspace *work){
 		disp = add_offset; disp2 = NX*(work->WS[i]-N_SIMPLE);
 		for(j=0, sum = 0;j<NX;j++,disp++,disp2++)
 		  sum +=work->M[disp2]*work->M[disp];
-		// 
 		if(IS_SOFT(work->add_ind) && IS_SOFT(work->WS[i])){
-		  if(IS_LOWER(work->add_ind)^IS_LOWER(work->add_ind))
+		  if(IS_LOWER(work->add_ind)^IS_LOWER(work->WS[i]))
 			sum -= SQUARE(work->settings->rho_soft);
 		  else
 			sum += SQUARE(work->settings->rho_soft);
 		}
-
 	  }
 	  work->L[new_L_start+i] = sum; 
 	  // TODO: softening can be added here
@@ -95,7 +96,8 @@ void update_LDL_add(Workspace *work){
   work->D[work->n_active]=sum;
 
   // Check for singularity
-  if(work->D[work->n_active]<work->settings->zero_tol||work->n_active==work->n){
+  //if(work->D[work->n_active]<work->settings->zero_tol||work->n_active==work->n+1){
+  if(work->D[work->n_active]<work->settings->zero_tol){
 	work->sing_ind=work->n_active;
 	work->D[work->n_active]=0;
   }

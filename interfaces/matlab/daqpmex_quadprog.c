@@ -5,7 +5,8 @@ const char* INFO_FIELDS[] = {
   "setup_time",           
   "solve_time",           
   "iter",           
-  "outer_iter"}; 
+  "outer_iter",
+  "soft_slack"}; 
 
 /* The gateway function */
 void mexFunction( int nlhs, mxArray *plhs[],
@@ -63,6 +64,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	settings.eps_prox = (c_float)mxGetScalar(mxGetField(mex_settings, 0, "eps_prox"));
 	settings.eta_prox= (c_float)mxGetScalar(mxGetField(mex_settings, 0, "eta_prox"));
 	settings.prox_iter_limit= (int)mxGetScalar(mxGetField(mex_settings, 0, "prox_iter_limit"));
+	settings.rho_soft= (c_float)mxGetScalar(mxGetField(mex_settings, 0, "rho_soft"));
   }
 
   // Solve problem 
@@ -79,5 +81,6 @@ void mexFunction( int nlhs, mxArray *plhs[],
   mxSetField(info_struct, 0, "setup_time", mxCreateDoubleScalar(res.setup_time));
   mxSetField(info_struct, 0, "iter", mxCreateDoubleScalar(res.iter));
   mxSetField(info_struct, 0, "outer_iter", mxCreateDoubleScalar(res.outer_iter));
+  mxSetField(info_struct, 0, "soft_slack", mxCreateDoubleScalar(res.soft_slack));
   plhs[3] = info_struct;
 }

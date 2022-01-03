@@ -4,7 +4,25 @@
 
 
 int daqp(Workspace *work){
+  //printf("\n ==== DAQP starting ====\n\n");
   while(1){
+	//printf("|fval: %10.2f | ", work->fval);
+	//printf("AS: { ");
+	//for(int i=0;i<work->n_active;i++)
+	//  printf("%d ",work->WS[i]+1);
+	//printf("}|");
+	//printf("sense: { ");
+	//for(int i=0;i<work->n_active;i++)
+	//  printf("%d ",work->sense[work->WS[i]]);
+	//printf("}|\n");
+	//printf("D: ");
+	//for(int i =0;i<work->n_active;i++)
+	//  printf("%5.5f ",work->D[i]);
+	//printf("|");
+	//printf("L: ");
+	//for(int i =0;i<ARSUM(work->n_active);i++)
+	//  printf("%5.5f ",work->L[i]);
+	//printf("\n");
 	if(work->iterations++>work->settings->iter_limit) return EXIT_ITERLIMIT;
 	if(work->sing_ind==EMPTY_IND){ 
 	  compute_CSP(work);
@@ -89,6 +107,7 @@ void warmstart_workspace(Workspace* work, int* WS, const int n_active){
 // Allocate memory for iterates  
 void allocate_daqp_workspace(Workspace *work, int n){
   work->n = n;
+  n = n + 1; //To account for soft_constraints
   work->Rinv = NULL;
   work->v = NULL;
 

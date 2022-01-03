@@ -98,6 +98,7 @@ void daqp_quadprog(DAQPResult *res, double* H, double* f, double *A, double *bup
 	  work.fval-=work.v[i]*work.v[i];// 
 	work.fval *=0.5;
 	res->fval = work.fval;
+	res->soft_slack = work.soft_slack;
 	res->iter = work.iterations;
 	res->outer_iter = 0;
 	

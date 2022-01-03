@@ -1,11 +1,11 @@
 #include "auxiliary.h"
 #include "factorization.h"
+#include <stdio.h> 
 void remove_constraint(Workspace* work){
   int i;
-  update_LDL_remove(work);
-  
   // Update data structures
   SET_INACTIVE(work->WS[work->rm_ind]); 
+  update_LDL_remove(work);
   (work->n_active)--;
   for(i=work->rm_ind;i<work->n_active;i++){
 	work->WS[i] = work->WS[i+1]; 
@@ -20,13 +20,13 @@ void remove_constraint(Workspace* work){
 }
 // Maybe take add_ind as input instead?
 void add_constraint(Workspace *work){
-  update_LDL_add(work);
   // Update data structures  
   SET_ACTIVE(work->add_ind);
   if(work->add_isupper)
 	SET_UPPER(work->add_ind);
   else
 	SET_LOWER(work->add_ind);
+  update_LDL_add(work);
   work->WS[work->n_active] = work->add_ind;
   work->lam[work->n_active] = 0;
   work->n_active++;
@@ -46,8 +46,6 @@ void find_constraint_to_add(Workspace *work){
   work->soft_slack = 0;
   //u[m] <-- Mk'*lam_star (zero if empty set)
   for(i=0;i<work->n_active;i++){
-	if(IS_SOFT(work->WS[i])) 
-	  work->soft_slack+=work->settings->rho_soft*work->lam_star[i];
 	if(IS_SIMPLE(work->WS[i])){
 	  // Simple constraint 
 	  if(work->Rinv!=NULL){ // Hessian is not identity
@@ -56,14 +54,21 @@ void find_constraint_to_add(Workspace *work){
 	  }
 	  else work->u[j]-=work->lam_star[work->WS[i]]; // Hessian is identity
 	}
-	else // General constraint
+	else{ // General constraint
 	  for(j=0,disp=NX*(work->WS[i]-N_SIMPLE);j<NX;j++)
 		work->u[j]-=work->M[disp++]*work->lam_star[i];
+	  if(IS_SOFT(work->WS[i])){ // Compute slack for soft constraint
+		if(IS_LOWER(work->WS[i]))
+		  work->soft_slack-=work->settings->rho_soft*work->lam_star[i];
+		else
+		  work->soft_slack+=work->settings->rho_soft*work->lam_star[i];
+	  }
+	}
   }
   // Check for progress 
   c_float fval_diff=work->fval;
   for(j=0;j<NX;j++)
-	fval_diff-=work->u[j]*work->u[j];
+	fval_diff-=work->u[j]*work->u[j]+work->soft_slack*work->soft_slack;
   if(fval_diff<-work->settings->progress_tol){
 	work->fval -= fval_diff;
 	work->cycle_counter=0;
@@ -250,6 +255,7 @@ void pivot_last(Workspace *work){
 	 work->D[work->n_active-2] < work->D[work->n_active-1]){
 	work->rm_ind = work->n_active-2; 
 	int ind_old = work->WS[work->rm_ind];
+	int isupper_old = IS_LOWER(ind_old)? 0:1;   
 	int old_sense =work->sense[ind_old]; // Make sure that equality constraints are retained... 
 
 	c_float lam_old = work->lam[work->rm_ind];
@@ -258,6 +264,7 @@ void pivot_last(Workspace *work){
 	if(work->sing_ind!=EMPTY_IND) return; // Abort if D becomes singular
 
 	work->add_ind = ind_old;
+	work->add_isupper= isupper_old;
 	add_constraint(work);
 	work->sense[ind_old] = old_sense;
 	work->lam[work->n_active-1] = lam_old;

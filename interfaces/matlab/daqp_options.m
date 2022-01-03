@@ -9,4 +9,5 @@ function opts = daqp_options()
  opts.eps_prox = 0;
  opts.eta_prox = 1e-6;
  opts.prox_iter_limit=1000;
+ opts.rho_soft=1e-3;
 end
