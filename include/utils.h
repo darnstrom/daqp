@@ -9,4 +9,5 @@ void pack_symmetric(double *S, double *Sp, int n);
 //
 // Utils for profiling
 double time_diff(struct timespec tic, struct timespec toc);
+
 #endif //ifndef DAQP_UTILS_H

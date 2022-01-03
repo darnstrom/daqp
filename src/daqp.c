@@ -4,6 +4,7 @@
 
 
 int daqp(Workspace *work){
+  c_float *swp_ptr;
   //printf("\n ==== DAQP starting ====\n\n");
   while(1){
 	//printf("|fval: %10.2f | ", work->fval);
@@ -49,9 +50,7 @@ int daqp(Workspace *work){
 		}
 		else{
 		  // Set lam = lam_star
-		  work->swp_pointer=work->lam;
-		  work->lam = work->lam_star;
-		  work->lam_star=work->swp_pointer;
+		  swp_ptr=work->lam; work->lam = work->lam_star; work->lam_star=swp_ptr;
 
 		  add_constraint(work);
 		}

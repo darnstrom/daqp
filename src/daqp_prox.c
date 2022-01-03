@@ -7,7 +7,7 @@ int daqp_prox(ProxWorkspace *prox_work){
   int i;
   const int nx=prox_work->n;
   int exitflag,fixpoint;
-  c_float sum, *swp_pointer;
+  c_float sum, *swp_ptr;
   Workspace *work = prox_work->work;
 
   while(prox_work->outer_iterations++  <  work->settings->prox_iter_limit){
@@ -26,9 +26,7 @@ int daqp_prox(ProxWorkspace *prox_work){
 	update_v_and_d(work->v,prox_work->bupper,prox_work->blower,work);
 
 	// xold <-- x
-	swp_pointer = prox_work->xold;
-	prox_work->xold = prox_work->x;
-	prox_work->x = swp_pointer;
+	swp_ptr = prox_work->xold; prox_work->xold = prox_work->x; prox_work->x = swp_ptr;
 	
 	
 	// ** Solve least-distance problem **
@@ -57,16 +55,18 @@ int daqp_prox(ProxWorkspace *prox_work){
 	}
 	// Compute objective function value to detect progress
 	// (TODO: this is currently only valid for LPs...)
-	sum = 0;
-	for(i=0;i<nx;i++)
-	  sum+=prox_work->f[i]*prox_work->x[i];
-	if(sum>prox_work->fval){ 
-	  if(prox_work->cycle_counter++ > work->settings->cycle_tol)
-		return EXIT_OPTIMAL; // No progress -> fix-point
-	}
-	else{ // Progress -> update objective function value
-	  prox_work->fval = sum;
-	  prox_work->cycle_counter=0;
+	if(work->Rinv == NULL){
+	  sum = 0;
+	  for(i=0;i<nx;i++)
+		sum+=prox_work->f[i]*prox_work->x[i];
+	  if(sum>prox_work->fval){ 
+		if(prox_work->cycle_counter++ > work->settings->cycle_tol)
+		  return EXIT_OPTIMAL; // No progress -> fix-point
+	  }
+	  else{ // Progress -> update objective function value
+		prox_work->fval = sum;
+		prox_work->cycle_counter=0;
+	  }
 	}
   }
   return EXIT_ITERLIMIT;

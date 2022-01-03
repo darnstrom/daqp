@@ -57,8 +57,6 @@ typedef struct{
   int cycle_counter; // Number of iterations when no progress has been made
   int tried_repair; // Flag to mark if repair has taken place 
 
-  c_float *swp_pointer;
-
   // Intermittent variables (LDL') lam_star = -dk
   c_float* xldl; // Solution to L xdldl = -dk
   c_float* zldl; // zldl_i = xldl_i/D_i
