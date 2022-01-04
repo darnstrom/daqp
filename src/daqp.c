@@ -5,25 +5,7 @@
 
 int daqp(Workspace *work){
   c_float *swp_ptr;
-  //printf("\n ==== DAQP starting ====\n\n");
   while(1){
-	//printf("|fval: %10.2f | ", work->fval);
-	//printf("AS: { ");
-	//for(int i=0;i<work->n_active;i++)
-	//  printf("%d ",work->WS[i]+1);
-	//printf("}|");
-	//printf("sense: { ");
-	//for(int i=0;i<work->n_active;i++)
-	//  printf("%d ",work->sense[work->WS[i]]);
-	//printf("}|\n");
-	//printf("D: ");
-	//for(int i =0;i<work->n_active;i++)
-	//  printf("%5.5f ",work->D[i]);
-	//printf("|");
-	//printf("L: ");
-	//for(int i =0;i<ARSUM(work->n_active);i++)
-	//  printf("%5.5f ",work->L[i]);
-	//printf("\n");
 	if(work->iterations++>work->settings->iter_limit) return EXIT_ITERLIMIT;
 	if(work->sing_ind==EMPTY_IND){ 
 	  compute_CSP(work);
@@ -124,6 +106,8 @@ void allocate_daqp_workspace(Workspace *work, int n){
   
   work->u= malloc(n*sizeof(c_float));
   work->x = work->u; 
+  
+  work->xold= malloc(n*sizeof(c_float));
 
   reset_daqp_workspace(work);
 }
@@ -144,11 +128,15 @@ void free_daqp_workspace(Workspace *work){
   free(work->zldl);
 
   free(work->u);
+
+  free(work->xold);
 }
 
 // Reset workspace to default values
 void reset_daqp_workspace(Workspace *work){
   work->iterations=0;
+  work->inner_iter=0;
+  work->outer_iter=0;
   work->sing_ind=EMPTY_IND;
   work->add_ind=EMPTY_IND;
   work->rm_ind=EMPTY_IND;
@@ -166,22 +154,4 @@ void reset_daqp_workspace_warm(Workspace *work){
   work->iterations=0;
   work->reuse_ind=0;
   work->fval= -1;
-}
-
-// Allocate memory for problem data
-void allocate_daqp_ldp(Workspace *work,int n, int m){
-  work->Rinv = malloc(((n+1)*n/2)*sizeof(c_float));
-  work->M = malloc(n*m*sizeof(c_float));
-  work->dupper = malloc(m*sizeof(c_float));
-  work->dlower = malloc(m*sizeof(c_float));
-  work->v = malloc(n*sizeof(c_float));
-}
-
-// Free data for problem data
-void free_daqp_ldp(Workspace *work){
-  free(work->Rinv);
-  free(work->M);
-  free(work->dupper);
-  free(work->dlower);
-  free(work->v);
 }

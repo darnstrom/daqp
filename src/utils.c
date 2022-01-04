@@ -5,7 +5,7 @@
 // H is stored in R (packed form) 
 // A is stored in M 
 // Works inplace, so H and A are overwritten
-int compute_Rinv_and_M(double *R, double *M, const double eps,const int n, const int m){
+int compute_Rinv_and_M(c_float *R, c_float *M, const c_float eps,const int n, const int m){
   int i,j,k,disp,disp2;
   // Cholesky
   for (i=0,disp=0; i<n; disp+=n-i,i++) {
@@ -52,7 +52,7 @@ int compute_Rinv_and_M(double *R, double *M, const double eps,const int n, const
   return 0;
 }
 
-void update_v_and_d(double *f, double *bupper, double *blower, Workspace *work) 
+void update_v_and_d(c_float *f, c_float *bupper, c_float *blower, Workspace *work) 
 {
   int i,j,disp;
   c_float sum;
@@ -85,7 +85,7 @@ void update_v_and_d(double *f, double *bupper, double *blower, Workspace *work)
 
 // Convert symmetric matrix to packed form
 // Example = [1 2 3; 4 5 6; 7 8 9] -> [1 2 3 5 6 9] 
-void pack_symmetric(double *S, double *Sp, int n){
+void pack_symmetric(c_float *S, c_float *Sp, const int n){
   if(S==NULL) return;
   int i,j,disp,disp2;
   for(i=0,disp=0,disp2=0;i<n;i++,disp2+=i)

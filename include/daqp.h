@@ -14,6 +14,4 @@ void free_daqp_workspace(Workspace *work);
 void reset_daqp_workspace(Workspace *work);
 void reset_daqp_workspace_warm(Workspace *work);
 
-void allocate_daqp_ldp(Workspace *work, int n, int m);
-void free_daqp_ldp(Workspace *work);
 #endif //ifndef DAQP_H

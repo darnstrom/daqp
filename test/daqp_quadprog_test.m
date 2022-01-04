@@ -75,10 +75,10 @@ daqp_opts.rho_soft = 1e-3;
 daqp_opts.progress_tol =1e-6;
 daqp_opts.iter_limit=2500;
 
-%Asoft_upper = [A,-S];
-%Asoft_lower= [A,S];
-%Hsoft = blkdiag(H,(1/daqp_opts.rho_soft)^2);
-%fsoft = [f;0];
+Asoft_upper = [A,-S];
+Asoft_lower= [A,S];
+Hsoft = blkdiag(H,(1/daqp_opts.rho_soft)^2);
+fsoft = [f;0];
 [xref,fval_ref,flag_ref] = cplexqp(Hsoft,fsoft,[Asoft_upper;-Asoft_lower],[bupper;-blower],[],[],[lb;-inf(n-ms+1,1)],[ub;inf(n-ms+1,1)]);
 
 %Ref

@@ -64,109 +64,137 @@ void daqp_setup(Workspace** ws_ptr, double* M, double* d, int n){
   *ws_ptr = work;
 }
 
-void daqp_quadprog(DAQPResult *res, double* H, double* f, double *A, double *bupper, double* blower, int* sense, int n, int m, int ms, int packed, DAQPSettings *settings){
+void daqp_quadprog(DAQPResult *res, QP* qp, DAQPSettings *settings){
   struct timespec tstart,tsetup,tsol;
-  int i;
   // TIC start
   clock_gettime(CLOCK_MONOTONIC, &tstart);
-
   // Transform QP to ldp (R,v,M,d is stored inplace of H,f,A,b)
-  if(!packed) pack_symmetric(H,H,n); 
-  compute_Rinv_and_M(H,A,settings->eps_prox,n,m-ms);
 
+  Workspace work;
+  printf("Allocate iters (n:%d)\n",qp->n);
+  allocate_daqp_workspace(&work,qp->n);
+  work.settings = settings;
+  printf("Setup LDP\n");
+  setup_daqp_ldp(&work,qp);
+  work.settings = settings; // TODO unnecessary? 
+  printf("Add equalities\n");
+  add_equality_constraints(&work);
+
+  clock_gettime(CLOCK_MONOTONIC, &tsetup);
+  printf("Solving\n");
   if(settings->eps_prox==0){
-	// Setup daqp workspace 
-	Workspace work;
-	allocate_daqp_workspace(&work,n);
-	work.n = n; work.m = m; work.ms = ms;
-	work.Rinv = H; work.v = f;
-	work.M = A; work.dupper = bupper; work.dlower = blower;
-	update_v_and_d(f,bupper,blower,&work);
-
-	work.x = res->x;
-	work.sense = sense;
-	work.settings = settings;
-	add_equality_constraints(&work);
-	clock_gettime(CLOCK_MONOTONIC, &tsetup);
-
-
-	// Solve LDP
 	res->exitflag = daqp(&work);
-	clock_gettime(CLOCK_MONOTONIC, &tsol);
-	// Correct offset in fval 
-	for(i=0;i<n;i++)
-	  work.fval-=work.v[i]*work.v[i];// 
-	work.fval *=0.5;
-	res->fval = work.fval;
-	res->soft_slack = work.soft_slack;
-	res->iter = work.iterations;
-	res->outer_iter = 0;
-	
-	free_daqp_workspace(&work);
+
   }
-  else{
-	// Setup workspace
-	ProxWorkspace prox_work;
-	allocate_prox_workspace(&prox_work,n,m);
-	prox_work.work->ms = ms; // TODO: move this into allocate
-	prox_work.work->Rinv=H; prox_work.work->M=A; 
-	prox_work.bupper = bupper; prox_work.blower=blower; prox_work.f = f;
-	prox_work.work->sense = sense;
-	prox_work.epsilon = settings->eps_prox;
-	prox_work.work->settings= settings;
-	add_equality_constraints(prox_work.work);
+  else{//Prox
 	clock_gettime(CLOCK_MONOTONIC, &tsetup);
-
-	// Solve problem
-	res->exitflag = daqp_prox(&prox_work);
+	res->exitflag = daqp_prox(&work);
 	clock_gettime(CLOCK_MONOTONIC, &tsol);
-
-	for(i=0;i<n;i++) // Extract solution
-	  res->x[i]=prox_work.x[i];
-	res->fval = 0; // TODO: correct this
-	res->soft_slack = prox_work.work->soft_slack;
-	res->iter = prox_work.inner_iterations;
-	res->outer_iter = prox_work.outer_iterations;
-
-	free_prox_workspace(&prox_work);
   }
+  clock_gettime(CLOCK_MONOTONIC, &tsol);
+  
+  printf("Extract results\n");
+  // Extract results and free workspace 
+  daqp_extract_result(res,&work);
+  free_daqp_workspace(&work);
+  free_daqp_ldp(&work);
 
-  // Append time 
+  // Add time to result
   res->solve_time = time_diff(tsetup,tsol);
   res->setup_time = time_diff(tstart,tsetup);
+}
+
+void setup_daqp(QP* qp, DAQPSettings *settings, Workspace *work){
+  // Check if QP is well-posed
+  //validate_QP(qp);
+  
+  // Setup workspace
+  allocate_daqp_workspace(work,qp->n);
+  setup_daqp_ldp(work,qp);
+}
+
+//  Setup LDP from QP  
+void setup_daqp_ldp(Workspace *work, QP *qp){
+  int i;
+
+  work->n = qp->n;
+  work->m = qp->m;
+  work->ms = qp->ms;
+  work->qp = qp;
+  printf("Extract Rinv M\n");
+ // Extract data for Rinv and M 
+  if(qp->H!=NULL){ 
+	work->Rinv = malloc(((qp->n+1)*qp->n/2)*sizeof(c_float));
+	work->M = malloc(qp->n*(qp->m-qp->ms)*sizeof(c_float));
+  }
+  else{// H = I =>  no need to transform H->Rinv and M->A 
+	work->Rinv = qp->H;
+	work->M = qp->A;
+  }
+
+  printf("Extract v and d\n");
+  // Extract data for v and d
+  if(qp->f!=NULL || work->settings->eps_prox != 0){
+	work->dupper = malloc(qp->m*sizeof(c_float));
+	work->dlower = malloc(qp->m*sizeof(c_float));
+	work->v = malloc(qp->n*sizeof(c_float));
+  }
+  else{ // f = 0 => no need to transform f->v and b->d 
+	work->v=qp->f;
+	work->dupper = qp->bupper; 
+	work->dlower = qp->blower; 
+  }
+  
+  // Transform QP to LDP
+  printf("Transform QP\n");
+  if(qp->H != 0){
+	// Copy H->Rinv and A->M
+	printf("Copy matrices\n");
+	pack_symmetric(qp->H,work->Rinv,qp->n);
+	const int nA = qp->n*(qp->m-qp->ms);
+	for(i=0; i<nA;i++) work->M[i] = qp->A[i];
+	
+	// Compute Rinv and M
+	printf("Compute Rinv and m\n");
+	compute_Rinv_and_M(work->Rinv,work->M,work->settings->eps_prox,qp->n,qp->m-qp->ms);
+  }
+  // Compute v and M
+  update_v_and_d(qp->f,qp->bupper,qp->blower,work);
+
+  // Setup up constraint states
+  printf("Setup sense\n");
+  if(qp->sense == NULL) // Assume all constraint are "normal" inequality constraints
+	work->sense = calloc(qp->m,sizeof(int));
+  else{
+	work->sense = malloc(qp->m*sizeof(int));
+	for(int i=0;i<qp->m;i++) work->sense[i] = qp->sense[i];
+  }
+}
+
+// Free data for LDP 
+void free_daqp_ldp(Workspace *work){
+  free(work->sense);
+  if(work->Rinv != NULL){
+	free(work->Rinv);
+	free(work->M);
+  }
+  if(work->v != NULL){
+	free(work->v);
+	free(work->dupper);
+	free(work->dlower);
+  }
 
 }
 
-int qp2ldp(double *R, double *v, double* M, double* dupper, double*  dlower, int n, int m, double eps)
-{
-  int i, j;
-  int disp;
-  c_float sum;
-  // If LP -> no cholesky, just scale f with eps
-  if(R==NULL){ 
-	for(i=0;i<n;i++)
-	  v[i]/=eps;
-	return -1; 
+void daqp_extract_result(DAQPResult* res, Workspace* work){
+  // Extract optimal solution and correct fval offset
+  res->fval = work->fval;
+  for(int i=0;i<work->n;i++){
+	res->x[i] = work->x[i];
+	res->fval-=work->v[i]*work->v[i]; 
   }
-  compute_Rinv_and_M(R,M,eps,n,m);
-
-  if(eps != 0) return  0; // No need to compute v & d for prox
-  
-  // Compute v = R'\f  
-  for(j=n-1,disp=ARSUM(n);j>=0;j--){
-	for(i=n-1;i>j;i--)
-	  v[i] +=R[--disp]*v[j];
-	v[j]*=R[--disp];
-  }
-
-  // Compute d  = b+M*v
-  for(i = 0, disp=0;i<m;i++){
-	sum = 0;
-	for(j=0;j<n;j++)
-	  sum+=M[disp++]*v[j];
-	dupper[i]+=sum;
-	dlower[i]+=sum;
-  }
-
-  return 0;
+  res->fval *=0.5;
+  res->soft_slack = work->soft_slack;
+  res->iter = work->inner_iter;
+  res->outer_iter = work->outer_iter; // TODO add iter...
 }
