@@ -88,17 +88,21 @@ sense2(ms+1:end)=8*S;
 [x_daqp_plain,fval_daqp, flag_daqp_plain, info_daqp_plain] =  daqpmex_quadprog(Hsoft',fsoft,[Asoft_upper;Asoft_lower]',[ub;bupper;1e9*ones(m,1)],[lb;-1e9*ones(m,1);blower],[],[],sense,daqp_opts);
 
 [x_daqp,fval_daqp, flag_daqp, info_daqp] =  daqpmex_quadprog(H',f,A',[ub;bupper],[lb;blower],[],[],sense2,daqp_opts);
-daqp_opts.eps_prox=1;
+daqp_opts.eps_prox=1e4;
 [x_daqp_prox,fval_daqp_prox, flag_daqp_prox, info_daqp_prox] =  daqpmex_quadprog(H',f,A',[ub;bupper],[lb;blower],[],[],sense2,daqp_opts);
 min_slack = min([ub;-lb;bupper;-blower]+[-eye(ms,n);eye(ms,n);-A;A]*x_daqp);
 x_daqp_ext = [x_daqp;info_daqp.soft_slack*daqp_opts.rho_soft];
-[x_daqp_ext xref];
+x_daqp_prox_ext = [x_daqp_prox;info_daqp_prox.soft_slack*daqp_opts.rho_soft];
 fval_daqp_ext = 0.5*x_daqp_ext'*Hsoft*x_daqp_ext+fsoft'*x_daqp_ext;
+
+fval_daqp_prox_ext = 0.5*x_daqp_prox_ext'*Hsoft*x_daqp_prox_ext+fsoft'*x_daqp_prox_ext;
+
 err=norm(x_daqp_ext-xref);
 fprintf('\n\n============= Result: ============ \n flag: %d|fval diff: %f|norm_diff : %f |min slack: %f\n',flag_daqp,fval_ref-fval_daqp_ext,err,min_slack);
 info_daqp
 info_daqp_prox
 norm(x_daqp-x_daqp_prox)
+fval_daqp_ext-fval_daqp_prox_ext
 
 
 %% Random lp 

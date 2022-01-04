@@ -16,14 +16,9 @@ typedef struct{
 
 }DAQPResult;
 
-void daqp_setup(Workspace** work, double* M, double* d,int n);
-
-int daqp_feas(Workspace* work, c_float* A, c_float*b, int *sense, const int m, c_float fval_bound);
-int daqp_feas_warmstart(Workspace* work, c_float* A, c_float*b, int *sense, const int m, c_float fval_bound, int* WS, const int n_active);
-
-
 void daqp_quadprog(DAQPResult* res, QP* qp,DAQPSettings* settings);
 
+void setup_daqp(QP *qp, DAQPSettings *settings, Workspace* work);
 void setup_daqp_ldp(Workspace *work, QP* qp);
 void free_daqp_ldp(Workspace *work);
 void daqp_extract_result(DAQPResult* res, Workspace* work);

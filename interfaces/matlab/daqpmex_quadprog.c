@@ -69,7 +69,6 @@ void mexFunction( int nlhs, mxArray *plhs[],
 
   // Solve problem 
   QP qp={n,m,ms,H,f,A,bupper,blower,sense};
-  printf("Calling quadprog\n");
   daqp_quadprog(&res,&qp,&settings);
   
   // Extract info

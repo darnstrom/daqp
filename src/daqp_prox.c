@@ -6,11 +6,10 @@
 int daqp_prox(Workspace *work){
   int i,cycle_counter=0;
   const int nx=work->n;
-  int exitflag,fixpoint;
-  c_float sum,fval=INF, *swp_ptr;
+  int exitflag;
+  c_float diff,fval=INF, *swp_ptr;
 
   while(work->outer_iter++  <  work->settings->prox_iter_limit){
-
 
 	// xold <-- x
 	swp_ptr = work->xold; work->xold = work->x; work->x = swp_ptr;
@@ -26,14 +25,11 @@ int daqp_prox(Workspace *work){
 	
 	// ** Check convergence **
 	if(work->iterations==1 && work->outer_iter&1){ // No changes to the working set 
-	  fixpoint = 1;
-	  for(i=0;i<nx;i++){ // ||x_old - x|| > eta  ?
-		work->xold[i]= work->x[i] - work->xold[i];
-		if((work->xold[i]> work->settings->eta_prox) || 
-		   (work->xold[i]< -work->settings->eta_prox)) 
-		  fixpoint = 0;
+	  for(i=0, diff= 0;i<nx;i++){ // ||x_old - x|| > eta  ?
+		diff= work->x[i] - work->xold[i];
+		if((diff> work->settings->eta_prox) || (diff< -work->settings->eta_prox)) break;
 	  }
-	  if(fixpoint==1) return EXIT_OPTIMAL; // Fix point reached
+	  if(i==nx) return EXIT_OPTIMAL; // Fix point reached
 	  // Take gradient step if LP (and we are not constrained to a vertex) 
 	  if((work->Rinv == NULL)&&(work->n_active != work->n)){ 
 		if(gradient_step(work)==EMPTY_IND) return EXIT_UNBOUNDED;
@@ -42,13 +38,13 @@ int daqp_prox(Workspace *work){
 	// Compute objective function value to detect progress
 	// (TODO: this is currently only valid for LPs...)
 	if(work->Rinv == NULL){
-	  for(i=0, sum = 0;i<nx;i++)
-		sum+=work->qp->f[i]*work->x[i];
-	  if(sum>fval){ 
+	  for(i=0, diff=fval;i<nx;i++)
+		diff-=work->qp->f[i]*work->x[i];
+	  if(diff<0){ 
 		if(cycle_counter++ > work->settings->cycle_tol) return EXIT_OPTIMAL;
 	  }
 	  else{ // Progress -> update objective function value
-		fval = sum;
+		fval -=diff ;
 		cycle_counter=0;
 	  }
 	}
@@ -83,7 +79,7 @@ int gradient_step(Workspace* work){
 	//delta_s[j] = A[j,:]*delta_x
 	delta_s= 0; 
 	for(k=0;k<nx;k++) // 
-	  delta_s+=work->M[disp++]*work->xold[k]; // delta_x stored in work->xold
+	  delta_s+=work->M[disp++]*(work->x[k]-work->xold[k]); 
 	if(delta_s>0){
 	  // Compute alphaj = (b[j]-A[j,:]*x]/delta_s
 	  alpha = work->qp->bupper[j];
