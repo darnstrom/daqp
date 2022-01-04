@@ -61,7 +61,7 @@ void update_v_and_d(c_float *f, c_float *bupper, c_float *blower, Workspace *wor
 	// Compute v = R'\f  
 	for(j=work->n-1,disp=ARSUM(work->n);j>=0;j--){
 	  for(i=work->n-1;i>j;i--)
-		work->v[i] +=work->Rinv[--disp]*work->v[j];
+		work->v[i] +=work->Rinv[--disp]*f[j];
 	  work->v[j]=work->Rinv[--disp]*f[j];
 	}
   }
