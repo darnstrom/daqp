@@ -1,0 +1,4 @@
+name = "DAQP"
+uuid = "03e84fa3-be71-4220-9c30-b0beea2f2cfa"
+authors = ["Daniel Arnström <daniel.arnstrom@liu.se>"]
+version = "0.1.0"
