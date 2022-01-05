@@ -50,13 +50,13 @@ void setup_daqp(QP* qp, DAQPSettings *settings, Workspace *work){
 
 //  Setup LDP from QP  
 void setup_daqp_ldp(Workspace *work, QP *qp){
-  int i;
 
   work->n = qp->n;
   work->m = qp->m;
   work->ms = qp->ms;
   work->qp = qp;
- // Extract data for Rinv and M 
+ 
+  // Allocate data for Rinv and M 
   if(qp->H!=NULL){ 
 	work->Rinv = malloc(((qp->n+1)*qp->n/2)*sizeof(c_float));
 	work->M = malloc(qp->n*(qp->m-qp->ms)*sizeof(c_float));
@@ -66,7 +66,7 @@ void setup_daqp_ldp(Workspace *work, QP *qp){
 	work->M = qp->A;
   }
 
-  // Extract data for v and d
+  // Allocate memory for d and v 
   if(qp->f!=NULL || work->settings->eps_prox != 0){
 	work->dupper = malloc(qp->m*sizeof(c_float));
 	work->dlower = malloc(qp->m*sizeof(c_float));
@@ -78,26 +78,20 @@ void setup_daqp_ldp(Workspace *work, QP *qp){
 	work->dlower = qp->blower; 
   }
   
-  // Transform QP to LDP
-  if(qp->H != 0){
-	// Copy H->Rinv and A->M
-	pack_symmetric(qp->H,work->Rinv,qp->n);
-	const int nA = qp->n*(qp->m-qp->ms);
-	for(i=0; i<nA;i++) work->M[i] = qp->A[i];
-	
-	// Compute Rinv and M
-	compute_Rinv_and_M(work->Rinv,work->M,work->settings->eps_prox,qp->n,qp->m-qp->ms);
-  }
-  // Compute v and M
-  update_v_and_d(qp->f,qp->bupper,qp->blower,work);
-
-  // Setup up constraint states
+  // Setup up local constraint states
   if(qp->sense == NULL) // Assume all constraint are "normal" inequality constraints
 	work->sense = calloc(qp->m,sizeof(int));
   else{
 	work->sense = malloc(qp->m*sizeof(int));
 	for(int i=0;i<qp->m;i++) work->sense[i] = qp->sense[i];
   }
+	
+  // Compute Rinv and M
+  compute_Rinv_and_M(work);
+  // Compute v and d 
+  update_v_and_d(qp->f,work);
+
+
 }
 
 // Free data for LDP 

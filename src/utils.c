@@ -4,55 +4,67 @@
 // Compute upper cholesky factor for H+eps*I and M = A*Rinv
 // H is stored in R (packed form) 
 // A is stored in M 
-// Works inplace, so H and A are overwritten
-int compute_Rinv_and_M(c_float *R, c_float *M, const c_float eps,const int n, const int m){
-  int i,j,k,disp,disp2;
+int compute_Rinv_and_M(Workspace *work){
+  // TODO: Allow M to be computed separately
+  // maybe check work->qp->H == NULL instead ? 
+  if(work->Rinv == NULL) return 1; //Assume identity Hessian 
+  int i,j,k,disp,disp2,disp3;
+  const int n = work->n; 
   // Cholesky
-  for (i=0,disp=0; i<n; disp+=n-i,i++) {
+  for (i=0,disp=0,disp3=0; i<n; disp+=n-i,i++,disp3+=i) {
 	// Diagonal element
-	R[disp] += eps;// Add regularization
+	work->Rinv[disp] = work->qp->H[disp3++]+work->settings->eps_prox;// Add regularization
 	for (k=0,disp2=i; k<i; k++,disp2+=n-k) 
-	  R[disp] -= R[disp2]*R[disp2];
-	if (R[disp] <= 0)
-	  return -1; // Not positive definite
-	R[disp] = sqrt(R[disp]);
+	  work->Rinv[disp] -= work->Rinv[disp2]*work->Rinv[disp2];
+	if (work->Rinv[disp] <= 0) return -1; // Not positive definite
+	work->Rinv[disp] = sqrt(work->Rinv[disp]);
 
 	// Off-diagonal elements
 	for (j=1; j<n-i; j++) {
+	  work->Rinv[disp+j]=work->qp->H[disp3++];
 	  for (k=0,disp2=i; k<i; k++,disp2+=n-k)
-		R[disp+j] -= R[disp2]*R[disp2+j];
-	  R[disp+j] /= R[disp];
+		work->Rinv[disp+j] -= work->Rinv[disp2]*work->Rinv[disp2+j];
+	  work->Rinv[disp+j] /= work->Rinv[disp];
 	}
 	// Store 1/r_ii instead of r_ii 
 	// to get multiplication instead division when forward/backward substituting
-	R[disp] = 1/R[disp]; 
+	work->Rinv[disp] = 1/work->Rinv[disp]; 
   }
-  // Compute M = A\R  
-  for(k = 0,disp=0;k<m;k++)
-	for(i = 0,disp2=0; i<n;i++,disp++){
-	  M[disp]*=R[disp2++];// Final divide
+  // Copy A into M
+  const int mA = work->m-work->ms;
+  // Compute M = A/R (by using M' = R'\A')
+  for(k = 0,disp=0;k<mA;k++){
+	// Breakout i = 0 to populate RHS with A
+	disp2=0;
+	work->M[disp]=work->qp->A[disp]*work->Rinv[disp2++];
+	for(j=1;j<n;j++)
+	  work->M[disp+j] = work->qp->A[disp+j]-work->Rinv[disp2++]*work->M[disp];
+	++disp;
+	for(i = 1; i<n;i++,disp++){
+	  work->M[disp]*=work->Rinv[disp2++];// Final divide
 	  for(j=1;j<n-i;j++)
-		M[disp+j] -= R[disp2++]*M[disp];
+		work->M[disp+j] -= work->Rinv[disp2++]*work->M[disp];
 	}
+  }
 
 
   // Compute Rinv (store in R) by Rinv = R\I 
   for(k=0,disp=0;k<n;k++){
     disp2=disp;
-    R[disp]=R[disp2++]; // Break out first iteration to get rhs
+    work->Rinv[disp]=work->Rinv[disp2++]; // Break out first iteration to get rhs
     for(j=k+1;j<n;j++)
-      R[disp2++]*=-R[disp];
+      work->Rinv[disp2++]*=-work->Rinv[disp];
     disp++;
     for(i=k+1;i<n;i++,disp++){
-      R[disp]*=R[disp2++];
+      work->Rinv[disp]*=work->Rinv[disp2++];
       for(j=1;j<n-i;j++)
-    	R[disp+j]-=R[disp2++]*R[disp];
+    	work->Rinv[disp+j]-=work->Rinv[disp2++]*work->Rinv[disp];
     }
   }
   return 0;
 }
 
-void update_v_and_d(c_float *f, c_float *bupper, c_float *blower, Workspace *work) 
+void update_v_and_d(c_float *f, Workspace *work) 
 {
   int i,j,disp;
   c_float sum;
@@ -71,27 +83,16 @@ void update_v_and_d(c_float *f, c_float *bupper, c_float *blower, Workspace *wor
   for(i = 0,disp=0;i<N_SIMPLE;i++){
 	for(j=i, sum=0;j<work->n;j++)
 	  sum+=work->Rinv[disp++]*work->v[j];
-	work->dupper[i]=bupper[i]+sum;
-	work->dlower[i]=blower[i]+sum;
+	work->dupper[i]=work->qp->bupper[i]+sum;
+	work->dlower[i]=work->qp->blower[i]+sum;
   }
   //General bounds
   for(i = N_SIMPLE, disp=0;i<N_CONSTR;i++){
 	for(j=0, sum=0;j<work->n;j++)
 	  sum+=work->M[disp++]*work->v[j];
-	work->dupper[i]=bupper[i]+sum;
-	work->dlower[i]=blower[i]+sum;
+	work->dupper[i]=work->qp->bupper[i]+sum;
+	work->dlower[i]=work->qp->blower[i]+sum;
   }
-}
-
-// Convert symmetric matrix to packed form
-// Example = [1 2 3; 4 5 6; 7 8 9] -> [1 2 3 5 6 9] 
-void pack_symmetric(c_float *S, c_float *Sp, const int n){
-  if(S==NULL) return;
-  int i,j,disp,disp2;
-  for(i=0,disp=0,disp2=0;i<n;i++,disp2+=i)
-	for(j=i;j<n;j++){
-	  Sp[disp++] = S[disp2++];
-	}
 }
 
 /* Profiling */

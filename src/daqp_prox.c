@@ -58,7 +58,7 @@ int daqp_prox(Workspace *work){
 	  for(i = 0; i<nx;i++) 
 		work->v[i] = work->qp->f[i]-work->settings->eps_prox*work->x[i];
 	// update v and d 
-	update_v_and_d(work->v,work->qp->bupper,work->qp->blower,work);
+	update_v_and_d(work->v,work);
   }
   return EXIT_ITERLIMIT;
 }
