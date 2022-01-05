@@ -298,4 +298,5 @@ void daqp_default_settings(DAQPSettings* settings){
   settings->eps_prox = 0;
   settings->eta_prox = DEFAULT_ETA;
   settings->prox_iter_limit = DEFAULT_PROX_ITER_LIMIT; 
+  settings->rho_soft = DEFAULT_RHO_SOFT; 
 }

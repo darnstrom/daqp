@@ -21,6 +21,8 @@
 #define DEFAULT_ITER_LIMIT 1000 
 #define DEFAULT_PROX_ITER_LIMIT 1000 
 
+#define DEFAULT_RHO_SOFT 1e-3 
+
 #define SQUARE(x) ((x)*(x))
 #define ARSUM(x) ((x)*(x+1)/2)
 #define INF ((c_float)1e30)
