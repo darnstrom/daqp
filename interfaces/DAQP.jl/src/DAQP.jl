@@ -2,6 +2,7 @@ module DAQP
 
 const lib = "libdaqp.so"
 include("types.jl")
+include("constants.jl")
 
 function quadprog(H::Matrix{Float64},f::Vector{Float64}, 
 	A::Matrix{Float64},bupper::Vector{Float64},blower::Vector{Float64},sense::Vector{Int64})
@@ -22,11 +23,12 @@ function quadprog(H::Matrix{Float64},f::Vector{Float64},
 		(Ref{DAQP.DAQPResult},Ref{DAQP.QP},Ref{DAQP.DAQPSettings}), 
 		result,Ref(qp),Ref(settings))
   
-  profiling = (solve_time = result[].solve_time,
-			   setup_time = result[].setup_time,
-			   inner_iter = result[].iter,
-			   outer_iter = result[].outer_iter)
-  return xstar,result[].fval,result[].exitflag,profiling
+  info = (status = DAQP.flag2status[result[].exitflag],
+		  solve_time = result[].solve_time,
+		  setup_time = result[].setup_time,
+		  inner_iter = result[].iter,
+		  outer_iter = result[].outer_iter)
+  return xstar,result[].fval,result[].exitflag,info
 end
 
 end
