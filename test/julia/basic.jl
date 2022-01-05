@@ -10,4 +10,4 @@ bupper = [1.0;1];
 blower = [-1.0,-1];
 sense = [0;0];
 ## Solve QP
-xstar,fval,exitflag,profiling = DAQP.quadprog(H,f,A,bupper,blower,sense);
+xstar,fval,exitflag,info= DAQP.quadprog(H,f,A,bupper,blower,sense);
