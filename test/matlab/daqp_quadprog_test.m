@@ -1,5 +1,5 @@
 %% Init 
-addpath ../interfaces/matlab/
+addpath ../../interfaces/daqp-matlab/
 %% Random qp  bounds
 %Generate problem 
 addpath ../interfaces/matlab/
