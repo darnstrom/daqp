@@ -1,6 +1,7 @@
 #include "daqp.h"
 #include "utils.h"
 #include <math.h>
+#include <stdio.h>
 // Compute upper cholesky factor for H+eps*I and M = A*Rinv
 // H is stored in R (packed form) 
 // A is stored in M 
@@ -30,23 +31,6 @@ int compute_Rinv_and_M(Workspace *work){
 	// to get multiplication instead division when forward/backward substituting
 	work->Rinv[disp] = 1/work->Rinv[disp]; 
   }
-  // Copy A into M
-  const int mA = work->m-work->ms;
-  // Compute M = A/R (by using M' = R'\A')
-  for(k = 0,disp=0;k<mA;k++){
-	// Breakout i = 0 to populate RHS with A
-	disp2=0;
-	work->M[disp]=work->qp->A[disp]*work->Rinv[disp2++];
-	for(j=1;j<n;j++)
-	  work->M[disp+j] = work->qp->A[disp+j]-work->Rinv[disp2++]*work->M[disp];
-	++disp;
-	for(i = 1; i<n;i++,disp++){
-	  work->M[disp]*=work->Rinv[disp2++];// Final divide
-	  for(j=1;j<n-i;j++)
-		work->M[disp+j] -= work->Rinv[disp2++]*work->M[disp];
-	}
-  }
-
 
   // Compute Rinv (store in R) by Rinv = R\I 
   for(k=0,disp=0;k<n;k++){
@@ -60,6 +44,16 @@ int compute_Rinv_and_M(Workspace *work){
       for(j=1;j<n-i;j++)
     	work->Rinv[disp+j]-=work->Rinv[disp2++]*work->Rinv[disp];
     }
+  }
+  
+  // Compute M = A*Rinv (by using M' = Rinv'*A')
+  const int mA = work->m-work->ms;
+  for(k = 0,disp2=n*mA-1;k<mA;k++,disp2-=n){
+	for(j = 0, disp=ARSUM(work->n); j<n; ++j){
+	  for(i=0;i<j;++i)
+		work->M[disp2-i] += work->Rinv[--disp]*work->qp->A[disp2-j];
+	  work->M[disp2-j]=work->Rinv[--disp]*work->qp->A[disp2-j];
+	}
   }
   return 0;
 }
