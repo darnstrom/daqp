@@ -56,7 +56,7 @@ void setup_daqp_ldp(Workspace *work, QP *qp){
   work->ms = qp->ms;
   work->qp = qp;
  
-  // Allocate data for Rinv and M 
+  // Allocate memory for Rinv and M 
   if(qp->H!=NULL){ 
 	work->Rinv = malloc(((qp->n+1)*qp->n/2)*sizeof(c_float));
 	work->M = malloc(qp->n*(qp->m-qp->ms)*sizeof(c_float));
@@ -78,20 +78,11 @@ void setup_daqp_ldp(Workspace *work, QP *qp){
 	work->dlower = qp->blower; 
   }
   
-  // Setup up local constraint states
-  if(qp->sense == NULL) // Assume all constraint are "normal" inequality constraints
-	work->sense = calloc(qp->m,sizeof(int));
-  else{
-	work->sense = malloc(qp->m*sizeof(int));
-	for(int i=0;i<qp->m;i++) work->sense[i] = qp->sense[i];
-  }
+  // Allocate memory for local constraint states
+  work->sense = malloc(qp->m*sizeof(int));
 	
-  // Compute Rinv and M
-  compute_Rinv_and_M(work);
-  // Compute v and d 
-  update_v_and_d(qp->f,work);
-
-
+  // Form LDP
+  update_ldp(UPDATE_Rinv+UPDATE_M+UPDATE_v+UPDATE_d+UPDATE_sense, work);
 }
 
 // Free data for LDP 

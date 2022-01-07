@@ -35,6 +35,13 @@
 #define EXIT_UNBOUNDED -3
 #define EXIT_ITERLIMIT -4
 
+// UPDATE LDP MASKS 
+#define UPDATE_Rinv 1
+#define UPDATE_M 2
+#define UPDATE_v 4
+#define UPDATE_d 8
+#define UPDATE_sense 16 
+
 // CONSTRAINT MASKS 
 #define INACTIVE 1
 #define ACTIVE 1
