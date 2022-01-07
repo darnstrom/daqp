@@ -16,10 +16,11 @@ typedef struct{
 
 }DAQPResult;
 
+void daqp_solve(DAQPResult* res, Workspace *work);
 void daqp_quadprog(DAQPResult* res, QP* qp,DAQPSettings* settings);
 
-void setup_daqp(QP *qp, DAQPSettings *settings, Workspace* work);
-void setup_daqp_ldp(Workspace *work, QP* qp);
+int setup_daqp(QP *qp, DAQPSettings *settings, Workspace* work);
+int setup_daqp_ldp(Workspace *work, QP* qp);
 void free_daqp_ldp(Workspace *work);
 void daqp_extract_result(DAQPResult* res, Workspace* work);
 #endif //ifndef DAQP_API_H

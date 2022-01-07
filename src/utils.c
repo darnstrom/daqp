@@ -90,10 +90,14 @@ void update_v_and_d(c_float *f, Workspace *work)
   }
 }
 int update_ldp(const int mask, Workspace *work){
+  // TODO: copy dimensions from work->qp? 
+  int error_flag;
   /** Update Rinv **/
-  if(mask&UPDATE_Rinv)
-	update_Rinv(work);
-  
+  if(mask&UPDATE_Rinv){
+	error_flag = update_Rinv(work);
+	if(error_flag<0)
+	  return error_flag;
+  }
   /** Update M **/
   if(mask&UPDATE_Rinv||mask&UPDATE_M)
 	update_M(work);
@@ -106,8 +110,9 @@ int update_ldp(const int mask, Workspace *work){
   if(mask&UPDATE_Rinv||mask&UPDATE_M||mask&UPDATE_v||mask&UPDATE_d)
 	update_d(work);
 
+  /** Update constraint sense **/
   if(mask&UPDATE_sense){
-	if(work->qp->sense == NULL) // Assume all are "normal" inequality constraints
+	if(work->qp->sense == NULL) // Assume all constraints are "normal" inequality constraints
 	  for(int i=0;i<work->m;i++) work->sense[i] = 0;
 	else
 	  for(int i=0;i<work->m;i++) work->sense[i] = work->qp->sense[i];
@@ -125,7 +130,8 @@ int update_Rinv(Workspace *work){
 	work->Rinv[disp] = work->qp->H[disp3++]+work->settings->eps_prox;// Add regularization
 	for (k=0,disp2=i; k<i; k++,disp2+=n-k) 
 	  work->Rinv[disp] -= work->Rinv[disp2]*work->Rinv[disp2];
-	if (work->Rinv[disp] <= 0) return -1; // Not positive definite
+	if (work->Rinv[disp] <= 0) return EXIT_NONCONVEX; // Not positive definite 
+	//TODO: handle singular case by regularization
 	work->Rinv[disp] = sqrt(work->Rinv[disp]);
 
 	// Off-diagonal elements
@@ -153,7 +159,7 @@ int update_Rinv(Workspace *work){
 		work->Rinv[disp+j]-=work->Rinv[disp2++]*work->Rinv[disp];
 	}
   }
-  return 0;
+  return 1;
 }
 
 void update_M(Workspace *work){

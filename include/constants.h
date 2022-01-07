@@ -29,11 +29,13 @@
 #define R_OFFSET(X,Y) (((2*Y-X+1)*X)/2)
 
 // EXIT FLAGS
+#define EXIT_SOFT_OPTIMAL 1
 #define EXIT_OPTIMAL 1
 #define EXIT_INFEASIBLE -1
 #define EXIT_CYCLE -2
 #define EXIT_UNBOUNDED -3
 #define EXIT_ITERLIMIT -4
+#define EXIT_NONCONVEX -5
 
 // UPDATE LDP MASKS 
 #define UPDATE_Rinv 1

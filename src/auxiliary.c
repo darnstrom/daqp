@@ -271,7 +271,7 @@ void pivot_last(Workspace *work){
   }	
 }
 
-void add_equality_constraints(Workspace *work){
+int add_equality_constraints(Workspace *work){
   for(int i =0;i<N_CONSTR;i++){
 	//TODO prioritize inequalities?
 	if(IS_ACTIVE(i)){
@@ -279,10 +279,11 @@ void add_equality_constraints(Workspace *work){
 	  update_LDL_add(work);
 	  work->WS[work->n_active] = i;
 	  work->n_active++;
-	  //TODO check singularity...
+	  //TODO check singularity and return error
 	  pivot_last(work);
 	}
   }
+  return 1;
 }
 
 void daqp_default_settings(DAQPSettings* settings){

@@ -21,7 +21,10 @@ int daqp_prox(Workspace *work){
 	
 	work->inner_iter+=work->iterations;
 	if(exitflag!=EXIT_OPTIMAL) return exitflag;
-	if(work->settings->eps_prox == 0) return EXIT_OPTIMAL; 
+	if(work->settings->eps_prox == 0){
+	  if(work->soft_slack > work->settings->primal_tol) return EXIT_SOFT_OPTIMAL;
+	  return EXIT_OPTIMAL; 
+	}
 	
 	// ** Check convergence **
 	if(work->iterations==1 && work->outer_iter&1){ // No changes to the working set 
@@ -57,7 +60,7 @@ int daqp_prox(Workspace *work){
 	else{
 	  for(i = 0; i<nx;i++) 
 		work->v[i] = work->qp->f[i]-work->settings->eps_prox*work->x[i];
-	  update_v(work->v,work);
+	  update_v(work->v,work); // 
 	}
 	// Perturb RHS of constraints 
 	update_d(work);

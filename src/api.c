@@ -4,52 +4,72 @@
 #include <stdio.h>
 #include <math.h>
 
-void daqp_quadprog(DAQPResult *res, QP* qp, DAQPSettings *settings){
-  struct timespec tstart,tsetup,tsol;
-  // TIC start
-  clock_gettime(CLOCK_MONOTONIC, &tstart);
-  
-  Workspace work;
-  setup_daqp(qp,settings,&work);
-
-  // Solve problem
-  if(settings->eps_prox==0){
-	clock_gettime(CLOCK_MONOTONIC, &tsetup);
-	res->exitflag = daqp(&work);
-	clock_gettime(CLOCK_MONOTONIC, &tsol);
-	work.inner_iter = work.iterations;
+// DAQP + timing
+void daqp_solve(DAQPResult *res, Workspace *work){
+  struct timespec tstart,tsol;
+  clock_gettime(CLOCK_MONOTONIC, &tstart); //TIC
+  // Select algorithm
+  if(work->settings->eps_prox==0){
+	res->exitflag = daqp(work);
+	work->inner_iter = work->iterations;
   }
-  else{//Prox
-	clock_gettime(CLOCK_MONOTONIC, &tsetup);
-	res->exitflag = daqp_prox(&work);
-	clock_gettime(CLOCK_MONOTONIC, &tsol);
-  }
-  
-  // Extract results
-  daqp_extract_result(res,&work);
+  else//Prox
+	res->exitflag = daqp_prox(work);
 
+  clock_gettime(CLOCK_MONOTONIC, &tsol); // TOC
+  
+  // Package result
+  daqp_extract_result(res,work);
   // Add time to result
-  res->solve_time = time_diff(tsetup,tsol);
-  res->setup_time = time_diff(tstart,tsetup);
+  res->solve_time = time_diff(tstart,tsol);
+  res->setup_time = 0; 
+}
+
+void daqp_quadprog(DAQPResult *res, QP* qp, DAQPSettings *settings){
+  struct timespec tstart,tsetup;
+  int setup_flag;
   
+  clock_gettime(CLOCK_MONOTONIC, &tstart); //TIC
+  Workspace work;
+  setup_flag = setup_daqp(qp,settings,&work);
+  clock_gettime(CLOCK_MONOTONIC, &tsetup); //TOC
+
+  if(setup_flag >= 0)
+	daqp_solve(res,&work);
+  else
+	res->exitflag = setup_flag;
+  
+  // Add setup time to result 
+  res->setup_time = time_diff(tstart,tsetup);
   // Free memory
   free_daqp_workspace(&work);
   free_daqp_ldp(&work);
 }
 
-void setup_daqp(QP* qp, DAQPSettings *settings, Workspace *work){
+int setup_daqp(QP* qp, DAQPSettings *settings, Workspace *work){
+  int errorflag;
   // Check if QP is well-posed
   //validate_QP(qp);
   
   // Setup workspace
   work->settings = settings;
   allocate_daqp_workspace(work,qp->n);
-  setup_daqp_ldp(work,qp);
-  add_equality_constraints(work);
+  errorflag = setup_daqp_ldp(work,qp);
+  if(errorflag < 0){
+	free_daqp_workspace(work);
+	return errorflag;
+  }
+  errorflag = add_equality_constraints(work);
+  if(errorflag < 0){
+	free_daqp_workspace(work);
+	return errorflag;
+  }
+  return 1;
 }
 
 //  Setup LDP from QP  
-void setup_daqp_ldp(Workspace *work, QP *qp){
+int setup_daqp_ldp(Workspace *work, QP *qp){
+  int error_flag;
 
   work->n = qp->n;
   work->m = qp->m;
@@ -82,11 +102,17 @@ void setup_daqp_ldp(Workspace *work, QP *qp){
   work->sense = malloc(qp->m*sizeof(int));
 	
   // Form LDP
-  update_ldp(UPDATE_Rinv+UPDATE_M+UPDATE_v+UPDATE_d+UPDATE_sense, work);
+  error_flag = update_ldp(UPDATE_Rinv+UPDATE_M+UPDATE_v+UPDATE_d+UPDATE_sense, work);
+  if(error_flag<0){
+	free_daqp_ldp(work);
+	return error_flag;
+  }
+  return 1;
 }
 
 // Free data for LDP 
 void free_daqp_ldp(Workspace *work){
+  if(work->sense==NULL) return; // Already freed
   free(work->sense);
   if(work->Rinv != NULL){
 	free(work->Rinv);
@@ -97,7 +123,7 @@ void free_daqp_ldp(Workspace *work){
 	free(work->dupper);
 	free(work->dlower);
   }
-
+  work->sense = NULL;
 }
 
 void daqp_extract_result(DAQPResult* res, Workspace* work){

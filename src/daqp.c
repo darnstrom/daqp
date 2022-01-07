@@ -28,7 +28,10 @@ int daqp(Workspace *work){
 		if(work->add_ind == EMPTY_IND){ //mu >= (i.e., primal feasible)
 		  // All KKT-conditions satisfied -> optimum found 
 		  ldp2qp_solution(work); 
-		  return EXIT_OPTIMAL; 
+		  if(work->soft_slack > work->settings->primal_tol) 
+			return EXIT_SOFT_OPTIMAL; 
+		  else
+			return EXIT_OPTIMAL; 
 		}
 		else{
 		  // Set lam = lam_star
@@ -115,21 +118,25 @@ void allocate_daqp_workspace(Workspace *work, int n){
 
 // Free memory for iterates
 void free_daqp_workspace(Workspace *work){
-  free(work->lam);
-  free(work->lam_star);
+  if(work->lam != NULL){
+	free(work->lam);
+	free(work->lam_star);
 
-  free(work->WS);
-  free(work->BS);
+	free(work->WS);
+	free(work->BS);
 
-  free(work->L);
-  free(work->D);
+	free(work->L);
+	free(work->D);
 
-  free(work->xldl);
-  free(work->zldl);
+	free(work->xldl);
+	free(work->zldl);
 
-  free(work->u);
+	free(work->u);
 
-  free(work->xold);
+	free(work->xold);
+
+	work->lam = NULL;
+  }
 }
 
 // Reset workspace to default values
