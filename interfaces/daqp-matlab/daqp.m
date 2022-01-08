@@ -17,8 +17,9 @@ classdef daqp< handle
 
 	function [x,fval,exitflag,info] = linprog(f,A,bupper,blower,sense)
 	  d = daqp();
-	  % TODO: Set eps to =/= 0
 	  d.setup([],f,A,bupper,blower,sense);
+	  d.settings('eps_prox',1);
+	  d.settings('eta_prox',1e-6);
 	  [x,fval,exitflag,info] = d.solve();
 	end
   end

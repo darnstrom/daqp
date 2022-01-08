@@ -64,13 +64,6 @@ classdef core_test < matlab.unittest.TestCase
 	  [~,~,exitflag,info] = d.solve();
 	  testCase.verifyEqual(exitflag,int32(2));
 	end
-	function random_unconstrained_QP(testCase) 
-	  daqp_opts = daqp_options();
-	  [xref,H,f,A,bupper,blower,sense]=generate_test_QP(100,200,50,0,1e2);
-	  [x,fval,exitflag, info] = daqpmex_quadprog(H',f,A',bupper,blower,[],[],sense,daqp_opts);
-	  testCase.verifyLessThan(norm(x+H\f),1e-6);
-	  testCase.verifyEqual(info.iter,1);
-	end
   end
 end
 

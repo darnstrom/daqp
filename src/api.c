@@ -13,8 +13,9 @@ void daqp_solve(DAQPResult *res, Workspace *work){
 	res->exitflag = daqp(work);
 	work->inner_iter = work->iterations;
   }
-  else//Prox
+  else{//Prox
 	res->exitflag = daqp_prox(work);
+  }
 
   clock_gettime(CLOCK_MONOTONIC, &tsol); // TOC
   
@@ -69,7 +70,7 @@ int setup_daqp(QP* qp, DAQPSettings *settings, Workspace *work){
 
 //  Setup LDP from QP  
 int setup_daqp_ldp(Workspace *work, QP *qp){
-  int error_flag;
+  int error_flag,update_mask=0;
 
   work->n = qp->n;
   work->m = qp->m;
@@ -80,9 +81,10 @@ int setup_daqp_ldp(Workspace *work, QP *qp){
   if(qp->H!=NULL){ 
 	work->Rinv = malloc(((qp->n+1)*qp->n/2)*sizeof(c_float));
 	work->M = malloc(qp->n*(qp->m-qp->ms)*sizeof(c_float));
+	update_mask += UPDATE_Rinv+UPDATE_M;
   }
   else{// H = I =>  no need to transform H->Rinv and M->A 
-	work->Rinv = qp->H;
+	work->Rinv = NULL;
 	work->M = qp->A;
   }
 
@@ -91,18 +93,20 @@ int setup_daqp_ldp(Workspace *work, QP *qp){
 	work->dupper = malloc(qp->m*sizeof(c_float));
 	work->dlower = malloc(qp->m*sizeof(c_float));
 	work->v = malloc(qp->n*sizeof(c_float));
+	update_mask+=UPDATE_v+UPDATE_d;
   }
   else{ // f = 0 => no need to transform f->v and b->d 
-	work->v=qp->f;
+	work->v= NULL;
 	work->dupper = qp->bupper; 
 	work->dlower = qp->blower; 
   }
   
   // Allocate memory for local constraint states
   work->sense = malloc(qp->m*sizeof(int));
+  update_mask += UPDATE_sense;
 	
   // Form LDP
-  error_flag = update_ldp(UPDATE_Rinv+UPDATE_M+UPDATE_v+UPDATE_d+UPDATE_sense, work);
+  error_flag = update_ldp(update_mask, work);
   if(error_flag<0){
 	free_daqp_ldp(work);
 	return error_flag;

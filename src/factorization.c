@@ -32,6 +32,10 @@ void update_LDL_add(Workspace *work){
   if(IS_SIMPLE(work->add_ind)){
 	for(i=0;i<work->n_active;i++){
 	  if(IS_SIMPLE(work->WS[i])){ // Simple*Simple 
+		if(work->Rinv==NULL){ 
+		  work->L[new_L_start+i] = 0;// Always orthogonal when Rinv = I
+		  continue;
+		}
 		if(work->add_ind < work->WS[i]){
 		  disp = add_offset+(work->WS[i]-work->add_ind); 
 		  disp2 = R_OFFSET(work->WS[i],NX);
@@ -47,9 +51,14 @@ void update_LDL_add(Workspace *work){
 
 	  }
 	  else{ // General * Simple
-		disp = add_offset; disp2 = NX*(work->WS[i]-N_SIMPLE)+work->add_ind;
-		for(j=work->add_ind, sum = 0;j<NX;j++,disp++,disp2++){
-		  sum +=work->M[disp2]*work->Rinv[disp];
+		disp2 = NX*(work->WS[i]-N_SIMPLE)+work->add_ind;
+		if(work->Rinv==NULL)
+		  sum = work->M[disp2];
+		else{
+		  disp = add_offset;
+		  for(j=work->add_ind, sum = 0;j<NX;j++,disp++,disp2++){
+			sum +=work->M[disp2]*work->Rinv[disp];
+		  }
 		}
 	  }
 	  work->L[new_L_start+i] = sum;
@@ -58,9 +67,14 @@ void update_LDL_add(Workspace *work){
   else{ // mi is a general bound
 	for(i=0;i<work->n_active;i++){
 	  if(IS_SIMPLE(work->WS[i])){ // Simple * General  
-		disp = add_offset+work->WS[i]; disp2 = R_OFFSET(work->WS[i],NX);
-		for(j=work->WS[i], sum = 0;j<NX;j++,disp++,disp2++)
-		  sum +=work->Rinv[disp2]*work->M[disp];
+		disp = add_offset+work->WS[i]; 
+		if(work->Rinv == NULL)//(Rinv = I)
+		  sum = work->M[disp];
+		else{
+		  disp2 = R_OFFSET(work->WS[i],NX);
+		  for(j=work->WS[i], sum = 0;j<NX;j++,disp++,disp2++)
+			sum +=work->Rinv[disp2]*work->M[disp];
+		}
 	  }
 	  else{// General * General 
 		disp = add_offset; disp2 = NX*(work->WS[i]-N_SIMPLE);
@@ -74,7 +88,6 @@ void update_LDL_add(Workspace *work){
 		}
 	  }
 	  work->L[new_L_start+i] = sum; 
-	  // TODO: softening can be added here
 	}
   }
   //Forward substitution: l <-- L\(Mk*m)  

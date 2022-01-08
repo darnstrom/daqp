@@ -182,11 +182,15 @@ void update_M(Workspace *work){
 void update_v(c_float *f, Workspace *work){
   int i,j,disp;
   const int n = work->n;
-	for(j=n-1,disp=ARSUM(n);j>=0;j--){
-	  for(i=n-1;i>j;i--)
-		work->v[i] +=work->Rinv[--disp]*f[j];
-	  work->v[j]=work->Rinv[--disp]*f[j];
-	}
+  if(work->Rinv == 0){// Rinv = I => v = R'\v = f
+	for(i=0;i<n;++i) work->v[i] = f[i];
+	return;
+  }
+  for(j=n-1,disp=ARSUM(n);j>=0;j--){
+	for(i=n-1;i>j;i--)
+	  work->v[i] +=work->Rinv[--disp]*f[j];
+	work->v[j]=work->Rinv[--disp]*f[j];
+  }
 }
 
 void update_d(Workspace *work){

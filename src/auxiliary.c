@@ -52,7 +52,7 @@ void find_constraint_to_add(Workspace *work){
 	  for(j=work->WS[i], disp=R_OFFSET(work->WS[i],NX);j<NX;j++)
 		work->u[j]-=work->Rinv[disp++]*work->lam_star[i];
 	  }
-	  else work->u[j]-=work->lam_star[work->WS[i]]; // Hessian is identity
+	  else work->u[work->WS[i]]-=work->lam_star[i]; // Hessian is identity
 	}
 	else{ // General constraint
 	  for(j=0,disp=NX*(work->WS[i]-N_SIMPLE);j<NX;j++)
@@ -93,7 +93,7 @@ void find_constraint_to_add(Workspace *work){
 		continue;
 	  }
 	  if(work->Rinv==NULL){// Hessian is identify
-		Mu=work->u[i]; 
+		Mu=work->u[j]; 
 		disp+=NX-j;
 	  }
 	  else{

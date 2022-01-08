@@ -83,23 +83,13 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  qp->n = n;
 	  qp->m = m;
 	  qp->ms = ms;
-	  qp->H= mxGetPr(prhs[2]);
-	  qp->f= mxGetPr(prhs[3]);
+	  qp->H= mxIsEmpty(prhs[2]) ? NULL : mxGetPr(prhs[2]);
+	  qp->f= mxIsEmpty(prhs[3]) ? NULL : mxGetPr(prhs[3]);
 	  qp->A= mxGetPr(prhs[4]);
 	  qp->bupper= mxGetPr(prhs[5]);
 	  qp->blower= mxGetPr(prhs[6]);
 	  qp->sense= (int *)mxGetPr(prhs[7]);
-	  // Copy f and b since these might be used after mex ends
-	  //qp->f = calloc(n,sizeof(c_float));
-	  //qp->bupper = calloc(m,sizeof(c_float));
-	  //qp->blower = calloc(m,sizeof(c_float));
-	  //for(int i=0;i<n;i++) qp->f[i] = f[i];
-	  //for(int i=0;i<m;i++) qp->bupper[i]=bupper[i];	
-	  //for(int i=0;i<m;i++) qp->blower[i]=blower[i];	
-
-	  // Setup QP struct
-	  //QP qp={n,m,ms,H,f,A,bupper,blower,sense};
-	  // Call C API 
+	  
 	  error_flag = setup_daqp(qp,work->settings,work);
 	  if(error_flag < 0){
 		printf("Setup failed (%d)\n",error_flag);
@@ -116,8 +106,8 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  DAQPResult result;
 	  if(work->qp == NULL) mexErrMsgTxt("No problem to solve");
 	  // Update QP pointers 
-	  work->qp->H= mxGetPr(prhs[2]);
-	  work->qp->f= mxGetPr(prhs[3]);
+	  work->qp->H= mxIsEmpty(prhs[2]) ? NULL : mxGetPr(prhs[2]);
+	  work->qp->f= mxIsEmpty(prhs[3]) ? NULL : mxGetPr(prhs[3]);
 	  work->qp->A= mxGetPr(prhs[4]);
 	  work->qp->bupper= mxGetPr(prhs[5]);
 	  work->qp->blower= mxGetPr(prhs[6]);
@@ -186,8 +176,8 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	else if (!strcmp("update", cmd)) {
 	  if(work->qp == NULL) mexErrMsgTxt("No problem to update");
 	  // Update QP pointers 
-	  work->qp->H= mxGetPr(prhs[2]);
-	  work->qp->f= mxGetPr(prhs[3]);
+	  work->qp->H= mxIsEmpty(prhs[2]) ? NULL : mxGetPr(prhs[2]);
+	  work->qp->f= mxIsEmpty(prhs[3]) ? NULL : mxGetPr(prhs[3]);
 	  work->qp->A= mxGetPr(prhs[4]);
 	  work->qp->bupper= mxGetPr(prhs[5]);
 	  work->qp->blower= mxGetPr(prhs[6]);
