@@ -99,16 +99,19 @@ int update_ldp(const int mask, Workspace *work){
 	  return error_flag;
   }
   /** Update M **/
-  if(mask&UPDATE_Rinv||mask&UPDATE_M)
+  if(mask&UPDATE_Rinv||mask&UPDATE_M){
 	update_M(work);
+  }
 
   /** Update v **/
-  if(mask&UPDATE_Rinv||mask&UPDATE_v)
+  if(mask&UPDATE_Rinv||mask&UPDATE_v){
 	update_v(work->qp->f,work);
+  }
   
   /** Update d **/
-  if(mask&UPDATE_Rinv||mask&UPDATE_M||mask&UPDATE_v||mask&UPDATE_d)
+  if(mask&UPDATE_Rinv||mask&UPDATE_M||mask&UPDATE_v||mask&UPDATE_d){
 	update_d(work);
+  }
 
   /** Update constraint sense **/
   if(mask&UPDATE_sense){
@@ -173,6 +176,7 @@ void update_M(Workspace *work){
 	  work->M[disp2-j]=work->Rinv[--disp]*work->qp->A[disp2-j];
 	}
   }
+  reset_daqp_workspace(work); // Internal factorizations need to be redone!
 }
 
 void update_v(c_float *f, Workspace *work){
@@ -211,6 +215,8 @@ void update_d(Workspace *work){
 	work->dupper[i]=work->qp->bupper[i]+sum;
 	work->dlower[i]=work->qp->blower[i]+sum;
   }
+
+  reset_daqp_workspace_warm(work);
 }
 
 /* Profiling */

@@ -29,7 +29,7 @@
 #define R_OFFSET(X,Y) (((2*Y-X+1)*X)/2)
 
 // EXIT FLAGS
-#define EXIT_SOFT_OPTIMAL 1
+#define EXIT_SOFT_OPTIMAL 2 
 #define EXIT_OPTIMAL 1
 #define EXIT_INFEASIBLE -1
 #define EXIT_CYCLE -2

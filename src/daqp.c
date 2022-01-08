@@ -6,7 +6,7 @@
 int daqp(Workspace *work){
   c_float *swp_ptr;
   while(1){
-	if(work->iterations++>work->settings->iter_limit) return EXIT_ITERLIMIT;
+	if(++work->iterations>work->settings->iter_limit) return EXIT_ITERLIMIT;
 	if(work->sing_ind==EMPTY_IND){ 
 	  compute_CSP(work);
 	  if(work->fval > work->fval_bound) return EXIT_INFEASIBLE;
