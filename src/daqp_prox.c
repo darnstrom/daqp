@@ -116,9 +116,7 @@ int gradient_step(Workspace* work){
   }
   if(add_ind == EMPTY_IND) return EMPTY_IND;
   // TODO Maybe don't add to AS?
-  work->add_ind = add_ind;
-  work->add_isupper= add_isupper;
-  add_constraint(work); // Update working set and LDL'
+  add_constraint(work,add_ind,add_isupper); // Update working set and LDL'
   // TODO: Won't this be handled inside daqp anyways? 
   if(work->sing_ind!=EMPTY_IND){// Remove constraint if basis becomes singular 
 	remove_constraint(work,work->sing_ind);

@@ -75,23 +75,19 @@ typedef struct{
   // LDL factors (Mk Mk' = L D L')
   c_float *L;
   c_float *D;
+  // Intermittent variables (LDL') lam_star = -dk
+  c_float* xldl; // Solution to L xdldl = -dk
+  c_float* zldl; // zldl_i = xldl_i/D_i
+  int reuse_ind; // How much work that can be saved when solving Mk Mk' lam* = -dk
 
   int *WS; // Working set
+  int n_active; // Number of active contraints 
 
   int iterations;
   int outer_iter;
   int inner_iter;
   int sing_ind; // Flag for denoting whether Mk Mk' is singular or not 
-  int add_ind; // Index to add to the working set
-  int add_isupper; // Marks if index to add is upper or lower 
-  int n_active; // Number of active contraints 
-  int reuse_ind; // How much work that can be saved when solving Mk Mk' lam* = -dk
-  int cycle_counter; // Number of iterations when no progress has been made
-  int tried_repair; // Flag to mark if repair has taken place 
 
-  // Intermittent variables (LDL') lam_star = -dk
-  c_float* xldl; // Solution to L xdldl = -dk
-  c_float* zldl; // zldl_i = xldl_i/D_i
 
   // Minimum slack for soft constraints
   c_float soft_slack; 

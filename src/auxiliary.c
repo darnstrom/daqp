@@ -19,15 +19,15 @@ void remove_constraint(Workspace* work, const int rm_ind){
   pivot_last(work);
 }
 // Maybe take add_ind as input instead?
-void add_constraint(Workspace *work){
+void add_constraint(Workspace *work, const int add_ind, const int isupper){
   // Update data structures  
-  SET_ACTIVE(work->add_ind);
-  if(work->add_isupper)
-	SET_UPPER(work->add_ind);
+  SET_ACTIVE(add_ind);
+  if(isupper)
+	SET_UPPER(add_ind);
   else
-	SET_LOWER(work->add_ind);
-  update_LDL_add(work);
-  work->WS[work->n_active] = work->add_ind;
+	SET_LOWER(add_ind);
+  update_LDL_add(work, add_ind);
+  work->WS[work->n_active] = add_ind;
   work->lam[work->n_active] = 0;
   work->n_active++;
 
@@ -35,11 +35,8 @@ void add_constraint(Workspace *work){
   pivot_last(work);
 }
 
-void find_constraint_to_add(Workspace *work){
-  int i,j,k,disp;
-  c_float min_val = -work->settings->primal_tol;
-  c_float Mu,soft_slack;
-  int isupper=0, add_ind=EMPTY_IND;
+void compute_primal_and_fval(Workspace *work){
+  int i,j,disp;
   // Reset u & soft slack
   for(j=0;j<NX;j++)
 	work->u[j]=0;
@@ -66,14 +63,17 @@ void find_constraint_to_add(Workspace *work){
 	}
   }
   // Check for progress 
-  c_float fval_diff=work->fval;
+  c_float fval=0;
   for(j=0;j<NX;j++)
-	fval_diff-=work->u[j]*work->u[j]+work->soft_slack*work->soft_slack;
-  if(fval_diff<-work->settings->progress_tol){
-	work->fval -= fval_diff;
-	work->cycle_counter=0;
-  }else work->cycle_counter++;
-  
+	fval+=work->u[j]*work->u[j];
+  fval+=work->soft_slack*work->soft_slack;
+  work->fval = fval;
+}
+int add_infeasible(Workspace *work){
+  int j,k,disp;
+  c_float min_val = -work->settings->primal_tol;
+  c_float Mu,soft_slack;
+  int isupper=0, add_ind=EMPTY_IND;
   // If empty working mu = d
   if(work->n_active==0){  
 	for(j=0;j<N_CONSTR;j++)
@@ -130,8 +130,10 @@ void find_constraint_to_add(Workspace *work){
 	  }
 	}
   }
-  work->add_ind = add_ind;
-  work->add_isupper = isupper;
+  if(add_ind == EMPTY_IND) return 0;
+  add_constraint(work,add_ind,isupper);
+  return 1;
+
 }
 int remove_blocking(Workspace *work){
  int i,rm_ind = EMPTY_IND; 
@@ -215,9 +217,6 @@ void compute_singular_direction(Workspace *work){
   if(IS_LOWER(work->WS[work->sing_ind])) //Flip to ensure descent direction 
 	for(i=0;i<=work->sing_ind;i++)
 	  work->lam_star[i] =-work->lam_star[i];
-
-  for(i =work->sing_ind+1;i<work->n_active;i++) //Probably uneccesary...
-	work->lam_star[i] = 0;
 }
 
 
@@ -262,9 +261,7 @@ void pivot_last(Workspace *work){
 
 	if(work->sing_ind!=EMPTY_IND) return; // Abort if D becomes singular
 
-	work->add_ind = ind_old;
-	work->add_isupper= isupper_old;
-	add_constraint(work);
+	add_constraint(work,ind_old,isupper_old);
 	work->sense[ind_old] = old_sense;
 	work->lam[work->n_active-1] = lam_old;
   }	
@@ -274,8 +271,7 @@ int add_equality_constraints(Workspace *work){
   for(int i =0;i<N_CONSTR;i++){
 	//TODO prioritize inequalities?
 	if(IS_ACTIVE(i)){
-	  work->add_ind=i; 
-	  update_LDL_add(work);
+	  update_LDL_add(work,i);
 	  work->WS[work->n_active] = i;
 	  work->n_active++;
 	  //TODO check singularity and return error

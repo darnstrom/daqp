@@ -5,26 +5,17 @@
 
 int daqp(Workspace *work){
   c_float *swp_ptr;
+  int tried_repair=0, cycle_counter=0;
+  c_float best_fval = -1;
   while(1){
+	/* CHECK TERMINAL CONDITIONS */
 	if(++work->iterations>work->settings->iter_limit) return EXIT_ITERLIMIT;
 	if(work->sing_ind==EMPTY_IND){ 
 	  compute_CSP(work);
-	  if(work->fval > work->fval_bound) return EXIT_INFEASIBLE;
-	  if(work->cycle_counter > work->settings->cycle_tol){
-		if(work->tried_repair==1) return EXIT_CYCLE;
-		else{
-		  // Cycling -> Try to reorder and refactorize LDL
-		  reorder_LDL(work);
-		  warmstart_workspace(work, work->WS,work->n_active);
-		  work->tried_repair=1;
-		  continue;
-		}
-
-	  }
 	  // Check dual feasibility of CSP
 	  if(!remove_blocking(work)){ //lam_star >= 0 (i.e., dual feasible)
-		find_constraint_to_add(work);
-		if(work->add_ind == EMPTY_IND){ //mu >= (i.e., primal feasible)
+		compute_primal_and_fval(work);
+		if(!add_infeasible(work)){ //mu >= (i.e., primal feasible)
 		  // All KKT-conditions satisfied -> optimum found 
 		  ldp2qp_solution(work); 
 		  if(work->soft_slack > work->settings->primal_tol) 
@@ -35,8 +26,21 @@ int daqp(Workspace *work){
 		else{
 		  // Set lam = lam_star
 		  swp_ptr=work->lam; work->lam = work->lam_star; work->lam_star=swp_ptr;
+		}
 
-		  add_constraint(work);
+		/* Check fval terminal conditions */
+		if(best_fval > work->fval+work->settings->progress_tol){ 
+		  if(cycle_counter++ > work->settings->cycle_tol && tried_repair++ == 1) 
+			return EXIT_CYCLE;
+		  else{// Cycling -> Try to reorder and refactorize LDL
+			reorder_LDL(work);
+			warmstart_workspace(work, work->WS,work->n_active);
+		  }
+		}
+		else{ // Progress was made
+		  best_fval = work->fval;
+		  cycle_counter = 0;
+		  if(best_fval > work->fval_bound) return EXIT_INFEASIBLE;
 		}
 	  }
 	}
@@ -66,8 +70,7 @@ void warmstart_workspace(Workspace* work, int* WS, const int n_active){
   reset_daqp_workspace(work); // Reset workspace
   for(int i = 0; i<n_active; i++){
 	if(work->sing_ind!=EMPTY_IND){ //If  
-	  work->add_ind = WS[i];
-	  add_constraint(work);
+	  add_constraint(work,WS[i],0); // TODO: replace 0 with upper/lower...
 	  work->lam[i] = 1;
 	}else{ //Make sure that the unadded constraints are inactive in sense
 	  SET_INACTIVE(work->WS[i]);
@@ -130,11 +133,8 @@ void reset_daqp_workspace(Workspace *work){
   work->inner_iter=0;
   work->outer_iter=0;
   work->sing_ind=EMPTY_IND;
-  work->add_ind=EMPTY_IND;
   work->n_active =0;
   work->reuse_ind=0;
-  work->cycle_counter=0;
-  work->tried_repair=0;
   work->fval= -1;
   work->fval_bound= INF;
 }

@@ -1,6 +1,6 @@
 #include "factorization.h"
 #include <stdio.h>
-void update_LDL_add(Workspace *work){
+void update_LDL_add(Workspace *work, const int add_ind){
   work->sing_ind = EMPTY_IND;
   int add_offset;
   int i,j,disp,disp2;
@@ -9,19 +9,19 @@ void update_LDL_add(Workspace *work){
 
   // di <-- Mi' Mi
   // If normalized this will always be 1...
-  if(IS_SIMPLE(work->add_ind)){
-	add_offset = R_OFFSET(work->add_ind,NX); 
+  if(IS_SIMPLE(add_ind)){
+	add_offset = R_OFFSET(add_ind,NX); 
 	if(work->Rinv==NULL) 
 	  sum=1; // Hessian is identity
 	else 
-	  for(i=work->add_ind,disp= add_offset, sum=0;i<NX;i++,disp++)
+	  for(i=add_ind,disp= add_offset, sum=0;i<NX;i++,disp++)
 		sum+=(work->Rinv[disp])*(work->Rinv[disp]);
   }
   else{ // Mi is a general constraint
-	add_offset = (NX)*(work->add_ind-N_SIMPLE);
+	add_offset = (NX)*(add_ind-N_SIMPLE);
 	for(i=0,disp=add_offset,sum=0;i<NX;i++,disp++)
 	  sum+=(work->M[disp])*(work->M[disp]);
-	if(IS_SOFT(work->add_ind))
+	if(IS_SOFT(add_ind))
 	  sum+=SQUARE(work->settings->rho_soft);
   }
   work->D[work->n_active] = sum;
@@ -29,34 +29,34 @@ void update_LDL_add(Workspace *work){
   if(work->n_active==0) return;
 
   // store l <-- Mk* m
-  if(IS_SIMPLE(work->add_ind)){
+  if(IS_SIMPLE(add_ind)){
 	for(i=0;i<work->n_active;i++){
 	  if(IS_SIMPLE(work->WS[i])){ // Simple*Simple 
 		if(work->Rinv==NULL){ 
 		  work->L[new_L_start+i] = 0;// Always orthogonal when Rinv = I
 		  continue;
 		}
-		if(work->add_ind < work->WS[i]){
-		  disp = add_offset+(work->WS[i]-work->add_ind); 
+		if(add_ind < work->WS[i]){
+		  disp = add_offset+(work->WS[i]-add_ind); 
 		  disp2 = R_OFFSET(work->WS[i],NX);
 		  for(j=work->WS[i], sum = 0;j<NX;j++,disp++,disp2++)
 			sum+=work->Rinv[disp2]*work->Rinv[disp];
 		}
 		else{
 		  disp = add_offset;
-		  disp2 = R_OFFSET(work->WS[i],NX)+(work->add_ind-work->WS[i]);
-		  for(j=work->add_ind, sum = 0;j<NX;j++,disp++,disp2++)
+		  disp2 = R_OFFSET(work->WS[i],NX)+(add_ind-work->WS[i]);
+		  for(j=add_ind, sum = 0;j<NX;j++,disp++,disp2++)
 			sum+=work->Rinv[disp2]*work->Rinv[disp];
 		}
 
 	  }
 	  else{ // General * Simple
-		disp2 = NX*(work->WS[i]-N_SIMPLE)+work->add_ind;
+		disp2 = NX*(work->WS[i]-N_SIMPLE)+add_ind;
 		if(work->Rinv==NULL)
 		  sum = work->M[disp2];
 		else{
 		  disp = add_offset;
-		  for(j=work->add_ind, sum = 0;j<NX;j++,disp++,disp2++){
+		  for(j=add_ind, sum = 0;j<NX;j++,disp++,disp2++){
 			sum +=work->M[disp2]*work->Rinv[disp];
 		  }
 		}
@@ -80,8 +80,8 @@ void update_LDL_add(Workspace *work){
 		disp = add_offset; disp2 = NX*(work->WS[i]-N_SIMPLE);
 		for(j=0, sum = 0;j<NX;j++,disp++,disp2++)
 		  sum +=work->M[disp2]*work->M[disp];
-		if(IS_SOFT(work->add_ind) && IS_SOFT(work->WS[i])){
-		  if(IS_LOWER(work->add_ind)^IS_LOWER(work->WS[i]))
+		if(IS_SOFT(add_ind) && IS_SOFT(work->WS[i])){
+		  if(IS_LOWER(add_ind)^IS_LOWER(work->WS[i]))
 			sum -= SQUARE(work->settings->rho_soft);
 		  else
 			sum += SQUARE(work->settings->rho_soft);
