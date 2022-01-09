@@ -5,6 +5,6 @@
 #include "constants.h"
 
 void update_LDL_add(Workspace *work);
-void update_LDL_remove(Workspace *work);
+void update_LDL_remove(Workspace *work, const int rm_ind);
 
 #endif //ifndef DAQP_FACTORIZATION_H

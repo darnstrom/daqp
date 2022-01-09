@@ -4,7 +4,7 @@
 #include "types.h"
 #include "constants.h"
 
-void remove_constraint(Workspace* work);
+void remove_constraint(Workspace* work, const int rm_ind);
 void add_constraint(Workspace *work);
 void find_constraint_to_add(Workspace *work);
 int remove_blocking(Workspace *work);

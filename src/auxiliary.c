@@ -1,19 +1,19 @@
 #include "auxiliary.h"
 #include "factorization.h"
 #include <stdio.h> 
-void remove_constraint(Workspace* work){
+void remove_constraint(Workspace* work, const int rm_ind){
   int i;
   // Update data structures
-  SET_INACTIVE(work->WS[work->rm_ind]); 
-  update_LDL_remove(work);
+  SET_INACTIVE(work->WS[rm_ind]); 
+  update_LDL_remove(work,rm_ind);
   (work->n_active)--;
-  for(i=work->rm_ind;i<work->n_active;i++){
+  for(i=rm_ind;i<work->n_active;i++){
 	work->WS[i] = work->WS[i+1]; 
 	work->lam[i] = work->lam[i+1]; 
   }
   // Can only reuse work less than the ind that was removed 
-  if(work->rm_ind < work->reuse_ind)
-	work->reuse_ind = work->rm_ind;
+  if(rm_ind < work->reuse_ind)
+	work->reuse_ind = rm_ind;
   
   // Pivot for improved numerics
   pivot_last(work);
@@ -157,9 +157,8 @@ int remove_blocking(Workspace *work){
    work->lam[i]+=alpha*(work->lam_star[i]-work->lam[i]);
  
  // Remove the constraint from the working set and update LDL
- work->rm_ind = rm_ind;
  work->sing_ind=EMPTY_IND;
- remove_constraint(work);
+ remove_constraint(work,rm_ind);
  return 1;
 }
 
@@ -253,13 +252,13 @@ void reorder_LDL(Workspace *work){
 void pivot_last(Workspace *work){
   if(work->n_active > 1 && work->D[work->n_active-2] < work->settings->pivot_tol && 
 	 work->D[work->n_active-2] < work->D[work->n_active-1]){
-	work->rm_ind = work->n_active-2; 
-	int ind_old = work->WS[work->rm_ind];
-	int isupper_old = IS_LOWER(ind_old)? 0:1;   
-	int old_sense =work->sense[ind_old]; // Make sure that equality constraints are retained... 
+	const int rm_ind = work->n_active-2; 
+	const int ind_old = work->WS[rm_ind];
+	const int isupper_old = IS_LOWER(ind_old)? 0:1;   
+	const int old_sense =work->sense[ind_old]; // Make sure that equality constraints are retained... 
 
-	c_float lam_old = work->lam[work->rm_ind];
-	remove_constraint(work);
+	c_float lam_old = work->lam[rm_ind];
+	remove_constraint(work,rm_ind);
 
 	if(work->sing_ind!=EMPTY_IND) return; // Abort if D becomes singular
 

@@ -121,8 +121,7 @@ int gradient_step(Workspace* work){
   add_constraint(work); // Update working set and LDL'
   // TODO: Won't this be handled inside daqp anyways? 
   if(work->sing_ind!=EMPTY_IND){// Remove constraint if basis becomes singular 
-	work->rm_ind = work->sing_ind;
-	remove_constraint(work);
+	remove_constraint(work,work->sing_ind);
 	work->sing_ind = EMPTY_IND;
   }
   else{

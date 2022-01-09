@@ -131,7 +131,6 @@ void reset_daqp_workspace(Workspace *work){
   work->outer_iter=0;
   work->sing_ind=EMPTY_IND;
   work->add_ind=EMPTY_IND;
-  work->rm_ind=EMPTY_IND;
   work->n_active =0;
   work->reuse_ind=0;
   work->cycle_counter=0;

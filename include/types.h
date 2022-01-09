@@ -84,7 +84,6 @@ typedef struct{
   int sing_ind; // Flag for denoting whether Mk Mk' is singular or not 
   int add_ind; // Index to add to the working set
   int add_isupper; // Marks if index to add is upper or lower 
-  int rm_ind; // Index to remove from the working set
   int n_active; // Number of active contraints 
   int reuse_ind; // How much work that can be saved when solving Mk Mk' lam* = -dk
   int cycle_counter; // Number of iterations when no progress has been made

@@ -116,20 +116,20 @@ void update_LDL_add(Workspace *work){
   }
 }
 
-void update_LDL_remove(Workspace *work){
-  if(work->n_active==work->rm_ind+1)
+void update_LDL_remove(Workspace *work, const int rm_ind){
+  if(work->n_active==rm_ind+1)
 	return;
-  int i, j, r, old_disp, new_disp, w_count, n_update=work->n_active-work->rm_ind-1;
-  c_float* w = &work->zldl[work->rm_ind]; // Since zldl will be obsolete use that memory to save some allocations..
+  int i, j, r, old_disp, new_disp, w_count, n_update=work->n_active-rm_ind-1;
+  c_float* w = &work->zldl[rm_ind]; // Since zldl will be obsolete use that memory to save some allocations..
   // Extract parts to keep/update in L & D
-  new_disp=ARSUM(work->rm_ind);
-  old_disp=new_disp+(work->rm_ind+1);
+  new_disp=ARSUM(rm_ind);
+  old_disp=new_disp+(rm_ind+1);
   w_count= 0;
   // Remove column rm_ind (and add parts of L in its new place)
   // I.e., copy row i into i-1
-  for(i = work->rm_ind+1;i<work->n_active;old_disp++,new_disp++,i++) //(disp++ skips blank element)..
+  for(i = rm_ind+1;i<work->n_active;old_disp++,new_disp++,i++) //(disp++ skips blank element)..
 	for(j=0;j<i;j++){ 
-	  if(j!=work->rm_ind)
+	  if(j!=rm_ind)
 		work->L[new_disp++]=work->L[old_disp++];
 	  else
 		w[w_count++] = work->L[old_disp++];
@@ -137,10 +137,10 @@ void update_LDL_remove(Workspace *work){
   // Algorithm C1 in Gill 1974 for low-rank update of LDL 
   // (L2 block...)
   // TODO the disp can most likely be done cleaner...
-  c_float p,beta,d_bar,alpha=work->D[work->rm_ind];
+  c_float p,beta,d_bar,alpha=work->D[rm_ind];
   // i - Element/row to update|j - Column which is looped over|r - Row to loop over
-  old_disp=ARSUM(work->rm_ind)+work->rm_ind;
-  for(j = 0, i=work->rm_ind; j<n_update;j++,i++){
+  old_disp=ARSUM(rm_ind)+rm_ind;
+  for(j = 0, i=rm_ind; j<n_update;j++,i++){
 	p=w[j];
 	d_bar = work->D[i+1]+alpha*p*p; 
 	beta = p*alpha/d_bar;
@@ -156,7 +156,7 @@ void update_LDL_remove(Workspace *work){
 	for(r=j+1, new_disp=old_disp+j;r<n_update;r++){
 	  w[r] -= p*work->L[new_disp];//instead, initialize new_disp+j
 	  work->L[new_disp]+= beta*w[r]; //Use sum to block register
-	  new_disp+=work->rm_ind+r+1; //Update to the id which starts the next row in L
+	  new_disp+=rm_ind+r+1; //Update to the id which starts the next row in L
 	}
   }
 }
