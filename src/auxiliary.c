@@ -151,11 +151,16 @@ int remove_blocking(Workspace *work){
 	 rm_ind = i;
    }
  }
- if(rm_ind == EMPTY_IND) return EMPTY_IND; // Either optimal or infeasible
+ if(rm_ind == EMPTY_IND) return 0; // Either dual feasible or primal infeasible
  // If blocking constraint -> update lambda
  for(i=0;i<work->n_active;i++)
    work->lam[i]+=alpha*(work->lam_star[i]-work->lam[i]);
- return rm_ind;
+ 
+ // Remove the constraint from the working set and update LDL
+ work->rm_ind = rm_ind;
+ work->sing_ind=EMPTY_IND;
+ remove_constraint(work);
+ return 1;
 }
 
 void compute_CSP(Workspace *work){

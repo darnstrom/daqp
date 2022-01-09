@@ -22,8 +22,7 @@ int daqp(Workspace *work){
 
 	  }
 	  // Check dual feasibility of CSP
-	  work->rm_ind=remove_blocking(work);
-	  if(work->rm_ind==EMPTY_IND){ //lam_star >= 0 (i.e., dual feasible)
+	  if(!remove_blocking(work)){ //lam_star >= 0 (i.e., dual feasible)
 		find_constraint_to_add(work);
 		if(work->add_ind == EMPTY_IND){ //mu >= (i.e., primal feasible)
 		  // All KKT-conditions satisfied -> optimum found 
@@ -40,18 +39,10 @@ int daqp(Workspace *work){
 		  add_constraint(work);
 		}
 	  }
-	  else{// Blocking constraints -> remove constraint from working set
-		remove_constraint(work);
-	  }
 	}
 	else{// Singular case
 	  compute_singular_direction(work);
-	  work->rm_ind=remove_blocking(work);
-	  if(work->rm_ind==EMPTY_IND) return EXIT_INFEASIBLE;
-	  else{
-		work->sing_ind=EMPTY_IND;
-		remove_constraint(work);
-	  }
+	  if(!remove_blocking(work)) return EXIT_INFEASIBLE;
 	}
   }
 }
