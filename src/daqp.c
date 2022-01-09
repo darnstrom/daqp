@@ -22,8 +22,8 @@ int daqp(Workspace *work){
 
 	  }
 	  // Check dual feasibility of CSP
-	  find_blocking_constraints(work);
-	  if(work->n_blocking==0){ //lam_star >= 0 (i.e., dual feasible)
+	  work->rm_ind=remove_blocking(work);
+	  if(work->rm_ind==EMPTY_IND){ //lam_star >= 0 (i.e., dual feasible)
 		find_constraint_to_add(work);
 		if(work->add_ind == EMPTY_IND){ //mu >= (i.e., primal feasible)
 		  // All KKT-conditions satisfied -> optimum found 
@@ -41,18 +41,14 @@ int daqp(Workspace *work){
 		}
 	  }
 	  else{// Blocking constraints -> remove constraint from working set
-		for(int i=0; i<work->n_active;i++)// p = lam^*-lam (stored in lam^*)
-		  work->lam_star[i]-=work->lam[i];
-		compute_alpha_and_rm_blocking(work);
 		remove_constraint(work);
 	  }
 	}
 	else{// Singular case
 	  compute_singular_direction(work);
-	  find_blocking_constraints(work);
-	  if(work->n_blocking==0) return EXIT_INFEASIBLE;
+	  work->rm_ind=remove_blocking(work);
+	  if(work->rm_ind==EMPTY_IND) return EXIT_INFEASIBLE;
 	  else{
-		compute_alpha_and_rm_blocking(work);
 		work->sing_ind=EMPTY_IND;
 		remove_constraint(work);
 	  }
@@ -99,7 +95,6 @@ void allocate_daqp_workspace(Workspace *work, int n){
   work->lam_star = malloc((n+1)*sizeof(c_float));
   
   work->WS= malloc((n+1)*sizeof(int));
-  work->BS= malloc((n+1)*sizeof(int));
   
   work->L= malloc(((n+1)*(n+2)/2)*sizeof(c_float));
   work->D= malloc((n+1)*sizeof(c_float));
@@ -123,7 +118,6 @@ void free_daqp_workspace(Workspace *work){
 	free(work->lam_star);
 
 	free(work->WS);
-	free(work->BS);
 
 	free(work->L);
 	free(work->D);
@@ -148,7 +142,6 @@ void reset_daqp_workspace(Workspace *work){
   work->add_ind=EMPTY_IND;
   work->rm_ind=EMPTY_IND;
   work->n_active =0;
-  work->n_blocking=0;
   work->reuse_ind=0;
   work->cycle_counter=0;
   work->tried_repair=0;

@@ -77,7 +77,6 @@ typedef struct{
   c_float *D;
 
   int *WS; // Working set
-  int *BS; // Set of blocking constraints 
 
   int iterations;
   int outer_iter;
@@ -87,7 +86,6 @@ typedef struct{
   int add_isupper; // Marks if index to add is upper or lower 
   int rm_ind; // Index to remove from the working set
   int n_active; // Number of active contraints 
-  int n_blocking; // Number of blocking constraints  
   int reuse_ind; // How much work that can be saved when solving Mk Mk' lam* = -dk
   int cycle_counter; // Number of iterations when no progress has been made
   int tried_repair; // Flag to mark if repair has taken place 

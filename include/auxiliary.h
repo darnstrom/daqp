@@ -7,6 +7,7 @@
 void remove_constraint(Workspace* work);
 void add_constraint(Workspace *work);
 void find_constraint_to_add(Workspace *work);
+int remove_blocking(Workspace *work);
 void find_blocking_constraints(Workspace *work);
 void compute_alpha_and_rm_blocking(Workspace *work);
 void compute_CSP(Workspace *work);

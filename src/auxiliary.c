@@ -133,36 +133,31 @@ void find_constraint_to_add(Workspace *work){
   work->add_ind = add_ind;
   work->add_isupper = isupper;
 }
-void find_blocking_constraints(Workspace *work){
-  c_float violation;
-  work->n_blocking=0;
-  for(int i=0;i<work->n_active;i++){
-	if(IS_IMMUTABLE(work->WS[i])) continue;
-	if(IS_LOWER(work->WS[i])) 
-	  violation = work->lam_star[i]-work->settings->dual_tol;
-	else
-	  violation = -work->lam_star[i]-work->settings->dual_tol;
-	if(violation>0)
-	  work->BS[work->n_blocking++]=i;
-  }
+int remove_blocking(Workspace *work){
+ int i,rm_ind = EMPTY_IND; 
+ c_float alpha=INF;
+ c_float alpha_cand;
+ const c_float dual_tol = work->settings->dual_tol;
+ for(int i=0;i<work->n_active;i++){
+   if(IS_IMMUTABLE(work->WS[i])) continue;
+   if(IS_LOWER(work->WS[i])){
+	 if(work->lam_star[i]<dual_tol) continue; //lam <= 0 for lower -> dual feasible
+   }
+   else if(work->lam_star[i]>-dual_tol) continue; //lam* >= 0 for upper-> dual feasible
+
+   alpha_cand= -work->lam[i]/(work->lam_star[i]-work->lam[i]);
+   if(alpha_cand < alpha){
+	 alpha = alpha_cand; 
+	 rm_ind = i;
+   }
+ }
+ if(rm_ind == EMPTY_IND) return EMPTY_IND; // Either optimal or infeasible
+ // If blocking constraint -> update lambda
+ for(i=0;i<work->n_active;i++)
+   work->lam[i]+=alpha*(work->lam_star[i]-work->lam[i]);
+ return rm_ind;
 }
-void compute_alpha_and_rm_blocking(Workspace *work){
-  // p is stored in lam_star...
-  int i;
-  c_float alpha_cand; 
-  c_float alpha=-work->lam[work->BS[0]]/work->lam_star[work->BS[0]]; 
-  work->rm_ind = work->BS[0];
-  for(i=1;i<work->n_blocking;i++){
-	alpha_cand = -work->lam[work->BS[i]]/work->lam_star[work->BS[i]];
-	if(alpha_cand < alpha){
-	  alpha = alpha_cand;
-	  work->rm_ind =work->BS[i]; 
-	}
-  }
-  // lam = lam + alpha p
-  for(i=0;i<work->n_active;i++)
-	work->lam[i]+=alpha*work->lam_star[i];
-}
+
 void compute_CSP(Workspace *work){
   int i,j,disp,start_disp;
   double sum;
