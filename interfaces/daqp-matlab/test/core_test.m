@@ -3,6 +3,7 @@ classdef core_test < matlab.unittest.TestCase
   methods (Test)
 	function random_feasible_QPs(testCase)
 	  % Test on randomly generated feasible QPs
+	  rng('default');
 	  nQPs = 100;
 	  n = 100; m = 500; ms = 50;
 	  nAct = 80;
@@ -25,6 +26,7 @@ classdef core_test < matlab.unittest.TestCase
 	end
 	function prox_random_feasible_QPs(testCase)
 	  % Test on randomly generated feasible QPs
+	  rng('default');
 	  nQPs = 100;
 	  n = 100; m = 500; ms = 50;
 	  nAct = 80;
@@ -64,6 +66,34 @@ classdef core_test < matlab.unittest.TestCase
 	  [~,~,exitflag,info] = d.solve();
 	  testCase.verifyEqual(exitflag,int32(2));
 	end
+	
+	function random_feasible_LPs(testCase)
+	  % Test on randomly generated feasible LPs
+	  rng('default');
+	  nQPs = 100;
+	  n = 200; m = 1000; ms = 100;
+	  tol = 1e-4;
+	  solve_times = zeros(nQPs,1);
+	  for i = 1:nQPs
+		[xref,f,A,bupper,blower,sense]=generate_test_LP(n,m,ms);
+		d = daqp();
+		d.setup([],f,A,bupper,blower,sense);
+		d.settings('eps_prox',1);
+		d.settings('iter_limit',2500);
+		[x,fval,exitflag, info] = d.solve(); 
+
+		testCase.verifyEqual(exitflag,int32(1));
+		testCase.verifyLessThan(norm(x-xref),tol);
+		if(norm(x-xref)>tol)
+		  x_linprog = linprog(f,[A;-A],[bupper(ms+1:end);-blower(ms+1:end)],[],[],[blower(1:ms);-inf(n-ms,1)],[bupper(1:ms);inf(n-ms,1)]);
+		  fprintf('Linprog error: %f\n',norm(xref-x_linprog));
+		  disp(info)
+		end
+		solve_times(i) = info.solve_time;
+	  end
+	  fprintf('\n========================== DALP =============================\n')
+	  fprintf('Solve times [s]: |avg: %2.6f| max: %2.6f| min %2.6f|\n',mean(solve_times),max(solve_times),min(solve_times))
+	  fprintf('=============================================================\n')
+	end
   end
 end
-
