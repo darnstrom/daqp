@@ -71,8 +71,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  if(work->qp) mexErrMsgTxt("Setup already completed.");
 	  QP *qp = calloc(1,sizeof(QP));
 	  // Extract data
-	  double *H,*f,*A,*bupper,*blower;
-	  int *sense,error_flag;
+	  int error_flag;
 	  
 	  // Get dimensions 
 	  int n = mxGetM(prhs[4]);
@@ -100,7 +99,6 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  return;
 	}
 	else if (!strcmp("solve", cmd)) {
-	  int error_flag;
 	  double *fval;
 	  int *exitflag;
 	  DAQPResult result;
