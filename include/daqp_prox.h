@@ -6,6 +6,5 @@
 #include "daqp.h"
 
 int daqp_prox(Workspace *work);
-int gradient_step(Workspace* work);
 
 #endif //ifndef DAQP_PROX_H 
