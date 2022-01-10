@@ -197,7 +197,7 @@ void update_d(Workspace *work){
   /* Compute d  = b+M*v */
   // Simple bounds 
   int i,j,disp;
-  double sum;
+  c_float sum;
   const int n = work->n;
   if(work->Rinv !=NULL){
 	for(i = 0,disp=0;i<N_SIMPLE;i++){

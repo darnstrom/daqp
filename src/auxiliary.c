@@ -165,7 +165,7 @@ int remove_blocking(Workspace *work){
 
 void compute_CSP(Workspace *work){
   int i,j,disp,start_disp;
-  double sum;
+  c_float sum;
   // Forward substitution (xi <-- L\d)
   for(i=work->reuse_ind,disp=ARSUM(work->reuse_ind); i<work->n_active; i++){
 	// Setup RHS
