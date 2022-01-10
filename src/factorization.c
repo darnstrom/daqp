@@ -1,5 +1,4 @@
 #include "factorization.h"
-#include <stdio.h>
 void update_LDL_add(Workspace *work, const int add_ind){
   work->sing_ind = EMPTY_IND;
   int add_offset;

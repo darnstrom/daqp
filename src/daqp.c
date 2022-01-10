@@ -1,5 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
 #include "daqp.h" 
 
 
@@ -78,54 +76,6 @@ void warmstart_workspace(Workspace* work, int* WS, const int n_active){
   }
 }
 
-// Allocate memory for iterates  
-void allocate_daqp_workspace(Workspace *work, int n){
-  work->n = n;
-  n = n + 1; //To account for soft_constraints
-  work->Rinv = NULL;
-  work->v = NULL;
-
-  work->lam = malloc((n+1)*sizeof(c_float));
-  work->lam_star = malloc((n+1)*sizeof(c_float));
-  
-  work->WS= malloc((n+1)*sizeof(int));
-  
-  work->L= malloc(((n+1)*(n+2)/2)*sizeof(c_float));
-  work->D= malloc((n+1)*sizeof(c_float));
-
-  work->xldl= malloc((n+1)*sizeof(c_float));
-  work->zldl= malloc((n+1)*sizeof(c_float));
-  
-  work->u= malloc(n*sizeof(c_float));
-  work->x = work->u; 
-  
-  work->xold= malloc(n*sizeof(c_float));
-
-  reset_daqp_workspace(work);
-}
-
-
-// Free memory for iterates
-void free_daqp_workspace(Workspace *work){
-  if(work->lam != NULL){
-	free(work->lam);
-	free(work->lam_star);
-
-	free(work->WS);
-
-	free(work->L);
-	free(work->D);
-
-	free(work->xldl);
-	free(work->zldl);
-
-	free(work->u);
-
-	free(work->xold);
-
-	work->lam = NULL;
-  }
-}
 
 // Reset workspace to default values
 void reset_daqp_workspace(Workspace *work){

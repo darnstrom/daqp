@@ -1,6 +1,5 @@
 #include "auxiliary.h"
 #include "factorization.h"
-#include <stdio.h> 
 void remove_constraint(Workspace* work, const int rm_ind){
   int i;
   // Update data structures
@@ -279,20 +278,4 @@ int add_equality_constraints(Workspace *work){
 	}
   }
   return 1;
-}
-
-void daqp_default_settings(DAQPSettings* settings){
-  settings->primal_tol = DEFAULT_PRIM_TOL;
-  settings->dual_tol = DEFAULT_DUAL_TOL; 
-  settings->zero_tol = DEFAULT_ZERO_TOL;
-  settings->pivot_tol = DEFAULT_PIVOT_TOL;
-  settings->progress_tol= DEFAULT_PROG_TOL;
-
-  settings->cycle_tol = DEFAULT_CYCLE_TOL;
-  settings->iter_limit = DEFAULT_ITER_LIMIT;
-
-  settings->eps_prox = 0;
-  settings->eta_prox = DEFAULT_ETA;
-  settings->prox_iter_limit = DEFAULT_PROX_ITER_LIMIT; 
-  settings->rho_soft = DEFAULT_RHO_SOFT; 
 }

@@ -130,6 +130,55 @@ void free_daqp_ldp(Workspace *work){
   work->sense = NULL;
 }
 
+// Allocate memory for iterates  
+void allocate_daqp_workspace(Workspace *work, int n){
+  work->n = n;
+  n = n + 1; //To account for soft_constraints
+  work->Rinv = NULL;
+  work->v = NULL;
+
+  work->lam = malloc((n+1)*sizeof(c_float));
+  work->lam_star = malloc((n+1)*sizeof(c_float));
+  
+  work->WS= malloc((n+1)*sizeof(int));
+  
+  work->L= malloc(((n+1)*(n+2)/2)*sizeof(c_float));
+  work->D= malloc((n+1)*sizeof(c_float));
+
+  work->xldl= malloc((n+1)*sizeof(c_float));
+  work->zldl= malloc((n+1)*sizeof(c_float));
+  
+  work->u= malloc(n*sizeof(c_float));
+  work->x = work->u; 
+  
+  work->xold= malloc(n*sizeof(c_float));
+
+  reset_daqp_workspace(work);
+}
+
+
+// Free memory for iterates
+void free_daqp_workspace(Workspace *work){
+  if(work->lam != NULL){
+	free(work->lam);
+	free(work->lam_star);
+
+	free(work->WS);
+
+	free(work->L);
+	free(work->D);
+
+	free(work->xldl);
+	free(work->zldl);
+
+	free(work->u);
+
+	free(work->xold);
+
+	work->lam = NULL;
+  }
+}
+
 void daqp_extract_result(DAQPResult* res, Workspace* work){
   // Extract optimal solution and correct fval offset
   res->fval = work->fval;
@@ -141,4 +190,20 @@ void daqp_extract_result(DAQPResult* res, Workspace* work){
   res->soft_slack = work->soft_slack;
   res->iter = work->inner_iter;
   res->outer_iter = work->outer_iter; // TODO add iter...
+}
+
+void daqp_default_settings(DAQPSettings* settings){
+  settings->primal_tol = DEFAULT_PRIM_TOL;
+  settings->dual_tol = DEFAULT_DUAL_TOL; 
+  settings->zero_tol = DEFAULT_ZERO_TOL;
+  settings->pivot_tol = DEFAULT_PIVOT_TOL;
+  settings->progress_tol= DEFAULT_PROG_TOL;
+
+  settings->cycle_tol = DEFAULT_CYCLE_TOL;
+  settings->iter_limit = DEFAULT_ITER_LIMIT;
+
+  settings->eps_prox = 0;
+  settings->eta_prox = DEFAULT_ETA;
+  settings->prox_iter_limit = DEFAULT_PROX_ITER_LIMIT; 
+  settings->rho_soft = DEFAULT_RHO_SOFT; 
 }
