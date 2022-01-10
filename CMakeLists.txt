@@ -28,10 +28,14 @@ install(TARGETS daqp EXPORT  ${PROJECT_NAME}
 install(FILES ${daqp_headers} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/daqp")
 
 if(MATLAB)
-  find_package(Matlab REQUIRED MAIN_PROGRAM)
+  find_package(Matlab)
   set(MATLAB_INTERFACE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/interfaces/daqp-matlab")
   matlab_add_mex(NAME daqpmex SRC ${MATLAB_INTERFACE_DIR}/daqpmex.c LINK_TO daqpstat)
   set_target_properties(daqpmex PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${MATLAB_INTERFACE_DIR})
+endif()
+
+if(MATLABTEST)
+  find_package(Matlab REQUIRED MAIN_PROGRAM)
   enable_testing()
   matlab_add_unit_test(NAME core_test UNITTEST_FILE ${MATLAB_INTERFACE_DIR}/test/core_test.m ADDITIONAL_PATH ${MATLAB_INTERFACE_DIR} ${MATLAB_INTERFACE_DIR}/utils)
 endif()
