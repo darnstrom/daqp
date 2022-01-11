@@ -91,12 +91,12 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  
 	  error_flag = setup_daqp(qp,work->settings,work);
 	  if(error_flag < 0){
-		printf("Setup failed (%d)\n",error_flag);
 		free(work->qp);
 		work->qp = NULL;
 	  }
 
-	  return;
+
+	  plhs[0] = mxCreateDoubleScalar(error_flag);
 	}
 	else if (!strcmp("solve", cmd)) {
 	  double *fval;

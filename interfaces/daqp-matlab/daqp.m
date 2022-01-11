@@ -11,13 +11,21 @@ classdef daqp< handle
   methods(Static)
 	function [x,fval,exitflag,info] = quadprog(H,f,A,bupper,blower,sense)
 	  d = daqp();
-	  d.setup(H,f,A,bupper,blower,sense);
+	  exitflag = d.setup(H,f,A,bupper,blower,sense);
+	  if(exitflag <0)
+		x = [];fval=[];info=[];
+		return; 
+	  end
 	  [x,fval,exitflag,info] = d.solve();
 	end
 
 	function [x,fval,exitflag,info] = linprog(f,A,bupper,blower,sense)
 	  d = daqp();
-	  d.setup([],f,A,bupper,blower,sense);
+	  exitflag = d.setup([],f,A,bupper,blower,sense);
+	  if(exitflag <0)
+		x = [];fval=[];info=[];
+		return; 
+	  end
 	  d.settings('eps_prox',1);
 	  d.settings('eta_prox',1e-6);
 	  [x,fval,exitflag,info] = d.solve();
@@ -40,7 +48,7 @@ classdef daqp< handle
 	  [x,fval,exitflag,info] = daqpmex('solve', this.work_ptr,...
 		this.H,this.f,this.A,this.bupper,this.blower,this.sense);
 	end
-	function setup(this,H,f,A,bupper,blower,sense)
+	function exitflag = setup(this,H,f,A,bupper,blower,sense)
 	  % TODO Check validity
 	  % TODO match double/single with c_float... 
 	  this.n = length(f);
@@ -52,7 +60,7 @@ classdef daqp< handle
 	  this.bupper = double(bupper);
 	  this.blower = double(blower);
 	  this.sense = int32(sense);
-	  daqpmex('setup', this.work_ptr,this.H,this.f,this.A,this.bupper,this.blower,this.sense);
+	  exitflag = daqpmex('setup', this.work_ptr,this.H,this.f,this.A,this.bupper,this.blower,this.sense);
 	end
 
 	function settings = settings(this,varargin)
