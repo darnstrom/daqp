@@ -108,8 +108,9 @@ void update_LDL_add(Workspace *work, const int add_ind){
   work->D[work->n_active]=sum;
 
   // Check for singularity
-  //if(work->D[work->n_active]<work->settings->zero_tol||work->n_active==work->n+1){
-  if(work->D[work->n_active]<work->settings->zero_tol){
+  if(work->D[work->n_active]<work->settings->zero_tol||
+	 (work->n_active >= work->n && IS_SOFT(add_ind)==HARD && work->soft_slack < work->settings->zero_tol) || 
+	 (work->n_active > work->n)){
 	work->sing_ind=work->n_active;
 	work->D[work->n_active]=0;
   }
