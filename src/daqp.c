@@ -1,6 +1,5 @@
 #include "daqp.h" 
 
-
 int daqp(Workspace *work){
   c_float *swp_ptr;
   int tried_repair=0, cycle_counter=0;
@@ -28,11 +27,16 @@ int daqp(Workspace *work){
 
 		/* Check fval terminal conditions */
 		if(best_fval > work->fval+work->settings->progress_tol){ 
-		  if(cycle_counter++ > work->settings->cycle_tol && tried_repair++ == 1) 
-			return EXIT_CYCLE;
-		  else{// Cycling -> Try to reorder and refactorize LDL
-			reorder_LDL(work);
-			warmstart_workspace(work, work->WS,work->n_active);
+		  if(cycle_counter++ > work->settings->cycle_tol){
+			if(tried_repair++ == 1) return EXIT_CYCLE;
+			else{// Cycling -> Try to reorder and refactorize LDL
+			  reset_daqp_workspace(work);
+			  activate_constraints(work);
+			  //reorder_LDL(work);
+			  //warmstart_workspace(work, work->WS,work->n_active);
+			  cycle_counter=0;
+			  best_fval = -1;
+			}
 		  }
 		}
 		else{ // Progress was made
@@ -67,8 +71,8 @@ void warmstart_workspace(Workspace* work, int* WS, const int n_active){
   // TODO, will probably be error with equality constraints here... (Make sure reorder always adds inequality constraints...)
   reset_daqp_workspace(work); // Reset workspace
   for(int i = 0; i<n_active; i++){
-	if(work->sing_ind!=EMPTY_IND){ //If  
-	  add_constraint(work,WS[i],0); // TODO: replace 0 with upper/lower...
+	if(work->sing_ind!=EMPTY_IND){
+	  add_constraint(work,WS[i]); 
 	  work->lam[i] = 1;
 	}else{ //Make sure that the unadded constraints are inactive in sense
 	  SET_INACTIVE(work->WS[i]);

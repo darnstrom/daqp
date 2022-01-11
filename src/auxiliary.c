@@ -18,13 +18,9 @@ void remove_constraint(Workspace* work, const int rm_ind){
   pivot_last(work);
 }
 // Maybe take add_ind as input instead?
-void add_constraint(Workspace *work, const int add_ind, const int isupper){
+void add_constraint(Workspace *work, const int add_ind){
   // Update data structures  
   SET_ACTIVE(add_ind);
-  if(isupper)
-	SET_UPPER(add_ind);
-  else
-	SET_LOWER(add_ind);
   update_LDL_add(work, add_ind);
   work->WS[work->n_active] = add_ind;
   work->lam[work->n_active] = 0;
@@ -129,8 +125,14 @@ int add_infeasible(Workspace *work){
 	  }
 	}
   }
+  // No constraint is infeasible => return
   if(add_ind == EMPTY_IND) return 0;
-  add_constraint(work,add_ind,isupper);
+  // Otherwise add infeasible constraint to working set 
+  if(isupper)
+	SET_UPPER(add_ind);
+  else
+	SET_LOWER(add_ind);
+  add_constraint(work,add_ind);
   return 1;
 
 }
@@ -248,34 +250,37 @@ void reorder_LDL(Workspace *work){
 }
 
 void pivot_last(Workspace *work){
-  if(work->n_active > 1 && work->D[work->n_active-2] < work->settings->pivot_tol && 
-	 work->D[work->n_active-2] < work->D[work->n_active-1]){
+  if(work->n_active > 1 && 
+	 work->D[work->n_active-2] < work->settings->pivot_tol && // element in D small enough
+	 work->D[work->n_active-2] < work->D[work->n_active-1]){ // element in D smallar than neighbor
 	const int rm_ind = work->n_active-2; 
 	const int ind_old = work->WS[rm_ind];
-	const int isupper_old = IS_LOWER(ind_old)? 0:1;   
-	const int old_sense =work->sense[ind_old]; // Make sure that equality constraints are retained... 
 
 	c_float lam_old = work->lam[rm_ind];
-	remove_constraint(work,rm_ind);
+	remove_constraint(work,rm_ind); // pivot_last might be recursively called here 
 
 	if(work->sing_ind!=EMPTY_IND) return; // Abort if D becomes singular
 
-	add_constraint(work,ind_old,isupper_old);
-	work->sense[ind_old] = old_sense;
+	add_constraint(work,ind_old);
 	work->lam[work->n_active-1] = lam_old;
   }	
 }
 
-int add_equality_constraints(Workspace *work){
-  for(int i =0;i<N_CONSTR;i++){
+// Activate constrainte that are marked active in sense
+int activate_constraints(Workspace *work){
 	//TODO prioritize inequalities?
-	if(IS_ACTIVE(i)){
-	  update_LDL_add(work,i);
-	  work->WS[work->n_active] = i;
-	  work->n_active++;
-	  //TODO check singularity and return error
-	  pivot_last(work);
-	}
+  for(int i =0;i<N_CONSTR;i++){
+	if(IS_ACTIVE(i)) add_constraint(work,i);
+	if(work->sing_ind != EMPTY_IND) return EXIT_OVERDETERMINED_INITIAL;
   }
   return 1;
+}
+
+// Deactivate all active constraints that are mutable (i.e., not equality constraints)
+void deactive_constraints(Workspace *work){
+  //TODO prioritize inequalities?
+  for(int i =0;i<work->n_active;i++){
+	if(IS_IMMUTABLE(work->WS[i])) continue; 
+	SET_INACTIVE(work->WS[i]); 
+  }
 }

@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <math.h>
 
-// DAQP + timing
+// Solve problem from a given workspace and measure setup and solve time 
 void daqp_solve(DAQPResult *res, Workspace *work){
   struct timespec tstart,tsol;
   clock_gettime(CLOCK_MONOTONIC, &tstart); //TIC
@@ -26,6 +26,7 @@ void daqp_solve(DAQPResult *res, Workspace *work){
   res->setup_time = 0; 
 }
 
+// Setup and solve problem
 void daqp_quadprog(DAQPResult *res, QP* qp, DAQPSettings *settings){
   struct timespec tstart,tsetup;
   int setup_flag;
@@ -47,6 +48,7 @@ void daqp_quadprog(DAQPResult *res, QP* qp, DAQPSettings *settings){
   free_daqp_ldp(&work);
 }
 
+// Setup workspace and transform QP to LDP
 int setup_daqp(QP* qp, DAQPSettings *settings, Workspace *work){
   int errorflag;
   // Check if QP is well-posed
@@ -60,7 +62,7 @@ int setup_daqp(QP* qp, DAQPSettings *settings, Workspace *work){
 	free_daqp_workspace(work);
 	return errorflag;
   }
-  errorflag = add_equality_constraints(work);
+  errorflag = activate_constraints(work);
   if(errorflag < 0){
 	free_daqp_workspace(work);
 	return errorflag;
@@ -179,6 +181,7 @@ void free_daqp_workspace(Workspace *work){
   }
 }
 
+// Extract solution information from workspace 
 void daqp_extract_result(DAQPResult* res, Workspace* work){
   // Extract optimal solution and correct fval offset
   res->fval = work->fval;
