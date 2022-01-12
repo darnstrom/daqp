@@ -58,11 +58,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  // Free workspace 
 	  free_daqp_workspace(work);
 	  free_daqp_ldp(work);
-	  //if(work->qp && work->qp->f) free(work->qp->f);
-	  //if(work->qp && work->qp->bupper) free(work->qp->bupper);
-	  //if(work->qp && work->qp->blower) free(work->qp->blower);
 	  if(work->qp) free(work->qp);
-	  free(work->settings);
 	  free(work);
 	  return;
 	}
@@ -89,7 +85,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  qp->blower= mxGetPr(prhs[6]);
 	  qp->sense= (int *)mxGetPr(prhs[7]);
 	  
-	  error_flag = setup_daqp(qp,work->settings,work);
+	  error_flag = setup_daqp(qp,work);
 	  if(error_flag < 0){
 		free(work->qp);
 		work->qp = NULL;
@@ -136,7 +132,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  plhs[3] = info_struct;
 	}
 	else if (!strcmp("set_default_settings", cmd)){
-	  if(work->settings == 0) work->settings = malloc(sizeof(DAQPSettings));
+	  if(work->settings == NULL) work->settings = malloc(sizeof(DAQPSettings));
 	  daqp_default_settings(work->settings);
 	}
 	else if (!strcmp("get_settings", cmd)) {

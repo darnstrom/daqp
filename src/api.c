@@ -34,7 +34,11 @@ void daqp_quadprog(DAQPResult *res, QP* qp, DAQPSettings *settings){
   
   clock_gettime(CLOCK_MONOTONIC, &tstart); //TIC
   Workspace work;
-  setup_flag = setup_daqp(qp,settings,&work);
+  work.settings = NULL;
+  setup_flag = setup_daqp(qp,&work);
+  if(settings!=NULL) 
+	*(work.settings) = *settings; 
+
   clock_gettime(CLOCK_MONOTONIC, &tsetup); //TOC
 
   if(setup_flag >= 0)
@@ -50,13 +54,13 @@ void daqp_quadprog(DAQPResult *res, QP* qp, DAQPSettings *settings){
 }
 
 // Setup workspace and transform QP to LDP
-int setup_daqp(QP* qp, DAQPSettings *settings, Workspace *work){
+int setup_daqp(QP* qp, Workspace *work){
   int errorflag;
   // Check if QP is well-posed
   //validate_QP(qp);
   
   // Setup workspace
-  work->settings = settings;
+  allocate_daqp_settings(work);
   allocate_daqp_workspace(work,qp->n);
   errorflag = setup_daqp_ldp(work,qp);
   if(errorflag < 0){
@@ -133,6 +137,13 @@ void free_daqp_ldp(Workspace *work){
   work->sense = NULL;
 }
 
+void allocate_daqp_settings(Workspace *work){
+  if(work->settings == NULL){
+	work->settings = malloc(sizeof(DAQPSettings));
+	daqp_default_settings(work->settings);
+  }
+}
+
 // Allocate memory for iterates  
 void allocate_daqp_workspace(Workspace *work, int n){
   work->n = n;
@@ -179,6 +190,10 @@ void free_daqp_workspace(Workspace *work){
 	free(work->xold);
 
 	work->lam = NULL;
+  }
+  if(work->settings != NULL){ 
+	free(work->settings);
+	work->settings = NULL;
   }
 }
 
