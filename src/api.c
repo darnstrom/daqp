@@ -10,7 +10,8 @@ void daqp_solve(DAQPResult *res, Workspace *work){
   clock_gettime(CLOCK_MONOTONIC, &tstart); //TIC
   // Select algorithm
   if(work->settings->eps_prox==0){
-	res->exitflag = daqp(work);
+	res->exitflag = daqp_ldp(work);
+	if(res->exitflag > 0) ldp2qp_solution(work); // Retrieve qp solution 
 	work->inner_iter = work->iterations;
   }
   else{//Prox

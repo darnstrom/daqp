@@ -17,10 +17,14 @@ int daqp_prox(Workspace *work){
 	// ** Solve least-distance problem **
 	work->u = work->x;
 	reset_daqp_workspace_warm(work);
-	exitflag = daqp(work);
+	exitflag = daqp_ldp(work);
 	
 	work->inner_iter+=work->iterations;
-	if(exitflag!=EXIT_OPTIMAL) return exitflag;
+	if(exitflag<0) 
+	  return exitflag; // Could not solve LDP -> return
+	else 
+	 ldp2qp_solution(work); // Get qp solution 
+
 	if(eps==0){
 	  if(work->soft_slack > work->settings->primal_tol) return EXIT_SOFT_OPTIMAL;
 	  return EXIT_OPTIMAL; 

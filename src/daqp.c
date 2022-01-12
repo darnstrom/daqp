@@ -1,6 +1,6 @@
 #include "daqp.h" 
 
-int daqp(Workspace *work){
+int daqp_ldp(Workspace *work){
   c_float *swp_ptr;
   int tried_repair=0, cycle_counter=0;
   c_float best_fval = -1;
@@ -14,7 +14,6 @@ int daqp(Workspace *work){
 		compute_primal_and_fval(work);
 		if(!add_infeasible(work)){ //mu >= (i.e., primal feasible)
 		  // All KKT-conditions satisfied -> optimum found 
-		  ldp2qp_solution(work); 
 		  if(work->soft_slack > work->settings->primal_tol) 
 			return EXIT_SOFT_OPTIMAL; 
 		  else

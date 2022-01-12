@@ -5,7 +5,7 @@
 #include "constants.h"
 #include "auxiliary.h"
 
-int daqp(Workspace *work);
+int daqp_ldp(Workspace *work);
 void ldp2qp_solution(Workspace *work);
 
 void warmstart_workspace(Workspace* work, int* WS, const int n_active); 
