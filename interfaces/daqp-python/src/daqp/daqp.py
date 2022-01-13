@@ -38,8 +38,7 @@ class daqp:
         # Collect results 
         profiling = {'solve_time':result.solve_time,
                 'setup_time': result.setup_time,
-                'inner_iter': result.iter,
-                'outer_iter': result.outer_iter}
+                'iterations': result.iter}
         return x, result.fval, result.exitflag, profiling 
 
     def linprog(self, f=None,

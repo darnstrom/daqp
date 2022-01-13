@@ -12,7 +12,6 @@ void daqp_solve(DAQPResult *res, Workspace *work){
   if(work->settings->eps_prox==0){
 	res->exitflag = daqp_ldp(work);
 	if(res->exitflag > 0) ldp2qp_solution(work); // Retrieve qp solution 
-	work->inner_iter = work->iterations;
   }
   else{//Prox
 	res->exitflag = daqp_prox(work);
@@ -207,8 +206,7 @@ void daqp_extract_result(DAQPResult* res, Workspace* work){
   }
   res->fval *=0.5;
   res->soft_slack = work->soft_slack;
-  res->iter = work->inner_iter;
-  res->outer_iter = work->outer_iter; // TODO add iter...
+  res->iter = work->iterations;
 }
 
 void daqp_default_settings(DAQPSettings* settings){
@@ -223,6 +221,5 @@ void daqp_default_settings(DAQPSettings* settings){
 
   settings->eps_prox = 0;
   settings->eta_prox = DEFAULT_ETA;
-  settings->prox_iter_limit = DEFAULT_PROX_ITER_LIMIT; 
   settings->rho_soft = DEFAULT_RHO_SOFT; 
 }

@@ -10,7 +10,6 @@ typedef struct{
 
   int exitflag; 
   int iter;
-  int outer_iter;
   c_float solve_time;
   c_float setup_time; 
 

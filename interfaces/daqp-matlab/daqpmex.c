@@ -7,7 +7,6 @@ const char* INFO_FIELDS[] = {
   "setup_time",           
   "solve_time",           
   "iter",           
-  "outer_iter",
   "soft_slack"}; 
 
 const char* SETTINGS_FIELDS[] = {
@@ -20,7 +19,6 @@ const char* SETTINGS_FIELDS[] = {
   "iter_limit",
   "eps_prox",
   "eta_prox",
-  "prox_iter_limit",
   "rho_soft"}; 
 
 
@@ -127,7 +125,6 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  mxSetField(info_struct, 0, "solve_time", mxCreateDoubleScalar(result.solve_time));
 	  mxSetField(info_struct, 0, "setup_time", mxCreateDoubleScalar(result.setup_time));
 	  mxSetField(info_struct, 0, "iter", mxCreateDoubleScalar(result.iter));
-	  mxSetField(info_struct, 0, "outer_iter", mxCreateDoubleScalar(result.outer_iter));
 	  mxSetField(info_struct, 0, "soft_slack", mxCreateDoubleScalar(result.soft_slack));
 	  plhs[3] = info_struct;
 	}
@@ -148,7 +145,6 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		mxSetField(s, 0, "iter_limit", mxCreateDoubleScalar(work->settings->iter_limit));
 		mxSetField(s, 0, "eps_prox", mxCreateDoubleScalar(work->settings->eps_prox));
 		mxSetField(s, 0, "eta_prox", mxCreateDoubleScalar(work->settings->eta_prox));
-		mxSetField(s, 0, "prox_iter_limit", mxCreateDoubleScalar(work->settings->prox_iter_limit));
 		mxSetField(s, 0, "rho_soft", mxCreateDoubleScalar(work->settings->rho_soft));
 		plhs[0] = s;
 	  }
@@ -164,7 +160,6 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  work->settings->iter_limit= (int)mxGetScalar(mxGetField(s, 0, "iter_limit"));
 	  work->settings->eps_prox = (c_float)mxGetScalar(mxGetField(s, 0, "eps_prox"));
 	  work->settings->eta_prox= (c_float)mxGetScalar(mxGetField(s, 0, "eta_prox"));
-	  work->settings->prox_iter_limit= (int)mxGetScalar(mxGetField(s, 0, "prox_iter_limit"));
 	  work->settings->rho_soft= (c_float)mxGetScalar(mxGetField(s, 0, "rho_soft"));
 	}
 	else if (!strcmp("update", cmd)) {

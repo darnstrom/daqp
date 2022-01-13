@@ -28,7 +28,6 @@ class DAQPSettings(Structure):
             ('iter_limit', c_int),
             ('eps_prox', c_double),
             ('eta_prox', c_double),
-            ('prox_iter_limit', c_int),
             ('rho_soft', c_double)]
 
     _defaults_ = { "primal_tol" : 1e-6,
@@ -40,8 +39,7 @@ class DAQPSettings(Structure):
             "iter_limit" : 1000,
             "eps_prox" : 0,
             "eta_prox" : 1e-6,
-            "prox_iter_limit" : 1000,
-            "rho_soft" :1e-6 
+            "rho_soft" :1e-3 
             }
 
 class DAQPResult(Structure):
@@ -50,7 +48,6 @@ class DAQPResult(Structure):
             ('soft_slack',c_double),
             ('exitflag',c_int),
             ('iter',c_int),
-            ('outer_iter',c_int),
             ('solve_time',c_double),
             ('setup_time',c_double)] 
 

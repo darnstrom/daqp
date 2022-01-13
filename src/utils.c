@@ -134,7 +134,7 @@ void update_d(Workspace *work){
 	work->dlower[i]=work->qp->blower[i]+sum;
   }
 
-  reset_daqp_workspace_warm(work);
+  work->reuse_ind = 0; // RHS of KKT system changed => cannot reuse intermediate results 
 }
 
 /* Profiling */

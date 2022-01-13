@@ -43,7 +43,6 @@ typedef struct{
  
   c_float eps_prox;
   c_float eta_prox;
-  int prox_iter_limit;
 
   c_float rho_soft;
 }DAQPSettings;
@@ -84,8 +83,6 @@ typedef struct{
   int n_active; // Number of active contraints 
 
   int iterations;
-  int outer_iter;
-  int inner_iter;
   int sing_ind; // Flag for denoting whether Mk Mk' is singular or not 
 
 
