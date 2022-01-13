@@ -3,6 +3,7 @@ module DAQP
 const lib = "libdaqp.so"
 include("types.jl")
 include("constants.jl")
+include("../test/utils.jl")
 
 function quadprog(H::Matrix{Float64},f::Vector{Float64}, 
 	A::Matrix{Float64},bupper::Vector{Float64},blower::Vector{Float64},sense::Vector{Cint})
@@ -24,8 +25,7 @@ function quadprog(qpj::QPj)
   info = (status = DAQP.flag2status[result[].exitflag],
 		  solve_time = result[].solve_time,
 		  setup_time = result[].setup_time,
-		  inner_iter = result[].iter,
-		  outer_iter = result[].outer_iter)
+		  iterations= result[].iter)
   return xstar,result[].fval,result[].exitflag,info
 end
 
@@ -37,12 +37,6 @@ mutable struct Model
 	# Setup initial model
 	work = Libc.calloc(1,sizeof(DAQP.Workspace))
 	daqp= new(Ptr{DAQP.Workspace}(work))
-	# Add default settings
-	#settings = Ptr{DAQPSettings}(Libc.calloc(1,sizeof(DAQP.DAQPSettings)))
-	#ccall((:daqp_default_settings,DAQP.lib),Nothing,(Ref{DAQP.DAQPSettings},),settings)
-	#offset_settings = fieldoffset(DAQP.Workspace,findfirst(fieldnames(DAQP.Workspace).==:settings))
-	#unsafe_store!(Ptr{Ptr{DAQP.DAQPSettings}}(work+offset_settings),settings)
-	# Add finalizer to free memory
 	finalizer(DAQP.delete!, daqp)
 	return daqp 
   end
@@ -76,8 +70,7 @@ function solve(daqp::DAQP.Model)
   info = (status = DAQP.flag2status[result[].exitflag],
 		  solve_time = result[].solve_time,
 		  setup_time = result[].setup_time,
-		  inner_iter = result[].iter,
-		  outer_iter = result[].outer_iter)
+		  iterations= result[].iter)
   return xstar,result[].fval,result[].exitflag,info
 end
 
@@ -98,5 +91,38 @@ function settings(daqp::DAQP.Model,changes::Dict{Symbol,<:Any})
   return new_settings;
 end
 
+function update(daqp::DAQP.Model, H,f,A,bupper,blower,sense) 
+  update_mask = Cint(0);
+  work = unsafe_load(daqp.work);
+  if(!isnothing(H) && work.n == size(H,1) && work.n == size(H,2))
+	daqp.qpj.H[:].=H[:]
+	update_mask +=1
+  end
+  if(!isnothing(A) && size(A,1)==(work.m-work.ms) && size(A,2)==work.n)
+	daqp.qpj.A[:].=A'[:]
+	update_mask+=2
+  end
+  
+  if(!isnothing(f) && length(f)==work.n)
+	daqp.qpj.f[:].=f[:]
+	update_mask+=4
+  end
+  
+  if(!isnothing(bupper) && !isnothing(blower) && 
+	 length(bupper)==work.m && length(blower)==work.m)
+	daqp.qpj.bupper[:].=bupper[:]
+	daqp.qpj.blower[:].=blower[:]
+	update_mask+=8
+  end
+
+  if(!isnothing(sense) && length(sense)== work.m)
+	daqp.qpj.sense[:] .= sense[:]
+	update_mask+=16
+  end
+  daqp.qpc = QPc(daqp.qpj);
+  unsafe_store!(work.qp,daqp.qpc);
+  
+  exitflag = ccall((:update_ldp,DAQP.lib),Cint,(Cint,Ptr{DAQP.Workspace},), update_mask, daqp.work);
+end
 
 end

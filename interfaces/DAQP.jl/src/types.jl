@@ -1,4 +1,4 @@
-mutable struct QPj
+struct QPj
   n::Cint
   m::Cint
   ms::Cint
@@ -48,10 +48,10 @@ struct DAQPSettings
 
   cycle_tol::Cint
   iter_limit::Cint
+  fval_bound::Cdouble
 
   eps_prox::Cdouble
   eta_prox::Cdouble
-  prox_iter_limit::Cint
 
   rho_soft::Cdouble
 end
@@ -68,13 +68,12 @@ struct DAQPResult
 
   exitflag::Cint
   iter::Cint
-  outer_iter::Cint
   solve_time::Cdouble
   setup_time::Cdouble
 end
 
 function DAQPResult(x::Vector{Float64})
-  return DAQPResult(pointer(x),0,0,0,0,0,0,0)
+  return DAQPResult(pointer(x),0,0,0,0,0,0)
 end
 
 struct Workspace
@@ -97,8 +96,6 @@ struct Workspace
 
   u::Ptr{Cdouble}
   fval::Cdouble
-  fval_bound::Cdouble
-
 
   L::Ptr{Cdouble}
   D::Ptr{Cdouble}
@@ -110,12 +107,9 @@ struct Workspace
   n_active::Cint
 
   iterations::Cint
-  outer_iter::Cint
-  inner_iter::Cint
   sing_ind::Cint
 
   soft_slack::Cdouble
 
   settings::Ptr{DAQPSettings}
 end
-

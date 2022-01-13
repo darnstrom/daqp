@@ -18,3 +18,8 @@ xstar,fval,exitflag,info= DAQP.quadprog(H,f,A,bupper,blower,sense);
 d = DAQP.Model();
 DAQP.setup(d,H,f,A,bupper,blower,sense); 
 xstar,fval,exitflag,info = DAQP.solve(d);
+
+## Update model
+f = -1*f;
+DAQP.update(d,H,f,A,bupper,blower,sense);
+xstar,fval,exitflag,info = DAQP.solve(d);
