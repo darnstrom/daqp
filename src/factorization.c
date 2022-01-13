@@ -1,93 +1,65 @@
 #include "factorization.h"
+
 void update_LDL_add(Workspace *work, const int add_ind){
   work->sing_ind = EMPTY_IND;
-  int add_offset;
-  int i,j,disp,disp2;
+  int i,j,disp;
   int new_L_start= ARSUM(work->n_active);
+  int start_col;
   c_float sum;
+  c_float *Mi, *Mk;
 
   // di <-- Mi' Mi
   // If normalized this will always be 1...
   if(IS_SIMPLE(add_ind)){
-	add_offset = R_OFFSET(add_ind,NX); 
-	if(work->Rinv==NULL) 
-	  sum=1; // Hessian is identity
-	else 
-	  for(i=add_ind,disp= add_offset, sum=0;i<NX;i++,disp++)
-		sum+=(work->Rinv[disp])*(work->Rinv[disp]);
+	Mi = (work->Rinv)? work->Rinv+R_OFFSET(add_ind,NX): NULL;
+	start_col = add_ind;
   }
-  else{ // Mi is a general constraint
-	add_offset = (NX)*(add_ind-N_SIMPLE);
-	for(i=0,disp=add_offset,sum=0;i<NX;i++,disp++)
-	  sum+=(work->M[disp])*(work->M[disp]);
-	if(IS_SOFT(add_ind))
-	  sum+=SQUARE(work->settings->rho_soft);
+  else{
+	Mi = work->M+NX*(add_ind-N_SIMPLE);
+	start_col = 0;
   }
+  if(Mi==NULL) sum = 1;
+  else
+	for(i=start_col,sum=0;i<NX;i++)
+	  sum+=Mi[i]*Mi[i];
+  
+  if(IS_SOFT(add_ind))
+	sum+=SQUARE(work->settings->rho_soft);
+
   work->D[work->n_active] = sum;
   
   if(work->n_active==0) return;
 
   // store l <-- Mk* m
-  if(IS_SIMPLE(add_ind)){
-	for(i=0;i<work->n_active;i++){
-	  if(IS_SIMPLE(work->WS[i])){ // Simple*Simple 
-		if(work->Rinv==NULL){ 
-		  work->L[new_L_start+i] = 0;// Always orthogonal when Rinv = I
-		  continue;
-		}
-		if(add_ind < work->WS[i]){
-		  disp = add_offset+(work->WS[i]-add_ind); 
-		  disp2 = R_OFFSET(work->WS[i],NX);
-		  for(j=work->WS[i], sum = 0;j<NX;j++,disp++,disp2++)
-			sum+=work->Rinv[disp2]*work->Rinv[disp];
-		}
-		else{
-		  disp = add_offset;
-		  disp2 = R_OFFSET(work->WS[i],NX)+(add_ind-work->WS[i]);
-		  for(j=add_ind, sum = 0;j<NX;j++,disp++,disp2++)
-			sum+=work->Rinv[disp2]*work->Rinv[disp];
-		}
+  for(i=0;i<work->n_active;i++){
+	// Use Rinv or M for Mk depending on if k is simple bound or not 
+	if(IS_SIMPLE(work->WS[i])){ 
+	  Mk = (work->Rinv) ? work->Rinv+R_OFFSET(work->WS[i],NX): NULL;
+	  j= MAX(start_col,work->WS[i]);
+	}
+	else{
+	  Mk = work->M+NX*(work->WS[i]-N_SIMPLE);
+	  j= start_col;
+	}
+	// Multiply Mk*Mi (NULL signify unity)
+	if(Mk == NULL){ 
+	  if(Mi ==NULL) sum = 0;
+	  else sum = Mi[j];
+	}
+	else if(Mi == NULL) sum = Mk[j];
+	else
+	  for(sum = 0;j<NX;j++)
+		sum+=Mk[j]*Mi[j];
+	
+	// Take into account soft constraints
+	if(IS_SOFT(add_ind) && IS_SOFT(work->WS[i])){
+	  if(IS_LOWER(add_ind)^IS_LOWER(work->WS[i]))
+		sum -= SQUARE(work->settings->rho_soft);
+	  else
+		sum += SQUARE(work->settings->rho_soft);
+	}
 
-	  }
-	  else{ // General * Simple
-		disp2 = NX*(work->WS[i]-N_SIMPLE)+add_ind;
-		if(work->Rinv==NULL)
-		  sum = work->M[disp2];
-		else{
-		  disp = add_offset;
-		  for(j=add_ind, sum = 0;j<NX;j++,disp++,disp2++){
-			sum +=work->M[disp2]*work->Rinv[disp];
-		  }
-		}
-	  }
-	  work->L[new_L_start+i] = sum;
-	}
-  }
-  else{ // mi is a general bound
-	for(i=0;i<work->n_active;i++){
-	  if(IS_SIMPLE(work->WS[i])){ // Simple * General  
-		disp = add_offset+work->WS[i]; 
-		if(work->Rinv == NULL)//(Rinv = I)
-		  sum = work->M[disp];
-		else{
-		  disp2 = R_OFFSET(work->WS[i],NX);
-		  for(j=work->WS[i], sum = 0;j<NX;j++,disp++,disp2++)
-			sum +=work->Rinv[disp2]*work->M[disp];
-		}
-	  }
-	  else{// General * General 
-		disp = add_offset; disp2 = NX*(work->WS[i]-N_SIMPLE);
-		for(j=0, sum = 0;j<NX;j++,disp++,disp2++)
-		  sum +=work->M[disp2]*work->M[disp];
-		if(IS_SOFT(add_ind) && IS_SOFT(work->WS[i])){
-		  if(IS_LOWER(add_ind)^IS_LOWER(work->WS[i]))
-			sum -= SQUARE(work->settings->rho_soft);
-		  else
-			sum += SQUARE(work->settings->rho_soft);
-		}
-	  }
-	  work->L[new_L_start+i] = sum; 
-	}
+	work->L[new_L_start+i] = sum;
   }
   //Forward substitution: l <-- L\(Mk*m)  
   for(i=0,disp=0; i<work->n_active; i++){
@@ -115,7 +87,6 @@ void update_LDL_add(Workspace *work, const int add_ind){
 	work->D[work->n_active]=0;
   }
 }
-
 void update_LDL_remove(Workspace *work, const int rm_ind){
   if(work->n_active==rm_ind+1)
 	return;
@@ -160,3 +131,4 @@ void update_LDL_remove(Workspace *work, const int rm_ind){
 	}
   }
 }
+
