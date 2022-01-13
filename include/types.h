@@ -40,6 +40,7 @@ typedef struct{
   
   int cycle_tol;
   int iter_limit;
+  c_float fval_bound;
  
   c_float eps_prox;
   c_float eta_prox;
@@ -69,7 +70,6 @@ typedef struct{
   c_float* lam_star; // Current constrained stationary point 
   c_float* u; // Stores Mk' lam_star
   c_float fval;
-  c_float fval_bound;
 
   // LDL factors (Mk Mk' = L D L')
   c_float *L;

@@ -26,6 +26,7 @@ class DAQPSettings(Structure):
             ('progress_tol', c_double),
             ('cycle_tol', c_int),
             ('iter_limit', c_int),
+            ('fval_bound', c_double),
             ('eps_prox', c_double),
             ('eta_prox', c_double),
             ('rho_soft', c_double)]
@@ -37,6 +38,7 @@ class DAQPSettings(Structure):
             "progress_tol" : 1e-6,
             "cycle_tol" : 10,
             "iter_limit" : 1000,
+            "fval_bound" : 1e30,
             "eps_prox" : 0,
             "eta_prox" : 1e-6,
             "rho_soft" :1e-3 

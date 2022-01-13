@@ -17,6 +17,7 @@ const char* SETTINGS_FIELDS[] = {
   "progress_tol",
   "cycle_tol",
   "iter_limit",
+  "fval_bound",
   "eps_prox",
   "eta_prox",
   "rho_soft"}; 
@@ -143,6 +144,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		mxSetField(s, 0, "progress_tol", mxCreateDoubleScalar(work->settings->progress_tol));
 		mxSetField(s, 0, "cycle_tol", mxCreateDoubleScalar(work->settings->cycle_tol));
 		mxSetField(s, 0, "iter_limit", mxCreateDoubleScalar(work->settings->iter_limit));
+		mxSetField(s, 0, "fval_bound", mxCreateDoubleScalar(work->settings->fval_bound));
 		mxSetField(s, 0, "eps_prox", mxCreateDoubleScalar(work->settings->eps_prox));
 		mxSetField(s, 0, "eta_prox", mxCreateDoubleScalar(work->settings->eta_prox));
 		mxSetField(s, 0, "rho_soft", mxCreateDoubleScalar(work->settings->rho_soft));
@@ -158,6 +160,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  work->settings->progress_tol = (c_float)mxGetScalar(mxGetField(s, 0, "progress_tol"));
 	  work->settings->cycle_tol = (int)mxGetScalar(mxGetField(s, 0, "cycle_tol"));
 	  work->settings->iter_limit= (int)mxGetScalar(mxGetField(s, 0, "iter_limit"));
+	  work->settings->fval_bound= (c_float)mxGetScalar(mxGetField(s, 0, "fval_bound"));
 	  work->settings->eps_prox = (c_float)mxGetScalar(mxGetField(s, 0, "eps_prox"));
 	  work->settings->eta_prox= (c_float)mxGetScalar(mxGetField(s, 0, "eta_prox"));
 	  work->settings->rho_soft= (c_float)mxGetScalar(mxGetField(s, 0, "rho_soft"));

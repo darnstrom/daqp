@@ -45,7 +45,7 @@ int daqp_ldp(Workspace *work){
 		else{ // Progress was made
 		  best_fval = work->fval;
 		  cycle_counter = 0;
-		  if(best_fval > work->fval_bound){ 
+		  if(best_fval > work->settings->fval_bound){ 
 			exitflag = EXIT_INFEASIBLE;
 			break;
 		  }
@@ -98,5 +98,4 @@ void reset_daqp_workspace(Workspace *work){
   work->sing_ind=EMPTY_IND;
   work->n_active =0;
   work->reuse_ind=0;
-  work->fval_bound= INF;
 }

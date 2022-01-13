@@ -218,6 +218,7 @@ void daqp_default_settings(DAQPSettings* settings){
 
   settings->cycle_tol = DEFAULT_CYCLE_TOL;
   settings->iter_limit = DEFAULT_ITER_LIMIT;
+  settings->fval_bound = 1e30; 
 
   settings->eps_prox = 0;
   settings->eta_prox = DEFAULT_ETA;
