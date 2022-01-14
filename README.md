@@ -1,15 +1,23 @@
 ## DAQP 
-DAQP is a dual active-set solver for convex quadratic programming. 
-
-:warning: The project is currently under development.  
-:warning: [Documentation](https://darnstrom.github.io/daqp/) for the project is also under development. 
-
-## Building from source 
-Run the following commands in the `<path where the repo was cloned>/daqp`:
+DAQP is a dual active-set solver that solves convex quadratic programs in the form 
 ```
-mkdir build
-cd build 
-cmake ..
-cmake --build .
+minimize        0.5 x' H x + f' x
+
+subject to      l  <=  x  <= u
+				bl <=  Ax <= bu.
+```
+
+The code is written in C and is *library free*. DAQP can be interfaced to C, Julia, MATLAB, and Python. 
+
+See [Documentation](https://darnstrom.github.io/daqp/) for an installation guide and basic use of the interfaces. 
+
+## Citing DAQP 
+```
+@article{arnstrom2021dual,
+  title={A Dual Active-Set Solver for Embedded Quadratic Programming Using Recursive LDL' Updates},
+  author={Arnstr{\"o}m, Daniel and Bemporad, Alberto and Axehill, Daniel},
+  journal={arXiv preprint arXiv:2103.16236},
+  year={2021}
+}
 ```
 
