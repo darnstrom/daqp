@@ -4,7 +4,7 @@ DAQP is a dual active-set solver that solves convex quadratic programs in the fo
 minimize        0.5 x' H x + f' x
 
 subject to      l  <=  x  <= u
-				bl <=  Ax <= bu.
+		bl <=  Ax <= bu.
 ```
 
 The code is written in C and is *library free*. DAQP can be interfaced to C, Julia, MATLAB, and Python. 
