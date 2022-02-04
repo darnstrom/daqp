@@ -35,7 +35,7 @@ class DAQPSettings(Structure):
             "dual_tol" : 1e-12, 
             "zero_tol" : 1e-14,
             "pivot_tol" : 1e-2,
-            "progress_tol" : 1e-6,
+            "progress_tol" : 1e-14,
             "cycle_tol" : 10,
             "iter_limit" : 1000,
             "fval_bound" : 1e30,

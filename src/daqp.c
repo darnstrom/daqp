@@ -1,7 +1,6 @@
 #include "daqp.h" 
 
 int daqp_ldp(Workspace *work){
-  c_float *swp_ptr;
   int exitflag=EXIT_ITERLIMIT,iter;
   int tried_repair=0, cycle_counter=0;
   c_float best_fval = -1;
@@ -21,7 +20,7 @@ int daqp_ldp(Workspace *work){
 		}
 
 		/* Check fval terminal conditions */
-		if(best_fval > work->fval+work->settings->progress_tol){ 
+		if(best_fval > work->fval-work->settings->progress_tol){ 
 		  if(cycle_counter++ > work->settings->cycle_tol){
 			if(tried_repair == 1){
 			  exitflag = EXIT_CYCLE;
