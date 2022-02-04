@@ -19,10 +19,6 @@ int daqp_ldp(Workspace *work){
 			exitflag = EXIT_OPTIMAL;
 		  break;
 		}
-		else{
-		  // Set lam = lam_star
-		  swp_ptr=work->lam; work->lam = work->lam_star; work->lam_star=swp_ptr;
-		}
 
 		/* Check fval terminal conditions */
 		if(best_fval > work->fval+work->settings->progress_tol){ 

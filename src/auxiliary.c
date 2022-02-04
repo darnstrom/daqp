@@ -119,6 +119,10 @@ int add_infeasible(Workspace *work){
 	SET_UPPER(add_ind);
   else
 	SET_LOWER(add_ind);
+  // Set lam = lam_star
+  c_float *swp_ptr;
+  swp_ptr=work->lam; work->lam = work->lam_star; work->lam_star=swp_ptr;
+  // Add the constraint
   add_constraint(work,add_ind);
   return 1;
 }
