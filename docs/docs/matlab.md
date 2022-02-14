@@ -33,7 +33,7 @@ This will solve the problem with default settings. A more flexible interface is 
 ```matlab
 d = daqp();
 d.setup(H,f,A,bupper,blower,sense);
-[x,fval,exitflag,info] = d.solve(H,f,A,bupper,blower,sense);
+[x,fval,exitflag,info] = d.solve();
 ```
 This allows us to reuse internal matrix factorization if we want to solve a perturbed problem. 
 
