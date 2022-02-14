@@ -5,7 +5,7 @@
 #include "constants.h"
 
 void remove_constraint(Workspace* work, const int rm_ind);
-void add_constraint(Workspace *work, const int add_ind);
+void add_constraint(Workspace *work, const int add_ind, c_float lam);
 //void find_constraint_to_add(Workspace *work);
 void compute_primal_and_fval(Workspace *work);
 int add_infeasible(Workspace *work);

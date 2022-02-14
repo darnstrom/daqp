@@ -79,8 +79,7 @@ void warmstart_workspace(Workspace* work, int* WS, const int n_active){
   reset_daqp_workspace(work); // Reset workspace
   for(int i = 0; i<n_active; i++){
 	if(work->sing_ind!=EMPTY_IND){
-	  add_constraint(work,WS[i]); 
-	  work->lam[i] = 1;
+	  add_constraint(work,WS[i],1.0); 
 	}else{ //Make sure that the unadded constraints are inactive in sense
 	  SET_INACTIVE(work->WS[i]);
 	}

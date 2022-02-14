@@ -18,12 +18,12 @@ void remove_constraint(Workspace* work, const int rm_ind){
   pivot_last(work);
 }
 // Maybe take add_ind as input instead?
-void add_constraint(Workspace *work, const int add_ind){
+void add_constraint(Workspace *work, const int add_ind, c_float lam){
   // Update data structures  
   SET_ACTIVE(add_ind);
   update_LDL_add(work, add_ind);
   work->WS[work->n_active] = add_ind;
-  work->lam[work->n_active] = 0;
+  work->lam[work->n_active] = lam;
   work->n_active++;
 
   // Pivot for improved numerics
@@ -123,7 +123,7 @@ int add_infeasible(Workspace *work){
   c_float *swp_ptr;
   swp_ptr=work->lam; work->lam = work->lam_star; work->lam_star=swp_ptr;
   // Add the constraint
-  add_constraint(work,add_ind);
+  add_constraint(work,add_ind,0.0);
   return 1;
 }
 int remove_blocking(Workspace *work){
@@ -251,8 +251,7 @@ void pivot_last(Workspace *work){
 
 	if(work->sing_ind!=EMPTY_IND) return; // Abort if D becomes singular
 
-	add_constraint(work,ind_old);
-	work->lam[work->n_active-1] = lam_old;
+	add_constraint(work,ind_old,lam_old);
   }	
 }
 
@@ -260,7 +259,7 @@ void pivot_last(Workspace *work){
 int activate_constraints(Workspace *work){
 	//TODO prioritize inequalities?
   for(int i =0;i<N_CONSTR;i++){
-	if(IS_ACTIVE(i)) add_constraint(work,i);
+	if(IS_ACTIVE(i)) add_constraint(work,i,1.0);
 	if(work->sing_ind != EMPTY_IND) return EXIT_OVERDETERMINED_INITIAL;
   }
   return 1;
