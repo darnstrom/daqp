@@ -148,7 +148,7 @@ void toc(DAQPtimer *timer){
 double get_time(DAQPtimer *timer){
   LARGE_INTEGER f;
   QueryPerformanceFrequency(&f);
-  return(timer->stop.QuadPart - timer->start.QuadPart)/(f.QuadPart);
+  return (double)(timer->stop.QuadPart - timer->start.QuadPart)/f.QuadPart;
 }
 #else // not _WIN32 (assume that time.h works) 
 
