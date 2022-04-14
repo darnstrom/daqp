@@ -6,8 +6,8 @@
 
 // Solve problem from a given workspace and measure setup and solve time 
 void daqp_solve(DAQPResult *res, Workspace *work){
-  struct timespec tstart,tsol;
-  clock_gettime(CLOCK_MONOTONIC, &tstart); //TIC
+  DAQPtimer timer;
+  tic(&timer);
   // Select algorithm
   if(work->settings->eps_prox==0){
 	res->exitflag = daqp_ldp(work);
@@ -16,29 +16,28 @@ void daqp_solve(DAQPResult *res, Workspace *work){
   else{//Prox
 	res->exitflag = daqp_prox(work);
   }
-
-  clock_gettime(CLOCK_MONOTONIC, &tsol); // TOC
+  toc(&timer);
   
   // Package result
   daqp_extract_result(res,work);
   // Add time to result
-  res->solve_time = time_diff(tstart,tsol);
+  res->solve_time = get_time(&timer);
   res->setup_time = 0; 
 }
 
 // Setup and solve problem
 void daqp_quadprog(DAQPResult *res, QP* qp, DAQPSettings *settings){
-  struct timespec tstart,tsetup;
+  DAQPtimer timer;
   int setup_flag;
   
-  clock_gettime(CLOCK_MONOTONIC, &tstart); //TIC
+  tic(&timer);
   Workspace work;
   work.settings = NULL;
   setup_flag = setup_daqp(qp,&work);
   if(settings!=NULL) 
 	*(work.settings) = *settings; 
 
-  clock_gettime(CLOCK_MONOTONIC, &tsetup); //TOC
+  toc(&timer);
 
   if(setup_flag >= 0)
 	daqp_solve(res,&work);
@@ -46,7 +45,7 @@ void daqp_quadprog(DAQPResult *res, QP* qp, DAQPSettings *settings){
 	res->exitflag = setup_flag;
   
   // Add setup time to result 
-  res->setup_time = time_diff(tstart,tsetup);
+  res->setup_time = get_time(&timer);
   // Free memory
   free_daqp_workspace(&work);
   free_daqp_ldp(&work);

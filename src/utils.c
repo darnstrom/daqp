@@ -138,14 +138,36 @@ void update_d(Workspace *work){
 }
 
 /* Profiling */
-double time_diff(struct timespec tic, struct timespec toc){
+#ifdef _WIN32
+void tic(DAQPtimer *timer){
+  QueryPerformanceCounter(&(timer->start));
+}
+void toc(DAQPtimer *timer){
+  QueryPerformanceCounter(&(timer->stop));
+}
+double get_time(DAQPtimer *timer){
+  LARGE_INTEGER f;
+  QueryPerformanceFrequency(&f);
+  return(timer->stop.QuadPart - timer->start.QuadPart)/(f.QuadPart);
+}
+#else // not _WIN32 (assume that time.h works) 
+
+void tic(DAQPtimer *timer){
+  clock_gettime(CLOCK_MONOTONIC, &(timer->start));
+}
+void toc(DAQPtimer *timer){
+  clock_gettime(CLOCK_MONOTONIC, &(timer->stop));
+}
+
+double get_time(DAQPtimer *timer){
   struct timespec diff;
-  if ((toc.tv_nsec - tic.tv_nsec) < 0) {
-    diff.tv_sec  = toc.tv_sec - tic.tv_sec - 1;
-    diff.tv_nsec = 1e9 + toc.tv_nsec - tic.tv_nsec;
+  if ((timer->stop.tv_nsec - timer->start.tv_nsec) < 0) {
+    diff.tv_sec  = timer->stop.tv_sec - timer->start.tv_sec - 1;
+    diff.tv_nsec = 1e9 + timer->stop.tv_nsec - timer->start.tv_nsec;
   } else {
-    diff.tv_sec  = toc.tv_sec - tic.tv_sec;
-    diff.tv_nsec = toc.tv_nsec - tic.tv_nsec;
+    diff.tv_sec  = timer->stop.tv_sec - timer->start.tv_sec;
+    diff.tv_nsec = timer->stop.tv_nsec - timer->start.tv_nsec;
   }
   return (double)diff.tv_sec + (double )diff.tv_nsec / 1e9;
 }
+#endif // _WIN32
