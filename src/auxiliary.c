@@ -258,9 +258,13 @@ void pivot_last(Workspace *work){
 // Activate constrainte that are marked active in sense
 int activate_constraints(Workspace *work){
 	//TODO prioritize inequalities?
-  for(int i =0;i<N_CONSTR;i++){
+  int i;
+  for(i =0;i<N_CONSTR;i++){
 	if(IS_ACTIVE(i)) add_constraint(work,i,1.0);
-	if(work->sing_ind != EMPTY_IND) return EXIT_OVERDETERMINED_INITIAL;
+	if(work->sing_ind != EMPTY_IND){
+	  for(;i<N_CONSTR;i++) SET_INACTIVE(i); // correct sense for unadded constraints
+	  return EXIT_OVERDETERMINED_INITIAL;
+	}
   }
   return 1;
 }
