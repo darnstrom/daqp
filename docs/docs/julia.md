@@ -26,21 +26,21 @@ Note: When $$b_u$$ and $$b_l$$ has more elements than the number of rows in $$A$
 
 ## Calling DAQP
 There are two ways of calling DAQP in Julia. The first way is through a quadprog call: 
-```matlab
+```julia
 x,fval,exitflag,info = DAQP.quadprog(H,f,A,bupper,blower,sense);
 ```
 This will solve the problem with default settings. A more flexible interface is also offered, where we first setup the problem and then solve it 
-```matlab
+```julia
 d = DAQP.Model();
 DAQP.setup(d;H,f,A,bupper,blower,sense);
-[x,fval,exitflag,info] = DAQP.solve(d;H,f,A,bupper,blower,sense);
+x,fval,exitflag,info = DAQP.solve(d,H,f,A,bupper,blower,sense);
 ```
 This allows us to reuse internal matrix factorization if we want to solve a perturbed problem. 
 
 ## Changing settings
 If we, for example, want to change the maximum number of iterations to 2000 we can do so by
-```matlab
+```julia
 DAQP.settings(d; Dict(:iter_limit =>2000))
 ```
 
-A full list of available settings are provided [here]().
+A full list of available settings are provided [here](/parameters/#settings)

@@ -43,4 +43,4 @@ If we, for example, want to change the maximum number of iterations to 2000 we c
 d.settings('iter_limit',2000)
 ```
 
-A full list of available settings are provided [here]().
+A full list of available settings are provided [here](/parameters/#settings).

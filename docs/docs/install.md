@@ -18,19 +18,24 @@ Table of contents
 ## Installing from source 
 The installation requires [CMake](https://cmake.org/) and [GCC](https://gcc.gnu.org/).
 
-In the cloned directory (i.e, `<path were cloned>/daqp`), run the following commands
+In the path where you want to keep the source code, run the following commands
 
 ```shell
+git clone https://github.com/darnstrom/daqp.git
 mkdir build
 cd build
 cmake ..
 cmake --build .
 ```
 
+
 To copy the header files and libraries into `includedir` and `libdir`, respectively, run the following command in the `build` folder 
 ```shell
 cmake --build . --target install
 ```
+
+### For Windows
+The commands mentioned above can be executed on Windows by, for example, using [Git BASH](https://gitforwindows.org/) after installing [CMake](https://cmake.org/) and [TDM-GCC](https://jmeubank.github.io/tdm-gcc/download/). Make sure that CMake is added to PATH during installation.) 
 
 
 ## Installing the MATLAB interface
@@ -45,9 +50,8 @@ cmake --build .
 ## Installing the Julia interface
 In the REPL run the command 
 ```julia
-] add (path_to_DAQP)
+] add DAQP 
 ```
-where `path_to_DAQP` is the location of the `DAQP.jl` subdirectory
 
 ## Installing the Python interface
 Move to the `daqp-python` subdirectory and call pip from the shell:
