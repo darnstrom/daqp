@@ -20,7 +20,7 @@ bupper = [1; 2; 3; 4];
 blower = [-1; -2; -3; -4];
 sense = zeros(Cint,4);
 ```
-`sense` determines the type of the constraints (more details are given [here](/parameters/#constraint-classification)).
+`sense` determines the type of the constraints (more details are given [here](/daqp/parameters/#constraint-classification)).
 
 Note: When $$b_u$$ and $$b_l$$ has more elements than the number of rows in $$A$$, the first elements in $$b_u$$ and $$b_l$$ are interpreted as simple bounds. 
 
@@ -43,4 +43,4 @@ If we, for example, want to change the maximum number of iterations to 2000 we c
 DAQP.settings(d; Dict(:iter_limit =>2000))
 ```
 
-A full list of available settings are provided [here](/parameters/#settings)
+A full list of available settings is provided [here](/daqp/parameters/#settings)

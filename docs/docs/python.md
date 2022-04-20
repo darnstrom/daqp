@@ -27,7 +27,7 @@ blower = np.array([-1,-2,-3,-4],dtype=c_double)
 sense = np.array([0,0,0,0],dtype=c_int)
 
 ```
-`sense` determines the type of the constraints (more details are given [here](/parameters/#constraint-classification)).
+`sense` determines the type of the constraints (more details are given [here](/daqp/parameters/#constraint-classification)).
 
 Note: When $$b_u$$ and $$b_l$$ has more elements than the number of rows in $$A$$, the first elements in $$b_u$$ and $$b_l$$ are interpreted as simple bounds. 
 

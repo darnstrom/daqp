@@ -24,7 +24,7 @@ double blower[4] = {-1, -2, -3, -4};
 int sense[4] = {0,0,0,0}; 
 QP qp = {n,m,ms,H,f,A,bupper,blower,sense};
 ```
-`sense` determines the type of the constraints (more details are given [here](/parameters/#constraint-classification)).
+`sense` determines the type of the constraints (more details are given [here](/daqp/parameters/#constraint-classification)).
 
 Note: When $$b_u$$ and $$b_l$$ have more elements than the number of rows in $$A$$, the first elements in $$b_u$$ and $$b_l$$ are interpreted as simple bounds. 
 
@@ -48,4 +48,4 @@ daqp_default_settings(&settings); // Populate settings with default values
 settings.iter_limit = 2000;
 ```
 
-A full list of available settings are provided [here]().
+A full list of available settings is provided [here](/daqp/parameters/#settings).

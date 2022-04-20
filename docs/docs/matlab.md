@@ -20,7 +20,7 @@ bupper = [1; 2; 3; 4];
 blower = [-1; -2; -3; -4];
 sense = zeros(4,1,'int32');
 ```
-`sense` determines the type of the constraints (more details are given [here](/parameters/#constraint-classification)).
+`sense` determines the type of the constraints (more details are given [here](/daqp/parameters/#constraint-classification)).
 
 Note: When $$b_u$$ and $$b_l$$ have more elements than the number of rows in $$A$$, the first elements in $$b_u$$ and $$b_l$$ are interpreted as simple bounds. 
 
@@ -29,7 +29,7 @@ There are two ways of calling DAQP in MATLAB. The first way is through a quadpro
 ```matlab
 [x,fval,exitflag,info] = daqp.quadprog(H,f,A,bupper,blower,sense);
 ```
-This will solve the problem with default settings. A more flexible interface is also offered, where we first setup the problem and then solve it 
+This will solve the problem with default settings. A more flexible interface is also offered, where we first setup the problem and then solve it:
 ```matlab
 d = daqp();
 d.setup(H,f,A,bupper,blower,sense);
@@ -43,4 +43,4 @@ If we, for example, want to change the maximum number of iterations to 2000 we c
 d.settings('iter_limit',2000)
 ```
 
-A full list of available settings are provided [here](/parameters/#settings).
+A full list of available settings is provided [here](/daqp/parameters/#settings).
