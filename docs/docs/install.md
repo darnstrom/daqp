@@ -39,13 +39,12 @@ The commands mentioned above can be executed on Windows by, for example, using [
 
 
 ## Installing the MATLAB interface
-If you also want to generate the mex-file used in the MATLAB interface when building from source, pass the flag `MATLAB` when setting up cmake. That is, replace the above steps with
+The MATLAB interface can be installed directly in MATLAB by running the following commands in the directory where you want to store the m-files:
 ```shell
-mkdir build
-cd build
-cmake .. -DMATLAB=True
-cmake --build .
+websave('install_daqp','https://raw.githubusercontent.com/darnstrom/daqp/master/interfaces/daqp-matlab/install_daqp.m')
+install_daqp
 ```
+It is also possible to generate the mex-file used in the MATLAB interface when building from source by passing the flag `MATLAB` when setting up CMake, or by running the script `make_daqp` in MATLAB.
 
 ## Installing the Julia interface
 In the REPL run the command 
