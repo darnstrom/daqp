@@ -70,7 +70,7 @@ classdef daqp< handle
 	  end
 	  if(length(varargin)==1)
 		if(isstruct(varargin{1})) % If struct as input treat it as new settings
-		  new_settings = varagin{1};
+		  new_settings = varargin{1};
 		else 
 		  if(isstr(varargin{1})&& strcmp(varargin{1},'default')) % set/return default settings
 			daqpmex('set_default_settings', this.work_ptr);
