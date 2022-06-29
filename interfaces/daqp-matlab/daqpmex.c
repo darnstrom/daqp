@@ -4,6 +4,7 @@
 #include <string.h>
 
 const char* INFO_FIELDS[] = {
+  "lambda",
   "setup_time",           
   "solve_time",           
   "iter",           
@@ -111,18 +112,23 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  plhs[2] = mxCreateNumericMatrix(1, 1, mxINT32_CLASS, mxREAL); //Exit flag
 	  plhs[3] = mxCreateDoubleMatrix(1,1,mxREAL); //CPU time
 	  plhs[0] = mxCreateDoubleMatrix((mwSize)work->n,1,mxREAL); // x_star
+	  mxArray* lam = mxCreateDoubleMatrix((mwSize)work->m,1,mxREAL); // lambda
+
 	  result.x = mxGetPr(plhs[0]);
+	  result.lam = mxGetPr(lam);
 	  fval= mxGetPr(plhs[1]);
 	  exitflag = (int *)mxGetPr(plhs[2]);
 	  
 	  // Solve problem
 	  daqp_solve(&result,work); 
-	  // Package solution information
+	  // Extract solution information
 	  exitflag[0] = result.exitflag; 
 	  fval[0] = result.fval;
-	  //
+
+	  // Package info struct
 	  int n_info = sizeof(INFO_FIELDS)/sizeof(INFO_FIELDS[0]);
 	  mxArray* info_struct = mxCreateStructMatrix(1,1,n_info,INFO_FIELDS);
+	  mxSetField(info_struct, 0, "lambda", lam);
 	  mxSetField(info_struct, 0, "solve_time", mxCreateDoubleScalar(result.solve_time));
 	  mxSetField(info_struct, 0, "setup_time", mxCreateDoubleScalar(result.setup_time));
 	  mxSetField(info_struct, 0, "iter", mxCreateDoubleScalar(result.iter));

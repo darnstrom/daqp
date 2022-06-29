@@ -5,6 +5,7 @@
 
 typedef struct{
   c_float *x;
+  c_float *lam;
   c_float fval;
   c_float soft_slack;  
 

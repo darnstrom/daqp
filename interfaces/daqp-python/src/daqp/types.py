@@ -46,6 +46,7 @@ class DAQPSettings(Structure):
 
 class DAQPResult(Structure):
     _fields_ = [('x', POINTER(c_double)),
+            ('lam', POINTER(c_double)),
             ('fval',c_double),
             ('soft_slack',c_double),
             ('exitflag',c_int),

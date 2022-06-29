@@ -198,12 +198,20 @@ void free_daqp_workspace(Workspace *work){
 // Extract solution information from workspace 
 void daqp_extract_result(DAQPResult* res, Workspace* work){
   // Extract optimal solution and correct fval offset
+  int i; 
   res->fval = work->fval;
-  for(int i=0;i<work->n;i++){
+  for(i=0;i<work->n;i++){
 	res->x[i] = work->x[i];
 	res->fval-=work->v[i]*work->v[i]; 
   }
   res->fval *=0.5;
+
+  // Extract dual solution 
+  for(i=0;i<work->m;i++) 
+	res->lam[i] = 0; 
+  for(i=0;i<work->n_active;i++)
+	  res->lam[work->WS[i]] = work->lam_star[i];
+
   res->soft_slack = work->soft_slack;
   res->iter = work->iterations;
 }

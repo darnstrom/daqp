@@ -32,14 +32,16 @@ class daqp:
         # Create struct to put result in
         result = types.DAQPResult()
         x = np.zeros([n,1]);
+        lam = np.zeros([m,1]);
         result.x = np.ascontiguousarray(x).ctypes.data_as(POINTER(c_double));
+        result.lam = np.ascontiguousarray(lam).ctypes.data_as(POINTER(c_double));
         # Call C api
         self._daqp.daqp_quadprog(byref(result),byref(qp),byref(daqp_options))
         # Collect results 
         profiling = {'solve_time':result.solve_time,
                 'setup_time': result.setup_time,
                 'iterations': result.iter}
-        return x, result.fval, result.exitflag, profiling 
+        return x, result.fval, result.exitflag, profiling, lam 
 
     def linprog(self, f=None,
             A=None,bupper=None,blower=None,sense=None, **settings):
