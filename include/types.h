@@ -30,7 +30,7 @@ c_float* bupper;
 c_float* blower;
 
 int* sense; 
-}QP;
+}DAQPProblem;
 typedef struct{
   c_float primal_tol; 
   c_float dual_tol; 
@@ -49,7 +49,7 @@ typedef struct{
 }DAQPSettings;
 
 typedef struct{
-  QP* qp;
+  DAQPProblem* qp;
   // LDP data 
   int n; // Number of primal variable  
   int m; // Number of constraints  

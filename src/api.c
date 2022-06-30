@@ -26,7 +26,7 @@ void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
 }
 
 // Setup and solve problem
-void daqp_quadprog(DAQPResult *res, QP* qp, DAQPSettings *settings){
+void daqp_quadprog(DAQPResult *res, DAQPProblem* qp, DAQPSettings *settings){
   DAQPtimer timer;
   int setup_flag;
   
@@ -52,7 +52,7 @@ void daqp_quadprog(DAQPResult *res, QP* qp, DAQPSettings *settings){
 }
 
 // Setup workspace and transform QP to LDP
-int setup_daqp(QP* qp, DAQPWorkspace *work){
+int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work){
   int errorflag;
   // Check if QP is well-posed
   //validate_QP(qp);
@@ -74,7 +74,7 @@ int setup_daqp(QP* qp, DAQPWorkspace *work){
 }
 
 //  Setup LDP from QP  
-int setup_daqp_ldp(DAQPWorkspace *work, QP *qp){
+int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp){
   int error_flag,update_mask=0;
 
   work->n = qp->n;

@@ -17,10 +17,10 @@ typedef struct{
 }DAQPResult;
 
 void daqp_solve(DAQPResult* res, DAQPWorkspace *work);
-void daqp_quadprog(DAQPResult* res, QP* qp,DAQPSettings* settings);
+void daqp_quadprog(DAQPResult* res, DAQPProblem* qp,DAQPSettings* settings);
 
-int setup_daqp(QP *qp, DAQPWorkspace* work);
-int setup_daqp_ldp(DAQPWorkspace *work, QP* qp);
+int setup_daqp(DAQPProblem *qp, DAQPWorkspace* work);
+int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem* qp);
 void allocate_daqp_settings(DAQPWorkspace *work);
 void allocate_daqp_workspace(DAQPWorkspace *work, int n);
 

@@ -65,7 +65,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	else if (!strcmp("setup", cmd)) {
 
 	  if(work->qp) mexErrMsgTxt("Setup already completed.");
-	  QP *qp = calloc(1,sizeof(QP));
+	  DAQPProblem *qp = calloc(1,sizeof(DAQPProblem));
 	  // Extract data
 	  int error_flag;
 	  
