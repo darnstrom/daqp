@@ -71,7 +71,8 @@ int add_infeasible(Workspace *work){
   int isupper=0, add_ind=EMPTY_IND;
   // Simple bounds 
   for(j=0, disp=0;j<N_SIMPLE;j++){
-	if(IS_ACTIVE(j)){
+	// Never activate immutable or already active constraints 
+	if(work->sense[j]&(ACTIVE+IMMUTABLE)){ 
 	  disp+=NX-j;
 	  continue;
 	}
@@ -94,7 +95,8 @@ int add_infeasible(Workspace *work){
   }
   /* General two-sided constraints */
   for(j=N_SIMPLE, disp=0;j<N_CONSTR;j++){
-	if(IS_ACTIVE(j)){
+	// Never activate immutable or already active constraints 
+	if(work->sense[j]&(ACTIVE+IMMUTABLE)){ 
 	  disp+=NX;// Skip ahead in M
 	  continue;
 	}
