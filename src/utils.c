@@ -3,7 +3,7 @@
 #include <math.h>
 #include <stdio.h>
 
-int update_ldp(const int mask, Workspace *work){
+int update_ldp(const int mask, DAQPWorkspace *work){
   // TODO: copy dimensions from work->qp? 
   int error_flag;
   /** Update Rinv **/
@@ -38,7 +38,7 @@ int update_ldp(const int mask, Workspace *work){
   return 0;
 }
 
-int update_Rinv(Workspace *work){
+int update_Rinv(DAQPWorkspace *work){
   int i,j,k,disp,disp2,disp3;
   const int n = work->n; 
   // Cholesky
@@ -79,7 +79,7 @@ int update_Rinv(Workspace *work){
   return 1;
 }
 
-void update_M(Workspace *work){
+void update_M(DAQPWorkspace *work){
   int i,j,k,disp,disp2;
   const int n = work->n;
   const int mA = work->m-work->ms;
@@ -93,7 +93,7 @@ void update_M(Workspace *work){
   reset_daqp_workspace(work); // Internal factorizations need to be redone!
 }
 
-void update_v(c_float *f, Workspace *work){
+void update_v(c_float *f, DAQPWorkspace *work){
   int i,j,disp;
   const int n = work->n;
   if(work->Rinv == 0){// Rinv = I => v = R'\v = f
@@ -107,7 +107,7 @@ void update_v(c_float *f, Workspace *work){
   }
 }
 
-void update_d(Workspace *work){
+void update_d(DAQPWorkspace *work){
   /* Compute d  = b+M*v */
   // Simple bounds 
   int i,j,disp;

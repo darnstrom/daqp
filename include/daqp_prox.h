@@ -5,6 +5,6 @@
 #include "constants.h"
 #include "daqp.h"
 
-int daqp_prox(Workspace *work);
+int daqp_prox(DAQPWorkspace *work);
 
 #endif //ifndef DAQP_PROX_H 

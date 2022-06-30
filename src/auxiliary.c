@@ -1,6 +1,6 @@
 #include "auxiliary.h"
 #include "factorization.h"
-void remove_constraint(Workspace* work, const int rm_ind){
+void remove_constraint(DAQPWorkspace* work, const int rm_ind){
   int i;
   // Update data structures
   SET_INACTIVE(work->WS[rm_ind]); 
@@ -18,7 +18,7 @@ void remove_constraint(Workspace* work, const int rm_ind){
   pivot_last(work);
 }
 // Maybe take add_ind as input instead?
-void add_constraint(Workspace *work, const int add_ind, c_float lam){
+void add_constraint(DAQPWorkspace *work, const int add_ind, c_float lam){
   // Update data structures  
   SET_ACTIVE(add_ind);
   update_LDL_add(work, add_ind);
@@ -30,7 +30,7 @@ void add_constraint(Workspace *work, const int add_ind, c_float lam){
   pivot_last(work);
 }
 
-void compute_primal_and_fval(Workspace *work){
+void compute_primal_and_fval(DAQPWorkspace *work){
   int i,j,disp;
   // Reset u & soft slack
   for(j=0;j<NX;j++)
@@ -64,7 +64,7 @@ void compute_primal_and_fval(Workspace *work){
   fval+=work->soft_slack*work->soft_slack;
   work->fval = fval;
 }
-int add_infeasible(Workspace *work){
+int add_infeasible(DAQPWorkspace *work){
   int j,k,disp;
   c_float min_val = -work->settings->primal_tol;
   c_float Mu,soft_slack;
@@ -128,7 +128,7 @@ int add_infeasible(Workspace *work){
   add_constraint(work,add_ind,0.0);
   return 1;
 }
-int remove_blocking(Workspace *work){
+int remove_blocking(DAQPWorkspace *work){
  int i,rm_ind = EMPTY_IND; 
  c_float alpha=INF;
  c_float alpha_cand;
@@ -157,7 +157,7 @@ int remove_blocking(Workspace *work){
  return 1;
 }
 
-void compute_CSP(Workspace *work){
+void compute_CSP(DAQPWorkspace *work){
   int i,j,disp,start_disp;
   c_float sum;
   // Forward substitution (xi <-- L\d)
@@ -191,7 +191,7 @@ void compute_CSP(Workspace *work){
 }
 
 //TODO this could probably be directly calculated in L
-void compute_singular_direction(Workspace *work){
+void compute_singular_direction(DAQPWorkspace *work){
   // Step direction is stored in lam_star
   int i,j,disp,offset_L= ARSUM(work->sing_ind);
   int start_disp= offset_L-1;
@@ -213,7 +213,7 @@ void compute_singular_direction(Workspace *work){
 }
 
 
-void reorder_LDL(Workspace *work){
+void reorder_LDL(DAQPWorkspace *work){
   // Extract first column l1,: of  L 
   // and store l1,:^2 in the beginning of L (since L will be overwritten anyways...)  
   // (a large value of l^2 signify linear dependence with the first constraint)
@@ -241,7 +241,7 @@ void reorder_LDL(Workspace *work){
   }
 }
 
-void pivot_last(Workspace *work){
+void pivot_last(DAQPWorkspace *work){
   if(work->n_active > 1 && 
 	 work->D[work->n_active-2] < work->settings->pivot_tol && // element in D small enough
 	 work->D[work->n_active-2] < work->D[work->n_active-1]){ // element in D smallar than neighbor
@@ -258,7 +258,7 @@ void pivot_last(Workspace *work){
 }
 
 // Activate constrainte that are marked active in sense
-int activate_constraints(Workspace *work){
+int activate_constraints(DAQPWorkspace *work){
 	//TODO prioritize inequalities?
   int i;
   for(i =0;i<N_CONSTR;i++){
@@ -272,7 +272,7 @@ int activate_constraints(Workspace *work){
 }
 
 // Deactivate all active constraints that are mutable (i.e., not equality constraints)
-void deactive_constraints(Workspace *work){
+void deactive_constraints(DAQPWorkspace *work){
   //TODO prioritize inequalities?
   for(int i =0;i<work->n_active;i++){
 	if(IS_IMMUTABLE(work->WS[i])) continue; 

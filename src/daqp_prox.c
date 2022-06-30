@@ -3,7 +3,7 @@
 #include "daqp_prox.h"
 #include "utils.h"
 
-int daqp_prox(Workspace *work){
+int daqp_prox(DAQPWorkspace *work){
   int i,total_iter=0;
   const int nx=work->n;
   int exitflag;

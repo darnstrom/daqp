@@ -36,7 +36,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
   mxGetString(prhs[0], cmd, sizeof(cmd));
   
   // Extract workspace pointer 
-  Workspace *work;
+  DAQPWorkspace *work;
   long long *work_i;
   union{long long i; void *ptr;} work_ptr; // Used for int64 & pointer juggling..
   if(nrhs>1){// Pointer always second argument (stored as int64)
@@ -47,7 +47,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 
 	if (!strcmp("new", cmd)) {
 	  // Allocate new workspace and return pointer to it
-	  work_ptr.ptr = calloc(1,sizeof(Workspace));
+	  work_ptr.ptr = calloc(1,sizeof(DAQPWorkspace));
 	  // Return pointer as int64
 	  plhs[0] = mxCreateNumericMatrix(1, 1, mxINT64_CLASS, mxREAL);
 	  work_i = (long long *) mxGetData(plhs[0]);

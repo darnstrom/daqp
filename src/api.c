@@ -5,7 +5,7 @@
 #include <math.h>
 
 // Solve problem from a given workspace and measure setup and solve time 
-void daqp_solve(DAQPResult *res, Workspace *work){
+void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
   DAQPtimer timer;
   tic(&timer);
   // Select algorithm
@@ -31,7 +31,7 @@ void daqp_quadprog(DAQPResult *res, QP* qp, DAQPSettings *settings){
   int setup_flag;
   
   tic(&timer);
-  Workspace work;
+  DAQPWorkspace work;
   work.settings = NULL;
   setup_flag = setup_daqp(qp,&work);
   if(settings!=NULL) 
@@ -52,7 +52,7 @@ void daqp_quadprog(DAQPResult *res, QP* qp, DAQPSettings *settings){
 }
 
 // Setup workspace and transform QP to LDP
-int setup_daqp(QP* qp, Workspace *work){
+int setup_daqp(QP* qp, DAQPWorkspace *work){
   int errorflag;
   // Check if QP is well-posed
   //validate_QP(qp);
@@ -74,7 +74,7 @@ int setup_daqp(QP* qp, Workspace *work){
 }
 
 //  Setup LDP from QP  
-int setup_daqp_ldp(Workspace *work, QP *qp){
+int setup_daqp_ldp(DAQPWorkspace *work, QP *qp){
   int error_flag,update_mask=0;
 
   work->n = qp->n;
@@ -120,7 +120,7 @@ int setup_daqp_ldp(Workspace *work, QP *qp){
 }
 
 // Free data for LDP 
-void free_daqp_ldp(Workspace *work){
+void free_daqp_ldp(DAQPWorkspace *work){
   if(work->sense==NULL) return; // Already freed
   free(work->sense);
   if(work->Rinv != NULL){
@@ -135,7 +135,7 @@ void free_daqp_ldp(Workspace *work){
   work->sense = NULL;
 }
 
-void allocate_daqp_settings(Workspace *work){
+void allocate_daqp_settings(DAQPWorkspace *work){
   if(work->settings == NULL){
 	work->settings = malloc(sizeof(DAQPSettings));
 	daqp_default_settings(work->settings);
@@ -143,7 +143,7 @@ void allocate_daqp_settings(Workspace *work){
 }
 
 // Allocate memory for iterates  
-void allocate_daqp_workspace(Workspace *work, int n){
+void allocate_daqp_workspace(DAQPWorkspace *work, int n){
   work->n = n;
   n = n + 1; //To account for soft_constraints
   work->Rinv = NULL;
@@ -170,7 +170,7 @@ void allocate_daqp_workspace(Workspace *work, int n){
 
 
 // Free memory for iterates
-void free_daqp_workspace(Workspace *work){
+void free_daqp_workspace(DAQPWorkspace *work){
   if(work->lam != NULL){
 	free(work->lam);
 	free(work->lam_star);
@@ -196,7 +196,7 @@ void free_daqp_workspace(Workspace *work){
 }
 
 // Extract solution information from workspace 
-void daqp_extract_result(DAQPResult* res, Workspace* work){
+void daqp_extract_result(DAQPResult* res, DAQPWorkspace* work){
   // Extract optimal solution and correct fval offset
   int i; 
   res->fval = work->fval;

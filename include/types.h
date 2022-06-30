@@ -90,6 +90,6 @@ typedef struct{
   c_float soft_slack; 
 
   DAQPSettings* settings;
-}Workspace;
+}DAQPWorkspace;
 
 #endif //ifndef DAQP_TYPES_H

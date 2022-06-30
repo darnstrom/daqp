@@ -1,6 +1,6 @@
 #include "daqp.h" 
 
-int daqp_ldp(Workspace *work){
+int daqp_ldp(DAQPWorkspace *work){
   int exitflag=EXIT_ITERLIMIT,iter;
   int tried_repair=0, cycle_counter=0;
   c_float best_fval = -1;
@@ -61,7 +61,7 @@ int daqp_ldp(Workspace *work){
 }
 
 // Compute x = -R\(u+v)
-void ldp2qp_solution(Workspace *work){
+void ldp2qp_solution(DAQPWorkspace *work){
   int i,j,disp;
   // x* = Rinv*(u-v)
   for(i=0;i<work->n;i++)
@@ -74,7 +74,7 @@ void ldp2qp_solution(Workspace *work){
 	}
 }
 
-void warmstart_workspace(Workspace* work, int* WS, const int n_active){
+void warmstart_workspace(DAQPWorkspace* work, int* WS, const int n_active){
   // TODO, will probably be error with equality constraints here... (Make sure reorder always adds inequality constraints...)
   reset_daqp_workspace(work); // Reset workspace
   for(int i = 0; i<n_active; i++){
@@ -88,7 +88,7 @@ void warmstart_workspace(Workspace* work, int* WS, const int n_active){
 
 
 // Reset workspace to default values
-void reset_daqp_workspace(Workspace *work){
+void reset_daqp_workspace(DAQPWorkspace *work){
   work->sing_ind=EMPTY_IND;
   work->n_active =0;
   work->reuse_ind=0;

@@ -2,11 +2,11 @@
 # define DAQP_UTILS_H
 #include "daqp.h"
 // Utils for transforming QP to LDP
-int update_ldp(const int mask, Workspace *work);
-int update_Rinv(Workspace *work);
-void update_M(Workspace *work);
-void update_v(c_float *f, Workspace *work);
-void update_d(Workspace *work);
+int update_ldp(const int mask, DAQPWorkspace *work);
+int update_Rinv(DAQPWorkspace *work);
+void update_M(DAQPWorkspace *work);
+void update_v(c_float *f, DAQPWorkspace *work);
+void update_d(DAQPWorkspace *work);
 //
 // Utils for profiling
 #ifdef _WIN32

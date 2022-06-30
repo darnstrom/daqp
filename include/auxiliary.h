@@ -4,18 +4,17 @@
 #include "types.h"
 #include "constants.h"
 
-void remove_constraint(Workspace* work, const int rm_ind);
-void add_constraint(Workspace *work, const int add_ind, c_float lam);
-//void find_constraint_to_add(Workspace *work);
-void compute_primal_and_fval(Workspace *work);
-int add_infeasible(Workspace *work);
-int remove_blocking(Workspace *work);
-void compute_CSP(Workspace *work);
-void compute_singular_direction(Workspace *work);
+void remove_constraint(DAQPWorkspace* work, const int rm_ind);
+void add_constraint(DAQPWorkspace *work, const int add_ind, c_float lam);
+void compute_primal_and_fval(DAQPWorkspace *work);
+int add_infeasible(DAQPWorkspace *work);
+int remove_blocking(DAQPWorkspace *work);
+void compute_CSP(DAQPWorkspace *work);
+void compute_singular_direction(DAQPWorkspace *work);
 
-void reorder_LDL(Workspace *work);
-void pivot_last(Workspace *work);
+void reorder_LDL(DAQPWorkspace *work);
+void pivot_last(DAQPWorkspace *work);
 
-int activate_constraints(Workspace *work);
-void deactive_constraints(Workspace *work);
+int activate_constraints(DAQPWorkspace *work);
+void deactive_constraints(DAQPWorkspace *work);
 #endif //ifndef DAQP_AUX_H

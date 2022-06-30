@@ -1,6 +1,6 @@
 #include "factorization.h"
 
-void update_LDL_add(Workspace *work, const int add_ind){
+void update_LDL_add(DAQPWorkspace *work, const int add_ind){
   work->sing_ind = EMPTY_IND;
   int i,j,disp;
   int new_L_start= ARSUM(work->n_active);
@@ -87,7 +87,7 @@ void update_LDL_add(Workspace *work, const int add_ind){
 	work->D[work->n_active]=0;
   }
 }
-void update_LDL_remove(Workspace *work, const int rm_ind){
+void update_LDL_remove(DAQPWorkspace *work, const int rm_ind){
   if(work->n_active==rm_ind+1)
 	return;
   int i, j, r, old_disp, new_disp, w_count, n_update=work->n_active-rm_ind-1;
