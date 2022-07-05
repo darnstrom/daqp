@@ -10,6 +10,12 @@ int daqp_ldp(DAQPWorkspace *work){
 	  // Check dual feasibility of CSP
 	  if(!remove_blocking(work)){ //lam_star >= 0 (i.e., dual feasible)
 		compute_primal_and_fval(work);
+		// fval termination criterion
+		if(work->fval > work->settings->fval_bound){
+		  exitflag = EXIT_INFEASIBLE;
+		  break;
+		}
+		// Try to add infeasible constraint 
 		if(!add_infeasible(work)){ //mu >= (i.e., primal feasible)
 		  // All KKT-conditions satisfied -> optimum found 
 		  if(work->soft_slack > work->settings->primal_tol)
@@ -19,7 +25,7 @@ int daqp_ldp(DAQPWorkspace *work){
 		  break;
 		}
 
-		/* Check fval terminal conditions */
+		// Cycle guard
 		if(best_fval > work->fval-work->settings->progress_tol){ 
 		  if(cycle_counter++ > work->settings->cycle_tol){
 			if(tried_repair == 1){
@@ -40,10 +46,6 @@ int daqp_ldp(DAQPWorkspace *work){
 		else{ // Progress was made
 		  best_fval = work->fval;
 		  cycle_counter = 0;
-		  if(best_fval > work->settings->fval_bound){ 
-			exitflag = EXIT_INFEASIBLE;
-			break;
-		  }
 		}
 	  }
 	}
