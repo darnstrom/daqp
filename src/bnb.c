@@ -6,6 +6,7 @@ int daqp_bnb(DAQPWorkspace* work){
   int branch_id, node_id, exitflag;
   c_float *swp_ptr;
 
+  printf("REMOVE_LOWER_FLAG(18):%d\n",REMOVE_LOWER_FLAG(18));
   // Setup root node
   work->bnb->tree_depths[0]=-1;
   work->bnb->n_nodes=1;
@@ -41,7 +42,7 @@ int get_branch_id(DAQPWorkspace* work){
   for(int i=0; i < work->bnb->nb; i++){
 	// Branch on first inactive constraint 
 	if(IS_ACTIVE(work->bnb->bin_ids[i])) continue;
-	return i;
+	return work->bnb->bin_ids[i];
   }
   return -1;
 }
@@ -66,7 +67,7 @@ int process_node(const int node_id, DAQPWorkspace* work){
   if(depth >=0){
 	// Cleanup sense 
 	for(i=depth; i<work->n_active; i++)
-	  work->sense[i]&=~(ACTIVE+IMMUTABLE);
+	  work->sense[work->WS[i]]&=~(ACTIVE+IMMUTABLE);
 	// Reset workspace, but keep previous binaries in WS 
 	work->sing_ind=EMPTY_IND;
 	work->n_active=depth;
