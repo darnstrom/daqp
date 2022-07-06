@@ -10,7 +10,11 @@ void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
   tic(&timer);
   // Select algorithm
   if(work->settings->eps_prox==0){
-	res->exitflag = daqp_ldp(work);
+	if(work->bnb != NULL)
+	  res->exitflag = daqp_bnb(work);
+	else
+	  res->exitflag = daqp_ldp(work);
+
 	if(res->exitflag > 0) ldp2qp_solution(work); // Retrieve qp solution 
   }
   else{//Prox
@@ -165,6 +169,7 @@ void allocate_daqp_workspace(DAQPWorkspace *work, int n){
   
   work->xold= malloc(n*sizeof(c_float));
 
+  work->bnb = NULL;
   reset_daqp_workspace(work);
 }
 

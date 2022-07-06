@@ -2,6 +2,7 @@
 # define DAQP_API_H
 #include "daqp.h"
 #include "daqp_prox.h"
+#include "bnb.h"
 
 typedef struct{
   c_float *x;

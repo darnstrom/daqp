@@ -1,20 +1,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "bnb.h"
-#include "daqp.h"
 
-int daqp_bnb(DAQPBnBWorkspace* work){
+int daqp_bnb(DAQPWorkspace* work){
   DAQPNode current_node;
   int branch_id,exitflag;
   c_float *swp_ptr;
 
   // Setup root node
-  work->tree[0].depth=-1;
-  work->n_tree=1;
+  work->bnb->tree[0].depth=-1;
+  work->bnb->n_tree=1;
   
   // Start tree exploration
-  while(work->n_tree > 0){
-	current_node = work->tree[work->n_tree--]; 
+  while(work->bnb->n_tree > 0){
+	current_node = work->bnb->tree[work->bnb->n_tree--]; 
 
 	exitflag = process_node(&current_node,work); // Solve relaxation
 
@@ -25,31 +24,32 @@ int daqp_bnb(DAQPBnBWorkspace* work){
 	// Find index to branch over 
 	branch_id = get_branch_id(work); 
 	if(branch_id==-1){// Nothing to branch over => integer feasible
-	  work->dwork->settings->fval_bound = work->dwork->fval;
+	  work->settings->fval_bound = work->fval;
 	  // Set ubar = u
-	  swp_ptr=work->ustar; work->ustar= work->dwork->u; work->dwork->u=swp_ptr;
+	  swp_ptr=work->xold; work->xold= work->u; work->u=swp_ptr;
 	}
 	else{
 	  spawn_children(&current_node, branch_id, work);
 	}
   }
+  // Let work->u point to the best feasible solution 
+  swp_ptr=work->u; work->u= work->xold; work->xold=swp_ptr;
   return 1;
 }
 
-int get_branch_id(DAQPBnBWorkspace* work){
+int get_branch_id(DAQPWorkspace* work){
   // TODO: pick the most fractional? 
-  for(int i=0; i<work->nb; i++){
+  for(int i=0; i < work->bnb->nb; i++){
 	// Branch on first inactive constraint 
-	if((work->dwork->sense[work->bin_ids[i]]&1) != 1){
-	  return i;
-	}
+	if(IS_ACTIVE(work->bnb->bin_ids[i])) continue;
+	return i;
   }
   return -1;
 }
 
-void spawn_children(DAQPNode *node, int branch_id, DAQPBnBWorkspace* work){
+void spawn_children(DAQPNode *node, int branch_id, DAQPWorkspace* work){
   // Since lifo current node can be reused as a new child
-  DAQPNode* new_child = work->tree+(work->n_tree+1);
+  DAQPNode* new_child = work->bnb->tree+(work->bnb->n_tree+1);
 
   // Update child1 (reuse node) 
   node->new_bin = MASK_LOWER(branch_id); // LOWER 
@@ -59,13 +59,12 @@ void spawn_children(DAQPNode *node, int branch_id, DAQPBnBWorkspace* work){
   new_child->new_bin= branch_id; // UPPER
   new_child->depth=node->depth;
   
-  work->n_tree+=2;
+  work->bnb->n_tree+=2;
 }
 
 // TODO need to forbid pivoting
-int process_node(DAQPNode *node, DAQPBnBWorkspace* bnb_work){
+int process_node(DAQPNode *node, DAQPWorkspace* work){
   int i,exitflag;
-  DAQPWorkspace* work = bnb_work->dwork;
 
   if(node->depth>=0){
 	// Cleanup sense 
@@ -91,30 +90,19 @@ int process_node(DAQPNode *node, DAQPBnBWorkspace* bnb_work){
   return exitflag;
 }
 
-void setup_daqp_bnb(DAQPWorkspace* work, DAQPBnBWorkspace* bnb_work){
-  int i,nb;
+void setup_daqp_bnb(DAQPWorkspace* work, int* bin_ids, int nb){
+  if((work->bnb == NULL) && (nb >0)){
+	work->bnb= malloc(sizeof(DAQPBnB));
 
-  // Append workspace 
-  bnb_work->dwork = work;
-  // Setup binary ids 
-  bnb_work->bin_ids= malloc(work->n*sizeof(int)); // nb>n => overdetermined system 
-  nb = 0;
-  for(i = 0; i<work->m;i++){
-	if(work->sense[i]&BINARY){
-	  bnb_work->bin_ids[nb++]=i; 
-	  if(nb>work->n) return; // Cannot have more than n binaries 
-	}
+	work->bnb->nb = nb;
+	work->bnb->bin_ids = bin_ids;
 
-	// Allocate memory 
-	bnb_work->ustar= malloc(work->n*sizeof(int));
-	bnb_work->tree= malloc(bnb_work->nb*sizeof(DAQPNode));
-	bnb_work->n_tree = 0; 
+	// Setup tree
+	work->bnb->tree= malloc(work->bnb->nb*sizeof(DAQPNode));
+	work->bnb->n_tree = 0; 
   }
 }
 
-void free_daqp_bnb(DAQPBnBWorkspace* bnb_work){
-	free(bnb_work->ustar);
-	free(bnb_work->tree);
-	free(bnb_work->bin_ids);
-	//free_daqp_workspace(bnb_work->dwork);
+void free_daqp_bnb(DAQPWorkspace* work){
+	free(work->bnb->tree);
 }

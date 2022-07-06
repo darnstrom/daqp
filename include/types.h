@@ -30,6 +30,9 @@ c_float* bupper;
 c_float* blower;
 
 int* sense; 
+
+int* bin_ids;
+int nb;
 }DAQPProblem;
 typedef struct{
   c_float primal_tol; 
@@ -47,6 +50,19 @@ typedef struct{
 
   c_float rho_soft;
 }DAQPSettings;
+
+typedef struct{
+  int new_bin; 
+  int depth;
+}DAQPNode;
+
+typedef struct{
+  int* bin_ids;
+  int nb;
+
+  DAQPNode* tree;
+  int n_tree;
+}DAQPBnB;
 
 typedef struct{
   DAQPProblem* qp;
@@ -89,7 +105,11 @@ typedef struct{
   // Minimum slack for soft constraints
   c_float soft_slack; 
 
+  // Settings
   DAQPSettings* settings;
+
+  // BnB
+  DAQPBnB* bnb;
 }DAQPWorkspace;
 
 #endif //ifndef DAQP_TYPES_H
