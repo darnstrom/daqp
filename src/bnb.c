@@ -12,8 +12,7 @@ int daqp_bnb(DAQPWorkspace* work){
   work->bnb->n_tree=1;
   
   // Start tree exploration
-  int iter = 0;
-  while((work->bnb->n_tree > 0) && (++iter < 6)){
+  while(work->bnb->n_tree > 0){
 	current_node = work->bnb->tree+(--work->bnb->n_tree); 
 
 	exitflag = process_node(current_node,work); // Solve relaxation
@@ -65,7 +64,6 @@ void spawn_children(DAQPNode *node, int branch_id, DAQPWorkspace* work){
   work->bnb->n_tree+=2;
 }
 
-// TODO need to forbid pivoting
 int process_node(DAQPNode *node, DAQPWorkspace* work){
   int i,exitflag;
   if(node->depth >=0){
