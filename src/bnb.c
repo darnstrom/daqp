@@ -3,7 +3,7 @@
 #include "bnb.h"
 
 int daqp_bnb(DAQPWorkspace* work){
-  DAQPNode current_node;
+  DAQPNode* current_node;
   int branch_id,exitflag;
   c_float *swp_ptr;
 
@@ -12,10 +12,11 @@ int daqp_bnb(DAQPWorkspace* work){
   work->bnb->n_tree=1;
   
   // Start tree exploration
-  while(work->bnb->n_tree > 0){
-	current_node = work->bnb->tree[work->bnb->n_tree--]; 
+  int iter = 0;
+  while((work->bnb->n_tree > 0) && (++iter < 6)){
+	current_node = work->bnb->tree+(--work->bnb->n_tree); 
 
-	exitflag = process_node(&current_node,work); // Solve relaxation
+	exitflag = process_node(current_node,work); // Solve relaxation
 
 	// Cut conditions
 	if(exitflag==EXIT_INFEASIBLE) continue; // Dominance cut
@@ -29,7 +30,7 @@ int daqp_bnb(DAQPWorkspace* work){
 	  swp_ptr=work->xold; work->xold= work->u; work->u=swp_ptr;
 	}
 	else{
-	  spawn_children(&current_node, branch_id, work);
+	  spawn_children(current_node, branch_id, work);
 	}
   }
   // Let work->u point to the best feasible solution 
@@ -52,12 +53,14 @@ void spawn_children(DAQPNode *node, int branch_id, DAQPWorkspace* work){
   DAQPNode* new_child = work->bnb->tree+(work->bnb->n_tree+1);
 
   // Update child1 (reuse node) 
-  node->new_bin = MASK_LOWER(branch_id); // LOWER 
+  node->new_bin = branch_id; // LOWER 
   node->depth++;
+  node->is_lower = 2;
 
   // Update child2
   new_child->new_bin= branch_id; // UPPER
   new_child->depth=node->depth;
+  new_child->is_lower = 0;
   
   work->bnb->n_tree+=2;
 }
@@ -65,8 +68,7 @@ void spawn_children(DAQPNode *node, int branch_id, DAQPWorkspace* work){
 // TODO need to forbid pivoting
 int process_node(DAQPNode *node, DAQPWorkspace* work){
   int i,exitflag;
-
-  if(node->depth>=0){
+  if(node->depth >=0){
 	// Cleanup sense 
 	for(i=node->depth; i<work->n_active; i++)
 	  work->sense[i]&=~(ACTIVE+IMMUTABLE);
@@ -75,11 +77,10 @@ int process_node(DAQPNode *node, DAQPWorkspace* work){
 	work->n_active=node->depth;
 	work->reuse_ind=node->depth; 
 
+	add_constraint(work,node->new_bin,1.0);
 	// Setup new binary constraint
-	i = UNMASK_BIN_ID(node->new_bin);
-	add_constraint(work,i,1.0);
 	if(work->sing_ind!=EMPTY_IND) return EXIT_INFEASIBLE; // Disregard singular node 
-	work->sense[i] |= (IMMUTABLE+UNMASK_LOWER(node->new_bin));  
+	work->sense[node->new_bin] |= (IMMUTABLE+node->is_lower);  
 
 	// Possibly activate more constraints (Warm-start)...
 	// TODO
@@ -98,11 +99,15 @@ void setup_daqp_bnb(DAQPWorkspace* work, int* bin_ids, int nb){
 	work->bnb->bin_ids = bin_ids;
 
 	// Setup tree
-	work->bnb->tree= malloc(work->bnb->nb*sizeof(DAQPNode));
+	work->bnb->tree= malloc((work->bnb->nb+1)*sizeof(DAQPNode));
 	work->bnb->n_tree = 0; 
   }
 }
 
 void free_daqp_bnb(DAQPWorkspace* work){
+  if(work->bnb != NULL){
 	free(work->bnb->tree);
+	free(work->bnb);
+	work->bnb = NULL;
+  }
 }

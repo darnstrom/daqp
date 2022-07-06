@@ -54,6 +54,7 @@ typedef struct{
 typedef struct{
   int new_bin; 
   int depth;
+  int is_lower;
 }DAQPNode;
 
 typedef struct{

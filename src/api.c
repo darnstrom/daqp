@@ -69,6 +69,7 @@ int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work){
 	free_daqp_workspace(work);
 	return errorflag;
   }
+  setup_daqp_bnb(work,qp->bin_ids,qp->nb);
   errorflag = activate_constraints(work);
   if(errorflag < 0){
 	free_daqp_workspace(work);
@@ -194,10 +195,13 @@ void free_daqp_workspace(DAQPWorkspace *work){
 
 	work->lam = NULL;
   }
+
   if(work->settings != NULL){ 
 	free(work->settings);
 	work->settings = NULL;
   }
+
+  free_daqp_bnb(work);
 }
 
 // Extract solution information from workspace 

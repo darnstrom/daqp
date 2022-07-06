@@ -73,6 +73,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  int n = mxGetM(prhs[4]);
 	  int m = mxGetM(prhs[5]);
 	  int ms = m-mxGetN(prhs[4]);
+	  int nb = mxGetM(prhs[8]);
 	  
 	  // Setup QP struct
 	  qp->n = n;
@@ -84,6 +85,8 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  qp->bupper= mxGetPr(prhs[5]);
 	  qp->blower= mxGetPr(prhs[6]);
 	  qp->sense= (int *)mxGetPr(prhs[7]);
+	  qp->bin_ids= (int *)mxGetPr(prhs[8]);
+	  qp->nb=nb; 
 	  
 	  error_flag = setup_daqp(qp,work);
 	  if(error_flag < 0){
