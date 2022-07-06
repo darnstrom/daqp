@@ -242,11 +242,12 @@ void reorder_LDL(DAQPWorkspace *work){
 }
 
 void pivot_last(DAQPWorkspace *work){
+  const int rm_ind = work->n_active-2; 
   if(work->n_active > 1 && 
-	 work->D[work->n_active-2] < work->settings->pivot_tol && // element in D small enough
-	 work->D[work->n_active-2] < work->D[work->n_active-1]){ // element in D smallar than neighbor
-	const int rm_ind = work->n_active-2; 
+	 work->D[rm_ind] < work->settings->pivot_tol && // element in D small enough
+	 work->D[rm_ind] < work->D[work->n_active-1]){ // element in D smallar than neighbor
 	const int ind_old = work->WS[rm_ind];
+	if(IS_IMMUTABLE(ind_old)) return; // Never pivot immutable constraints 
 
 	c_float lam_old = work->lam[rm_ind];
 	remove_constraint(work,rm_ind); // pivot_last might be recursively called here 
