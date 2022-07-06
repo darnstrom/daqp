@@ -89,7 +89,8 @@ int process_node(DAQPNode *node, DAQPWorkspace* work){
   return exitflag;
 }
 
-void setup_daqp_bnb(DAQPWorkspace* work, int* bin_ids, int nb){
+int setup_daqp_bnb(DAQPWorkspace* work, int* bin_ids, int nb){
+  if(nb > work->n) return EXIT_OVERDETERMINED_INITIAL;
   if((work->bnb == NULL) && (nb >0)){
 	work->bnb= malloc(sizeof(DAQPBnB));
 
@@ -100,6 +101,7 @@ void setup_daqp_bnb(DAQPWorkspace* work, int* bin_ids, int nb){
 	work->bnb->tree= malloc((work->bnb->nb+1)*sizeof(DAQPNode));
 	work->bnb->n_tree = 0; 
   }
+  return 1;
 }
 
 void free_daqp_bnb(DAQPWorkspace* work){
