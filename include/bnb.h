@@ -5,10 +5,9 @@
 #include "constants.h"
 #include "daqp.h"
 
-int daqp_bnb(DAQPWorkspace *work);
-
 typedef struct{
-  int* bin_states; 
+  int new_bin; 
+  int depth;
 }DAQPNode;
 
 typedef struct{
@@ -17,16 +16,23 @@ typedef struct{
 
   DAQPNode* tree;
   int n_tree;
-  int start_id;
 
-  c_float  Jbar;
-  c_float* ubar;
+  c_float* ustar;
 
   DAQPWorkspace* dwork;
 }DAQPBnBWorkspace;
 
 int daqp_bnb(DAQPBnBWorkspace* work);
-int get_branch_id(DAQPNode *node, DAQPBnBWorkspace* work);
-int spawn_children(DAQPNode *node, int branch_id, DAQPBnBWorkspace* work);
+int get_branch_id(DAQPBnBWorkspace* work);
+void spawn_children(DAQPNode *node, int branch_id, DAQPBnBWorkspace* work);
+int process_node(DAQPNode *node, DAQPBnBWorkspace* work);
+
+void setup_daqp_bnb(DAQPWorkspace* work, DAQPBnBWorkspace* bnb_work);
+void free_daqp_bnb(DAQPBnBWorkspace* bnb_work);
+
+#define UNMASK_LOWER(x) (x>>30)
+#define UNMASK_BIN_ID(x) (x & ~(1 << 31))
+#define MASK_LOWER(x) (x+(1<<31))
+
 
 #endif //ifndef DAQP_BNB_H 

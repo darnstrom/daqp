@@ -70,6 +70,8 @@
 #define SET_SOFT(x) (work->sense[x]|=8)
 #define SET_HARD(x) (work->sense[x]&=~8)
 
+#define BINARY 16 
+
 #define IS_SIMPLE(x) (x < work->ms)
 
 
