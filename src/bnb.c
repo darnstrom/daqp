@@ -3,19 +3,18 @@
 #include "bnb.h"
 
 int daqp_bnb(DAQPWorkspace* work){
-  DAQPNode* current_node;
-  int branch_id,exitflag;
+  int branch_id, node_id, exitflag;
   c_float *swp_ptr;
 
   // Setup root node
-  work->bnb->tree[0].depth=-1;
-  work->bnb->n_tree=1;
+  work->bnb->tree_depths[0]=-1;
+  work->bnb->n_nodes=1;
   
   // Start tree exploration
-  while(work->bnb->n_tree > 0){
-	current_node = work->bnb->tree+(--work->bnb->n_tree); 
+  while(work->bnb->n_nodes > 0){
 
-	exitflag = process_node(current_node,work); // Solve relaxation
+	node_id = --work->bnb->n_nodes;
+	exitflag = process_node(node_id,work); // Solve relaxation
 
 	// Cut conditions
 	if(exitflag==EXIT_INFEASIBLE) continue; // Dominance cut
@@ -29,7 +28,7 @@ int daqp_bnb(DAQPWorkspace* work){
 	  swp_ptr=work->xold; work->xold= work->u; work->u=swp_ptr;
 	}
 	else{
-	  spawn_children(current_node, branch_id, work);
+	  spawn_children(node_id, branch_id, work);
 	}
   }
   // Let work->u point to the best feasible solution 
@@ -47,38 +46,37 @@ int get_branch_id(DAQPWorkspace* work){
   return -1;
 }
 
-void spawn_children(DAQPNode *node, int branch_id, DAQPWorkspace* work){
-  // Since lifo current node can be reused as a new child
-  DAQPNode* new_child = work->bnb->tree+(work->bnb->n_tree+1);
+void spawn_children(const int node_id, const int branch_id, DAQPWorkspace* work){
 
-  // Update child1 (reuse node) 
-  node->new_bin = branch_id; // LOWER 
-  node->depth++;
-  node->is_lower = 2;
+  // Update child1 (reuse current node) 
+  work->bnb->tree_bin_ids[node_id] = ADD_LOWER_FLAG(branch_id);
+  work->bnb->tree_depths[node_id] +=1;
 
   // Update child2
-  new_child->new_bin= branch_id; // UPPER
-  new_child->depth=node->depth;
-  new_child->is_lower = 0;
+  work->bnb->tree_bin_ids[node_id+1] = branch_id;
+  work->bnb->tree_depths[node_id+1] = work->bnb->tree_depths[node_id];
   
-  work->bnb->n_tree+=2;
+  work->bnb->n_nodes+=2;
 }
 
-int process_node(DAQPNode *node, DAQPWorkspace* work){
+int process_node(const int node_id, DAQPWorkspace* work){
   int i,exitflag;
-  if(node->depth >=0){
+  const int depth = work->bnb->tree_depths[node_id]; 
+  const int bin_id = work->bnb->tree_bin_ids[node_id]; 
+  if(depth >=0){
 	// Cleanup sense 
-	for(i=node->depth; i<work->n_active; i++)
+	for(i=depth; i<work->n_active; i++)
 	  work->sense[i]&=~(ACTIVE+IMMUTABLE);
 	// Reset workspace, but keep previous binaries in WS 
 	work->sing_ind=EMPTY_IND;
-	work->n_active=node->depth;
-	work->reuse_ind=node->depth; 
+	work->n_active=depth;
+	work->reuse_ind=depth; 
 
-	add_constraint(work,node->new_bin,1.0);
+	i = REMOVE_LOWER_FLAG(bin_id);
+	add_constraint(work,i,1.0);
 	// Setup new binary constraint
 	if(work->sing_ind!=EMPTY_IND) return EXIT_INFEASIBLE; // Disregard singular node 
-	work->sense[node->new_bin] |= (IMMUTABLE+node->is_lower);  
+	work->sense[i] |= (IMMUTABLE+EXTRACT_LOWER_FLAG(bin_id));  
 
 	// Possibly activate more constraints (Warm-start)...
 	// TODO
@@ -98,15 +96,17 @@ int setup_daqp_bnb(DAQPWorkspace* work, int* bin_ids, int nb){
 	work->bnb->bin_ids = bin_ids;
 
 	// Setup tree
-	work->bnb->tree= malloc((work->bnb->nb+1)*sizeof(DAQPNode));
-	work->bnb->n_tree = 0; 
+	work->bnb->tree_bin_ids= malloc((work->bnb->nb+1)*sizeof(int));
+	work->bnb->tree_depths = malloc((work->bnb->nb+1)*sizeof(int));
+	work->bnb->n_nodes = 0; 
   }
   return 1;
 }
 
 void free_daqp_bnb(DAQPWorkspace* work){
   if(work->bnb != NULL){
-	free(work->bnb->tree);
+	free(work->bnb->tree_bin_ids);
+	free(work->bnb->tree_depths);
 	free(work->bnb);
 	work->bnb = NULL;
   }

@@ -52,17 +52,12 @@ typedef struct{
 }DAQPSettings;
 
 typedef struct{
-  int new_bin; 
-  int depth;
-  int is_lower;
-}DAQPNode;
-
-typedef struct{
   int* bin_ids;
   int nb;
 
-  DAQPNode* tree;
-  int n_tree;
+  int* tree_bin_ids;
+  int* tree_depths;
+  int  n_nodes;
 }DAQPBnB;
 
 typedef struct{
