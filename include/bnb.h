@@ -8,8 +8,8 @@
 
 int daqp_bnb(DAQPWorkspace* work);
 int get_branch_id(DAQPWorkspace* work);
-void spawn_children(const int node_id, const int branch_id, DAQPWorkspace* work);
-int process_node(const int node_id, DAQPWorkspace* work);
+void spawn_children(DAQPNode* node, const int branch_id, DAQPWorkspace* work);
+int process_node(DAQPNode* node, DAQPWorkspace* work);
 
 int setup_daqp_bnb(DAQPWorkspace* work, int* bin_inds, int nb);
 void free_daqp_bnb(DAQPWorkspace* work);

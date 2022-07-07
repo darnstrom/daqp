@@ -51,13 +51,26 @@ typedef struct{
   c_float rho_soft;
 }DAQPSettings;
 
+
+typedef struct{
+  int bin_id;
+  int depth;
+  int WS_start;
+  int WS_end;
+}DAQPNode;
+
 typedef struct{
   int* bin_ids;
   int nb;
 
-  int* tree_bin_ids;
-  int* tree_depths;
+  DAQPNode* tree;
   int  n_nodes;
+  
+  int* tree_WS;
+  int nWS;
+
+  int nodecount;
+  int itercount;
 }DAQPBnB;
 
 typedef struct{
