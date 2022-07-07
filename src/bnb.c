@@ -6,7 +6,6 @@ int daqp_bnb(DAQPWorkspace* work){
   int branch_id, node_id, exitflag;
   c_float *swp_ptr;
 
-  printf("REMOVE_LOWER_FLAG(18):%d\n",REMOVE_LOWER_FLAG(18));
   // Setup root node
   work->bnb->tree_depths[0]=-1;
   work->bnb->n_nodes=1;
@@ -77,7 +76,11 @@ int process_node(const int node_id, DAQPWorkspace* work){
 	add_constraint(work,i,1.0);
 	// Setup new binary constraint
 	if(work->sing_ind!=EMPTY_IND) return EXIT_INFEASIBLE; // Disregard singular node 
-	work->sense[i] |= (IMMUTABLE+EXTRACT_LOWER_FLAG(bin_id));  
+	work->sense[i] |= IMMUTABLE;
+	if(EXTRACT_LOWER_FLAG(bin_id))
+	  SET_LOWER(i);
+	else
+	  SET_UPPER(i);
 
 	// Possibly activate more constraints (Warm-start)...
 	// TODO
@@ -85,6 +88,7 @@ int process_node(const int node_id, DAQPWorkspace* work){
 
   // Solve relaxation
   exitflag = daqp_ldp(work);
+
   return exitflag;
 }
 
