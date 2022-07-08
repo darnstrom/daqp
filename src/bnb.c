@@ -81,48 +81,58 @@ void spawn_children(DAQPNode* node, const int branch_id, DAQPWorkspace* work){
 }
 
 int process_node(DAQPNode* node, DAQPWorkspace* work){
-  int i,add_id,exitflag;
+  int exitflag;
   work->bnb->nodecount+=1;
   if(node->depth >=0){
-	// Cleanup sense 
-	for(i=node->depth; i<work->n_active; i++)
-	  work->sense[work->WS[i]]&=~(ACTIVE+IMMUTABLE);
-	// Reset workspace, but keep previous binaries in WS 
-	work->sing_ind=EMPTY_IND;
-	work->n_active=node->depth;
-	work->reuse_ind=node->depth; 
-
-	i = REMOVE_LOWER_FLAG(node->bin_id);
-	add_constraint(work,i,1.0);
-	// Setup new binary constraint
-	if(work->sing_ind!=EMPTY_IND) return EXIT_INFEASIBLE; // Disregard singular node 
-	work->sense[i] |= IMMUTABLE;
-	if(EXTRACT_LOWER_FLAG(node->bin_id))
-	  SET_LOWER(i);
-	else
-	  SET_UPPER(i);
-
+	// Setup workspace before processing node 
+	add_new_binary(node->depth,node->bin_id,work);
 	// Warm start 
-	for(i=node->WS_start;i<node->WS_end;i++){
-	  if(work->sing_ind != EMPTY_IND) break; // Abort warm start if singular basis 
-
-	  // Add the constraint
-	  add_id = REMOVE_LOWER_FLAG(work->bnb->tree_WS[i]);
-	  if(EXTRACT_LOWER_FLAG(work->bnb->tree_WS[i])){
-		SET_LOWER(add_id);
-		add_constraint(work,add_id,-1.0);
-	  }
-	  else{
-		SET_UPPER(add_id);
-		add_constraint(work,add_id,1.0);
-	  }
-	}
+	warmstart_node(node->WS_start,node->WS_end,work);
   }
   // Solve relaxation
   exitflag = daqp_ldp(work);
   work->bnb->itercount += work->iterations;
 
   return exitflag;
+}
+
+int add_new_binary(const int depth, const int bin_id, DAQPWorkspace* work){
+  int i;
+  // Cleanup sense 
+  for(i=depth; i<work->n_active; i++)
+	work->sense[work->WS[i]]&=~(ACTIVE+IMMUTABLE);
+  // Reset workspace, but keep previous binaries in WS 
+  work->sing_ind=EMPTY_IND;
+  work->n_active=depth;
+  work->reuse_ind=depth;
+
+  i = REMOVE_LOWER_FLAG(bin_id);
+  add_constraint(work,i,1.0);
+  // Setup new binary constraint
+  if(work->sing_ind!=EMPTY_IND) return EXIT_INFEASIBLE; // Disregard singular node 
+  work->sense[i] |= IMMUTABLE;
+  if(EXTRACT_LOWER_FLAG(bin_id))
+	SET_LOWER(i);
+  else
+	SET_UPPER(i);
+  return 1;
+}
+
+void warmstart_node(const int start_id, const int end_id, DAQPWorkspace* work){
+  int i,add_id;
+  for(i=start_id;i<end_id;i++){
+	if(work->sing_ind != EMPTY_IND) break; // Abort warm start if singular basis 
+	// Add the constraint
+	add_id = REMOVE_LOWER_FLAG(work->bnb->tree_WS[i]);
+	if(EXTRACT_LOWER_FLAG(work->bnb->tree_WS[i])){
+	  SET_LOWER(add_id);
+	  add_constraint(work,add_id,-1.0);
+	}
+	else{
+	  SET_UPPER(add_id);
+	  add_constraint(work,add_id,1.0);
+	}
+  }
 }
 
 int setup_daqp_bnb(DAQPWorkspace* work, int* bin_ids, int nb){
