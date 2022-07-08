@@ -27,13 +27,17 @@ int daqp_bnb(DAQPWorkspace* work){
 	if(exitflag<0) return exitflag; // Inner solver failed => abort
 
 	// Find index to branch over 
-	branch_id = get_branch_id(work); 
+	save_warmstart(node,work);
+	//branch_id = get_branch_id(work); 
+	//work->settings->iter_limit = 10;
+	branch_id = strong_branching(node,work); 
+	//work->settings->iter_limit = DEFAULT_ITER_LIMIT;
 	if(branch_id==-1){// Nothing to branch over => integer feasible
 	  work->settings->fval_bound = work->fval;
 	  // Set ubar = u
 	  swp_ptr=work->xold; work->xold= work->u; work->u=swp_ptr;
 	}
-	else{
+	else if(branch_id!=-2){
 	  spawn_children(node,branch_id, work);
 	}
   }
@@ -52,30 +56,88 @@ int get_branch_id(DAQPWorkspace* work){
   }
   return -1;
 }
+int strong_branching(DAQPNode* node,DAQPWorkspace* work){
+  // TODO: pick the most fractional? 
+  int branch_id=-1;
+  int i,exitflag_low,exitflag_up;
+  int* branch_cands = work->bnb->tree_WS+work->bnb->nWS;
+  int ncands=0;
 
-void spawn_children(DAQPNode* node, const int branch_id, DAQPWorkspace* work){
+  for(i=0; i < work->bnb->nb; i++){
+	// Branch on first inactive constraint 
+	if(IS_ACTIVE(work->bnb->bin_ids[i])) continue; // Never branch on active
+	branch_cands[ncands++]=work->bnb->bin_ids[i];
+  }
+  if(ncands==0) return -1;
+  if(ncands==1) return branch_cands[0];
 
-  int depth = node->depth;
-  // Update child1 (reuse current node) 
-  node->bin_id = ADD_LOWER_FLAG(branch_id);
-  node->depth =depth+1;
+  c_float fval_ref,best_score,fval_up,fval_low;
+  fval_ref = work->fval;
+  best_score = -INF;
+  for(i=0; i<ncands;i++){
+	// Upper
+	add_new_binary(node->depth+1,branch_cands[i],work);
+	warmstart_node(node->WS_start,node->WS_end,work);
+	exitflag_up = daqp_ldp(work);
+	work->bnb->itercount+=work->iterations;
+	fval_up = work->fval;
+	
+	// Lower 
+	add_new_binary(node->depth+1,ADD_LOWER_FLAG(branch_cands[i]),work);
+	warmstart_node(node->WS_start,node->WS_end,work);
+	exitflag_low = daqp_ldp(work);
+	fval_low = work->fval;
+	work->bnb->itercount+=work->iterations;
 
-  // Update child2
-  (node+1)->bin_id = branch_id;
-  (node+1)->depth = depth+1; 
+	if(exitflag_up == EXIT_INFEASIBLE && exitflag_low == EXIT_INFEASIBLE) return -2;
+	if(exitflag_up == EXIT_INFEASIBLE){ 
+	  // Only lower is valid  => Fix upper and continue
+	  node->depth++; // State ok since lower was the last tested
+	  continue;
+	}
+	if(exitflag_low == EXIT_INFEASIBLE){ 
+	  if(i<ncands-1 || branch_id !=-1){// To avoid needing to copy...
+	  // Only upper is valid 
+	  add_new_binary(++(node->depth),branch_cands[i],work);
+	  work->reuse_ind=0;
+	  work->fval=fval_up; // In case node becomes binary feasible
+	  continue;
+	  }
+	}
 
-  // Update warm start 
-  if(work->bnb->n_nodes==0 || (node-1)->depth!=depth){ // Moving up the tree
+	if(best_score< (fval_up-fval_ref)*(fval_low-fval_ref)){
+	  best_score = (fval_up-fval_ref)*(fval_low-fval_ref);
+	  branch_id = fval_up>fval_up ?
+		branch_cands[i] : ADD_LOWER_FLAG(branch_cands[i]);
+	}
+
+  }
+  return branch_id;
+}
+
+void save_warmstart(DAQPNode* node, DAQPWorkspace* work){
+  // Save warmstart 
+  if(work->bnb->n_nodes==0 || (node-1)->depth!=node->depth){ // Moving up the tree
     work->bnb->nWS = node->WS_start;
   }
   node->WS_start = work->bnb->nWS;
-  (node+1)->WS_start = work->bnb->nWS;
 
-  for(int i =depth+1; i<work->n_active;i++){
+  for(int i =node->depth+1; i<work->n_active;i++){
     work->bnb->tree_WS[work->bnb->nWS++]=(work->WS[i]+(IS_LOWER(work->WS[i]) << (LOWER_BIT-1)));
   }
   node->WS_end = work->bnb->nWS;
-  (node+1)->WS_end = work->bnb->nWS;
+}
+void spawn_children(DAQPNode* node, const int branch_id, DAQPWorkspace* work){
+
+  // Update child1 (reuse current node) 
+  node->bin_id = TOGGLE_LOWER_FLAG(branch_id);
+  node->depth +=1;
+
+  // Update child2
+  (node+1)->bin_id = branch_id;
+  (node+1)->depth = node->depth; 
+  (node+1)->WS_start = node->WS_start;
+  (node+1)->WS_end= node->WS_end;
   
   work->bnb->n_nodes+=2;
 }
@@ -104,7 +166,7 @@ int add_new_binary(const int depth, const int bin_id, DAQPWorkspace* work){
   // Reset workspace, but keep previous binaries in WS 
   work->sing_ind=EMPTY_IND;
   work->n_active=depth;
-  work->reuse_ind=depth;
+  work->reuse_ind= depth>work->reuse_ind ? work->reuse_ind : depth;
 
   i = REMOVE_LOWER_FLAG(bin_id);
   add_constraint(work,i,1.0);

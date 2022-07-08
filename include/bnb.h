@@ -8,7 +8,9 @@
 
 int daqp_bnb(DAQPWorkspace* work);
 int get_branch_id(DAQPWorkspace* work);
+int strong_branching(DAQPNode* node, DAQPWorkspace* work);
 void spawn_children(DAQPNode* node, const int branch_id, DAQPWorkspace* work);
+void save_warmstart(DAQPNode* node, DAQPWorkspace* work);
 int process_node(DAQPNode* node, DAQPWorkspace* work);
 int add_new_binary(const int depth, const int bin_id, DAQPWorkspace* work); 
 void warmstart_node(const int start_id, const int end_id, DAQPWorkspace* work); 
@@ -21,5 +23,6 @@ void free_daqp_bnb(DAQPWorkspace* work);
 #define EXTRACT_LOWER_FLAG(x) (x>>(LOWER_BIT-1))
 #define REMOVE_LOWER_FLAG(x) (x&~(1<<LOWER_BIT))
 #define ADD_LOWER_FLAG(x) (x|(1<<LOWER_BIT))
+#define TOGGLE_LOWER_FLAG(x) (x^(1<<LOWER_BIT))
 
 #endif //ifndef DAQP_BNB_H 
