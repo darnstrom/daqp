@@ -8,7 +8,6 @@
 
 int daqp_bnb(DAQPWorkspace* work);
 int get_branch_id(DAQPWorkspace* work);
-int strong_branching(DAQPNode* node, DAQPWorkspace* work);
 void spawn_children(DAQPNode* node, const int branch_id, DAQPWorkspace* work);
 void save_warmstart(DAQPNode* node, DAQPWorkspace* work);
 int process_node(DAQPNode* node, DAQPWorkspace* work);
