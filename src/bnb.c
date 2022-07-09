@@ -17,6 +17,7 @@ int daqp_bnb(DAQPWorkspace* work){
   work->bnb->tree[0].bin_id=0;
   
   // Start tree exploration
+
   while(work->bnb->n_nodes > 0){
 
 	node = work->bnb->tree+(--work->bnb->n_nodes);
@@ -38,6 +39,7 @@ int daqp_bnb(DAQPWorkspace* work){
 	  spawn_children(node,branch_id, work);
 	}
   }
+
   // Let work->u point to the best feasible solution 
   swp_ptr=work->u; work->u= work->xold; work->xold=swp_ptr;
   work->iterations = work->bnb->itercount;
@@ -82,8 +84,17 @@ void save_warmstart(DAQPNode* node, DAQPWorkspace* work){
   }
   node->WS_start = work->bnb->nWS;
 
-  for(int i =node->depth+1; i<work->n_active;i++){
-    work->bnb->tree_WS[work->bnb->nWS++]=(work->WS[i]+(IS_LOWER(work->WS[i]) << (LOWER_BIT-1)));
+  int nb_added = 0;
+  int id_to_add;
+  work->bnb->nWS+=node->depth+1;
+  for(int i =0; i<work->n_active;i++){
+	id_to_add = (work->WS[i]+(IS_LOWER(work->WS[i]) << (LOWER_BIT-1)));
+	if(work->sense[work->WS[i]]&IMMUTABLE){
+	  work->bnb->tree_WS[node->WS_start+(nb_added++)]= id_to_add; 
+	}
+	else{
+	  work->bnb->tree_WS[work->bnb->nWS++]= id_to_add;
+	}
   }
   node->WS_end = work->bnb->nWS;
 }
@@ -106,10 +117,14 @@ int process_node(DAQPNode* node, DAQPWorkspace* work){
   int exitflag;
   work->bnb->nodecount+=1;
   if(node->depth >=0){
-	// Setup workspace before processing node 
-	add_new_binary(node->depth,node->bin_id,work);
-	// Warm start 
-	warmstart_node(node->WS_start,node->WS_end,work);
+	if(work->bnb->n_nodes==0 || (node-1)->depth!=node->depth){ 
+	  // Sibling has been processed => need to fix workspace state
+	  node_cleanup_workspace(work);
+	  warmstart_node(node->depth, node->WS_start,node->WS_end,work);
+	}
+	// Add binary constraint 
+	add_upper_lower(node->bin_id,work);
+	work->sense[REMOVE_LOWER_FLAG(node->bin_id)] |= IMMUTABLE; // Make equality
   }
   // Solve relaxation
   exitflag = daqp_ldp(work);
@@ -118,43 +133,38 @@ int process_node(DAQPNode* node, DAQPWorkspace* work){
   return exitflag;
 }
 
-int add_new_binary(const int depth, const int bin_id, DAQPWorkspace* work){
-  int i;
+void node_cleanup_workspace(DAQPWorkspace* work){
   // Cleanup sense 
-  for(i=depth; i<work->n_active; i++)
+  for(int i=0; i<work->n_active; i++)
 	work->sense[work->WS[i]]&=~(ACTIVE+IMMUTABLE);
   // Reset workspace, but keep previous binaries in WS 
   work->sing_ind=EMPTY_IND;
-  work->n_active=depth;
-  work->reuse_ind=depth; 
-
-  i = REMOVE_LOWER_FLAG(bin_id);
-  add_constraint(work,i,1.0);
+  work->n_active=0;
+  work->reuse_ind=0; 
+}
+int add_upper_lower(const int add_id, DAQPWorkspace* work){
+  int true_add_id = REMOVE_LOWER_FLAG(add_id);
   // Setup new binary constraint
-  if(work->sing_ind!=EMPTY_IND) return EXIT_INFEASIBLE; // Disregard singular node 
-  work->sense[i] |= IMMUTABLE;
-  if(EXTRACT_LOWER_FLAG(bin_id))
-	SET_LOWER(i);
-  else
-	SET_UPPER(i);
+  if(EXTRACT_LOWER_FLAG(add_id)){
+	SET_LOWER(true_add_id);
+	add_constraint(work,true_add_id,-1.0);
+  }
+  else{
+	SET_UPPER(true_add_id);
+	add_constraint(work,true_add_id,1.0);
+  }
   return 1;
 }
 
-void warmstart_node(const int start_id, const int end_id, DAQPWorkspace* work){
-  int i,add_id;
+void warmstart_node(const int depth, const int start_id, const int end_id, DAQPWorkspace* work){
+  int i;
   for(i=start_id;i<end_id;i++){
 	if(work->sing_ind != EMPTY_IND) break; // Abort warm start if singular basis 
 	// Add the constraint
-	add_id = REMOVE_LOWER_FLAG(work->bnb->tree_WS[i]);
-	if(EXTRACT_LOWER_FLAG(work->bnb->tree_WS[i])){
-	  SET_LOWER(add_id);
-	  add_constraint(work,add_id,-1.0);
-	}
-	else{
-	  SET_UPPER(add_id);
-	  add_constraint(work,add_id,1.0);
-	}
+	add_upper_lower(work->bnb->tree_WS[i],work);
   }
+  for(i=0;i<depth;i++) // Make binaries immutable 
+	work->sense[REMOVE_LOWER_FLAG(work->WS[i])] |= IMMUTABLE; 
 }
 
 int setup_daqp_bnb(DAQPWorkspace* work, int* bin_ids, int nb){
