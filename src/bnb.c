@@ -28,9 +28,9 @@ int daqp_bnb(DAQPWorkspace* work){
 
 	// Find index to branch over 
 	save_warmstart(node,work);
-	//branch_id = get_branch_id(work); 
+	branch_id = get_branch_id(work); 
 	//work->settings->iter_limit = 10;
-	branch_id = strong_branching(node,work); 
+	//branch_id = strong_branching(node,work); 
 	//work->settings->iter_limit = DEFAULT_ITER_LIMIT;
 	if(branch_id==-1){// Nothing to branch over => integer feasible
 	  work->settings->fval_bound = work->fval;
@@ -48,14 +48,35 @@ int daqp_bnb(DAQPWorkspace* work){
 }
 
 int get_branch_id(DAQPWorkspace* work){
-  // TODO: pick the most fractional? 
-  for(int i=0; i < work->bnb->nb; i++){
+  int i,disp;
+  int branch_id = -1;
+  for(i=0; i < work->bnb->nb; i++){
 	// Branch on first inactive constraint 
 	if(IS_ACTIVE(work->bnb->bin_ids[i])) continue;
-	return work->bnb->bin_ids[i];
+	branch_id = work->bnb->bin_ids[i];
+	break;
   }
-  return -1;
+
+  if(branch_id == -1) return -1; // No index to branch over (=>integer feasible)
+
+  // Determine if upper or lower child should be processed first 
+  // by computing whether the upper or lower bound is closer to be activated
+  c_float diff = 0.5*(work->dupper[branch_id]+work->dlower[branch_id]);
+  if(branch_id < N_SIMPLE){//Simple bound
+	if(work->Rinv==NULL) diff-=work->u[branch_id]; //Hessian is identify 
+	else{
+	  for(i=branch_id,disp=branch_id+R_OFFSET(branch_id,NX);i<NX;i++) // 
+		diff-=work->Rinv[disp++]*work->u[i];
+	}
+  }
+  else{//General bound
+	for(i=0,disp=NX*(branch_id-N_SIMPLE);i<NX;i++) 
+	  diff-=work->M[disp++]*work->u[i];
+  }
+  branch_id = diff<0 ? branch_id : ADD_LOWER_FLAG(branch_id);
+  return branch_id;
 }
+
 int strong_branching(DAQPNode* node,DAQPWorkspace* work){
   // TODO: pick the most fractional? 
   int branch_id=-1;
