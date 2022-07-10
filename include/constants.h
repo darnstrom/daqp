@@ -71,6 +71,9 @@
 #define SET_HARD(x) (work->sense[x]&=~8)
 
 #define BINARY 16 
+#define IS_BINARY(x) (work->sense[x]&16)
+#define IS_FIX_BINARY(x) (work->sense[x]&16)
+
 
 #define IS_SIMPLE(x) (x < work->ms)
 
