@@ -28,7 +28,6 @@ int daqp_bnb(DAQPWorkspace* work){
 	if(exitflag<0) return exitflag; // Inner solver failed => abort
 
 	// Find index to branch over 
-	save_warmstart(node,work);
 	branch_id = get_branch_id(work); 
 	if(branch_id==-1){// Nothing to branch over => integer feasible
 	  work->settings->fval_bound = work->fval;
@@ -101,6 +100,8 @@ int get_branch_id(DAQPWorkspace* work){
 }
 
 void spawn_children(DAQPNode* node, const int branch_id, DAQPWorkspace* work){
+
+  save_warmstart(node,work);
 
   // Update child1 (reuse current node) 
   node->bin_id = TOGGLE_LOWER_FLAG(branch_id);
