@@ -8,6 +8,7 @@ const char* INFO_FIELDS[] = {
   "setup_time",           
   "solve_time",           
   "iter",           
+  "nodes",
   "soft_slack"}; 
 
 const char* SETTINGS_FIELDS[] = {
@@ -135,6 +136,10 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  mxSetField(info_struct, 0, "solve_time", mxCreateDoubleScalar(result.solve_time));
 	  mxSetField(info_struct, 0, "setup_time", mxCreateDoubleScalar(result.setup_time));
 	  mxSetField(info_struct, 0, "iter", mxCreateDoubleScalar(result.iter));
+	  if(work->bnb != NULL)
+		mxSetField(info_struct, 0, "nodes", mxCreateDoubleScalar(work->bnb->nodecount));
+	  else
+		mxSetField(info_struct, 0, "nodes", mxCreateDoubleScalar(1));
 	  mxSetField(info_struct, 0, "soft_slack", mxCreateDoubleScalar(result.soft_slack));
 	  plhs[3] = info_struct;
 	}
