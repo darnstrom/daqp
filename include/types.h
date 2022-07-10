@@ -68,6 +68,7 @@ typedef struct{
   
   int* tree_WS;
   int nWS;
+  int n_clean;
 
   int nodecount;
   int itercount;
