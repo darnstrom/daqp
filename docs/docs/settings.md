@@ -21,7 +21,7 @@ Table of contents
 | `primal_tol`  | Tolerance for primal infeasibility|  1e-6 |
 | `dual_tol`	 | Tolerance for dual infeasibility| 1e-12|
 | `zero_tol` | Values below are regarded as zero | 1e-14|
-| `pivot_tol` | Value used for determining if rows in the LDL' factorization should be exchanged. A higher value improves stability. | 1e-2|
+| `pivot_tol` | Value used for determining if rows in the LDL' factorization should be exchanged. A higher value improves stability. | 1e-4|
 | `progress_tol` | Minimum change in objective function to consider it progress | 1e-6|
 | `cycle_tol` | Allowed number of iterations without progress before terminating| 10 |
 | `iter_limit` | Maximum number of iterations before terminating| 1000 |
