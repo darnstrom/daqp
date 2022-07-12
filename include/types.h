@@ -87,6 +87,7 @@ typedef struct{
   c_float *Rinv; // Inverse of upper cholesky factor of primal Hessian 
   c_float *v; // v = R'\f (used to transform QP to LDP 
   int *sense; // State of constraints  
+  c_float *scaling; // normalizations 
 
 
   // Iterates

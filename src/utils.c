@@ -34,6 +34,7 @@ int update_ldp(const int mask, DAQPWorkspace *work){
 	else
 	  for(int i=0;i<work->m;i++) work->sense[i] = work->qp->sense[i];
   }
+  normalize_constraints(work); // TODO this will only work if no additional update is done
   
   return 0;
 }
@@ -135,6 +136,41 @@ void update_d(DAQPWorkspace *work){
   }
 
   work->reuse_ind = 0; // RHS of KKT system changed => cannot reuse intermediate results 
+}
+
+void normalize_constraints(DAQPWorkspace* work){
+  int i,j,disp;
+  c_float scaling_i;
+  // Normalize simple constraints
+  if(work->Rinv !=NULL){
+	for(i=0, disp=0; i < work->ms;i++){
+	  scaling_i = 0;
+	  for(j=i; j < NX; j++,disp++){
+		scaling_i+=work->Rinv[disp]*work->Rinv[disp];
+	  }
+	  scaling_i = 1/sqrt(scaling_i);
+	  work->scaling[i] = scaling_i; // Need to save to correctly retrieve solution
+	  disp-= (NX-i);
+	  for(j=i; j < NX; j++,disp++){
+		work->Rinv[disp]*= scaling_i;
+	  }
+	  work->dupper[i]*=scaling_i;
+	  work->dlower[i]*=scaling_i;
+	}
+  }
+  // Normalize general constraints 
+  for(i=work->ms, disp=0;i<work->m;i++){
+	scaling_i = 0;
+	for(j=0;j<work->n;disp++,j++)
+	  scaling_i+=work->M[disp]*work->M[disp];
+	//if(!(scaling_i >= 0)) return EXIT_ILLPOSED;
+	scaling_i = 1/sqrt(scaling_i); 
+	for(j=0, disp-=NX;j<NX;j++,disp++){
+	  work->M[disp]*=scaling_i;
+	}
+	work->dupper[i]*=scaling_i;
+	work->dlower[i]*=scaling_i;
+  }
 }
 
 /* Profiling */

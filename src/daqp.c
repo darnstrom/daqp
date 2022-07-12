@@ -68,12 +68,16 @@ void ldp2qp_solution(DAQPWorkspace *work){
   // x* = Rinv*(u-v)
   for(i=0;i<work->n;i++)
 	work->x[i]=work->u[i]-work->v[i];
-  if(work->Rinv != NULL) // (Skip if LP since R = I)
+  if(work->Rinv != NULL){ // (Skip if LP since R = I)
 	for(i=0,disp=0;i<work->n;i++){
 	  work->x[i]*=work->Rinv[disp++];
 	  for(j=i+1;j<work->n;j++)
 		work->x[i]+=work->Rinv[disp++]*work->x[j];
 	}
+  if(work->scaling != NULL) // Correctly scale output 
+    for(i=0;i<work->ms;i++)
+      work->x[i]/=work->scaling[i];
+  }
 }
 
 void warmstart_workspace(DAQPWorkspace* work, int* WS, const int n_active){

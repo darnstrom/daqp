@@ -95,10 +95,12 @@ int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp){
   if(qp->H!=NULL){ 
 	work->Rinv = malloc(((qp->n+1)*qp->n/2)*sizeof(c_float));
 	work->M = malloc(qp->n*(qp->m-qp->ms)*sizeof(c_float));
+	work->scaling= malloc(qp->ms*sizeof(c_float));
 	update_mask += UPDATE_Rinv+UPDATE_M;
   }
   else{// H = I =>  no need to transform H->Rinv and M->A 
 	work->Rinv = NULL;
+	work->scaling = NULL;
 	work->M = qp->A;
   }
 
@@ -134,6 +136,7 @@ void free_daqp_ldp(DAQPWorkspace *work){
   free(work->sense);
   if(work->Rinv != NULL){
 	free(work->Rinv);
+	free(work->scaling);
 	free(work->M);
   }
   if(work->v != NULL){
@@ -157,6 +160,7 @@ void allocate_daqp_workspace(DAQPWorkspace *work, int n){
   n = n + 1; //To account for soft_constraints
   work->Rinv = NULL;
   work->v = NULL;
+  work->scaling = NULL;
 
   work->lam = malloc((n+1)*sizeof(c_float));
   work->lam_star = malloc((n+1)*sizeof(c_float));

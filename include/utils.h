@@ -7,6 +7,7 @@ int update_Rinv(DAQPWorkspace *work);
 void update_M(DAQPWorkspace *work);
 void update_v(c_float *f, DAQPWorkspace *work);
 void update_d(DAQPWorkspace *work);
+void normalize_constraints(DAQPWorkspace *work);
 //
 // Utils for profiling
 #ifdef _WIN32
