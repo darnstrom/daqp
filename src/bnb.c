@@ -131,15 +131,16 @@ void node_cleanup_workspace(int n_clean, DAQPWorkspace* work){
 
 
 void warmstart_node(DAQPNode* node, DAQPWorkspace* work){
-  int i;
-  for(i=node->WS_start + work->bnb->n_clean-work->bnb->neq; i< node->WS_end ;i++){
+  int i,n_clean_old;
+  n_clean_old = work->bnb->n_clean;
+  work->bnb->n_clean = work->bnb->neq+node->depth; 
+  for(i=node->WS_start + n_clean_old-work->bnb->neq; i< node->WS_end ;i++){
 	if(work->sing_ind != EMPTY_IND) break; // Abort warm start if singular basis 
 	// Add the constraint
 	add_upper_lower(work->bnb->tree_WS[i],work);
   }
-  for(i=work->bnb->n_clean;i<node->depth+work->bnb->neq;i++) // Make binaries immutable 
+  for(i=n_clean_old;i<work->bnb->n_clean;i++) // Make binaries immutable 
 	work->sense[work->WS[i]] |= IMMUTABLE; 
-  work->bnb->n_clean = work->bnb->neq+node->depth;
   work->bnb->nWS = node->WS_start; // always move up tree after warmstart 
 }
 
