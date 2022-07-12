@@ -248,6 +248,7 @@ void pivot_last(DAQPWorkspace *work){
 	 work->D[rm_ind] < work->D[work->n_active-1]){ // element in D smallar than neighbor
 	const int ind_old = work->WS[rm_ind];
 	// Ensure that binaries never swap order (since this order is exploited) 
+	if(IS_IMMUTABLE(ind_old)) return;
 	if(IS_BINARY(ind_old) && IS_BINARY(work->WS[work->n_active-1])) return; 
 
 	c_float lam_old = work->lam[rm_ind];

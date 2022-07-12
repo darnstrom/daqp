@@ -62,6 +62,7 @@ typedef struct{
 typedef struct{
   int* bin_ids;
   int nb;
+  int neq;
 
   DAQPNode* tree;
   int  n_nodes;
