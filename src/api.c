@@ -31,17 +31,14 @@ void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
 
 // Setup and solve problem
 void daqp_quadprog(DAQPResult *res, DAQPProblem* qp, DAQPSettings *settings){
-  DAQPtimer timer;
   int setup_flag;
+  c_float setup_time=0;
   
-  tic(&timer);
   DAQPWorkspace work;
   work.settings = NULL;
-  setup_flag = setup_daqp(qp,&work);
+  setup_flag = setup_daqp(qp,&work,&setup_time);
   if(settings!=NULL) 
 	*(work.settings) = *settings; 
-
-  toc(&timer);
 
   if(setup_flag >= 0)
 	daqp_solve(res,&work);
@@ -49,17 +46,23 @@ void daqp_quadprog(DAQPResult *res, DAQPProblem* qp, DAQPSettings *settings){
 	res->exitflag = setup_flag;
   
   // Add setup time to result 
-  res->setup_time = get_time(&timer);
+  res->setup_time = setup_time; 
   // Free memory
   free_daqp_workspace(&work);
   free_daqp_ldp(&work);
 }
 
 // Setup workspace and transform QP to LDP
-int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work){
+int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time){
   int errorflag;
+  DAQPtimer timer;
+  if(setup_time != NULL){
+	*setup_time = 0; // in case setup fails 
+	tic(&timer);
+  }
   // Check if QP is well-posed
   //validate_QP(qp);
+	
   
   // Setup workspace
   allocate_daqp_settings(work);
@@ -78,6 +81,10 @@ int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work){
   if(errorflag < 0){
 	free_daqp_workspace(work);
 	return errorflag;
+  }
+  if(setup_time != NULL){
+	toc(&timer);
+	*setup_time = get_time(&timer);
   }
   return 1;
 }

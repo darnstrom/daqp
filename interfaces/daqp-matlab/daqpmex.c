@@ -89,7 +89,8 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  qp->bin_ids= (int *)mxGetPr(prhs[8]);
 	  qp->nb=nb; 
 	  
-	  error_flag = setup_daqp(qp,work);
+	  double solve_time;
+	  error_flag = setup_daqp(qp,work,&solve_time);
 	  if(error_flag < 0){
 		free(work->qp);
 		work->qp = NULL;
@@ -97,6 +98,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 
 
 	  plhs[0] = mxCreateDoubleScalar(error_flag);
+	  plhs[1] = mxCreateDoubleScalar(solve_time);
 	}
 	else if (!strcmp("solve", cmd)) {
 	  double *fval;
