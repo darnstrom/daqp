@@ -11,10 +11,12 @@ int update_ldp(const int mask, DAQPWorkspace *work){
 	error_flag = update_Rinv(work);
 	if(error_flag<0)
 	  return error_flag;
+	normalize_Rinv(work);
   }
   /** Update M **/
   if(mask&UPDATE_Rinv||mask&UPDATE_M){
 	update_M(work);
+	normalize_M(work);
   }
 
   /** Update v **/
@@ -34,8 +36,6 @@ int update_ldp(const int mask, DAQPWorkspace *work){
 	else
 	  for(int i=0;i<work->m;i++) work->sense[i] = work->qp->sense[i];
   }
-  normalize_constraints(work); // TODO this will only work if no additional update is done
-  
   return 0;
 }
 
@@ -85,10 +85,16 @@ void update_M(DAQPWorkspace *work){
   const int n = work->n;
   const int mA = work->m-work->ms;
   for(k = 0,disp2=n*mA-1;k<mA;k++,disp2-=n){
-	for(j = 0, disp=ARSUM(n); j<n; ++j){
+	disp=ARSUM(n);
+	for(j = 0; j<n-work->ms; ++j){
 	  for(i=0;i<j;++i)
 		work->M[disp2-i] += work->Rinv[--disp]*work->qp->A[disp2-j];
 	  work->M[disp2-j]=work->Rinv[--disp]*work->qp->A[disp2-j];
+	}
+	for(; j<n; ++j){// Take into account scaling in Rinv 
+	  for(i=0;i<j;++i)
+		work->M[disp2-i] += work->scaling[n-j-1]*work->Rinv[--disp]*work->qp->A[disp2-j];
+	  work->M[disp2-j]=work->scaling[n-j-1]*work->Rinv[--disp]*work->qp->A[disp2-j];
 	}
   }
   reset_daqp_workspace(work); // Internal factorizations need to be redone!
@@ -97,48 +103,67 @@ void update_M(DAQPWorkspace *work){
 void update_v(c_float *f, DAQPWorkspace *work){
   int i,j,disp;
   const int n = work->n;
-  if(work->Rinv == 0){// Rinv = I => v = R'\v = f
+  if(work->Rinv == NULL){// Rinv = I => v = R'\v = f
 	for(i=0;i<n;++i) work->v[i] = f[i];
 	return;
   }
-  for(j=n-1,disp=ARSUM(n);j>=0;j--){
+  for(j=n-1,disp=ARSUM(n);j>=work->ms;j--){
 	for(i=n-1;i>j;i--)
 	  work->v[i] +=work->Rinv[--disp]*f[j];
 	work->v[j]=work->Rinv[--disp]*f[j];
+  }
+  for(;j>=0;j--){// Take into accoutn scaling in Rinv
+	for(i=n-1;i>j;i--)
+	  work->v[i] +=work->scaling[j]*work->Rinv[--disp]*f[j];
+	work->v[j]=work->scaling[j]*work->Rinv[--disp]*f[j];
   }
 }
 
 void update_d(DAQPWorkspace *work){
   /* Compute d  = b+M*v */
-  // Simple bounds 
   int i,j,disp;
   c_float sum;
   const int n = work->n;
+  // Take into scaling of constraints
+  if(work->scaling != NULL){
+	for(i = 0;i<N_CONSTR;i++){
+	  work->dupper[i] = work->qp->bupper[i]/work->scaling[i];
+	  work->dlower[i] = work->qp->blower[i]/work->scaling[i];
+	}
+  }
+  else{
+	for(i = 0;i<N_CONSTR;i++){
+	  work->dupper[i] = work->qp->bupper[i];
+	  work->dlower[i] = work->qp->blower[i];
+	}
+  }
+
+  // Simple bounds 
   if(work->Rinv !=NULL){
 	for(i = 0,disp=0;i<N_SIMPLE;i++){
 	  for(j=i, sum=0;j<n;j++)
 		sum+=work->Rinv[disp++]*work->v[j];
-	  work->dupper[i]=work->qp->bupper[i]+sum;
-	  work->dlower[i]=work->qp->blower[i]+sum;
+	  work->dupper[i]+=sum;
+	  work->dlower[i]+=sum;
 	}
   }else{
 	for(i = 0,disp=0;i<N_SIMPLE;i++){
-	  work->dupper[i]=work->qp->bupper[i]+work->v[i];
-	  work->dlower[i]=work->qp->blower[i]+work->v[i];
+	  work->dupper[i]+=work->v[i];
+	  work->dlower[i]+=work->v[i];
 	}
   }
   //General bounds
   for(i = N_SIMPLE, disp=0;i<N_CONSTR;i++){
 	for(j=0, sum=0;j<n;j++)
 	  sum+=work->M[disp++]*work->v[j];
-	work->dupper[i]=work->qp->bupper[i]+sum;
-	work->dlower[i]=work->qp->blower[i]+sum;
+	work->dupper[i]+=sum;
+	work->dlower[i]+=sum;
   }
 
   work->reuse_ind = 0; // RHS of KKT system changed => cannot reuse intermediate results 
 }
 
-void normalize_constraints(DAQPWorkspace* work){
+void normalize_Rinv(DAQPWorkspace* work){
   int i,j,disp;
   c_float scaling_i;
   // Normalize simple constraints
@@ -148,28 +173,26 @@ void normalize_constraints(DAQPWorkspace* work){
 	  for(j=i; j < NX; j++,disp++){
 		scaling_i+=work->Rinv[disp]*work->Rinv[disp];
 	  }
-	  scaling_i = 1/sqrt(scaling_i);
+	  scaling_i = sqrt(scaling_i);
 	  work->scaling[i] = scaling_i; // Need to save to correctly retrieve solution
-	  disp-= (NX-i);
-	  for(j=i; j < NX; j++,disp++){
-		work->Rinv[disp]*= scaling_i;
-	  }
-	  work->dupper[i]*=scaling_i;
-	  work->dlower[i]*=scaling_i;
+	  for(j=i,disp-=(NX-i); j < NX; j++,disp++)
+		work->Rinv[disp]/= scaling_i;
 	}
   }
+}
+void normalize_M(DAQPWorkspace* work){
+  int i,j,disp;
+  c_float scaling_i;
   // Normalize general constraints 
   for(i=work->ms, disp=0;i<work->m;i++){
 	scaling_i = 0;
 	for(j=0;j<work->n;disp++,j++)
 	  scaling_i+=work->M[disp]*work->M[disp];
 	//if(!(scaling_i >= 0)) return EXIT_ILLPOSED;
-	scaling_i = 1/sqrt(scaling_i); 
-	for(j=0, disp-=NX;j<NX;j++,disp++){
-	  work->M[disp]*=scaling_i;
-	}
-	work->dupper[i]*=scaling_i;
-	work->dlower[i]*=scaling_i;
+	scaling_i = sqrt(scaling_i); 
+	work->scaling[i]=scaling_i;
+	for(j=0, disp-=NX;j<NX;j++,disp++)
+	  work->M[disp]/=scaling_i;
   }
 }
 

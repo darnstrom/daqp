@@ -76,7 +76,7 @@ void ldp2qp_solution(DAQPWorkspace *work){
 	}
   if(work->scaling != NULL) // Correctly scale output 
     for(i=0;i<work->ms;i++)
-      work->x[i]/=work->scaling[i];
+      work->x[i]*=work->scaling[i];
   }
 }
 

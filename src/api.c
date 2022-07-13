@@ -95,13 +95,13 @@ int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp){
   if(qp->H!=NULL){ 
 	work->Rinv = malloc(((qp->n+1)*qp->n/2)*sizeof(c_float));
 	work->M = malloc(qp->n*(qp->m-qp->ms)*sizeof(c_float));
-	work->scaling= malloc(qp->ms*sizeof(c_float));
+	work->scaling= malloc(qp->m*sizeof(c_float));
 	update_mask += UPDATE_Rinv+UPDATE_M;
   }
   else{// H = I =>  no need to transform H->Rinv and M->A 
 	work->Rinv = NULL;
-	work->scaling = NULL;
 	work->M = qp->A;
+	work->scaling = NULL;
   }
 
   // Allocate memory for d and v 
