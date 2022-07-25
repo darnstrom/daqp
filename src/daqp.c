@@ -74,9 +74,12 @@ void ldp2qp_solution(DAQPWorkspace *work){
 	  for(j=i+1;j<work->n;j++)
 		work->x[i]+=work->Rinv[disp++]*work->x[j];
 	}
-  if(work->scaling != NULL) // Correctly scale output 
+  if(work->scaling != NULL){ // Correctly scale output
     for(i=0;i<work->ms;i++)
       work->x[i]*=work->scaling[i];
+	for(i=0;i<work->n_active;i++)
+	  work->lam_star[i]/=work->scaling[work->WS[i]];
+  }
   }
 }
 
