@@ -11,6 +11,7 @@ void normalize_Rinv(DAQPWorkspace *work);
 void normalize_M(DAQPWorkspace *work);
 //
 // Utils for profiling
+#ifdef PROFILING
 #ifdef _WIN32
 #include <windows.h>
 typedef struct{ 
@@ -29,5 +30,6 @@ typedef struct{
 void tic(DAQPtimer *timer);
 void toc(DAQPtimer *timer);
 double get_time(DAQPtimer *timer);
+#endif // PROFILING
 
 #endif //ifndef DAQP_UTILS_H

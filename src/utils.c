@@ -197,6 +197,7 @@ void normalize_M(DAQPWorkspace* work){
 }
 
 /* Profiling */
+#ifdef PROFILING
 #ifdef _WIN32
 void tic(DAQPtimer *timer){
   QueryPerformanceCounter(&(timer->start));
@@ -230,3 +231,4 @@ double get_time(DAQPtimer *timer){
   return (double)diff.tv_sec + (double )diff.tv_nsec / 1e9;
 }
 #endif // _WIN32
+#endif // PROFILING 

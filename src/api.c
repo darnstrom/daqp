@@ -6,8 +6,10 @@
 
 // Solve problem from a given workspace and measure setup and solve time 
 void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
+#ifdef PROFILING
   DAQPtimer timer;
   tic(&timer);
+#endif
   // Select algorithm
   if(work->settings->eps_prox==0){
 	if(work->bnb != NULL)
@@ -20,12 +22,18 @@ void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
   else{//Prox
 	res->exitflag = daqp_prox(work);
   }
+#ifdef PROFILING
   toc(&timer);
+#endif
   
   // Package result
   daqp_extract_result(res,work);
   // Add time to result
+#ifdef PROFILING
   res->solve_time = get_time(&timer);
+#else
+  res->solve_time = 0; 
+#endif
   res->setup_time = 0; 
 }
 
@@ -55,11 +63,13 @@ void daqp_quadprog(DAQPResult *res, DAQPProblem* qp, DAQPSettings *settings){
 // Setup workspace and transform QP to LDP
 int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time){
   int errorflag;
+#ifdef PROFILING
   DAQPtimer timer;
   if(setup_time != NULL){
 	*setup_time = 0; // in case setup fails 
 	tic(&timer);
   }
+#endif
   // Check if QP is well-posed
   //validate_QP(qp);
 	
@@ -82,10 +92,12 @@ int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time){
 	free_daqp_workspace(work);
 	return errorflag;
   }
+#ifdef PROFILING
   if(setup_time != NULL){
 	toc(&timer);
 	*setup_time = get_time(&timer);
   }
+#endif
   return 1;
 }
 
