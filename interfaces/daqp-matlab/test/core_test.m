@@ -18,6 +18,7 @@ classdef core_test < matlab.unittest.TestCase
 
 		testCase.verifyEqual(exitflag,int32(1));
 		testCase.verifyLessThan(norm(x-xref),tol);
+		testCase.verifyLessThan(norm(H*x+f+[eye(ms,n);A]'*info.lambda),tol);
 		solve_times(i) = info.solve_time;
 	  end
 	  fprintf('========================== DAQP =============================\n')
@@ -42,6 +43,7 @@ classdef core_test < matlab.unittest.TestCase
 
 		testCase.verifyEqual(exitflag,int32(1));
 		testCase.verifyLessThan(norm(x-xref),tol);
+		testCase.verifyLessThan(norm(H*x+f+[eye(ms,n);A]'*info.lambda),tol);
 		solve_times(i) = info.solve_time;
 	  end
 	  fprintf('\n======================== DAQP PROX ==========================\n')
