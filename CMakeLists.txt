@@ -1,9 +1,10 @@
 cmake_minimum_required(VERSION 3.10)
-project(DAQP VERSION 0.0.0)
+project(daqp VERSION 0.0.0)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 add_subdirectory(src)
 add_subdirectory(include)
+
 option (PROFILING "Enable profiling" ON)
 if(PROFILING)
   add_compile_definitions(PROFILING)
@@ -30,6 +31,8 @@ install(TARGETS daqp EXPORT  ${PROJECT_NAME}
   LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 install(FILES ${daqp_headers} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/daqp")
+
+install(EXPORT ${PROJECT_NAME} DESTINATION cmake)
 
 if(MATLAB)
   find_package(Matlab)
