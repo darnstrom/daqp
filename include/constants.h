@@ -22,10 +22,10 @@
 
 #define DEFAULT_RHO_SOFT 1e-3 
 
-#define MAX(x,y) ((x>y)? (x): (y))
+#define MAX(x,y) (((x)>(y)) ? (x) : (y))
 #define SQUARE(x) ((x)*(x))
 #define ARSUM(x) ((x)*(x+1)/2)
-#define INF ((c_float)1e30)
+#define DAQP_INF ((c_float)1e30)
 #define R_OFFSET(X,Y) (((2*Y-X-1)*X)/2)
 
 // EXIT FLAGS

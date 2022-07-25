@@ -130,7 +130,7 @@ int add_infeasible(DAQPWorkspace *work){
 }
 int remove_blocking(DAQPWorkspace *work){
  int i,rm_ind = EMPTY_IND; 
- c_float alpha=INF;
+ c_float alpha=DAQP_INF;
  c_float alpha_cand;
  const c_float dual_tol = work->settings->dual_tol;
  for(int i=0;i<work->n_active;i++){
