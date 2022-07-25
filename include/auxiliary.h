@@ -16,5 +16,5 @@ void reorder_LDL(DAQPWorkspace *work);
 void pivot_last(DAQPWorkspace *work);
 
 int activate_constraints(DAQPWorkspace *work);
-void deactive_constraints(DAQPWorkspace *work);
+void deactivate_constraints(DAQPWorkspace *work);
 #endif //ifndef DAQP_AUX_H

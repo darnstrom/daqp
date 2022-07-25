@@ -275,8 +275,7 @@ int activate_constraints(DAQPWorkspace *work){
 }
 
 // Deactivate all active constraints that are mutable (i.e., not equality constraints)
-void deactive_constraints(DAQPWorkspace *work){
-  //TODO prioritize inequalities?
+void deactivate_constraints(DAQPWorkspace *work){
   for(int i =0;i<work->n_active;i++){
 	if(IS_IMMUTABLE(work->WS[i])) continue; 
 	SET_INACTIVE(work->WS[i]); 
