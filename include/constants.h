@@ -8,24 +8,22 @@
 #define N_CONSTR work->m 
 #define N_SIMPLE work->ms 
 #define c_float double 
+#define DAQP_INF ((c_float)1e30)
 
+// DEFAULT SETTINGS 
 #define DEFAULT_PRIM_TOL 1e-6
 #define DEFAULT_DUAL_TOL 1e-12 
 #define DEFAULT_ZERO_TOL 1e-14
 #define DEFAULT_PROG_TOL 1e-14 
-#define DEFAULT_FARKAS_TOL 1e-7
 #define DEFAULT_PIVOT_TOL 1e-4
 #define DEFAULT_CYCLE_TOL 10
 #define DEFAULT_ETA 1e-6
-
 #define DEFAULT_ITER_LIMIT 1000 
-
 #define DEFAULT_RHO_SOFT 1e-3 
 
-#define MAX(x,y) (((x)>(y)) ? (x) : (y))
+// MACROS
 #define SQUARE(x) ((x)*(x))
 #define ARSUM(x) ((x)*(x+1)/2)
-#define DAQP_INF ((c_float)1e30)
 #define R_OFFSET(X,Y) (((2*Y-X-1)*X)/2)
 
 // EXIT FLAGS
@@ -46,25 +44,21 @@
 #define UPDATE_sense 16 
 
 // CONSTRAINT MASKS 
-#define INACTIVE 1
 #define ACTIVE 1
 #define IS_ACTIVE(x) (work->sense[x]&1)
 #define SET_ACTIVE(x) (work->sense[x]|=1)
 #define SET_INACTIVE(x) (work->sense[x]&=~1)
 
-#define UPPER 0
 #define LOWER 2 
 #define IS_LOWER(x) (work->sense[x]&2)
 #define SET_LOWER(x) (work->sense[x]|=2)
 #define SET_UPPER(x) (work->sense[x]&=~2)
 
-#define MUTABLE 0
 #define IMMUTABLE 4 
 #define IS_IMMUTABLE(x) (work->sense[x]&4)
 #define SET_IMMUTABLE(x) (work->sense[x]|=4)
 #define SET_MUTABLE(x) (work->sense[x]&=~4)
 
-#define HARD 0
 #define SOFT 8 
 #define IS_SOFT(x) (work->sense[x]&8)
 #define SET_SOFT(x) (work->sense[x]|=8)
@@ -72,8 +66,6 @@
 
 #define BINARY 16 
 #define IS_BINARY(x) (work->sense[x]&16)
-#define IS_FIX_BINARY(x) (work->sense[x]&16)
-
 
 #define IS_SIMPLE(x) (x < work->ms)
 
