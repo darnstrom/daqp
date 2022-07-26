@@ -14,7 +14,7 @@ In C we define the problem as
 ```c
 // Define the problem
 int n = 2; // Number of decision variables
-int m = 2; // Number of general constraints
+int m = 4; // Number of constraints (general + simple)
 int ms= 2; // Number of simple bounds
 double H[4] = {1, 0, 0, 1};
 double f[2] = {1,1}; 
@@ -22,7 +22,8 @@ double A[4] = {1, 1, 1, -1};
 double bupper[4] = {1, 2, 3, 4};
 double blower[4] = {-1, -2, -3, -4};
 int sense[4] = {0,0,0,0}; 
-DAQPProblem qp = {n,m,ms,H,f,A,bupper,blower,sense};
+int *bin_ids = NULL; int nbin = 0; // No binary constraints
+DAQPProblem qp = {n,m,ms,H,f,A,bupper,blower,sense,bin_ids,nbin};
 ```
 `sense` determines the type of the constraints (more details are given [here](/daqp/parameters/#constraint-classification)).
 
@@ -31,9 +32,10 @@ Note: When $$b_u$$ and $$b_l$$ have more elements than the number of rows in $$A
 ## Calling DAQP
 A high-level function `daqp_quadprog` can be used to solve the problem.
 ```c
-double x[2];
-DAQPResults result;
-result.x = x;
+double x[2],lam[4];
+DAQPResult result;
+result.x = x; // primal variable
+result.lam = lam; // dual variable
 daqp_quadprog(&result,&qp,NULL);
 ```
 The last argument is a pointer to a `DAQPSettings` struct, but passing a null-pointer will result in the default settings being used. The first argument is a pointer to a `DAQPResults` struct in which solution information will be populated. 

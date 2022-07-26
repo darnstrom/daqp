@@ -243,10 +243,12 @@ void daqp_extract_result(DAQPResult* res, DAQPWorkspace* work){
   res->fval *=0.5;
 
   // Extract dual solution 
-  for(i=0;i<work->m;i++) 
-	res->lam[i] = 0; 
-  for(i=0;i<work->n_active;i++)
+  if(res->lam != NULL){
+	for(i=0;i<work->m;i++) 
+	  res->lam[i] = 0; 
+	for(i=0;i<work->n_active;i++)
 	  res->lam[work->WS[i]] = work->lam_star[i];
+  }
 
   res->soft_slack = work->soft_slack;
   res->iter = work->iterations;
