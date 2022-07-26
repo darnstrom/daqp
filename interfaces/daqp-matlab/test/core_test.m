@@ -124,5 +124,42 @@ classdef core_test < matlab.unittest.TestCase
 	  fprintf('Solve times [s]: |avg: %2.6f| max: %2.6f| min %2.6f|\n',mean(solve_times),max(solve_times),min(solve_times))
 	  fprintf('=============================================================\n')
 	end
+	function random_bnb(testCase)
+	  % generate and solve with daqp
+	  rng('default');
+	  n = 150; m = 300; ms = 20; me = 0;
+	  tol = 1e-4;
+	  M = randn(n,n);
+	  H = M'*M;
+	  f = 100*randn(n,1); 
+	  f(1:ms) = -sign(f(1:ms)).*f(1:ms);
+	  A = randn(m,n);
+	  bupper = 20*rand(m,1); blower = -20*rand(m,1);
+	  bupper(ms+1:ms+me)=0; blower(ms+1:ms+me)=0;
+	  bupper_tot = [ones(ms,1);bupper];
+	  blower_tot = [zeros(ms,1);blower];
+	  sense = int32(zeros(m+ms,1));
+	  sense(1:ms) = sense(1:ms)+16;
+	  sense(ms+1:ms+me) = sense(ms+1:ms+me)+5;
+	  [x,fval,exitflag,info] = daqp.quadprog(H,f,A,bupper_tot,blower_tot,sense);
+	  testCase.verifyEqual(exitflag,int32(1));
+
+	  % compare with Gurobi (comparison skipped if Gurobi is not available)
+	  model.Q = 0.5*sparse(H);
+	  model.A = sparse([A;-A(me+1:end,:)]);
+	  model.rhs = [bupper;-blower(me+1:end)];
+	  model.obj = f;
+	  model.sense=repelem('=<',[me,2*(m-me)]);
+	  model.vtype=repelem('BC',[ms,n-ms]);
+	  model.lb = -inf(n,1);
+
+	  try
+		results = gurobi(model)
+		xref = results.x;
+		testCase.verifyLessThan(norm(x-xref),tol);
+	  catch
+	  end
+
+	end
   end
 end
