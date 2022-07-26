@@ -10,7 +10,9 @@ class QP(Structure):
             ('A', POINTER(c_double)),
             ('bupper', POINTER(c_double)),
             ('blower', POINTER(c_double)),
-            ('sense', POINTER(c_int))]
+            ('sense', POINTER(c_int)),
+            ('bin_ids', POINTER(c_int)),
+            ('nb', c_int)]
 
 class DAQPSettings(Structure):
     def __init__(self, **kwargs):
@@ -34,7 +36,7 @@ class DAQPSettings(Structure):
     _defaults_ = { "primal_tol" : 1e-6,
             "dual_tol" : 1e-12, 
             "zero_tol" : 1e-14,
-            "pivot_tol" : 1e-2,
+            "pivot_tol" : 1e-4,
             "progress_tol" : 1e-14,
             "cycle_tol" : 10,
             "iter_limit" : 1000,
