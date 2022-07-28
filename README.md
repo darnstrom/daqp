@@ -13,11 +13,15 @@ See [Documentation](https://darnstrom.github.io/daqp/) for an installation guide
 
 ## Citing DAQP 
 ```
-@article{arnstrom2021dual,
-  title={A Dual Active-Set Solver for Embedded Quadratic Programming Using Recursive LDL' Updates},
-  author={Arnstr{\"o}m, Daniel and Bemporad, Alberto and Axehill, Daniel},
-  journal={arXiv preprint arXiv:2103.16236},
-  year={2021}
+@article{arnstrom2022dual,
+  author={Arnström, Daniel and Bemporad, Alberto and Axehill, Daniel},
+  journal={IEEE Transactions on Automatic Control},
+  title={A Dual Active-Set Solver for Embedded Quadratic Programming Using Recursive {LDL}$^{T}$ Updates},
+  year={2022},
+  volume={67},
+  number={8},
+  pages={4362-4369},
+  doi={10.1109/TAC.2022.3176430}
 }
 ```
 

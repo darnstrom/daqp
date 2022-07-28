@@ -22,9 +22,9 @@ DAQP has been developed for solving QPs that arise in real-time Model Predictive
 
 For technical details and numerical results, see the papers
 
-**A Dual Active-Set Solver for Embedded Quadratic Programming Using Recursive LDL' Updates** <br>
+**A Dual Active-Set Solver for Embedded Quadratic Programming Using Recursive LDL$^T$ Updates** <br>
 D. Arnström, A. Bemporad, D. Axehill <br>
-*[Preprint](https://arxiv.org/pdf/2103.16236)* 
+*IEEE Transactions on Automatic Control*, vol. 67, no. 8, pp. 4362-4369, 2022
 
 **A Linear Programming Method Based on Proximal-Point Iterations With Applications to Multi-Parametric Programming** <br>
 D. Arnström, A. Bemporad, D. Axehill <br>
