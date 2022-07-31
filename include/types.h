@@ -1,6 +1,7 @@
 #ifndef DAQP_TYPES_H
 # define DAQP_TYPES_H
-#include "constants.h"
+
+typedef double c_float;
 
 typedef struct{
 

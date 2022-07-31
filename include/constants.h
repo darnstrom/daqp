@@ -2,13 +2,11 @@
 #define DAQP_CONSTANTS_H
 
 #include <stddef.h>
-typedef double c_float;
 
 #define EMPTY_IND -1 
 #define NX work->n 
 #define N_CONSTR work->m 
 #define N_SIMPLE work->ms 
-// #define c_float double 
 #define DAQP_INF ((c_float)1e30)
 
 // DEFAULT SETTINGS 
