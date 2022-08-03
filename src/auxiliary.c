@@ -32,7 +32,7 @@ void add_constraint(DAQPWorkspace *work, const int add_ind, c_float lam){
 
 void compute_primal_and_fval(DAQPWorkspace *work){
   int i,j,disp;
-  c_float fval_soft = 0;
+  c_float fval=0;
   // Reset u & soft slack
   for(j=0;j<NX;j++)
 	work->u[j]=0;
@@ -52,14 +52,14 @@ void compute_primal_and_fval(DAQPWorkspace *work){
 		work->u[j]-=work->M[disp++]*work->lam_star[i];
 	}
 	if(IS_SOFT(work->WS[i]))
-	  fval_soft += SQUARE(work->lam_star[i]);
+	  fval+= SQUARE(work->lam_star[i])/SQUARE(work->scaling[work->WS[i]]);
   }
   // Check for progress 
-  c_float fval=fval_soft*work->settings->rho_soft;
+  fval=fval*work->settings->rho_soft;
+  work->soft_slack=fval;// XXX: keep this for now to return SOFT_OPTIMAL
   for(j=0;j<NX;j++)
 	fval+=work->u[j]*work->u[j];
   work->fval = fval;
-  work->soft_slack=fval_soft;// XXX: keep this for now to return SOFT_OPTIMAL 
 }
 int add_infeasible(DAQPWorkspace *work){
   int j,k,disp;
