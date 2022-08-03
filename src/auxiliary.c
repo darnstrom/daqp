@@ -32,6 +32,7 @@ void add_constraint(DAQPWorkspace *work, const int add_ind, c_float lam){
 
 void compute_primal_and_fval(DAQPWorkspace *work){
   int i,j,disp;
+  c_float fval_soft = 0;
   // Reset u & soft slack
   for(j=0;j<NX;j++)
 	work->u[j]=0;
@@ -49,25 +50,21 @@ void compute_primal_and_fval(DAQPWorkspace *work){
 	else{ // General constraint
 	  for(j=0,disp=NX*(work->WS[i]-N_SIMPLE);j<NX;j++)
 		work->u[j]-=work->M[disp++]*work->lam_star[i];
-	  if(IS_SOFT(work->WS[i])){ // Compute slack for soft constraint
-		if(IS_LOWER(work->WS[i]))
-		  work->soft_slack-=work->settings->rho_soft*work->lam_star[i];
-		else
-		  work->soft_slack+=work->settings->rho_soft*work->lam_star[i];
-	  }
 	}
+	if(IS_SOFT(work->WS[i]))
+	  fval_soft += SQUARE(work->lam_star[i]);
   }
   // Check for progress 
-  c_float fval=0;
+  c_float fval=fval_soft*work->settings->rho_soft;
   for(j=0;j<NX;j++)
 	fval+=work->u[j]*work->u[j];
-  fval+=work->soft_slack*work->soft_slack;
   work->fval = fval;
+  work->soft_slack=fval_soft;// XXX: keep this for now to return SOFT_OPTIMAL 
 }
 int add_infeasible(DAQPWorkspace *work){
   int j,k,disp;
   c_float min_val = -work->settings->primal_tol;
-  c_float Mu,soft_slack;
+  c_float Mu;
   int isupper=0, add_ind=EMPTY_IND;
   // Simple bounds 
   for(j=0, disp=0;j<N_SIMPLE;j++){
@@ -104,14 +101,13 @@ int add_infeasible(DAQPWorkspace *work){
 	  Mu+=work->M[disp++]*work->u[k];
 
 	//TODO: check correct sign for slack!
-	soft_slack= (IS_SOFT(j)) ? work->settings->rho_soft*work->soft_slack: 0;
-	if(work->dupper[j]-Mu+soft_slack<min_val){
+	if(work->dupper[j]-Mu<min_val){
 	  add_ind = j; isupper = 1;
-	  min_val = work->dupper[j]-Mu+soft_slack;
+	  min_val = work->dupper[j]-Mu;
 	}
-	else if(-(work->dlower[j]-Mu)+soft_slack<min_val){
+	else if(-(work->dlower[j]-Mu)<min_val){
 	  add_ind = j; isupper = 0;
-	  min_val = -(work->dlower[j]-Mu)+soft_slack;
+	  min_val = -(work->dlower[j]-Mu);
 	}
   }
   // No constraint is infeasible => return

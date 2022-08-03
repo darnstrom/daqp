@@ -62,7 +62,7 @@ void daqp_quadprog(DAQPResult *res, DAQPProblem* qp, DAQPSettings *settings){
 
 // Setup workspace and transform QP to LDP
 int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time){
-  int errorflag;
+  int errorflag, ns;
 #ifdef PROFILING
   DAQPtimer timer;
   if(setup_time != NULL){
@@ -74,9 +74,13 @@ int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time){
   //validate_QP(qp);
 	
   
+  //
+  ns = 0;
+  for(int i = 0; i < qp->m ; i++)
+	if(qp->sense[i] & SOFT) ns++;
   // Setup workspace
   allocate_daqp_settings(work);
-  allocate_daqp_workspace(work,qp->n);
+  allocate_daqp_workspace(work,qp->n,ns);
   errorflag = setup_daqp_ldp(work,qp);
   if(errorflag < 0){
 	free_daqp_workspace(work);
@@ -174,9 +178,9 @@ void allocate_daqp_settings(DAQPWorkspace *work){
 }
 
 // Allocate memory for iterates  
-void allocate_daqp_workspace(DAQPWorkspace *work, int n){
+void allocate_daqp_workspace(DAQPWorkspace *work, int n, int ns){
   work->n = n;
-  n = n + 1; //To account for soft_constraints
+  n = n + ns; //To account for soft_constraints
   work->Rinv = NULL;
   work->v = NULL;
   work->scaling = NULL;
@@ -186,11 +190,12 @@ void allocate_daqp_workspace(DAQPWorkspace *work, int n){
   
   work->WS= malloc((n+1)*sizeof(int));
   
-  work->L= malloc(((n+1)*(n+2)/2)*sizeof(c_float));
   work->D= malloc((n+1)*sizeof(c_float));
-
   work->xldl= malloc((n+1)*sizeof(c_float));
   work->zldl= malloc((n+1)*sizeof(c_float));
+  work->L= malloc(((n+1)*(n+2)/2)*sizeof(c_float));
+
+
   
   work->u= malloc(n*sizeof(c_float));
   work->x = work->u; 

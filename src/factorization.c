@@ -5,6 +5,7 @@ void update_LDL_add(DAQPWorkspace *work, const int add_ind){
   int i,j,disp,id;
   int new_L_start= ARSUM(work->n_active);
   int start_col;
+  int ns_active=0;
   c_float sum;
   c_float *Mi, *Mk;
 
@@ -23,8 +24,10 @@ void update_LDL_add(DAQPWorkspace *work, const int add_ind){
 	for(i=start_col,sum=0;i<NX;i++)
 	  sum+=Mi[i]*Mi[i];
   
-  if(IS_SOFT(add_ind))
-	sum+=SQUARE(work->settings->rho_soft);
+  if(IS_SOFT(add_ind)){
+	sum+=work->settings->rho_soft/(SQUARE(work->scaling[add_ind]));
+	ns_active++;
+  }
 
   work->D[work->n_active] = sum;
   
@@ -33,6 +36,7 @@ void update_LDL_add(DAQPWorkspace *work, const int add_ind){
   // store l <-- Mk* m
   for(i=0;i<work->n_active;i++){
 	id = work->WS[i];
+	if(IS_SOFT(id)) ns_active++;
 	// Use Rinv or M for Mk depending on if k is simple bound or not 
 	if(IS_SIMPLE(id)){ 
 	  Mk = (work->Rinv) ? work->Rinv+R_OFFSET(id,NX): NULL;
@@ -52,14 +56,6 @@ void update_LDL_add(DAQPWorkspace *work, const int add_ind){
 	  for(sum = 0;j<NX;j++)
 		sum+=Mk[j]*Mi[j];
 	
-	// Take into account soft constraints
-	if(IS_SOFT(add_ind) && IS_SOFT(id)){
-	  if(IS_LOWER(add_ind)^IS_LOWER(id))
-		sum -= SQUARE(work->settings->rho_soft);
-	  else
-		sum += SQUARE(work->settings->rho_soft);
-	}
-
 	work->L[new_L_start+i] = sum;
   }
   //Forward substitution: l <-- L\(Mk*m)  
@@ -81,9 +77,8 @@ void update_LDL_add(DAQPWorkspace *work, const int add_ind){
   work->D[work->n_active]=sum;
 
   // Check for singularity
-  if(work->D[work->n_active]<work->settings->zero_tol||
-	 (work->n_active >= work->n && IS_SOFT(add_ind)==0 && work->soft_slack < work->settings->zero_tol) || 
-	 (work->n_active > work->n)){
+  if(work->D[work->n_active] < work->settings->zero_tol ||
+	 (work->n_active >= work->n + ns_active)){
 	work->sing_ind=work->n_active;
 	work->D[work->n_active]=0;
   }
