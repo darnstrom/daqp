@@ -136,7 +136,10 @@ int remove_blocking(DAQPWorkspace *work){
    }
    else if(work->lam_star[i]>-dual_tol) continue; //lam* >= 0 for upper-> dual feasible
 
-   alpha_cand= -work->lam[i]/(work->lam_star[i]-work->lam[i]);
+   if(work->sing_ind == EMPTY_IND)
+	 alpha_cand= -work->lam[i]/(work->lam_star[i]-work->lam[i]);
+   else
+	 alpha_cand= -work->lam[i]/work->lam_star[i];
    if(alpha_cand < alpha){
 	 alpha = alpha_cand; 
 	 rm_ind = i;
@@ -144,8 +147,12 @@ int remove_blocking(DAQPWorkspace *work){
  }
  if(rm_ind == EMPTY_IND) return 0; // Either dual feasible or primal infeasible
  // If blocking constraint -> update lambda
- for(i=0;i<work->n_active;i++)
-   work->lam[i]+=alpha*(work->lam_star[i]-work->lam[i]);
+ if(work->sing_ind == EMPTY_IND)
+   for(i=0;i<work->n_active;i++)
+	 work->lam[i]+=alpha*(work->lam_star[i]-work->lam[i]);
+ else
+   for(i=0;i<work->n_active;i++)
+	 work->lam[i]+=alpha*work->lam_star[i];
  
  // Remove the constraint from the working set and update LDL
  work->sing_ind=EMPTY_IND;
