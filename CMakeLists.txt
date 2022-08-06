@@ -10,6 +10,11 @@ if(PROFILING)
   add_compile_definitions(PROFILING)
 endif()
 
+option (SOFT_WEIGHTS "Use different weights/bounds for soft constraints slacks" OFF)
+if(SOFT_WEIGHTS)
+  add_compile_definitions(SOFT_WEIGHTS)
+endif()
+
 add_library(daqpstat STATIC ${daqp_src} ${daqp_headers})
 add_library(daqp SHARED ${daqp_src} ${daqp_headers})
 

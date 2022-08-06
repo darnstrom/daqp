@@ -144,6 +144,21 @@ int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp){
   work->sense = malloc(qp->m*sizeof(int));
   update_mask += UPDATE_sense;
 	
+
+#ifdef SOFT_WEIGHTS
+  // Allocate memory for soft weights
+  work->d_ls = malloc(qp->m*sizeof(c_float));
+  work->d_us = malloc(qp->m*sizeof(c_float));
+  work->rho_ls= malloc(qp->m*sizeof(c_float));
+  work->rho_us= malloc(qp->m*sizeof(c_float));
+  for(int i = 0; i< qp->m; i++){
+	work->d_ls[i] = 0;
+	work->d_us[i] = 0;
+	work->rho_ls[i] = DEFAULT_RHO_SOFT;
+	work->rho_us[i] = DEFAULT_RHO_SOFT;
+  }
+#endif
+
   // Form LDP
   error_flag = update_ldp(update_mask, work);
   if(error_flag<0){
@@ -167,6 +182,16 @@ void free_daqp_ldp(DAQPWorkspace *work){
 	free(work->dupper);
 	free(work->dlower);
   }
+
+#ifdef SOFT_WEIGHTS
+  if(work->d_ls != NULL){
+	free(work->d_ls);
+	free(work->d_us);
+	free(work->rho_ls);
+	free(work->rho_us);
+  }
+#endif
+
   work->sense = NULL;
 }
 
@@ -201,6 +226,13 @@ void allocate_daqp_workspace(DAQPWorkspace *work, int n, int ns){
   work->x = work->u; 
   
   work->xold= malloc(n*sizeof(c_float));
+
+#ifdef SOFT_WEIGHTS
+  work->d_ls= NULL;
+  work->d_us= NULL;
+  work->rho_ls= NULL;
+  work->rho_us= NULL;
+#endif
 
   work->bnb = NULL;
   reset_daqp_workspace(work);

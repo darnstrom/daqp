@@ -21,6 +21,13 @@ void remove_constraint(DAQPWorkspace* work, const int rm_ind){
 void add_constraint(DAQPWorkspace *work, const int add_ind, c_float lam){
   // Update data structures  
   SET_ACTIVE(add_ind);
+#ifdef SOFT_WEIGHTS
+  if((IS_LOWER(add_ind) && lam <= -work->d_ls[add_ind])||
+	  (IS_LOWER(add_ind)==0 && lam >=  work->d_us[add_ind]))
+	SET_SLACK_FREE(add_ind);
+  else
+	SET_SLACK_FIXED(add_ind);
+#endif
   update_LDL_add(work, add_ind);
   work->WS[work->n_active] = add_ind;
   work->lam[work->n_active] = lam;
@@ -51,11 +58,21 @@ void compute_primal_and_fval(DAQPWorkspace *work){
 	  for(j=0,disp=NX*(work->WS[i]-N_SIMPLE);j<NX;j++)
 		work->u[j]-=work->M[disp++]*work->lam_star[i];
 	}
-	if(IS_SOFT(work->WS[i]))
+	if(IS_SOFT(work->WS[i])){
+#ifdef SOFT_WEIGHTS
+	  if(IS_LOWER(work->WS[i]))
+		fval+=SQUARE(work->lam_star[i])*work->rho_ls[i];
+	  else
+		fval+=SQUARE(work->lam_star[i])*work->rho_us[i];
+#else
 	  fval+= SQUARE(work->lam_star[i])/SQUARE(work->scaling[work->WS[i]]);
+#endif
+	}
   }
   // Check for progress 
+#ifndef SOFT_WEIGHTS
   fval=fval*work->settings->rho_soft;
+#endif
   work->soft_slack=fval;// XXX: keep this for now to return SOFT_OPTIMAL
   for(j=0;j<NX;j++)
 	fval+=work->u[j]*work->u[j];
@@ -124,6 +141,89 @@ int add_infeasible(DAQPWorkspace *work){
   add_constraint(work,add_ind,0.0);
   return 1;
 }
+#ifdef SOFT_WEIGHTS
+int remove_blocking(DAQPWorkspace *work){
+  int i, ind, rm_ind = EMPTY_IND;
+  c_float alpha=DAQP_INF;
+  c_float alpha_cand, lam_slack;
+  const c_float dual_tol = work->settings->dual_tol;
+  c_float p;
+  for(int i=0;i<work->n_active;i++){
+	ind = work->WS[i];
+	if(IS_IMMUTABLE(ind)) continue;
+	lam_slack = work->lam[i];
+	p = (work->sing_ind == EMPTY_IND) ? work->lam_star[i]-work->lam[i] : work->lam_star[i];
+	if(IS_LOWER(ind)){
+	  if(IS_SLACK_FREE(ind)){ // lam <= -d_ls
+		lam_slack += work->d_ls[ind];
+		// lam* <= -d_ls for lower -> nothing to do
+		if(p < dual_tol || work->lam_star[i] <= -work->d_ls[ind]+dual_tol) continue;
+	  }
+	  else{ // slack bound active (implying that -d_ls <= lam <= 0)
+		//Remaining within the bound -d_ls <=lam* <= 0 -> nothing to do
+		if(work->lam_star[i] <= dual_tol && (work->lam_star[i]+dual_tol >= -work->d_ls[ind]) &&
+			work->sing_ind == EMPTY_IND) continue;
+		if(p < 0){ // lam* < -d_ls
+		  lam_slack += work->d_ls[ind];
+		}
+	  }
+	}
+	else{ // IS_UPPER
+	  if(IS_SLACK_FREE(ind)){ // lam >= d_us
+		lam_slack -= work->d_us[ind];
+		//lam* >= d_us for upper -> nothing to do
+		if(p > -dual_tol || work->lam_star[i] >= work->d_us[ind]) continue;
+	  }
+	  else{ // slack bound active (implying that 0 <= lam <=d_us)
+		//Remaining within the bound 0 <=lam* <=d_us -> nothing to do
+		if(work->lam_star[i] >= -dual_tol && (work->lam_star[i] <= dual_tol+work->d_us[ind])
+			&& work->sing_ind == EMPTY_IND) continue;
+		if(p > 0) // lam* > d_us
+		  lam_slack -= work->d_us[ind];
+	  }
+	}
+
+	alpha_cand = -lam_slack/p;
+	if(alpha_cand < alpha){
+	  alpha = alpha_cand;
+	  rm_ind = i;
+	}
+  }
+  if(rm_ind == EMPTY_IND) return 0; // Either dual feasible or primal infeasible
+									// If blocking constraint -> update lambda
+  alpha *= 1.001;
+  if(work->sing_ind == EMPTY_IND)
+	for(i=0;i<work->n_active;i++){
+	  work->lam[i]+=alpha*(work->lam_star[i]-work->lam[i]);
+	}
+  else
+	for(i=0;i<work->n_active;i++){
+	  work->lam[i]+=alpha*work->lam_star[i];
+	}
+
+
+
+  // Remove the constraint from the working set and update LDL
+  work->sing_ind=EMPTY_IND;
+  int abs_rm_id = work->WS[rm_ind];
+  lam_slack = work->lam[rm_ind];
+
+  remove_constraint(work,rm_ind);
+  if(IS_SOFT(abs_rm_id)==0 || work->sing_ind != EMPTY_IND) return 1;
+
+  // Reactivate
+  if((IS_LOWER(abs_rm_id))){
+	if(lam_slack  > 0) return 1;
+  }
+  else{//IS_UPPER
+	if(lam_slack  < 0) return 1;
+  }
+  // Reactive and toggle sense to correctly update factorization
+  add_constraint(work,abs_rm_id,lam_slack);
+
+  return 1;
+}
+#else // not SOFT_WEIGHTS
 int remove_blocking(DAQPWorkspace *work){
  int i,rm_ind = EMPTY_IND; 
  c_float alpha=DAQP_INF;
@@ -159,6 +259,7 @@ int remove_blocking(DAQPWorkspace *work){
  remove_constraint(work,rm_ind);
  return 1;
 }
+#endif // SOFT_WEIGHTS
 
 void compute_CSP(DAQPWorkspace *work){
   int i,j,disp,start_disp;
@@ -166,10 +267,20 @@ void compute_CSP(DAQPWorkspace *work){
   // Forward substitution (xi <-- L\d)
   for(i=work->reuse_ind,disp=ARSUM(work->reuse_ind); i<work->n_active; i++){
 	// Setup RHS
-	if(IS_LOWER(work->WS[i])) 
+	if(IS_LOWER(work->WS[i])){
 	  sum = -work->dlower[work->WS[i]];
-	else 
+#ifdef SOFT_WEIGHTS
+	  if(IS_SOFT(work->WS[i]) && IS_SLACK_FREE(work->WS[i])) 
+		sum-= work->d_ls[work->WS[i]]*work->rho_ls[work->WS[i]]; 
+#endif
+	}
+	else{
 	  sum = -work->dupper[work->WS[i]];
+#ifdef SOFT_WEIGHTS
+	  if(IS_SOFT(work->WS[i]) && IS_SLACK_FREE(work->WS[i])) 
+		sum+= work->d_us[work->WS[i]]*work->rho_us[work->WS[i]]; 
+#endif
+	}
 	for(j=0; j<i; j++)
 	  sum -= work->L[disp++]*work->xldl[j];
 	disp++; //Skip 1 in L 

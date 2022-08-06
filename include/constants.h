@@ -66,6 +66,12 @@
 #define BINARY 16 
 #define IS_BINARY(x) (work->sense[x]&16)
 
+#define SLACK_FIXED 32
+#define IS_SLACK_FIXED(x) (work->sense[x]&32)
+#define IS_SLACK_FREE(x) ((work->sense[x]&32)==0)
+#define SET_SLACK_FIXED(x) (work->sense[x]|=32)
+#define SET_SLACK_FREE(x) (work->sense[x]&=~32)
+
 #define IS_SIMPLE(x) (x < work->ms)
 
 

@@ -115,8 +115,14 @@ typedef struct{
   int sing_ind; // Flag for denoting whether Mk Mk' is singular or not 
 
 
-  // Minimum slack for soft constraints
-  c_float soft_slack; 
+  // Soft constraint
+  c_float soft_slack;
+#ifdef SOFT_WEIGHTS
+  c_float *d_ls;
+  c_float *d_us;
+  c_float *rho_ls;
+  c_float *rho_us;
+#endif
 
   // Settings
   DAQPSettings* settings;

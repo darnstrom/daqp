@@ -36,6 +36,18 @@ int update_ldp(const int mask, DAQPWorkspace *work){
 	else
 	  for(int i=0;i<work->m;i++) work->sense[i] = work->qp->sense[i];
   }
+
+#ifdef SOFT_WEIGHTS
+  // TODO: Use mask or something to avoid scaling something more times... 
+  if(work->d_ls != NULL && work->scaling !=NULL){
+	for(int i=0;i<work->m; i++){
+	  work->d_ls[i]*=work->scaling[i];
+	  work->d_us[i]*=work->scaling[i];
+	  work->rho_ls[i]/=SQUARE(work->scaling[i]);
+	  work->rho_us[i]/=SQUARE(work->scaling[i]);
+	}
+  }
+#endif
   return 0;
 }
 
