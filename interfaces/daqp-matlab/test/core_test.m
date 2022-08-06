@@ -59,14 +59,16 @@ classdef core_test < matlab.unittest.TestCase
 	  sense = zeros(3,1,'int32');
 	  d = daqp();
 	  d.setup(H,f,A,bupper,blower,sense);
-	  [~,~,exitflag,~] = d.solve();
+	  [~,~,exitflag,infeasible_info] = d.solve();
 	  testCase.verifyEqual(exitflag,int32(-1));
+	  infeasible_info
 	  % Retry but soften the constraint
 	  sense(3)=8; % soften
 	  d = daqp();
 	  d.setup(H,f,A,bupper,blower,sense);
-	  [~,~,exitflag,info] = d.solve();
+	  [~,~,exitflag,soft_info] = d.solve();
 	  testCase.verifyEqual(exitflag,int32(2));
+	  soft_info
 	end
 	
 	function equality_QP(testCase) 
@@ -79,20 +81,22 @@ classdef core_test < matlab.unittest.TestCase
 	  sense(3)=5; % Set third constraint to equality 
 	  d = daqp();
 	  d.setup(H,f,A,bupper,blower,sense);
-	  [x,~,exitflag,~] = d.solve();
+	  [x,~,exitflag,equality_info] = d.solve();
 	  testCase.verifyEqual(exitflag,int32(1));
 	  testCase.verifyLessThan(norm(x-[-0.25;1]),1e-8);
+	  equality_info
 	  % Distort the Hessian and ensure that the same result holds 
 	  R=rand(2);
 	  d = daqp();
 	  d.setup(R'*R,R'*f,[eye(2);A]*R,bupper,blower,sense);
-	  [x,~,exitflag,~] = d.solve();
+	  [x,~,exitflag,equality_info2] = d.solve();
 	  testCase.verifyEqual(exitflag,int32(1));
 	  testCase.verifyLessThan(norm(R*x-[-0.25;1]),1e-8);
+	  equality_info2
 
 	  % Make sure the solver detects an overdetermined set of constraints 
 	  sense(1:2) = 5;
-	  [x,~,exitflag,~] = d.quadprog(R'*R,R'*f,[eye(2);A]*R,bupper,blower,sense);
+	  [x,~,exitflag,info_overdetermined] = d.quadprog(R'*R,R'*f,[eye(2);A]*R,bupper,blower,sense);
 	  testCase.verifyEqual(exitflag,-6);
 
 	end
@@ -141,8 +145,9 @@ classdef core_test < matlab.unittest.TestCase
 	  sense = int32(zeros(m+ms,1));
 	  sense(1:ms) = sense(1:ms)+16;
 	  sense(ms+1:ms+me) = sense(ms+1:ms+me)+5;
-	  [x,fval,exitflag,info] = daqp.quadprog(H,f,A,bupper_tot,blower_tot,sense);
+	  [x,fval,exitflag,daqp_bnb_info] = daqp.quadprog(H,f,A,bupper_tot,blower_tot,sense);
 	  testCase.verifyEqual(exitflag,int32(1));
+	  display(daqp_bnb_info)
 
 	  % compare with Gurobi (comparison skipped if Gurobi is not available)
 	  model.Q = 0.5*sparse(H);
@@ -152,9 +157,10 @@ classdef core_test < matlab.unittest.TestCase
 	  model.sense=repelem('=<',[me,2*(m-me)]);
 	  model.vtype=repelem('BC',[ms,n-ms]);
 	  model.lb = -inf(n,1);
-
+	  params.OutputFlag=0;
 	  try
-		results = gurobi(model)
+
+		gurobi_result = gurobi(model,params)
 		xref = results.x;
 		testCase.verifyLessThan(norm(x-xref),tol);
 	  catch
