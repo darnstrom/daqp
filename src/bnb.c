@@ -47,6 +47,7 @@ int daqp_bnb(DAQPWorkspace* work){
   else{
 	// Let work->u point to the best feasible solution 
 	swp_ptr=work->u; work->u= work->xold; work->xold=swp_ptr;
+	work->fval = work->settings->fval_bound;
 	return EXIT_OPTIMAL;
   }
 }
