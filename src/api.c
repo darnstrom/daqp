@@ -289,6 +289,7 @@ void daqp_extract_result(DAQPResult* res, DAQPWorkspace* work){
 
   res->soft_slack = work->soft_slack;
   res->iter = work->iterations;
+  res->nodes = (work->bnb == NULL) ? 1 : work->bnb->nodecount;
 }
 
 void daqp_default_settings(DAQPSettings* settings){

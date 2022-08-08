@@ -12,6 +12,7 @@ typedef struct{
 
   int exitflag; 
   int iter;
+  int nodes;
   c_float solve_time;
   c_float setup_time; 
 
