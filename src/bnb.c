@@ -6,6 +6,7 @@ int daqp_bnb(DAQPWorkspace* work){
   int branch_id, exitflag;
   DAQPNode* node;
   c_float *swp_ptr = NULL;
+  c_float fval_bound0 = work->settings->fval_bound;
   work->bnb->neq = work->n_active; 
 
   work->bnb->itercount=0;
@@ -42,12 +43,14 @@ int daqp_bnb(DAQPWorkspace* work){
 
   // Exploration completed 
   work->iterations = work->bnb->itercount;
+  // Correct fval
+  work->fval = work->settings->fval_bound;
+  work->settings->fval_bound = fval_bound0;
   if(swp_ptr==NULL)
 	return EXIT_INFEASIBLE;
   else{
 	// Let work->u point to the best feasible solution 
 	swp_ptr=work->u; work->u= work->xold; work->xold=swp_ptr;
-	work->fval = work->settings->fval_bound;
 	return EXIT_OPTIMAL;
   }
 }
