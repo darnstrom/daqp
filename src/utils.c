@@ -202,11 +202,11 @@ void normalize_M(DAQPWorkspace* work){
 	  scaling_i+=work->M[disp]*work->M[disp];
 	//if(!(scaling_i >= 0)) return EXIT_ILLPOSED;
 	scaling_i = sqrt(scaling_i); 
+	work->scaling[i]=scaling_i;
 	if(scaling_i < work->settings->zero_tol){
 	  work->sense[i] = IMMUTABLE; // ignore zero-row constraint
-	  return; // TODO: mark infeasibility if dupper & dlower are nonzero
+	  continue; // TODO: mark infeasibility if dupper & dlower are nonzero
 	}
-	work->scaling[i]=scaling_i;
 	for(j=0, disp-=NX;j<NX;j++,disp++)
 	  work->M[disp]/=scaling_i;
   }
