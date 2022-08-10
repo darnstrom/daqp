@@ -5,16 +5,16 @@
 #include "bnb.h"
 
 typedef struct{
-  c_float *x;
-  c_float *lam;
-  c_float fval;
-  c_float soft_slack;  
+    c_float *x;
+    c_float *lam;
+    c_float fval;
+    c_float soft_slack;
 
-  int exitflag; 
-  int iter;
-  int nodes;
-  c_float solve_time;
-  c_float setup_time; 
+    int exitflag;
+    int iter;
+    int nodes;
+    c_float solve_time;
+    c_float setup_time;
 
 }DAQPResult;
 

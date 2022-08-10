@@ -15,14 +15,14 @@ void normalize_M(DAQPWorkspace *work);
 #ifdef _WIN32
 #include <windows.h>
 typedef struct{ 
-  LARGE_INTEGER start;
-  LARGE_INTEGER stop;
+    LARGE_INTEGER start;
+    LARGE_INTEGER stop;
 }DAQPtimer;
 #else // not _WIN32 
 #include <time.h>
 typedef struct{ 
-  struct timespec start;
-  struct timespec stop;
+    struct timespec start;
+    struct timespec stop;
 }DAQPtimer;
 #endif // _WIN32
 
