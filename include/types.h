@@ -120,6 +120,14 @@ typedef struct{
   // Soft constraint
   c_float soft_slack;
 #ifdef SOFT_WEIGHTS
+  // The softened objective is given by
+  //    min  0.5 x'*H*x + f'x + 0.5 su'su+0.5*sl'sl,
+  // and the softened constraints are given by (similar for simple bounds)
+  //    lbA-rho_ls*sl <= A*x <= ubA+rho_us*su,
+  // with the bounds sl >= d_ls, su >= d_us
+  // note that lbA/ubA is assumed to be shifted with rho_ls*d_ls and rho_us*d_us
+  // since the slacks are assumed to be active at their bounds by default.
+
   // size of the following is m; values are only used if index set to SOFT.
   c_float *d_ls;
   c_float *d_us;
