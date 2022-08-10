@@ -48,24 +48,29 @@
 #define SET_ACTIVE(x) (work->sense[x]|=1)
 #define SET_INACTIVE(x) (work->sense[x]&=~1)
 
+// marks if a constraints is active at its lower bound
 #define LOWER 2 
 #define IS_LOWER(x) (work->sense[x]&2)
 #define SET_LOWER(x) (work->sense[x]|=2)
 #define SET_UPPER(x) (work->sense[x]&=~2)
 
+// marks if a constraint cannot be activated/deactivated
 #define IMMUTABLE 4 
 #define IS_IMMUTABLE(x) (work->sense[x]&4)
 #define SET_IMMUTABLE(x) (work->sense[x]|=4)
 #define SET_MUTABLE(x) (work->sense[x]&=~4)
 
-#define SOFT 8 
+// marks that a constraint might be violated (but the slack is penalized)
+#define SOFT 8
 #define IS_SOFT(x) (work->sense[x]&8)
 #define SET_SOFT(x) (work->sense[x]|=8)
 #define SET_HARD(x) (work->sense[x]&=~8)
 
+// marks that a constraint has to be active at either its upper or lower bound 
 #define BINARY 16 
 #define IS_BINARY(x) (work->sense[x]&16)
 
+// marks that the soft slack is at its lower bound (d_ls or d_us) 
 #define SLACK_FIXED 32
 #define IS_SLACK_FIXED(x) (work->sense[x]&32)
 #define IS_SLACK_FREE(x) ((work->sense[x]&32)==0)
