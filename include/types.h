@@ -79,7 +79,7 @@ typedef struct{
 typedef struct{
   DAQPProblem* qp;
   // LDP data 
-  int n; // Number of primal variable  
+  int n; // Number of primal variables
   int m; // Number of constraints  
   int ms; // Number of simple bounds
   c_float *M; // M' M is the Hessian of the dual objective function (dimensions: n x m)  
@@ -108,7 +108,7 @@ typedef struct{
   c_float* zldl; // zldl_i = xldl_i/D_i
   int reuse_ind; // How much work that can be saved when solving Mk Mk' lam* = -dk
 
-  int *WS; // Working set
+  int *WS; // Working set, size: maximum number of constraints (n+ns+1)
   int n_active; // Number of active contraints 
 
   int iterations;
@@ -118,6 +118,7 @@ typedef struct{
   // Soft constraint
   c_float soft_slack;
 #ifdef SOFT_WEIGHTS
+  // size of the following is m; values are only used if index set to SOFT.
   c_float *d_ls;
   c_float *d_us;
   c_float *rho_ls;
