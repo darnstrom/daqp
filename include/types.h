@@ -7,13 +7,15 @@ typedef struct{
 
 // Data for the QP problem
 //
-// min		0.5 x'*H*x + f'x
-// s.t 	blower <= A*x <= bupper 
-// 			lb <=  x  <= ub
+// min  0.5 x'*H*x + f'x
+// s.t  lbA <= A*x <= ubA
+//      lb  <=  x  <= ub
 //
-// n  - dimension of x 
-// m  - # of rows in b 
-// ms - # of simple bounds (assumed to be the first ms elements in b) 
+// n  - dimension of x
+// m  - total number of constraints
+// ms - number of simple bounds
+// blower = [lb; lbA];
+// bupper = [ub; ubA];
 // (The number of rows in A is hence m-ms)
 
 // sense define the state of the constraints 
