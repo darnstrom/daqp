@@ -7,13 +7,15 @@ typedef struct{
 
 // Data for the QP problem
 //
-// min		0.5 x'*H*x + f'x
-// s.t 	blower <= A*x <= bupper 
-// 			lb <=  x  <= ub
+// min  0.5 x'*H*x + f'x
+// s.t  lbA <= A*x <= ubA
+//      lb  <=  x  <= ub
 //
-// n  - dimension of x 
-// m  - # of rows in b 
-// ms - # of simple bounds (assumed to be the first ms elements in b) 
+// n  - dimension of x
+// m  - total number of constraints
+// ms - number of simple bounds
+// blower = [lb; lbA];
+// bupper = [ub; ubA];
 // (The number of rows in A is hence m-ms)
 
 // sense define the state of the constraints 
@@ -79,7 +81,7 @@ typedef struct{
 typedef struct{
   DAQPProblem* qp;
   // LDP data 
-  int n; // Number of primal variable  
+  int n; // Number of primal variables
   int m; // Number of constraints  
   int ms; // Number of simple bounds
   c_float *M; // M' M is the Hessian of the dual objective function (dimensions: n x m)  
@@ -108,7 +110,7 @@ typedef struct{
   c_float* zldl; // zldl_i = xldl_i/D_i
   int reuse_ind; // How much work that can be saved when solving Mk Mk' lam* = -dk
 
-  int *WS; // Working set
+  int *WS; // Working set, size: maximum number of constraints (n+ns+1)
   int n_active; // Number of active contraints 
 
   int iterations;
@@ -118,6 +120,7 @@ typedef struct{
   // Soft constraint
   c_float soft_slack;
 #ifdef SOFT_WEIGHTS
+  // size of the following is m; values are only used if index set to SOFT.
   c_float *d_ls;
   c_float *d_us;
   c_float *rho_ls;
