@@ -115,6 +115,7 @@ void update_M(DAQPWorkspace *work){
 void update_v(c_float *f, DAQPWorkspace *work){
     int i,j,disp;
     const int n = work->n;
+    if(work->v == NULL || f == NULL) return;
     if(work->Rinv == NULL){// Rinv = I => v = R'\v = f
         for(i=0;i<n;++i) work->v[i] = f[i];
         return;
@@ -136,6 +137,7 @@ void update_d(DAQPWorkspace *work){
     int i,j,disp;
     c_float sum;
     const int n = work->n;
+    work->reuse_ind = 0; // RHS of KKT system changed => cannot reuse intermediate results
     // Take into scaling of constraints
     if(work->scaling != NULL){
         for(i = 0;i<N_CONSTR;i++){
@@ -150,6 +152,7 @@ void update_d(DAQPWorkspace *work){
         }
     }
 
+    if(work->v == NULL) return;
     // Simple bounds 
     if(work->Rinv !=NULL){
         for(i = 0,disp=0;i<N_SIMPLE;i++){
@@ -172,7 +175,6 @@ void update_d(DAQPWorkspace *work){
         work->dlower[i]+=sum;
     }
 
-    work->reuse_ind = 0; // RHS of KKT system changed => cannot reuse intermediate results 
 }
 
 void normalize_Rinv(DAQPWorkspace* work){
