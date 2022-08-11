@@ -66,8 +66,11 @@ int daqp_ldp(DAQPWorkspace *work){
 void ldp2qp_solution(DAQPWorkspace *work){
     int i,j,disp;
     // x* = Rinv*(u-v)
-    for(i=0;i<work->n;i++)
-        work->x[i]=work->u[i]-work->v[i];
+    if(work->v != NULL)
+        for(i=0;i<work->n;i++) work->x[i]=work->u[i]-work->v[i];
+    else
+        for(i=0;i<work->n;i++) work->x[i]=work->u[i];
+
     if(work->Rinv != NULL){ // (Skip if LP since R = I)
         for(i=0,disp=0;i<work->n;i++){
             work->x[i]*=work->Rinv[disp++];
