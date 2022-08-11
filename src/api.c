@@ -270,16 +270,11 @@ void free_daqp_workspace(DAQPWorkspace *work){
 
 // Extract solution information from workspace 
 void daqp_extract_result(DAQPResult* res, DAQPWorkspace* work){
-    // Extract optimal solution and correct fval offset
     int i; 
-    res->fval = work->fval;
-    for(i=0;i<work->n;i++){
-        res->x[i] = work->x[i];
-        res->fval-=work->v[i]*work->v[i]; 
-    }
-    res->fval *=0.5;
+    // Extract primal solution
+    for(i=0;i<work->n;i++) res->x[i] = work->x[i];
 
-    // Extract dual solution 
+    // Extract dual solution
     if(res->lam != NULL){
         for(i=0;i<work->m;i++) 
             res->lam[i] = 0; 
@@ -287,6 +282,21 @@ void daqp_extract_result(DAQPResult* res, DAQPWorkspace* work){
             res->lam[work->WS[i]] = work->lam_star[i];
     }
 
+    // Shift back function value
+    if(work->settings->eps_prox == 0 || work->Rinv != NULL){ // Normal QP
+        res->fval = work->fval;
+        for(i=0;i<work->n;i++) res->fval-=work->v[i]*work->v[i];
+        res->fval *=0.5;
+        if(work->settings->eps_prox != 0)
+        for(i=0;i<work->n;i++) // compensate for proximal iterations
+            res->fval+= work->settings->eps_prox*work->x[i]*work->x[i];
+    }
+    else if(work->qp != NULL && work->qp->f != NULL ){ // LP
+        res->fval = 0;
+        for(i=0;i<work->n;i++) res->fval+=work->qp->f[i]*work->x[i];
+    }
+
+    // info
     res->soft_slack = work->soft_slack;
     res->iter = work->iterations;
     res->nodes = (work->bnb == NULL) ? 1 : work->bnb->nodecount;
