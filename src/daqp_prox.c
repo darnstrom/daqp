@@ -64,6 +64,8 @@ int daqp_prox(DAQPWorkspace *work){
     }
     // Finalize results
     if(total_iter >= work->settings->iter_limit) exitflag = EXIT_ITERLIMIT; 
+    if(work->Rinv == NULL)
+        for(i = 0; i<work->n_active;i++) work->lam_star[i]/=eps;// Rescale dual variables
     work->iterations = total_iter;
     return exitflag;
 }
