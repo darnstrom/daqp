@@ -3,6 +3,8 @@
 #include "daqp_prox.h"
 #include "utils.h"
 
+static int gradient_step(DAQPWorkspace* work);
+
 int daqp_prox(DAQPWorkspace *work){
     int i,total_iter=0;
     const int nx=work->n;
@@ -36,6 +38,13 @@ int daqp_prox(DAQPWorkspace *work){
                 exitflag = EXIT_OPTIMAL; // Fix point reached
                 break;
             }
+            // Take gradient step if LP (and the iterate is not constrained to a vertex)
+            if((work->Rinv == NULL)&&(work->n_active != work->n)){
+                if(gradient_step(work)==EMPTY_IND){
+                    exitflag= EXIT_UNBOUNDED;
+                    break;
+                }
+            }
         }
 
         // ** Perturb problem **
@@ -57,4 +66,63 @@ int daqp_prox(DAQPWorkspace *work){
     if(total_iter >= work->settings->iter_limit) exitflag = EXIT_ITERLIMIT; 
     work->iterations = total_iter;
     return exitflag;
+}
+// Gradient step
+// TODO: could probably reuse code from daqp
+static int gradient_step(DAQPWorkspace* work){
+    int j,k,disp,add_ind=EMPTY_IND;
+    const int nx=work->n;
+    const int m=work->m;
+    const int ms=work->ms;
+    c_float Ax,delta_s, min_alpha=DAQP_INF;
+    // Find constraint j to add: j =  argmin_j s_j
+    // Simple bounds
+    for(j=0, disp=0;j<ms;j++){
+        if(work->sense[j]&(ACTIVE+IMMUTABLE)) continue;
+        delta_s = work->x[j]-work->xold[j];
+        if(delta_s>0 && //Feasible descent direction
+                work->qp->bupper[j]<DAQP_INF && // Not single-sided
+                work->qp->bupper[j]-work->x[j]<min_alpha*delta_s){
+            add_ind = j;
+            min_alpha = (work->qp->bupper[j]-work->x[j])/delta_s;
+        }
+        else if(delta_s < 0 && //Feasible descent direction
+                work->qp->blower[j]>-DAQP_INF && // Not single-sided
+                work->qp->blower[j]-work->x[j]>min_alpha*delta_s){
+            add_ind = j;
+            min_alpha = (work->qp->blower[j]-work->x[j])/delta_s;
+        }
+    }
+    //General bounds
+    for(j=ms, disp=0;j<m;j++){
+        if(work->sense[j]&(ACTIVE+IMMUTABLE)){
+            disp+=nx;// Skip ahead in A
+            continue;
+        }
+        //delta_s[j] = A[j,:]*delta_x
+        for(k=0,delta_s=0,Ax=0;k<nx;k++){ // compute s = A(x-xold) and Ax
+            Ax += work->M[disp]*work->x[k];
+            delta_s-=work->M[disp++]*work->xold[k];
+        }
+        delta_s +=Ax;
+
+        if(delta_s>0 && // Feasible descent direction
+                work->qp->bupper[j]<DAQP_INF && // Not single-sided
+                work->qp->bupper[j]-Ax < delta_s*min_alpha){
+            add_ind = j;
+            min_alpha=(work->qp->bupper[j]-Ax)/delta_s;
+        }
+        else if(delta_s<0 && // Feasible descent direction
+                work->qp->blower[j]>-DAQP_INF && // Not single-sided
+                work->qp->blower[j]-Ax > delta_s*min_alpha){
+            add_ind = j;
+            min_alpha=(work->qp->blower[j]-Ax)/delta_s;
+        }
+    }
+    // update iterate
+    if(add_ind != EMPTY_IND)
+        for(k=0;k<nx;k++) // x <-- x+alpha deltax
+            work->x[k]+=min_alpha*(work->x[k]-work->xold[k]);
+
+    return add_ind;
 }
