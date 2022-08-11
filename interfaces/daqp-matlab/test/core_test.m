@@ -128,11 +128,26 @@ classdef core_test < matlab.unittest.TestCase
 	  fprintf('Solve times [s]: |avg: %2.6f| max: %2.6f| min %2.6f|\n',mean(solve_times),max(solve_times),min(solve_times))
 	  fprintf('=============================================================\n')
 	end
+
+    function unbounded_LP(testCase)
+        f = [1; 1];
+        A = [1  0];
+        bupper = [1];
+        blower = [-1];
+        sense= int32([0]);
+        d = daqp();
+        d.setup([],f,A,bupper,blower,sense);
+        d.settings('eps_prox',1);
+        [x,fval,exitflag, unb_lp_info] = d.solve(); 
+        testCase.verifyEqual(exitflag,int32(-3));
+        unb_lp_info
+    end
+
 	function random_bnb(testCase)
 	  % generate and solve with daqp
 	  rng('default');
 	  n = 150; m = 300; ms = 20; me = 0;
-	  tol = 1e-4;
+	  tol = 1e-5;
 	  M = randn(n,n);
 	  H = M'*M;
 	  f = 100*randn(n,1); 
