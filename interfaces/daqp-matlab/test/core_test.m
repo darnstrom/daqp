@@ -8,7 +8,7 @@ classdef core_test < matlab.unittest.TestCase
 	  n = 100; m = 500; ms = 50;
 	  nAct = 80;
 	  kappa = 1e2;
-	  tol = 1e-4;
+	  tol = 1e-5;
 	  solve_times = zeros(nQPs,1);
 	  for i = 1:nQPs
 		[xref,H,f,A,bupper,blower,sense]=generate_test_QP(n,m,ms,nAct,kappa);
@@ -19,6 +19,7 @@ classdef core_test < matlab.unittest.TestCase
 		testCase.verifyEqual(exitflag,int32(1));
 		testCase.verifyLessThan(norm(x-xref),tol);
 		testCase.verifyLessThan(norm(H*x+f+[eye(ms,n);A]'*info.lambda),tol);
+		testCase.verifyLessThan(0.5*x'*H*x+f'*x-fval,tol);
 		solve_times(i) = info.solve_time;
 	  end
 	  fprintf('========================== DAQP =============================\n')
@@ -32,7 +33,7 @@ classdef core_test < matlab.unittest.TestCase
 	  n = 100; m = 500; ms = 50;
 	  nAct = 80;
 	  kappa = 1e2;
-	  tol = 1e-4;
+	  tol = 1e-5;
 	  solve_times = zeros(nQPs,1);
 	  for i = 1:nQPs
 		[xref,H,f,A,bupper,blower,sense]=generate_test_QP(n,m,ms,nAct,kappa);
@@ -44,6 +45,7 @@ classdef core_test < matlab.unittest.TestCase
 		testCase.verifyEqual(exitflag,int32(1));
 		testCase.verifyLessThan(norm(x-xref),tol);
 		testCase.verifyLessThan(norm(H*x+f+[eye(ms,n);A]'*info.lambda),tol);
+		testCase.verifyLessThan(0.5*x'*H*x+f'*x-fval,tol);
 		solve_times(i) = info.solve_time;
 	  end
 	  fprintf('\n======================== DAQP PROX ==========================\n')
@@ -70,7 +72,7 @@ classdef core_test < matlab.unittest.TestCase
 	  testCase.verifyEqual(exitflag,int32(2));
 	  soft_info
 	end
-	
+
 	function equality_QP(testCase) 
 	  H = eye(2); 
 	  f = 10*ones(1,1);
@@ -106,7 +108,7 @@ classdef core_test < matlab.unittest.TestCase
 	  rng('default');
 	  nQPs = 100;
 	  n = 100; m = 500; ms = 50;
-	  tol = 1e-4;
+	  tol = 1e-5;
 	  solve_times = zeros(nQPs,1);
 	  for i = 1:nQPs
 		[xref,f,A,bupper,blower,sense]=generate_test_LP(n,m,ms);
@@ -117,6 +119,8 @@ classdef core_test < matlab.unittest.TestCase
 
 		testCase.verifyEqual(exitflag,int32(1));
 		testCase.verifyLessThan(norm(x-xref),tol);
+		testCase.verifyLessThan(norm(f'*xref-fval),tol);
+		testCase.verifyLessThan(norm(f+[eye(ms,n);A]'*info.lambda),tol);
 		if(norm(x-xref)>tol)
 		  x_linprog = linprog(f,[A;-A],[bupper(ms+1:end);-blower(ms+1:end)],[],[],[blower(1:ms);-inf(n-ms,1)],[bupper(1:ms);inf(n-ms,1)]);
 		  fprintf('Linprog error: %f\n',norm(xref-x_linprog));
