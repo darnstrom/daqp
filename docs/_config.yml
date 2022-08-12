@@ -29,7 +29,7 @@ github_username: darnstrom
 
 # Build settings
 # theme: just-the-docs 
-remote_theme: pmarsceill/just-the-docs
+remote_theme: pmarsceill/just-the-docs@v0.3.3
 color_scheme: daqp
 
 # Exclude from processing.
