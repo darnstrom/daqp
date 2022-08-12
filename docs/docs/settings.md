@@ -28,7 +28,7 @@ Table of contents
 | `fval_bound` | Maximum allowed objective function value. The solver terminates if the dual objective exceeds this value (since it is a lower bound of the optimal value). | 1e30|
 | `eps_prox` | Regularization parameter used for proximal-point iterations (0 means that no proximal-point iterations are performed) | 0|
 | `eta_prox` | Tolerance that determines if a fix-point has been reached during proximal-point iterations | 1e-6|
-| `rho_soft` | Weight used for soft constraints | 1e-3|
+| `rho_soft` | Weight used for soft constraints (higher enables more violations) | 1e-3|
 
 
 ## Exit flags 
@@ -53,5 +53,6 @@ The type of a constraint is classified through an integer value (called sense), 
 |2|Lower| Determine which of the lower and upper bound is imposed when active| 
 |4|Immutable| Disallow the constraint to be activated/deactivated|
 |8|Soft| The constraint should be softened | 
+|16|Binary| Either the upper or lower bound should hold with equality|
 
 These flags can be combined through addition. For example, if we want to encode equality constraints in our problem we would mark these as active and immutable, that is, with sense 1+4=5.

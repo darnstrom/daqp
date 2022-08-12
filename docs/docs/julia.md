@@ -13,11 +13,11 @@ math: mathjax3
 In Julia we define the problem as 
 ```julia
 # Define the problem
-H = [1 0; 0 1]; 
-f = [1;1]; 
-A = [1 1; 1 -1];
-bupper = [1; 2; 3; 4];
-blower = [-1; -2; -3; -4];
+H = [1.0 0; 0 1];
+f = [1.0 ;1];
+A = [1.0 1; 1 -1];
+bupper = [1.0 ; 2; 3; 4];
+blower = [-1.0; -2; -3; -4];
 sense = zeros(Cint,4);
 ```
 `sense` determines the type of the constraints (more details are given [here](/daqp/parameters/#constraint-classification)).
@@ -32,8 +32,8 @@ x,fval,exitflag,info = DAQP.quadprog(H,f,A,bupper,blower,sense);
 This will solve the problem with default settings. A more flexible interface is also offered, where we first setup the problem and then solve it 
 ```julia
 d = DAQP.Model();
-DAQP.setup(d;H,f,A,bupper,blower,sense);
-x,fval,exitflag,info = DAQP.solve(d,H,f,A,bupper,blower,sense);
+DAQP.setup(d,H,f,A,bupper,blower,sense);
+x,fval,exitflag,info = DAQP.solve(d);
 ```
 This allows us to reuse internal matrix factorization if we want to solve a perturbed problem. 
 
@@ -44,3 +44,22 @@ DAQP.settings(d; Dict(:iter_limit =>2000))
 ```
 
 A full list of available settings is provided [here](/daqp/parameters/#settings)
+
+## Using DAQP in JuMP
+DAQP can also be interfaced to [JuMP](https://jump.dev/). The following code sets up and solves the problem considered above
+
+```julia
+using DAQP
+using JuMP
+
+## Setup problem
+model = Model(DAQP.Optimizer)
+@variable(model, -1<= x1 <=1)
+@variable(model, -2<= x2 <=2)
+@objective(model, Min, 0.5*(x1^2+x2^2)+x1+x2)
+@constraint(model, c1, -3 <= x1 + x2 <= 3)
+@constraint(model, c2, -4 <= x1 - x2 <= 4)
+
+## Solve problem
+optimize!(model)
+```

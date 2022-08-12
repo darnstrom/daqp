@@ -44,3 +44,20 @@ d.settings('iter_limit',2000)
 ```
 
 A full list of available settings is provided [here](/daqp/parameters/#settings).
+
+## Using DAQP in YALMIP
+DAQP can also be interfaced to [YALMIP](https://yalmip.github.io/). The following code sets up and solves the problem considered above
+
+```matlab
+% Setup problem
+x = sdpvar(2,1);
+cons = [-1 <= x(1) <=1,...
+        -2 <= x(2) <=2,...
+        -3 <= x(1)+x(2) <= 3,...
+        -4 <= x(1)-x(2) <= 4];
+obj = 0.5*x'*x+x(1)+x(2);
+options = sdpsettings('solver','daqp');
+
+% Solve problem
+sol = optimize(cons,obj,options);
+```
