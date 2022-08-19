@@ -11,6 +11,7 @@ int daqp_prox(DAQPWorkspace *work){
     int exitflag;
     c_float *swp_ptr;
     c_float diff,eps=work->settings->eps_prox;
+    for(i=0;i < work->n;i++) work->x[i] = 0; // TODO add option for user to set x0
 
     while(total_iter  <  work->settings->iter_limit){
         // xold <-- x
