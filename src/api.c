@@ -75,11 +75,19 @@ int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time){
     // Check if QP is well-posed
     //validate_QP(qp);
 
-
-    //
+    // Find # of maximum slack variables
     ns = 0;
-    for(int i = 0; i < qp->m ; i++)
-        if(qp->sense[i] & SOFT) ns++;
+    if(qp->nh <=1){
+        for(int i = 0; i < qp->m ; i++)
+            if(qp->sense[i] & SOFT) ns++;
+    }
+    else{
+        int start = 0;
+        for(int i = 0; i < qp->nh; i++){
+            ns = (ns  > qp->break_points[i]-start) ? ns : qp->break_points[i]-start;
+            start = qp->break_points[i]-start;
+        }
+    }
     // Setup workspace
     allocate_daqp_settings(work);
     allocate_daqp_workspace(work,qp->n,ns);
@@ -93,6 +101,8 @@ int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time){
         free_daqp_workspace(work);
         return errorflag;
     }
+    setup_daqp_hiqp(work,qp->break_points,qp->nh);
+
     errorflag = activate_constraints(work);
     if(errorflag < 0){
         free_daqp_workspace(work);
@@ -171,24 +181,13 @@ int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp){
 }
 
 // Setup hierarchical
-int setup_daqp_hiqp(DAQPWorkspace* work, DAQPProblem *qp, int nh, int* break_points){
+void setup_daqp_hiqp(DAQPWorkspace* work, int* break_points, int nh){
+    if((work->hier == NULL) && (nh > 1)){
+        work->hier= malloc(sizeof(DAQPHierarchy));
 
-    work->hier->nh = nh;
-    work->hier->break_points= break_points;
-
-    // Find maximum # of slack variables (i.e., maximum # of constraint in a level)
-    int max_ns=0;
-    int start=0;
-    for(int i = 0; i < nh; i++){
-        max_ns = (max_ns > break_points[i]-start) ? max_ns : break_points[i]-start;
-        start = break_points[i]-start;
+        work->hier->nh = nh;
+        work->hier->break_points= break_points;
     }
-    // Allocate settings & iters 
-    allocate_daqp_settings(work);
-    allocate_daqp_workspace(work,qp->n,max_ns);
-
-    // Setup LDP
-    return setup_daqp_ldp(work, qp);
 }
 
 // Free data for LDP 
@@ -290,6 +289,11 @@ void free_daqp_workspace(DAQPWorkspace *work){
     }
 
     free_daqp_bnb(work);
+
+    if(work->hier != NULL){
+        free(work->hier);
+        work->hier = NULL;
+    }
 }
 
 // Extract solution information from workspace 
