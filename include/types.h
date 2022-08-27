@@ -34,8 +34,13 @@ typedef struct{
 
     int* sense; 
 
+    // BnB
     int* bin_ids;
     int nb;
+
+    // Hierarchical QP
+    int* break_points;
+    int nh;
 }DAQPProblem;
 
 typedef struct{
