@@ -80,6 +80,11 @@ typedef struct{
 }DAQPBnB;
 
 typedef struct{
+    int nh; // Number of levels
+    int* break_points;
+}DAQPHierarchy;
+
+typedef struct{
     DAQPProblem* qp;
     // LDP data 
     int n; // Number of primal variables
@@ -141,6 +146,8 @@ typedef struct{
 
     // BnB
     DAQPBnB* bnb;
+    // Hierarchical QP 
+    DAQPHierarchy* hier;
 }DAQPWorkspace;
 
 #endif //ifndef DAQP_TYPES_H

@@ -14,6 +14,8 @@ void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
     if(work->settings->eps_prox==0){
         if(work->bnb != NULL)
             res->exitflag = daqp_bnb(work);
+        else if(work->hier !=NULL)
+            res->exitflag = daqp_hiqp(work);
         else
             res->exitflag = daqp_ldp(work);
 
@@ -168,6 +170,27 @@ int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp){
     return 1;
 }
 
+// Setup hierarchical
+int setup_daqp_hiqp(DAQPWorkspace* work, DAQPProblem *qp, int nh, int* break_points){
+
+    work->hier->nh = nh;
+    work->hier->break_points= break_points;
+
+    // Find maximum # of slack variables (i.e., maximum # of constraint in a level)
+    int max_ns=0;
+    int start=0;
+    for(int i = 0; i < nh; i++){
+        max_ns = (max_ns > break_points[i]-start) ? max_ns : break_points[i]-start;
+        start = break_points[i]-start;
+    }
+    // Allocate settings & iters 
+    allocate_daqp_settings(work);
+    allocate_daqp_workspace(work,qp->n,max_ns);
+
+    // Setup LDP
+    return setup_daqp_ldp(work, qp);
+}
+
 // Free data for LDP 
 void free_daqp_ldp(DAQPWorkspace *work){
     if(work->sense==NULL) return; // Already freed
@@ -235,6 +258,7 @@ void allocate_daqp_workspace(DAQPWorkspace *work, int n, int ns){
 #endif
 
     work->bnb = NULL;
+    work->hier = NULL;
     reset_daqp_workspace(work);
 }
 

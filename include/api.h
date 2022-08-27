@@ -3,6 +3,7 @@
 #include "daqp.h"
 #include "daqp_prox.h"
 #include "bnb.h"
+#include "hierarchical.h"
 
 typedef struct{
     c_float *x;
@@ -23,6 +24,8 @@ void daqp_quadprog(DAQPResult* res, DAQPProblem* qp,DAQPSettings* settings);
 
 int setup_daqp(DAQPProblem *qp, DAQPWorkspace* work, c_float* setup_time);
 int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem* qp);
+int setup_daqp_hiqp(DAQPWorkspace *work, DAQPProblem* qp, int nh, int* break_points);
+
 void allocate_daqp_settings(DAQPWorkspace *work);
 void allocate_daqp_workspace(DAQPWorkspace *work, int n, int ns);
 
