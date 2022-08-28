@@ -75,6 +75,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  int m = mxGetM(prhs[5]);
 	  int ms = m-mxGetN(prhs[4]);
 	  int nb = mxGetM(prhs[8]);
+	  int nh = mxGetM(prhs[9]);
 	  
 	  // Setup QP struct
 	  qp->n = n;
@@ -88,6 +89,9 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  qp->sense= (int *)mxGetPr(prhs[7]);
 	  qp->bin_ids= (int *)mxGetPr(prhs[8]);
 	  qp->nb=nb; 
+      qp->break_points= (nh > 1) ?  (int *)mxGetPr(prhs[9]) : NULL;
+      qp->nh=nh;
+
 	  
 	  double solve_time;
 	  error_flag = setup_daqp(qp,work,&solve_time);
@@ -112,6 +116,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  work->qp->bupper= mxGetPr(prhs[5]);
 	  work->qp->blower= mxGetPr(prhs[6]);
 	  work->qp->sense= (int *)mxGetPr(prhs[7]);
+	  work->qp->break_points= (int *)mxGetPr(prhs[8]);
 	  // Setup output 
 	  plhs[0] = mxCreateDoubleMatrix((mwSize)work->n,1,mxREAL); // x_star
 	  plhs[1] = mxCreateDoubleMatrix(1,1,mxREAL); // fval

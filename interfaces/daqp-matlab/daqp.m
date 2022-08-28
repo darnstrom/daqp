@@ -7,6 +7,7 @@ classdef daqp< handle
 	H; f;
 	A; bupper; blower; sense;
 	bin_ids;
+    break_points;
   end
 
   methods(Static)
@@ -49,9 +50,12 @@ classdef daqp< handle
 
 	function [x,fval,exitflag,info] = solve(this)
 	  [x,fval,exitflag,info] = daqpmex('solve', this.work_ptr,...
-		this.H,this.f,this.A,this.bupper,this.blower,this.sense);
+		this.H,this.f,this.A,this.bupper,this.blower,this.sense,this.break_points);
 	end
-	function [exitflag,setup_time] = setup(this,H,f,A,bupper,blower,sense)
+	function [exitflag,setup_time] = setup(this,H,f,A,bupper,blower,sense,break_points)
+      if(nargin < 8)
+          break_points = [];
+      end
 	  % TODO Check validity
 	  % TODO match double/single with c_float... 
 	  this.n = length(f);
@@ -64,7 +68,8 @@ classdef daqp< handle
 	  this.blower = double(blower);
 	  this.sense = int32(sense);
 	  this.bin_ids= int32(find(bitand(this.sense,16))-1);
-	  [exitflag,setup_time] = daqpmex('setup', this.work_ptr,this.H,this.f,this.A,this.bupper,this.blower,this.sense,this.bin_ids);
+	  this.break_points= int32(break_points);
+	  [exitflag,setup_time] = daqpmex('setup', this.work_ptr,this.H,this.f,this.A,this.bupper,this.blower,this.sense,this.bin_ids,this.break_points);
 	end
 
 	function settings = settings(this,varargin)
