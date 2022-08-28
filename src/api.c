@@ -187,6 +187,13 @@ void setup_daqp_hiqp(DAQPWorkspace* work, int* break_points, int nh){
 
         work->hier->nh = nh;
         work->hier->break_points= break_points;
+
+        // Normalize M
+        // TODO: make scaling handled better generally.
+        if(work->scaling == NULL){
+            work->scaling= malloc(work->m*sizeof(c_float));
+            normalize_M(work);
+        }
     }
 }
 
