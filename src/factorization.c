@@ -28,7 +28,7 @@ void update_LDL_add(DAQPWorkspace *work, const int add_ind){
 #ifdef SOFT_WEIGHTS
         sum+= IS_LOWER(add_ind) ? work->rho_ls[add_ind] : work->rho_us[add_ind];
 #else
-        sum+=work->settings->rho_soft/(SQUARE(work->scaling[add_ind]));
+        sum+=work->settings->rho_soft;
 #endif
         ns_active++;
     }
