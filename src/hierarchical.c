@@ -7,7 +7,8 @@ int daqp_hiqp(DAQPWorkspace *work){
     int start,end;
     int iterations = 0;
     int exitflag=0;
-    start=1;
+    start=0;
+    work->settings->rho_soft = 1e-10;
     for(i =0; i < work->hier->nh; i++){
         // initialize current level
         end=work->hier->break_points[i];
