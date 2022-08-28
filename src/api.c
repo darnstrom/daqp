@@ -193,6 +193,7 @@ void setup_daqp_hiqp(DAQPWorkspace* work, int* break_points, int nh){
         if(work->scaling == NULL){
             work->scaling= malloc(work->m*sizeof(c_float));
             normalize_M(work);
+            update_d(work);
         }
     }
 }
