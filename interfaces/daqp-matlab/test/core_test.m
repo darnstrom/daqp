@@ -220,7 +220,7 @@ classdef core_test < matlab.unittest.TestCase
             f = zeros(n,1);
             sense= int32(8*ones(m,1));
             d.setup(H,f,A,bu_cpy,bl_cpy,sense);
-            d.settings('rho_soft',1e-10);
+            d.settings('rho_soft',1e-8);
             [x_ref,fval,exitflag, hier_ref_info] = d.solve(); 
             hier_ref_info
             % Compute slacks
@@ -243,6 +243,7 @@ classdef core_test < matlab.unittest.TestCase
             [slacks_hier,ref_slacks_hier];
 
             testCase.verifyLessThan(ref_slacks_hier(1),slacks_hier(1));
+            testCase.verifyLessThan(norm(ref_slacks_hier,2),norm(slacks_hier,2));
 
         end
     end
