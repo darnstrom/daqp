@@ -1,42 +1,36 @@
 #include "hierarchical.h"
 #include "types.h"
 
-#define DAQP_HIQP_SOFT ((c_float)1e-5)
+#define DAQP_HIQP_SOFT ((c_float)1e-8)
 
 int daqp_hiqp(DAQPWorkspace *work){
     int i,j,id;
     int start,end;
     int iterations = 0;
     int exitflag=0;
+    c_float w;
     start=0;
-    work->settings->rho_soft = DAQP_HIQP_SOFT*DAQP_HIQP_SOFT;
+    work->settings->rho_soft = DAQP_HIQP_SOFT;
     for(i =0; i < work->hier->nh; i++){
         // initialize current level
         end=work->hier->break_points[i];
         work->m = end;
-        //printf("H-level: %d, start:%d, end:%d\n",i,start,end);
-        //printf("sense: ");
-        //for(int ii = 0; ii < work->m; ii++)
-        //    printf(" %d",work->sense[ii]);
-        //printf("\n");
 
         // Solve LDP
         exitflag = daqp_ldp(work);
-        if(exitflag < 0) return exitflag;
-        //printf("WS: {");
-        //for(int ii = 0; ii < work->n_active; ii++)
-        //    printf(" %d",work->WS[ii]);
-        //printf(" }\n");
-
         iterations+=work->iterations;
+        if(exitflag < 0) break;
+
         // Perturb rhs with slacks in level 
         for(j=0; j<work->n_active;j++){
             id=work->WS[j];
             if(IS_SOFT(id)){ 
+                w = work->lam_star[j]*work->settings->rho_soft*1.025;
+                if(-1e-4 < w &&  w < 1e-4) continue; // Too small
                 if(IS_LOWER(id))
-                    work->dlower[id]+=work->lam_star[j]*DAQP_HIQP_SOFT;
+                    work->dlower[id]+=w;
                 else
-                    work->dupper[id]+=work->lam_star[j]*DAQP_HIQP_SOFT;
+                    work->dupper[id]+=w;
             }
         }
 
@@ -44,32 +38,26 @@ int daqp_hiqp(DAQPWorkspace *work){
         for(j=start; j<end;j++) SET_HARD(j);
         
         // find first active constraint in current level 
-        deactivate_constraints(work);
-        reset_daqp_workspace(work);
-        //for(j=0;j < work->n_active; j++)
-        //    if(work->WS[j]>=start) break;
-        //printf("first active in H-level: %d\n",j);
-        //// reactive constraint in level current (to addresss soft->hard)
-        //// TODO: can factorization be directly reused?
-        //int n_active_old = (work->n_active < work->n) ? work->n_active : work->n;
-        //work->n_active =j;
-        //work->reuse_ind=j;
-        //work->sing_ind = EMPTY_IND;
-        //for(; j<n_active_old ;j++){
-        //    add_constraint(work,work->WS[j],work->lam_star[j]);
-        //    // Abort reactivation if WS becomes overdtermined
-        //    if(work->sing_ind != EMPTY_IND){
-        //        remove_constraint(work,j);
-        //        printf("Singular!\n");
-        //        work->sing_ind = EMPTY_IND;
-        //        for(; j<n_active_old ;j++) SET_INACTIVE(work->WS[j]);
-        //        break;
-        //    }
-        //}
-        //printf("WS: {");
-        //for(int ii = 0; ii < work->n_active; ii++)
-        //    printf(" %d",work->WS[ii]);
-        //printf(" }\n");
+        for(j=0;j < work->n_active; j++)
+            if(work->WS[j]>=start) break;
+        // reactive constraint in level current (to addresss soft->hard)
+        // TODO: can factorization be directly reused?
+        int n_active_old = (work->n_active < work->n) ? work->n_active : work->n;
+        for(int jj=n_active_old; jj < work->n_active ;jj++) SET_INACTIVE(work->WS[jj]);
+        work->n_active =j;
+        work->reuse_ind=j;
+        work->sing_ind = EMPTY_IND;
+        for(; j<n_active_old ;j++){
+            add_constraint(work,work->WS[j],work->lam_star[j]);
+            // Abort reactivation if WS becomes overdtermined
+            if(work->sing_ind != EMPTY_IND){
+                remove_constraint(work,j);
+                work->sing_ind = EMPTY_IND;
+                for(; j<n_active_old ;j++) SET_INACTIVE(work->WS[j]);
+                break;
+            }
+        }
+
         // Move up hierarchy
         start = end;
     }
