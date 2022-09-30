@@ -139,7 +139,7 @@ classdef daqp< handle
           if(length(varargin)<2 || ~ischar(varargin{2}))
               dir='';
           else
-              dir=varargin{2}
+              dir=varargin{2};
           end
           daqpmex('codegen', this.work_ptr,fname,dir);
       end

@@ -47,7 +47,10 @@ void render_daqp_workspace(DAQPWorkspace* work, const char *fname, const char *d
     fprintf(fh, "extern DAQPSettings settings;\n\n");
     write_daqp_settings_src(fsrc,work->settings);
 
-    // TODO Write BnB struct
+    // Write BnB struct
+    write_daqp_bnb_h(fh,work->bnb,work->n);
+    write_daqp_bnb_src(fsrc,work->bnb,work->n);
+
     // TODO Check soft constraints 
 
     //Write workspace
@@ -149,30 +152,65 @@ void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work){
     fprintf(f, "%f,\n",0.0); // Soft slack
     fprintf(f, "&settings, \n");
     //if(!has_binary)
-    if(1)
+    if(work->bnb == NULL)
         fprintf(f, "NULL};\n\n");
+    else
+        fprintf(f, "&daqp_bnb_work};\n\n");
+
 
 }
 
 void write_daqp_settings_src(FILE*  f, DAQPSettings* settings){
 
-  fprintf(f, "// Settings\n");
-  fprintf(f, "DAQPSettings settings = {");
-  fprintf(f, "(c_float)%.20f, ", settings->primal_tol);
-  fprintf(f, "(c_float)%.20f, ", settings->dual_tol);
-  fprintf(f, "(c_float)%.20f, ", settings->zero_tol);
-  fprintf(f, "(c_float)%.20f, ", settings->pivot_tol);
-  fprintf(f, "(c_float)%.20f, ", settings->progress_tol);
+    fprintf(f, "// Settings\n");
+    fprintf(f, "DAQPSettings settings = {");
+    fprintf(f, "(c_float)%.20f, ", settings->primal_tol);
+    fprintf(f, "(c_float)%.20f, ", settings->dual_tol);
+    fprintf(f, "(c_float)%.20f, ", settings->zero_tol);
+    fprintf(f, "(c_float)%.20f, ", settings->pivot_tol);
+    fprintf(f, "(c_float)%.20f, ", settings->progress_tol);
 
-  fprintf(f, "%d, ",             settings->cycle_tol);
-  fprintf(f, "%d, ",             settings->iter_limit);
-  fprintf(f, "(c_float)%.20f, ", settings->fval_bound);
+    fprintf(f, "%d, ",             settings->cycle_tol);
+    fprintf(f, "%d, ",             settings->iter_limit);
+    fprintf(f, "(c_float)%.20f, ", settings->fval_bound);
 
-  fprintf(f, "(c_float)%.20f, ", settings->eps_prox);
-  fprintf(f, "(c_float)%.20f, ", settings->eta_prox);
+    fprintf(f, "(c_float)%.20f, ", settings->eps_prox);
+    fprintf(f, "(c_float)%.20f, ", settings->eta_prox);
 
-  fprintf(f, "(c_float)%.20f", settings->rho_soft);
-  fprintf(f, "};\n\n");
+    fprintf(f, "(c_float)%.20f", settings->rho_soft);
+    fprintf(f, "};\n\n");
+}
+
+void write_daqp_bnb_h(FILE*  f, DAQPBnB* bnb, const int n){
+    fprintf(f, "extern int bin_ids[%d];\n", bnb->nb);
+    fprintf(f, "extern DAQPNode tree[%d];\n", bnb->nb+1);
+    fprintf(f, "extern int tree_WS[%d];\n", (n+1)*(bnb->nb+1));
+    fprintf(f, "extern DAQPBnB daqp_bnb_work;\n\n");
+}
+void write_daqp_bnb_src(FILE*  f, DAQPBnB* bnb, const int n){
+    if(bnb==NULL) return;
+    fprintf(f, "// BnB \n");
+
+    write_int_array(f,bnb->bin_ids, bnb->nb,"bin_ids");
+    fprintf(f, "DAQPNode tree[%d];\n", bnb->nb+1);
+    fprintf(f, "int tree_WS[%d];\n", (n+1)*(bnb->nb+1));
+
+    fprintf(f, "DAQPBnB daqp_bnb_work= {");
+    fprintf(f, "bin_ids, ");
+    fprintf(f, "(int)%d, ", bnb->nb);
+    fprintf(f, "(int)%d, ", bnb->neq);
+
+    fprintf(f, "tree, ");
+    fprintf(f, "(int)%d, ", 0); // n_nodes
+
+    fprintf(f, "tree_WS, ");
+    fprintf(f, "(int)%d, ", 0); // nWS
+    fprintf(f, "(int)%d, ", 0); // n_clean
+
+    fprintf(f, "(int)%d, ", 0); // nodecount
+    fprintf(f, "(int)%d, ", 0); // itercount
+
+    fprintf(f, "};\n\n");
 }
 
 void write_float_array(FILE *f, c_float* a, const int N, const char *name){
