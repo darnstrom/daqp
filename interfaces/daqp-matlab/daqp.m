@@ -130,5 +130,18 @@ classdef daqp< handle
 		this.H,this.f,this.A,this.bupper,this.blower,this.sense,...
 		update_mask);
 	end
+      function codegen(this,varargin)
+          if(length(varargin)<1 || ~ischar(varargin{1}))
+              fname='workspace';
+          else
+              fname=varargin{1};
+          end
+          if(length(varargin)<2 || ~ischar(varargin{2}))
+              dir='';
+          else
+              dir=varargin{2}
+          end
+          daqpmex('codegen', this.work_ptr,fname,dir);
+      end
   end
 end

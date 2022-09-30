@@ -1,6 +1,7 @@
 #include "mex.h"
 #include "api.h"
 #include "utils.h"
+#include "codegen.h"
 #include <string.h>
 
 const char* INFO_FIELDS[] = {
@@ -191,6 +192,14 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  const int update_mask = (int)mxGetScalar(prhs[8]);
 	  update_ldp(update_mask,work);
 	}
+    else if (!strcmp("codegen", cmd)) {
+        char fname[64];
+        char dir[128];
+        mxGetString(prhs[2], fname, sizeof(fname));
+        mxGetString(prhs[3], dir, sizeof(dir));
+        if(work->qp == NULL) mexErrMsgTxt("Setup is required before code generation");
+        render_daqp_workspace(work,fname,dir);
+    }
 
   // RHS
 }
