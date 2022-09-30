@@ -4,6 +4,7 @@ project(daqp VERSION 0.3.1)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 add_subdirectory(src)
 add_subdirectory(include)
+add_subdirectory(codegen)
 
 option (PROFILING "Enable profiling" ON)
 if(PROFILING)
@@ -15,8 +16,8 @@ if(SOFT_WEIGHTS)
   add_compile_definitions(SOFT_WEIGHTS)
 endif()
 
-add_library(daqpstat STATIC ${daqp_src} ${daqp_headers})
-add_library(daqp SHARED ${daqp_src} ${daqp_headers})
+add_library(daqpstat STATIC ${daqp_src} ${daqp_headers} ${daqp_codegen_src} ${daqp_codegen_headers})
+add_library(daqp SHARED ${daqp_src} ${daqp_headers} ${daqp_codegen_src} ${daqp_codegen_headers})
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_C_STANDARD_LIBRARIES "${CMAKE_C_STANDARD_LIBRARIES}") # math for C api
@@ -35,7 +36,7 @@ install(TARGETS daqp EXPORT  ${PROJECT_NAME}
   ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
-install(FILES ${daqp_headers} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/daqp")
+install(FILES ${daqp_headers} ${daqp_codegen_headers} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/daqp")
 
 install(EXPORT ${PROJECT_NAME} DESTINATION cmake)
 
