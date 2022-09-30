@@ -168,6 +168,23 @@ int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp){
     return 1;
 }
 
+int setup_daqp_bnb(DAQPWorkspace* work, int* bin_ids, int nb){
+    if(nb > work->n) return EXIT_OVERDETERMINED_INITIAL;
+    if((work->bnb == NULL) && (nb >0)){
+        work->bnb= malloc(sizeof(DAQPBnB));
+
+        work->bnb->nb = nb;
+        work->bnb->bin_ids = bin_ids;
+
+        // Setup tree
+        work->bnb->tree= malloc((work->bnb->nb+1)*sizeof(DAQPNode));
+        work->bnb->tree_WS= malloc((work->n+1)*(work->bnb->nb+1)*sizeof(int));
+        work->bnb->n_nodes = 0; 
+        work->bnb->nWS= 0; 
+    }
+    return 1;
+}
+
 // Free data for LDP 
 void free_daqp_ldp(DAQPWorkspace *work){
     if(work->sense==NULL) return; // Already freed
@@ -199,6 +216,15 @@ void allocate_daqp_settings(DAQPWorkspace *work){
     if(work->settings == NULL){
         work->settings = malloc(sizeof(DAQPSettings));
         daqp_default_settings(work->settings);
+    }
+}
+
+void free_daqp_bnb(DAQPWorkspace* work){
+    if(work->bnb != NULL){
+        free(work->bnb->tree);
+        free(work->bnb->tree_WS);
+        free(work->bnb);
+        work->bnb = NULL;
     }
 }
 
