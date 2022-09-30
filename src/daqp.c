@@ -67,18 +67,18 @@ void ldp2qp_solution(DAQPWorkspace *work){
     int i,j,disp;
     // x* = Rinv*(u-v)
     if(work->v != NULL)
-        for(i=0;i<work->n;i++) work->x[i]=work->u[i]-work->v[i];
+        for(i=0;i<NX;i++) work->x[i]=work->u[i]-work->v[i];
     else
-        for(i=0;i<work->n;i++) work->x[i]=work->u[i];
+        for(i=0;i<NX;i++) work->x[i]=work->u[i];
 
     if(work->Rinv != NULL){ // (Skip if LP since R = I)
-        for(i=0,disp=0;i<work->n;i++){
+        for(i=0,disp=0;i<NX;i++){
             work->x[i]*=work->Rinv[disp++];
-            for(j=i+1;j<work->n;j++)
+            for(j=i+1;j<NX;j++)
                 work->x[i]+=work->Rinv[disp++]*work->x[j];
         }
         if(work->scaling != NULL){ // Correctly scale output
-            for(i=0;i<work->ms;i++)
+            for(i=0;i<N_SIMPLE;i++)
                 work->x[i]*=work->scaling[i];
             for(i=0;i<work->n_active;i++)
                 work->lam_star[i]/=work->scaling[work->WS[i]];
