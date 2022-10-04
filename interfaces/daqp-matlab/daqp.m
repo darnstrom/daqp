@@ -1,6 +1,7 @@
 classdef daqp< handle
   properties (SetAccess = immutable, Hidden = true)
-	work_ptr
+	work_ptr;
+    isdouble;
   end
   properties(SetAccess = protected)
 	n = 0; m = 0; ms = 0
@@ -40,6 +41,7 @@ classdef daqp< handle
 	function this = daqp(varargin)
 	  this.work_ptr= daqpmex('new', varargin{:});
 	  daqpmex('set_default_settings', this.work_ptr);
+      this.isdouble = daqpmex('isdouble');
 	end
 
 	%% Destructor (Free C workspace) 
@@ -57,11 +59,21 @@ classdef daqp< handle
 	  this.n = length(f);
 	  this.m = length(bupper);
 	  this.ms = this.m-size(A,1);
-	  this.H = double(H);
-	  this.f = double(f);
-	  this.A = double(A'); % col.major => row.major 
-	  this.bupper = double(bupper);
-	  this.blower = double(blower);
+      if(this.isdouble)
+          disp("Double precision");
+          this.H = double(H);
+          this.f = double(f);
+          this.A = double(A'); % col.major => row.major 
+          this.bupper = double(bupper);
+          this.blower = double(blower);
+      else
+          disp("Single precision");
+          this.H = single(H);
+          this.f = single(f);
+          this.A = single(A'); % col.major => row.major 
+          this.bupper = single(bupper);
+          this.blower = single(blower);
+      end
 	  this.sense = int32(sense);
 	  this.bin_ids= int32(find(bitand(this.sense,16))-1);
 	  [exitflag,setup_time] = daqpmex('setup', this.work_ptr,this.H,this.f,this.A,this.bupper,this.blower,this.sense,this.bin_ids);
