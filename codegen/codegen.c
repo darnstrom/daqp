@@ -104,7 +104,7 @@ void write_daqp_workspace_h(FILE *f, DAQPWorkspace* work){
     fprintf(f, "extern c_float xldl[%d];\n", n+2);
     fprintf(f, "extern c_float zldl[%d];\n\n", n+2);
 
-    fprintf(f, "int WS[%d];\n\n", n+1);
+    fprintf(f, "extern int WS[%d];\n\n", n+1);
 
     fprintf(f, "extern DAQPWorkspace daqp_work;\n\n");
 }
