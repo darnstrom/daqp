@@ -48,8 +48,10 @@ void render_daqp_workspace(DAQPWorkspace* work, const char *fname, const char *d
     write_daqp_settings_src(fsrc,work->settings);
 
     // Write BnB struct
-    write_daqp_bnb_h(fh,work->bnb,work->n);
-    write_daqp_bnb_src(fsrc,work->bnb,work->n);
+    if(work->bnb != NULL){
+        write_daqp_bnb_h(fh,work->bnb,work->n);
+        write_daqp_bnb_src(fsrc,work->bnb,work->n);
+    }
 
     // TODO Check soft constraints 
 
