@@ -1,5 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
 #include "daqp_prox.h"
 #include "utils.h"
 

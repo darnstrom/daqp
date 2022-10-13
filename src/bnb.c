@@ -1,5 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
 #include "bnb.h"
 
 int daqp_bnb(DAQPWorkspace* work){
