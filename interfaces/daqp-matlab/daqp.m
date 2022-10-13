@@ -60,14 +60,12 @@ classdef daqp< handle
             this.m = length(bupper);
             this.ms = this.m-size(A,1);
             if(this.isdouble)
-                disp("Double precision");
                 this.H = double(H);
                 this.f = double(f);
                 this.A = double(A'); % col.major => row.major 
                 this.bupper = double(bupper);
                 this.blower = double(blower);
             else
-                disp("Single precision");
                 this.H = single(H);
                 this.f = single(f);
                 this.A = single(A'); % col.major => row.major 
