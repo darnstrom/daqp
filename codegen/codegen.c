@@ -119,10 +119,12 @@ void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work){
     fprintf(f, "// Workspace\n");
     // LDP data
     write_float_array(f,work->M,(m-ms)*n,"M");
-    write_float_array(f,work->dupper,m,"dupper");
-    write_float_array(f,work->dlower,m,"dlower");
+    //write_float_array(f,work->dupper,m,"dupper");
+    //write_float_array(f,work->dlower,m,"dlower");
+    fprintf(f, "c_float dupper[%d];\n", m);
+    fprintf(f, "c_float dlower[%d];\n", m);
     write_float_array(f,work->Rinv,n*(n+1)/2,"Rinv");
-    write_float_array(f,work->v,n, "v");
+    //write_float_array(f,work->v,n, "v");
     write_int_array(f,work->sense, m,"sense");
 
     // Iteratates
@@ -144,7 +146,7 @@ void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work){
     fprintf(f, "DAQPWorkspace daqp_work= {\n");
     fprintf(f, "NULL,\n"); // DAQPProblem
     fprintf(f, "%d, %d, %d,\n",n,m,ms); // dimensions 
-    fprintf(f, "M, dupper, dlower, Rinv, v, sense,\n"); //LDP 
+    fprintf(f, "M, dupper, dlower, Rinv, NULL, sense,\n"); //LDP 
     fprintf(f, "NULL,\n"); // scaling
     fprintf(f, "x, xold,\n");
     fprintf(f, "lam, lam_star, u, %d,\n",-1); // fval
