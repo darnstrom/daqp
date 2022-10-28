@@ -28,7 +28,7 @@ int daqp_ldp(DAQPWorkspace *work){
                 // Cycle guard
                 if(best_fval > work->fval-work->settings->progress_tol){ 
                     if(cycle_counter++ > work->settings->cycle_tol){
-                        if(tried_repair == 1){
+                        if(tried_repair == 1 || work->bnb != NULL){
                             exitflag = EXIT_CYCLE;
                             break;
                         }
