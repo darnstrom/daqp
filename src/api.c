@@ -181,6 +181,7 @@ int setup_daqp_bnb(DAQPWorkspace* work, int* bin_ids, int nb){
         work->bnb->tree_WS= malloc((work->n+1)*(work->bnb->nb+1)*sizeof(int));
         work->bnb->n_nodes = 0; 
         work->bnb->nWS= 0; 
+        work->bnb->fixed_ids= malloc((work->bnb->nb+1)*sizeof(int));
     }
     return 1;
 }
@@ -223,6 +224,7 @@ void free_daqp_bnb(DAQPWorkspace* work){
     if(work->bnb != NULL){
         free(work->bnb->tree);
         free(work->bnb->tree_WS);
+        free(work->bnb->fixed_ids);
         free(work->bnb);
         work->bnb = NULL;
     }

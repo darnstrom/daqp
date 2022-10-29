@@ -4,7 +4,37 @@ int daqp_ldp(DAQPWorkspace *work){
     int exitflag=EXIT_ITERLIMIT,iter;
     int tried_repair=0, cycle_counter=0;
     c_float best_fval = -1;
+    printf(" ===== DAQP LDP ====== \n");
+    printf("WS: { ");
+    for(int i = 0; i < work->n_active; i++){
+        if(IS_BINARY(work->WS[i]) && IS_IMMUTABLE(work->WS[i])){
+            printf("\033[1;33m");
+            printf("%d ",work->WS[i]);
+            printf("\033[0m");
+        }
+        else
+            printf("%d ",work->WS[i]);
+    }
+    printf("}\n");
+    printf("D: ");
+    for(int i = 0; i < work->n_active; i++){
+        if(IS_BINARY(work->WS[i]) && IS_IMMUTABLE(work->WS[i])){
+            printf("\033[1;33m");
+            printf("%.0e ",work->D[i]);
+            printf("\033[0m");
+        }
+        else
+            printf("%.0e ",work->D[i]);
+    }
+    printf("\n");
     for(iter=1; iter < work->settings->iter_limit; ++iter){
+        printf("\n fval: %.2e |",best_fval);
+        //printf("D: ");
+        //for(int i = 0; i < work->n_active; i++)
+        //    printf("%.1e ",work->D[i]);
+        //printf("\n");
+
+
         if(work->sing_ind==EMPTY_IND){ 
             compute_CSP(work);
             // Check dual feasibility of CSP
@@ -26,7 +56,7 @@ int daqp_ldp(DAQPWorkspace *work){
                 }
 
                 // Cycle guard
-                if(best_fval > work->fval-work->settings->progress_tol){ 
+                if(work->fval-best_fval < work->settings->progress_tol){ 
                     if(cycle_counter++ > work->settings->cycle_tol){
                         if(tried_repair == 1 || work->bnb != NULL){
                             exitflag = EXIT_CYCLE;
@@ -44,6 +74,7 @@ int daqp_ldp(DAQPWorkspace *work){
                     }
                 }
                 else{ // Progress was made
+                    printf("Progress: %e\n",best_fval-work->fval);
                     best_fval = work->fval;
                     cycle_counter = 0;
                 }
@@ -57,6 +88,7 @@ int daqp_ldp(DAQPWorkspace *work){
             }
         }
     }
+    printf("\n");
     // Finalize result before returning
     work->iterations = iter;
     return exitflag;

@@ -138,7 +138,15 @@ int add_infeasible(DAQPWorkspace *work){
     c_float *swp_ptr;
     swp_ptr=work->lam; work->lam = work->lam_star; work->lam_star=swp_ptr;
     // Add the constraint
-    add_constraint(work,add_ind,0.0);
+    printf("\033[1;32m");
+    printf(" %d",add_ind); 
+    if(isupper)
+        printf("U|"); 
+    else
+        printf("L|"); 
+    printf("\033[0m");
+    printf("slack: %.1e|",min_val);
+    add_constraint(work,add_ind,0);
     return 1;
 }
 #ifdef SOFT_WEIGHTS
@@ -256,6 +264,11 @@ int remove_blocking(DAQPWorkspace *work){
 
     // Remove the constraint from the working set and update LDL
     work->sing_ind=EMPTY_IND;
+    printf("\033[1;31m");
+    printf(" %d|",work->WS[rm_ind]); 
+    printf("\033[0m");
+    printf(" alpha: %.1e|",alpha);
+    printf(" lam*[rm_ind]: %.1e|",work->lam_star[rm_ind]);
     remove_constraint(work,rm_ind);
     return 1;
 }
