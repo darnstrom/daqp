@@ -78,6 +78,9 @@ int process_node(DAQPNode* node, DAQPWorkspace* work){
         }
         else{
             printf("Hot\n");
+            //work->bnb->n_clean = node->depth;
+            //node_cleanup_workspace(work->bnb->n_clean,work);
+            //warmstart_node(node,work);
             add_upper_lower(node->bin_id,work);
             work->sense[REMOVE_LOWER_FLAG(node->bin_id)] |= IMMUTABLE; // Make equality
         }
@@ -90,6 +93,19 @@ int process_node(DAQPNode* node, DAQPWorkspace* work){
     printf("\n");
     exitflag = daqp_ldp(work);
     work->bnb->itercount += work->iterations;
+    
+    if(exitflag == EXIT_CYCLE){// Try to repair (cold start)
+        work->sing_ind=EMPTY_IND;
+        work->n_active=work->bnb->n_clean;
+        work->reuse_ind=work->bnb->n_clean;
+        for(int i=work->bnb->n_clean - work->bnb->neq; i< node->depth+1;i++){
+            add_upper_lower(work->bnb->fixed_ids[i],work);
+            SET_IMMUTABLE(REMOVE_LOWER_FLAG(work->bnb->fixed_ids[i]));
+        }
+        work->bnb->n_clean = work->bnb->neq+node->depth;
+        exitflag = daqp_ldp(work);
+        work->bnb->itercount += work->iterations;
+    }
 
     return exitflag;
 }
