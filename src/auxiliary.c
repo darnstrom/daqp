@@ -98,7 +98,7 @@ int add_infeasible(DAQPWorkspace *work){
             for(k=j,Mu=0;k<NX;k++) // 
                 Mu+=work->Rinv[disp++]*work->u[k];
         }
-        if(work->dupper[j]-Mu<min_val){
+        if((work->dupper[j]-Mu)<min_val){
             add_ind = j; isupper = 1;
             min_val = work->dupper[j]-Mu;
         }
@@ -118,7 +118,7 @@ int add_infeasible(DAQPWorkspace *work){
             Mu+=work->M[disp++]*work->u[k];
 
         //TODO: check correct sign for slack!
-        if(work->dupper[j]-Mu<min_val){
+        if((work->dupper[j]-Mu)<min_val){
             add_ind = j; isupper = 1;
             min_val = work->dupper[j]-Mu;
         }
@@ -140,13 +140,17 @@ int add_infeasible(DAQPWorkspace *work){
     // Add the constraint
     printf("\033[1;32m");
     printf(" %d",add_ind); 
-    if(isupper)
-        printf("U|"); 
+    if(IS_LOWER(add_ind))
+        printf("L|");
     else
-        printf("L|"); 
+        printf("U|");
     printf("\033[0m");
-    printf("slack: %.1e|",min_val);
-    add_constraint(work,add_ind,0);
+    printf("slack: %.1e |",min_val);
+    printf("scaling: %.1e |",work->scaling[add_ind]);
+    if(isupper)
+        add_constraint(work,add_ind,1);
+    else
+        add_constraint(work,add_ind,-1);
     return 1;
 }
 #ifdef SOFT_WEIGHTS
@@ -265,7 +269,11 @@ int remove_blocking(DAQPWorkspace *work){
     // Remove the constraint from the working set and update LDL
     work->sing_ind=EMPTY_IND;
     printf("\033[1;31m");
-    printf(" %d|",work->WS[rm_ind]); 
+    printf(" %d",work->WS[rm_ind]); 
+    if(IS_LOWER(work->WS[rm_ind]))
+        printf("L|");
+    else
+        printf("U|");
     printf("\033[0m");
     printf(" alpha: %.1e|",alpha);
     printf(" lam*[rm_ind]: %.1e|",work->lam_star[rm_ind]);
@@ -304,15 +312,27 @@ void compute_CSP(DAQPWorkspace *work){
         work->zldl[i] = work->xldl[i]/work->D[i];
     //Backward substitution  (lam_star <-- L'\z)
     start_disp = ARSUM(work->n_active)-1;
+    printf("L:\n");
     for(i = work->n_active-1;i>=0;i--){
         sum=work->zldl[i];
         disp = start_disp--;
         for(j=work->n_active-1;j>i;j--){
             sum-=work->lam_star[j]*work->L[disp];
+            printf("%.2e ",work->L[disp]);
             disp-=j;
         } 
+        printf("\n");
         work->lam_star[i] = sum;
+        //if(work->lam_star[i] < 1e-4 && work->lam_star[i] > -1e-4)
+        //    work->lam_star[i] = 0;
     }
+    printf("\n x  z  lam\n");
+    for(i = 0; i < work->n_active; i++)
+        printf("%7.2e | %7.2e | %7.2e\n",work->xldl[i], work->zldl[i],work->lam_star[i]);
+    printf("D: ");
+    for(int i = 0; i < work->n_active; i++)
+        printf("%.2e ",work->D[i]);
+    printf("\n");
 
     work->reuse_ind = work->n_active; // Save forward substitution information 
 }

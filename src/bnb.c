@@ -19,10 +19,10 @@ int daqp_bnb(DAQPWorkspace* work){
 
     // Start tree exploration
 
-    //printf("Starting BnB\n");
+    printf("====Starting BnB====\n");
     while( work->bnb->n_nodes > 0 ){
         node = work->bnb->tree+(--work->bnb->n_nodes);
-        //printf("# nodes: %d, depth:%d \n", work->bnb->n_nodes,node->depth);
+        printf("# nodes: %d, depth:%d \n", work->bnb->n_nodes,node->depth);
         exitflag = process_node(node,work); // Solve relaxation
         //printf("{ ");
         //for(int i =0; i<work->m; i++){
@@ -41,6 +41,12 @@ int daqp_bnb(DAQPWorkspace* work){
             //printf("====== Nothing to branch over =======\n");
             work->settings->fval_bound = work->fval;
             swp_ptr=work->xold; work->xold= work->u; work->u=swp_ptr; // Store feasible sol
+            printf(" >>>>>>>>>>>>>>> Candidate <<<<<<<<<<<<<<<\n");
+            for(int i = 0; i<work->n_active; i++)
+                printf(" %d",work->WS[i]); 
+            printf("\n ---------------------------------------------\n");
+
+
         }
         else{
             //printf("====== branch_id:%d =======\n",REMOVE_LOWER_FLAG(branch_id));
@@ -70,14 +76,14 @@ int process_node(DAQPNode* node, DAQPWorkspace* work){
         work->bnb->fixed_ids[node->depth] = node->bin_id;
         // Setup relaxation 
         if(work->bnb->n_nodes==0 || (node-1)->depth!=node->depth){ 
-            printf("Warm\n");
+            //printf("Warm\n");
             // Sibling has been processed => need to fix workspace state
             work->bnb->n_clean += (node->depth-(node+1)->depth);
             node_cleanup_workspace(work->bnb->n_clean,work);
             warmstart_node(node,work);
         }
         else{
-            printf("Hot\n");
+            //printf("Hot\n");
             //work->bnb->n_clean = node->depth;
             //node_cleanup_workspace(work->bnb->n_clean,work);
             //warmstart_node(node,work);
