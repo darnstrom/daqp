@@ -87,14 +87,15 @@ int process_node(DAQPNode* node, DAQPWorkspace* work){
         // Add binary constraint 
     }
     // Solve relaxation
-    printf("node: ");
-    for(int i=0; i < node->depth+1; i++)
-        printf(" %d",work->bnb->fixed_ids[i]);
-    printf("\n");
+    //printf("node: ");
+    //for(int i=0; i < node->depth+1; i++)
+    //    printf(" %d",work->bnb->fixed_ids[i]);
+    //printf("\n");
     exitflag = daqp_ldp(work);
     work->bnb->itercount += work->iterations;
     
     if(exitflag == EXIT_CYCLE){// Try to repair (cold start)
+        node_cleanup_workspace(work->bnb->n_clean,work);
         work->sing_ind=EMPTY_IND;
         work->n_active=work->bnb->n_clean;
         work->reuse_ind=work->bnb->n_clean;
@@ -178,8 +179,12 @@ void warmstart_node(DAQPNode* node, DAQPWorkspace* work){
     work->bnb->n_clean = work->bnb->neq+node->depth; 
     // Add free constraints
     for(i=node->WS_start; i < node->WS_end; i++){
-        if(work->sing_ind != EMPTY_IND) break; // Abort warm start if singular basis 
         add_upper_lower(work->bnb->tree_WS[i],work);
+        if(work->sing_ind != EMPTY_IND) {
+            work->n_active--;
+            work->sing_ind = EMPTY_IND;
+            break; // Abort warm start if singular basis 
+        }
     }
     work->bnb->nWS = node->WS_start; // always move up tree after warmstart 
 }
