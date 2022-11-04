@@ -93,6 +93,7 @@ void write_daqp_workspace_h(FILE *f, DAQPWorkspace* work){
     fprintf(f, "extern c_float Rinv[%d];\n", n*(n+1)/2);
     fprintf(f, "extern c_float v[%d];\n", n);
     fprintf(f, "extern int sense[%d];\n\n", m);
+    fprintf(f, "extern c_float scaling[%d];\n\n", m);
 
     fprintf(f, "extern c_float x[%d];\n", n+1);
     fprintf(f, "extern c_float xold[%d];\n\n", n+1);
@@ -126,6 +127,7 @@ void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work){
     write_float_array(f,work->Rinv,n*(n+1)/2,"Rinv");
     //write_float_array(f,work->v,n, "v");
     write_int_array(f,work->sense, m,"sense");
+    write_float_array(f,work->scaling, m,"scaling");
 
     // Iteratates
     fprintf(f, "c_float x[%d];\n", n+1);
@@ -147,7 +149,7 @@ void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work){
     fprintf(f, "NULL,\n"); // DAQPProblem
     fprintf(f, "%d, %d, %d,\n",n,m,ms); // dimensions 
     fprintf(f, "M, dupper, dlower, Rinv, NULL, sense,\n"); //LDP 
-    fprintf(f, "NULL,\n"); // scaling
+    fprintf(f, "scaling,\n"); // scaling
     fprintf(f, "x, xold,\n");
     fprintf(f, "lam, lam_star, u, %d,\n",-1); // fval
     fprintf(f, "L, D, xldl,zldl,%d,\n",0); // reuse_ind
@@ -189,6 +191,7 @@ void write_daqp_bnb_h(FILE*  f, DAQPBnB* bnb, const int n){
     fprintf(f, "extern int bin_ids[%d];\n", bnb->nb);
     fprintf(f, "extern DAQPNode tree[%d];\n", bnb->nb+1);
     fprintf(f, "extern int tree_WS[%d];\n", (n+1)*(bnb->nb+1));
+    fprintf(f, "extern int fixed_ids[%d];\n", bnb->nb+1);
     fprintf(f, "extern DAQPBnB daqp_bnb_work;\n\n");
 }
 void write_daqp_bnb_src(FILE*  f, DAQPBnB* bnb, const int n){
@@ -198,6 +201,7 @@ void write_daqp_bnb_src(FILE*  f, DAQPBnB* bnb, const int n){
     write_int_array(f,bnb->bin_ids, bnb->nb,"bin_ids");
     fprintf(f, "DAQPNode tree[%d];\n", bnb->nb+1);
     fprintf(f, "int tree_WS[%d];\n", (n+1)*(bnb->nb+1));
+    fprintf(f, "int fixed_ids[%d];\n", bnb->nb+1);
 
     fprintf(f, "DAQPBnB daqp_bnb_work= {");
     fprintf(f, "bin_ids, ");
@@ -210,6 +214,7 @@ void write_daqp_bnb_src(FILE*  f, DAQPBnB* bnb, const int n){
     fprintf(f, "tree_WS, ");
     fprintf(f, "(int)%d, ", 0); // nWS
     fprintf(f, "(int)%d, ", 0); // n_clean
+    fprintf(f, "fixed_ids, "); // n_clean
 
     fprintf(f, "(int)%d, ", 0); // nodecount
     fprintf(f, "(int)%d, ", 0); // itercount
