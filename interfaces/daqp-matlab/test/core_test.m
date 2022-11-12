@@ -177,13 +177,53 @@ classdef core_test < matlab.unittest.TestCase
 	  model.vtype=repelem('BC',[ms,n-ms]);
 	  model.lb = -inf(n,1);
 	  params.OutputFlag=0;
-	  try
-
+      if(exist('gurobi'))
 		gurobi_result = gurobi(model,params)
-		xref = results.x;
+		xref = gurobi_result.x;
 		testCase.verifyLessThan(norm(x-xref),tol);
-	  catch
-	  end
+      end
+	end
+
+	function random_bnb_subopt(testCase)
+	  % generate and solve with daqp
+	  rng('default');
+	  n = 150; m = 300; ms = 20; me = 0;
+	  tol = 1e-5;
+	  M = randn(n,n);
+	  H = M'*M;
+	  f = 100*randn(n,1); 
+	  f(1:ms) = -sign(f(1:ms)).*f(1:ms);
+	  A = randn(m,n);
+	  bupper = 20*rand(m,1); blower = -20*rand(m,1);
+	  bupper(ms+1:ms+me)=0; blower(ms+1:ms+me)=0;
+	  bupper_tot = [ones(ms,1);bupper];
+	  blower_tot = [zeros(ms,1);blower];
+	  sense = int32(zeros(m+ms,1));
+	  sense(1:ms) = sense(1:ms)+16;
+	  sense(ms+1:ms+me) = sense(ms+1:ms+me)+5;
+      d = daqp();
+	  d.setup(H,f,A,bupper_tot,blower_tot,sense);
+      d.settings('rel_subopt',0.1)
+	  [x,fval,exitflag,daqp_bnb_info_subopt] = d.solve();
+	  testCase.verifyEqual(exitflag,int32(1));
+	  display(daqp_bnb_info_subopt)
+
+	  % compare with Gurobi (comparison skipped if Gurobi is not available)
+	  model.Q = 0.5*sparse(H);
+	  model.A = sparse([A;-A(me+1:end,:)]);
+	  model.rhs = [bupper;-blower(me+1:end)];
+	  model.obj = f;
+	  model.sense=repelem('=<',[me,2*(m-me)]);
+	  model.vtype=repelem('BC',[ms,n-ms]);
+	  model.lb = -inf(n,1);
+	  params.OutputFlag=0;
+
+      gurobi_result = gurobi(model,params)
+      if(exist('gurobi'))
+          rel_error = (fval-gurobi_result.objval)/fval;
+          fprintf('fval_daqp:%f fval_grb:%f, rel_error:%f',fval,gurobi_result.objval,rel_error);
+          testCase.verifyLessThan((fval-gurobi_result.objval)/fval,0.1);
+      end
 
 	end
   end

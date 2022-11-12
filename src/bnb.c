@@ -4,9 +4,13 @@ int daqp_bnb(DAQPWorkspace* work){
     int branch_id, exitflag;
     DAQPNode* node;
     c_float *swp_ptr = NULL;
-    c_float fval_bound0 = work->settings->fval_bound;
-    work->bnb->neq = work->n_active; 
 
+    // Modify upper bound based on absolute/relavtive suboptimality tolerance
+    c_float fval_bound0 = work->settings->fval_bound;
+    c_float eps_r = 1/(1+work->settings->rel_subopt);
+    work->settings->fval_bound = (fval_bound0 - work->settings->abs_subopt)*eps_r;
+
+    work->bnb->neq = work->n_active; 
     work->bnb->itercount=0;
     work->bnb->nodecount=0;
     // Setup root node
@@ -28,7 +32,7 @@ int daqp_bnb(DAQPWorkspace* work){
         // Find index to branch over 
         branch_id = get_branch_id(work); 
         if(branch_id==-1){// Nothing to branch over => integer feasible
-            work->settings->fval_bound = work->fval;
+            work->settings->fval_bound = (work->fval - work->settings->abs_subopt)*eps_r;
             swp_ptr=work->xold; work->xold= work->u; work->u=swp_ptr; // Store feasible sol
         }
         else{
@@ -39,7 +43,7 @@ int daqp_bnb(DAQPWorkspace* work){
     // Exploration completed 
     work->iterations = work->bnb->itercount;
     // Correct fval
-    work->fval = work->settings->fval_bound;
+    work->fval = work->settings->fval_bound/eps_r+work->settings->abs_subopt;
     work->settings->fval_bound = fval_bound0;
     if(swp_ptr==NULL)
         return EXIT_INFEASIBLE;
