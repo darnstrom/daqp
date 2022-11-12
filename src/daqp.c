@@ -4,58 +4,14 @@ int daqp_ldp(DAQPWorkspace *work){
     int exitflag=EXIT_ITERLIMIT,iter;
     int tried_repair=0, cycle_counter=0;
     c_float best_fval = -1;
-    //printf(" ===== DAQP LDP ====== \n");
-    //printf("sense: ");
-    //for(int i = 0; i < N_CONSTR; i++)
-    //    printf(" %d",work->sense[i]);
-    //printf("\n");
 
-
-    printf("WS: { ");
-    for(int i = 0; i < work->n_active; i++){
-        if(IS_BINARY(work->WS[i]) && IS_IMMUTABLE(work->WS[i])){
-            printf("\033[1;33m");
-            printf("%d ",work->WS[i]);
-            printf("\033[0m");
-        }
-        else
-            printf("%d ",work->WS[i]);
-    }
-    printf("}\n");
-    //printf("D: ");
-    //for(int i = 0; i < work->n_active; i++){
-    //    if(IS_BINARY(work->WS[i]) && IS_IMMUTABLE(work->WS[i])){
-    //        printf("\033[1;33m");
-    //        printf("%.0e ",work->D[i]);
-    //        printf("\033[0m");
-    //    }
-    //    else
-    //        printf("%.0e ",work->D[i]);
-    //}
-    //printf("\n");
     for(iter=1; iter < work->settings->iter_limit; ++iter){
-        printf("\n fval: %.2e |",best_fval);
-        //printf("WS : ");
-        //for(int i = 0; i < work->n_active; i++)
-        //    printf("%d ",work->WS[i]);
-        //printf("\n");
-        //printf("\nD: ");
-        //for(int i = 0; i < work->n_active; i++)
-        //    printf("%.1e ",work->D[i]);
-        //printf("\n");
-
-
         if(work->sing_ind==EMPTY_IND){ 
             compute_CSP(work);
-            //printf("\nlamstar: ");
-            //for(int i = 0; i < work->n_active; i++)
-            //    printf("%.1e, ",work->lam_star[i]);
-            //printf("\n");
             // Check dual feasibility of CSP
             if(!remove_blocking(work)){ //lam_star >= 0 (i.e., dual feasible)
                 compute_primal_and_fval(work);
                 // fval termination criterion
-                printf("\n fval:%.2e, fval_bound:%.2e\n",work->fval, work->settings->fval_bound);
                 if(work->fval > work->settings->fval_bound){
                     exitflag = EXIT_INFEASIBLE;
                     break;
@@ -71,7 +27,7 @@ int daqp_ldp(DAQPWorkspace *work){
                 }
 
                 // Cycle guard
-                if(work->fval-best_fval < work->settings->progress_tol){ 
+                if(work->fval-best_fval < work->settings->progress_tol){
                     if(cycle_counter++ > work->settings->cycle_tol){
                         if(tried_repair == 1 || work->bnb != NULL){
                             exitflag = EXIT_CYCLE;
@@ -81,8 +37,6 @@ int daqp_ldp(DAQPWorkspace *work){
                             tried_repair =1;
                             reset_daqp_workspace(work);
                             activate_constraints(work);
-                            //reorder_LDL(work);
-                            //warmstart_workspace(work, work->WS,work->n_active);
                             cycle_counter=0;
                             best_fval = -1;
                         }
@@ -95,11 +49,6 @@ int daqp_ldp(DAQPWorkspace *work){
             }
         }
         else{// Singular case
-            printf("Singular!\n");
-            printf("D: ");
-            for(int i = 0; i < work->n_active; i++)
-                printf("%.1e ",work->D[i]);
-            printf("\n");
             compute_singular_direction(work);
             if(!remove_blocking(work)){ 
                 exitflag = EXIT_INFEASIBLE;
@@ -107,9 +56,7 @@ int daqp_ldp(DAQPWorkspace *work){
             }
         }
     }
-    //printf("\n");
     // Finalize result before returning
-    printf("========= EXIT %d ========\n",exitflag);
     work->iterations = iter;
     return exitflag;
 }
