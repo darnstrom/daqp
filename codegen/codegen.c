@@ -184,6 +184,10 @@ void write_daqp_settings_src(FILE*  f, DAQPSettings* settings){
     fprintf(f, "(c_float)%.20f, ", settings->eta_prox);
 
     fprintf(f, "(c_float)%.20f", settings->rho_soft);
+
+    fprintf(f, "(c_float)%.20f", settings->rel_subopt);
+    fprintf(f, "(c_float)%.20f", settings->abs_subopt);
+
     fprintf(f, "};\n\n");
 }
 

@@ -343,5 +343,9 @@ void daqp_default_settings(DAQPSettings* settings){
 
     settings->eps_prox = 0;
     settings->eta_prox = DEFAULT_ETA;
+
     settings->rho_soft = DEFAULT_RHO_SOFT; 
+
+    settings->rel_subopt = DEFAULT_REL_SUBOPT;
+    settings->abs_subopt = DEFAULT_ABS_SUBOPT;
 }
