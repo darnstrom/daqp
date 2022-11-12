@@ -23,7 +23,7 @@ void daqp_quadprog(DAQPResult* res, DAQPProblem* qp,DAQPSettings* settings);
 
 int setup_daqp(DAQPProblem *qp, DAQPWorkspace* work, c_float* setup_time);
 int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem* qp);
-int setup_daqp_bnb(DAQPWorkspace* work, int* bin_inds, int nb);
+int setup_daqp_bnb(DAQPWorkspace* work, int* bin_inds, int nb, int ns);
 void allocate_daqp_settings(DAQPWorkspace *work);
 void allocate_daqp_workspace(DAQPWorkspace *work, int n, int ns);
 

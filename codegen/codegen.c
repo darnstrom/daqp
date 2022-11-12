@@ -76,6 +76,9 @@ void write_daqp_workspace_h(FILE *f, DAQPWorkspace* work){
     const int n = work->n;
     const int m = work->m;
     const int ms = work->ms;
+    int ntot = n;
+    for(int i = 0; i < m ; i++) 
+        if(work->sense[i] & SOFT) ntot++;
 
     // Refdefine NX, N_CONSTR and N_SIMPLE to static
     fprintf(f, "#undef NX\n");
@@ -98,16 +101,16 @@ void write_daqp_workspace_h(FILE *f, DAQPWorkspace* work){
     fprintf(f, "extern c_float x[%d];\n", n+1);
     fprintf(f, "extern c_float xold[%d];\n\n", n+1);
 
-    fprintf(f, "extern c_float lam[%d];\n", n+2);
-    fprintf(f, "extern c_float lam_star[%d];\n", n+2);
+    fprintf(f, "extern c_float lam[%d];\n", ntot+1);
+    fprintf(f, "extern c_float lam_star[%d];\n", ntot+1);
     fprintf(f, "extern c_float u[%d];\n\n", n+1);
 
-    fprintf(f, "extern c_float L[%d];\n", (n+2)*(n+3)/2);
-    fprintf(f, "extern c_float D[%d];\n", n+2);
-    fprintf(f, "extern c_float xldl[%d];\n", n+2);
-    fprintf(f, "extern c_float zldl[%d];\n\n", n+2);
+    fprintf(f, "extern c_float L[%d];\n", (ntot+1)*(ntot+2)/2);
+    fprintf(f, "extern c_float D[%d];\n", ntot+1);
+    fprintf(f, "extern c_float xldl[%d];\n", ntot+1);
+    fprintf(f, "extern c_float zldl[%d];\n\n", ntot+1);
 
-    fprintf(f, "extern int WS[%d];\n\n", n+1);
+    fprintf(f, "extern int WS[%d];\n\n", ntot+1);
 
     fprintf(f, "extern DAQPWorkspace daqp_work;\n\n");
 }
@@ -116,6 +119,9 @@ void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work){
     int n = work->n;
     int m = work->m;
     int ms = work->ms;
+    int ntot = n;
+    for(int i = 0; i < m ; i++) 
+        if(work->sense[i] & SOFT) ntot++;
 
     fprintf(f, "// Workspace\n");
     // LDP data
@@ -133,16 +139,16 @@ void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work){
     fprintf(f, "c_float x[%d];\n", n+1);
     fprintf(f, "c_float xold[%d];\n\n", n+1);
 
-    fprintf(f, "c_float lam[%d];\n", n+2);
-    fprintf(f, "c_float lam_star[%d];\n", n+2);
+    fprintf(f, "c_float lam[%d];\n", ntot+1);
+    fprintf(f, "c_float lam_star[%d];\n", ntot+1);
     fprintf(f, "c_float u[%d];\n\n", n+1);
 
-    fprintf(f, "c_float L[%d];\n", (n+2)*(n+3)/2);
-    fprintf(f, "c_float D[%d];\n", n+2);
-    fprintf(f, "c_float xldl[%d];\n", n+2);
-    fprintf(f, "c_float zldl[%d];\n\n", n+2);
+    fprintf(f, "c_float L[%d];\n", (ntot+1)*(ntot+2)/2);
+    fprintf(f, "c_float D[%d];\n", ntot+1);
+    fprintf(f, "c_float xldl[%d];\n", ntot+1);
+    fprintf(f, "c_float zldl[%d];\n\n", ntot+1);
 
-    fprintf(f, "int WS[%d];\n\n", n+1);
+    fprintf(f, "int WS[%d];\n\n", ntot+1);
 
     //Workspace struct
     fprintf(f, "DAQPWorkspace daqp_work= {\n");
