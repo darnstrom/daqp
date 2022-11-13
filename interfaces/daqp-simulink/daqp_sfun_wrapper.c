@@ -42,7 +42,7 @@
 void daqp_sfun_Start_wrapper(void **pW)
 {
 /* %%%-SFUNWIZ_wrapper_Start_Changes_BEGIN --- EDIT HERE TO _END */
-int n = N_VARS;
+    int n = N_VARS;
     int m = N_CONSTRS;
     int ms = N_BOUNDS;
 
@@ -53,6 +53,8 @@ int n = N_VARS;
     daqp_default_settings(work->settings);
 
     allocate_daqp_workspace(work,n,0);
+    work->m = m;
+    work->ms = ms;
 
     // Allocate qp 
     DAQPProblem *qp = calloc(1,sizeof(DAQPProblem));
@@ -119,15 +121,15 @@ DAQPWorkspace* work = pW[0];
         work->qp->bupper[ii] = bupper[ii];
         work->qp->blower[ii] = blower[ii];
     }
-    // Update internal problem 
-    update_ldp(update_mask,work);
-
-    // Correct working set
+    // Cleanup sense
     if(WARM_START == 0){
         deactivate_constraints(work);
-        reset_daqp_workspace(work);
     }
-    else if(WARM_START == 1)
+    // Update internal problem
+    update_ldp(update_mask,work);
+
+    // Reuse previous working set
+    if(WARM_START == 1)
         activate_constraints(work);
 
     // Solve problem
