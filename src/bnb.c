@@ -168,6 +168,7 @@ void warmstart_node(DAQPNode* node, DAQPWorkspace* work){
         add_upper_lower(work->bnb->tree_WS[i],work);
         if(work->sing_ind != EMPTY_IND) {
             work->n_active--;
+            SET_INACTIVE(work->WS[work->n_active]);
             work->sing_ind = EMPTY_IND;
             break; // Abort warm start if singular basis 
         }
