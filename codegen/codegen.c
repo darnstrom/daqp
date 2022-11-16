@@ -198,6 +198,7 @@ void write_daqp_settings_src(FILE*  f, DAQPSettings* settings){
 }
 
 void write_daqp_bnb_h(FILE*  f, DAQPBnB* bnb, const int n){
+    fprintf(f, "#define DAQP_BNB\n");
     fprintf(f, "extern int bin_ids[%d];\n", bnb->nb);
     fprintf(f, "extern DAQPNode tree[%d];\n", bnb->nb+1);
     fprintf(f, "extern int tree_WS[%d];\n", (n+1)*(bnb->nb+1));
