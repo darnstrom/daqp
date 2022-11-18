@@ -58,7 +58,7 @@ int process_node(DAQPNode* node, DAQPWorkspace* work){
     int exitflag;
     work->bnb->nodecount+=1;
     if(node->depth >=0){
-        // Fix a inary constraints
+        // Fix a binary constraints
         work->bnb->fixed_ids[node->depth] = node->bin_id;
         // Setup relaxation 
         if(work->bnb->n_nodes==0 || (node-1)->depth!=node->depth){ 
