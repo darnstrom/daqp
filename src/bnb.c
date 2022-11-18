@@ -202,14 +202,3 @@ int add_upper_lower(const int add_id, DAQPWorkspace* work){
     }
     return 1;
 }
-
-//void warmstart_tree(const int* ids, const int n_ids){
-//    DAQPNode* node;
-//    for(int i = 0; i<n_ids; i++){
-//        node = work->bnb->tree+i;
-//        //TODO: use correct upper/lower for branch_id
-//        spawn_children(node,branch_id, work);
-//        add_upper_lower(node->bin_id,work);
-//        work->sense[REMOVE_LOWER_FLAG(node->bin_id)] |= IMMUTABLE; // Make equality
-//    }
-//}
