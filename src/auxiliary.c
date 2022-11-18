@@ -98,7 +98,7 @@ int add_infeasible(DAQPWorkspace *work){
             for(k=j,Mu=0;k<NX;k++) // 
                 Mu+=work->Rinv[disp++]*work->u[k];
         }
-        if(work->dupper[j]-Mu<min_val){
+        if((work->dupper[j]-Mu)<min_val){
             add_ind = j; isupper = 1;
             min_val = work->dupper[j]-Mu;
         }
@@ -118,7 +118,7 @@ int add_infeasible(DAQPWorkspace *work){
             Mu+=work->M[disp++]*work->u[k];
 
         //TODO: check correct sign for slack!
-        if(work->dupper[j]-Mu<min_val){
+        if((work->dupper[j]-Mu)<min_val){
             add_ind = j; isupper = 1;
             min_val = work->dupper[j]-Mu;
         }
@@ -138,7 +138,10 @@ int add_infeasible(DAQPWorkspace *work){
     c_float *swp_ptr;
     swp_ptr=work->lam; work->lam = work->lam_star; work->lam_star=swp_ptr;
     // Add the constraint
-    add_constraint(work,add_ind,0.0);
+    if(isupper)
+        add_constraint(work,add_ind,1);
+    else
+        add_constraint(work,add_ind,-1);
     return 1;
 }
 #ifdef SOFT_WEIGHTS
@@ -300,7 +303,6 @@ void compute_CSP(DAQPWorkspace *work){
         } 
         work->lam_star[i] = sum;
     }
-
     work->reuse_ind = work->n_active; // Save forward substitution information 
 }
 

@@ -4,6 +4,7 @@ int daqp_ldp(DAQPWorkspace *work){
     int exitflag=EXIT_ITERLIMIT,iter;
     int tried_repair=0, cycle_counter=0;
     c_float best_fval = -1;
+
     for(iter=1; iter < work->settings->iter_limit; ++iter){
         if(work->sing_ind==EMPTY_IND){ 
             compute_CSP(work);
@@ -26,9 +27,9 @@ int daqp_ldp(DAQPWorkspace *work){
                 }
 
                 // Cycle guard
-                if(best_fval > work->fval-work->settings->progress_tol){ 
+                if(work->fval-best_fval < work->settings->progress_tol){
                     if(cycle_counter++ > work->settings->cycle_tol){
-                        if(tried_repair == 1){
+                        if(tried_repair == 1 || work->bnb != NULL){
                             exitflag = EXIT_CYCLE;
                             break;
                         }
@@ -36,8 +37,6 @@ int daqp_ldp(DAQPWorkspace *work){
                             tried_repair =1;
                             reset_daqp_workspace(work);
                             activate_constraints(work);
-                            //reorder_LDL(work);
-                            //warmstart_workspace(work, work->WS,work->n_active);
                             cycle_counter=0;
                             best_fval = -1;
                         }
@@ -67,18 +66,18 @@ void ldp2qp_solution(DAQPWorkspace *work){
     int i,j,disp;
     // x* = Rinv*(u-v)
     if(work->v != NULL)
-        for(i=0;i<work->n;i++) work->x[i]=work->u[i]-work->v[i];
+        for(i=0;i<NX;i++) work->x[i]=work->u[i]-work->v[i];
     else
-        for(i=0;i<work->n;i++) work->x[i]=work->u[i];
+        for(i=0;i<NX;i++) work->x[i]=work->u[i];
 
     if(work->Rinv != NULL){ // (Skip if LP since R = I)
-        for(i=0,disp=0;i<work->n;i++){
+        for(i=0,disp=0;i<NX;i++){
             work->x[i]*=work->Rinv[disp++];
-            for(j=i+1;j<work->n;j++)
+            for(j=i+1;j<NX;j++)
                 work->x[i]+=work->Rinv[disp++]*work->x[j];
         }
         if(work->scaling != NULL){ // Correctly scale output
-            for(i=0;i<work->ms;i++)
+            for(i=0;i<N_SIMPLE;i++)
                 work->x[i]*=work->scaling[i];
             for(i=0;i<work->n_active;i++)
                 work->lam_star[i]/=work->scaling[work->WS[i]];

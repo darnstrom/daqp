@@ -1,5 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
 #include "daqp_prox.h"
 #include "utils.h"
 
@@ -7,11 +5,11 @@ static int gradient_step(DAQPWorkspace* work);
 
 int daqp_prox(DAQPWorkspace *work){
     int i,total_iter=0;
-    const int nx=work->n;
+    const int nx=NX;
     int exitflag;
     c_float *swp_ptr;
     c_float diff,eps=work->settings->eps_prox;
-    for(i=0;i < work->n;i++) work->x[i] = 0; // TODO add option for user to set x0
+    for(i=0;i < NX;i++) work->x[i] = 0; // TODO add option for user to set x0
 
     while(total_iter  <  work->settings->iter_limit){
         // xold <-- x
@@ -40,7 +38,7 @@ int daqp_prox(DAQPWorkspace *work){
                 break;
             }
             // Take gradient step if LP (and the iterate is not constrained to a vertex)
-            if((work->Rinv == NULL)&&(work->n_active != work->n)){
+            if((work->Rinv == NULL)&&(work->n_active != NX)){
                 if(gradient_step(work)==EMPTY_IND){
                     exitflag= EXIT_UNBOUNDED;
                     break;
@@ -74,9 +72,9 @@ int daqp_prox(DAQPWorkspace *work){
 // TODO: could probably reuse code from daqp
 static int gradient_step(DAQPWorkspace* work){
     int j,k,disp,add_ind=EMPTY_IND;
-    const int nx=work->n;
-    const int m=work->m;
-    const int ms=work->ms;
+    const int nx=NX;
+    const int m=N_CONSTR;
+    const int ms=N_SIMPLE;
     c_float Ax,delta_s, min_alpha=DAQP_INF;
     // Find constraint j to add: j =  argmin_j s_j
     // Simple bounds

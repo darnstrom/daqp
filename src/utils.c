@@ -32,15 +32,15 @@ int update_ldp(const int mask, DAQPWorkspace *work){
     /** Update constraint sense **/
     if(mask&UPDATE_sense){
         if(work->qp->sense == NULL) // Assume all constraints are "normal" inequality constraints
-            for(int i=0;i<work->m;i++) work->sense[i] = 0;
+            for(int i=0;i<N_CONSTR;i++) work->sense[i] = 0;
         else
-            for(int i=0;i<work->m;i++) work->sense[i] = work->qp->sense[i];
+            for(int i=0;i<N_CONSTR;i++) work->sense[i] = work->qp->sense[i];
     }
 
 #ifdef SOFT_WEIGHTS
     // TODO: Use mask or something to avoid scaling something more times... 
     if(work->d_ls != NULL && work->scaling !=NULL){
-        for(int i=0;i<work->m; i++){
+        for(int i=0;i<N_CONSTR; i++){
             work->d_ls[i]*=work->scaling[i];
             work->d_us[i]*=work->scaling[i];
             work->rho_ls[i]/=SQUARE(work->scaling[i]);
@@ -53,7 +53,7 @@ int update_ldp(const int mask, DAQPWorkspace *work){
 
 int update_Rinv(DAQPWorkspace *work){
     int i,j,k,disp,disp2,disp3;
-    const int n = work->n; 
+    const int n = NX; 
     // Cholesky
     for (i=0,disp=0,disp3=0; i<n; disp+=n-i,i++,disp3+=i) {
         // Diagonal element
@@ -94,11 +94,11 @@ int update_Rinv(DAQPWorkspace *work){
 
 void update_M(DAQPWorkspace *work){
     int i,j,k,disp,disp2;
-    const int n = work->n;
-    const int mA = work->m-work->ms;
+    const int n = NX;
+    const int mA = N_CONSTR-N_SIMPLE;
     for(k = 0,disp2=n*mA-1;k<mA;k++,disp2-=n){
         disp=ARSUM(n);
-        for(j = 0; j<n-work->ms; ++j){
+        for(j = 0; j<NX-N_SIMPLE; ++j){
             for(i=0;i<j;++i)
                 work->M[disp2-i] += work->Rinv[--disp]*work->qp->A[disp2-j];
             work->M[disp2-j]=work->Rinv[--disp]*work->qp->A[disp2-j];
@@ -114,13 +114,13 @@ void update_M(DAQPWorkspace *work){
 
 void update_v(c_float *f, DAQPWorkspace *work){
     int i,j,disp;
-    const int n = work->n;
+    const int n = NX;
     if(work->v == NULL || f == NULL) return;
     if(work->Rinv == NULL){// Rinv = I => v = R'\v = f
         for(i=0;i<n;++i) work->v[i] = f[i];
         return;
     }
-    for(j=n-1,disp=ARSUM(n);j>=work->ms;j--){
+    for(j=n-1,disp=ARSUM(n);j>=N_SIMPLE;j--){
         for(i=n-1;i>j;i--)
             work->v[i] +=work->Rinv[--disp]*f[j];
         work->v[j]=work->Rinv[--disp]*f[j];
@@ -136,7 +136,7 @@ void update_d(DAQPWorkspace *work){
     /* Compute d  = b+M*v */
     int i,j,disp;
     c_float sum;
-    const int n = work->n;
+    const int n = NX;
     work->reuse_ind = 0; // RHS of KKT system changed => cannot reuse intermediate results
     // Take into scaling of constraints
     if(work->scaling != NULL){
@@ -182,7 +182,7 @@ void normalize_Rinv(DAQPWorkspace* work){
     c_float scaling_i;
     // Normalize simple constraints
     if(work->Rinv !=NULL){
-        for(i=0, disp=0; i < work->ms;i++){
+        for(i=0, disp=0; i < N_SIMPLE;i++){
             scaling_i = 0;
             for(j=i; j < NX; j++,disp++){
                 scaling_i+=work->Rinv[disp]*work->Rinv[disp];
@@ -198,9 +198,9 @@ void normalize_M(DAQPWorkspace* work){
     int i,j,disp;
     c_float scaling_i;
     // Normalize general constraints 
-    for(i=work->ms, disp=0;i<work->m;i++){
+    for(i=N_SIMPLE, disp=0;i<N_CONSTR;i++){
         scaling_i = 0;
-        for(j=0;j<work->n;disp++,j++)
+        for(j=0;j<NX;disp++,j++)
             scaling_i+=work->M[disp]*work->M[disp];
         //if(!(scaling_i >= 0)) return EXIT_ILLPOSED;
         scaling_i = sqrt(scaling_i); 

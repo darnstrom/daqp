@@ -62,7 +62,7 @@ void daqp_quadprog(DAQPResult *res, DAQPProblem* qp, DAQPSettings *settings){
 
 // Setup workspace and transform QP to LDP
 int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time){
-    int errorflag, ns;
+    int errorflag;
 #ifdef PROFILING
     DAQPtimer timer;
     if(setup_time != NULL){
@@ -75,7 +75,7 @@ int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time){
 
 
     //
-    ns = 0;
+    int ns = 0;
     for(int i = 0; i < qp->m ; i++)
         if(qp->sense[i] & SOFT) ns++;
     // Setup workspace
@@ -86,7 +86,7 @@ int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time){
         free_daqp_workspace(work);
         return errorflag;
     }
-    errorflag = setup_daqp_bnb(work,qp->bin_ids,qp->nb);
+    errorflag = setup_daqp_bnb(work,qp->bin_ids,qp->nb, ns);
     if(errorflag < 0){
         free_daqp_workspace(work);
         return errorflag;
@@ -168,6 +168,24 @@ int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp){
     return 1;
 }
 
+int setup_daqp_bnb(DAQPWorkspace* work, int* bin_ids, int nb, int ns){
+    if(nb > work->n) return EXIT_OVERDETERMINED_INITIAL;
+    if((work->bnb == NULL) && (nb >0)){
+        work->bnb= malloc(sizeof(DAQPBnB));
+
+        work->bnb->nb = nb;
+        work->bnb->bin_ids = bin_ids;
+
+        // Setup tree
+        work->bnb->tree= malloc((work->bnb->nb+1)*sizeof(DAQPNode));
+        work->bnb->tree_WS= malloc((work->n+ns+1)*(work->bnb->nb+1)*sizeof(int));
+        work->bnb->n_nodes = 0; 
+        work->bnb->nWS= 0; 
+        work->bnb->fixed_ids= malloc((work->bnb->nb+1)*sizeof(int));
+    }
+    return 1;
+}
+
 // Free data for LDP 
 void free_daqp_ldp(DAQPWorkspace *work){
     if(work->sense==NULL) return; // Already freed
@@ -202,6 +220,16 @@ void allocate_daqp_settings(DAQPWorkspace *work){
     }
 }
 
+void free_daqp_bnb(DAQPWorkspace* work){
+    if(work->bnb != NULL){
+        free(work->bnb->tree);
+        free(work->bnb->tree_WS);
+        free(work->bnb->fixed_ids);
+        free(work->bnb);
+        work->bnb = NULL;
+    }
+}
+
 // Allocate memory for iterates  
 void allocate_daqp_workspace(DAQPWorkspace *work, int n, int ns){
     work->n = n;
@@ -222,10 +250,10 @@ void allocate_daqp_workspace(DAQPWorkspace *work, int n, int ns){
 
 
 
-    work->u= malloc(n*sizeof(c_float));
+    work->u= malloc(work->n*sizeof(c_float));
     work->x = work->u; 
 
-    work->xold= malloc(n*sizeof(c_float));
+    work->xold= malloc(work->n*sizeof(c_float));
 
 #ifdef SOFT_WEIGHTS
     work->d_ls= NULL;
@@ -315,5 +343,9 @@ void daqp_default_settings(DAQPSettings* settings){
 
     settings->eps_prox = 0;
     settings->eta_prox = DEFAULT_ETA;
+
     settings->rho_soft = DEFAULT_RHO_SOFT; 
+
+    settings->rel_subopt = DEFAULT_REL_SUBOPT;
+    settings->abs_subopt = DEFAULT_ABS_SUBOPT;
 }

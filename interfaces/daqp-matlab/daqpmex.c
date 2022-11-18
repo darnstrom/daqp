@@ -1,6 +1,7 @@
 #include "mex.h"
 #include "api.h"
 #include "utils.h"
+#include "codegen.h"
 #include <string.h>
 
 const char* INFO_FIELDS[] = {
@@ -22,7 +23,12 @@ const char* SETTINGS_FIELDS[] = {
   "fval_bound",
   "eps_prox",
   "eta_prox",
-  "rho_soft"}; 
+  "rho_soft",
+  "abs_subopt",
+  "rel_subopt"};
+
+const int DAQPMEX_ISDOUBLE = (sizeof(double)==sizeof(c_float))? 1 :0;
+mxClassID DAQPMEX_FLOATTYPE = DAQPMEX_ISDOUBLE ? mxDOUBLE_CLASS : mxSINGLE_CLASS;
 
 
 /* The gateway function */
@@ -80,16 +86,16 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  qp->n = n;
 	  qp->m = m;
 	  qp->ms = ms;
-	  qp->H= mxIsEmpty(prhs[2]) ? NULL : mxGetPr(prhs[2]);
-	  qp->f= mxIsEmpty(prhs[3]) ? NULL : mxGetPr(prhs[3]);
-	  qp->A= mxGetPr(prhs[4]);
-	  qp->bupper= mxGetPr(prhs[5]);
-	  qp->blower= mxGetPr(prhs[6]);
+	  qp->H= mxIsEmpty(prhs[2]) ? NULL : (c_float *)mxGetPr(prhs[2]);
+	  qp->f= mxIsEmpty(prhs[3]) ? NULL : (c_float *)mxGetPr(prhs[3]);
+	  qp->A= (c_float *)mxGetPr(prhs[4]);
+	  qp->bupper= (c_float *)mxGetPr(prhs[5]);
+	  qp->blower= (c_float *)mxGetPr(prhs[6]);
 	  qp->sense= (int *)mxGetPr(prhs[7]);
 	  qp->bin_ids= (int *)mxGetPr(prhs[8]);
 	  qp->nb=nb; 
 	  
-	  double solve_time;
+	  c_float solve_time;
 	  error_flag = setup_daqp(qp,work,&solve_time);
 	  if(error_flag < 0){
 		free(work->qp);
@@ -101,35 +107,32 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  plhs[1] = mxCreateDoubleScalar(solve_time);
 	}
 	else if (!strcmp("solve", cmd)) {
-	  double *fval;
 	  int *exitflag;
+
 	  DAQPResult result;
 	  if(work->qp == NULL) mexErrMsgTxt("No problem to solve");
 	  // Update QP pointers 
-	  work->qp->H= mxIsEmpty(prhs[2]) ? NULL : mxGetPr(prhs[2]);
-	  work->qp->f= mxIsEmpty(prhs[3]) ? NULL : mxGetPr(prhs[3]);
-	  work->qp->A= mxGetPr(prhs[4]);
-	  work->qp->bupper= mxGetPr(prhs[5]);
-	  work->qp->blower= mxGetPr(prhs[6]);
+	  work->qp->H= mxIsEmpty(prhs[2]) ? NULL : (c_float *)mxGetPr(prhs[2]);
+	  work->qp->f= mxIsEmpty(prhs[3]) ? NULL : (c_float *)mxGetPr(prhs[3]);
+	  work->qp->A= (c_float *)mxGetPr(prhs[4]);
+	  work->qp->bupper= (c_float *)mxGetPr(prhs[5]);
+	  work->qp->blower= (c_float *)mxGetPr(prhs[6]);
 	  work->qp->sense= (int *)mxGetPr(prhs[7]);
 	  // Setup output 
-	  plhs[0] = mxCreateDoubleMatrix((mwSize)work->n,1,mxREAL); // x_star
-	  plhs[1] = mxCreateDoubleMatrix(1,1,mxREAL); // fval
+	  //plhs[0] = mxCreateNumericMatrix(1, (mwSize)work->n, mxDOUBLE_CLASS, mxREAL); //Exit flag
+	  plhs[0] = mxCreateNumericMatrix((mwSize)work->n,1,DAQPMEX_FLOATTYPE,mxREAL); // x_star
+	  mxArray* lam = mxCreateNumericMatrix((mwSize)work->m,1,DAQPMEX_FLOATTYPE,mxREAL); // lambda 
 	  plhs[2] = mxCreateNumericMatrix(1, 1, mxINT32_CLASS, mxREAL); //Exit flag
-	  plhs[3] = mxCreateDoubleMatrix(1,1,mxREAL); //CPU time
-	  plhs[0] = mxCreateDoubleMatrix((mwSize)work->n,1,mxREAL); // x_star
-	  mxArray* lam = mxCreateDoubleMatrix((mwSize)work->m,1,mxREAL); // lambda
 
-	  result.x = mxGetPr(plhs[0]);
-	  result.lam = mxGetPr(lam);
-	  fval= mxGetPr(plhs[1]);
+	  result.x = (c_float *) mxGetPr(plhs[0]);
+	  result.lam = (c_float *) mxGetPr(lam);
 	  exitflag = (int *)mxGetPr(plhs[2]);
 	  
 	  // Solve problem
 	  daqp_solve(&result,work); 
 	  // Extract solution information
 	  exitflag[0] = result.exitflag; 
-	  fval[0] = result.fval;
+	  plhs[1] = mxCreateDoubleScalar(result.fval);
 
 	  // Package info struct
 	  int n_info = sizeof(INFO_FIELDS)/sizeof(INFO_FIELDS[0]);
@@ -161,6 +164,8 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		mxSetField(s, 0, "eps_prox", mxCreateDoubleScalar(work->settings->eps_prox));
 		mxSetField(s, 0, "eta_prox", mxCreateDoubleScalar(work->settings->eta_prox));
 		mxSetField(s, 0, "rho_soft", mxCreateDoubleScalar(work->settings->rho_soft));
+		mxSetField(s, 0, "abs_subopt", mxCreateDoubleScalar(work->settings->abs_subopt));
+		mxSetField(s, 0, "rel_subopt", mxCreateDoubleScalar(work->settings->rel_subopt));
 		plhs[0] = s;
 	  }
 	}
@@ -177,20 +182,35 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  work->settings->eps_prox = (c_float)mxGetScalar(mxGetField(s, 0, "eps_prox"));
 	  work->settings->eta_prox= (c_float)mxGetScalar(mxGetField(s, 0, "eta_prox"));
 	  work->settings->rho_soft= (c_float)mxGetScalar(mxGetField(s, 0, "rho_soft"));
+	  work->settings->abs_subopt= (c_float)mxGetScalar(mxGetField(s, 0, "abs_subopt"));
+	  work->settings->rel_subopt= (c_float)mxGetScalar(mxGetField(s, 0, "rel_subopt"));
 	}
 	else if (!strcmp("update", cmd)) {
 	  if(work->qp == NULL) mexErrMsgTxt("No problem to update");
 	  // Update QP pointers 
-	  work->qp->H= mxIsEmpty(prhs[2]) ? NULL : mxGetPr(prhs[2]);
-	  work->qp->f= mxIsEmpty(prhs[3]) ? NULL : mxGetPr(prhs[3]);
-	  work->qp->A= mxGetPr(prhs[4]);
-	  work->qp->bupper= mxGetPr(prhs[5]);
-	  work->qp->blower= mxGetPr(prhs[6]);
+	  work->qp->H= mxIsEmpty(prhs[2]) ? NULL : (c_float *)mxGetPr(prhs[2]);
+	  work->qp->f= mxIsEmpty(prhs[3]) ? NULL : (c_float *)mxGetPr(prhs[3]);
+	  work->qp->A= (c_float *)mxGetPr(prhs[4]);
+	  work->qp->bupper= (c_float *)mxGetPr(prhs[5]);
+	  work->qp->blower= (c_float *)mxGetPr(prhs[6]);
 	  work->qp->sense= (int *)mxGetPr(prhs[7]);
 	  // Update LDP with new QP data
 	  const int update_mask = (int)mxGetScalar(prhs[8]);
 	  update_ldp(update_mask,work);
 	}
+    else if (!strcmp("codegen", cmd)) {
+        char fname[64];
+        char dir[128];
+        mxGetString(prhs[2], fname, sizeof(fname));
+        mxGetString(prhs[3], dir, sizeof(dir));
+        if(work->qp == NULL) mexErrMsgTxt("Setup is required before code generation");
+        render_daqp_workspace(work,fname,dir);
+    }
+    else if (!strcmp("isdouble", cmd)) {
+        plhs[0] = mxCreateNumericMatrix(1, 1, mxINT32_CLASS, mxREAL); // is_double 
+        int* isdouble_ptr = (int *)mxGetPr(plhs[0]);
+        isdouble_ptr[0] = DAQPMEX_ISDOUBLE;
+    }
 
   // RHS
 }

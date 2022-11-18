@@ -1,14 +1,16 @@
-#include <stdio.h>
-#include <stdlib.h>
 #include "bnb.h"
 
 int daqp_bnb(DAQPWorkspace* work){
     int branch_id, exitflag;
     DAQPNode* node;
     c_float *swp_ptr = NULL;
-    c_float fval_bound0 = work->settings->fval_bound;
-    work->bnb->neq = work->n_active; 
 
+    // Modify upper bound based on absolute/relavtive suboptimality tolerance
+    c_float fval_bound0 = work->settings->fval_bound;
+    c_float eps_r = 1/(1+work->settings->rel_subopt);
+    work->settings->fval_bound = (fval_bound0 - work->settings->abs_subopt)*eps_r;
+
+    work->bnb->neq = work->n_active; 
     work->bnb->itercount=0;
     work->bnb->nodecount=0;
     // Setup root node
@@ -20,12 +22,9 @@ int daqp_bnb(DAQPWorkspace* work){
     work->bnb->n_clean=work->bnb->neq;
 
     // Start tree exploration
-
     while( work->bnb->n_nodes > 0 ){
-
         node = work->bnb->tree+(--work->bnb->n_nodes);
         exitflag = process_node(node,work); // Solve relaxation
-
         // Cut conditions
         if(exitflag==EXIT_INFEASIBLE) continue; // Dominance cut
         if(exitflag<0) return exitflag; // Inner solver failed => abort
@@ -33,7 +32,7 @@ int daqp_bnb(DAQPWorkspace* work){
         // Find index to branch over 
         branch_id = get_branch_id(work); 
         if(branch_id==-1){// Nothing to branch over => integer feasible
-            work->settings->fval_bound = work->fval;
+            work->settings->fval_bound = (work->fval - work->settings->abs_subopt)*eps_r;
             swp_ptr=work->xold; work->xold= work->u; work->u=swp_ptr; // Store feasible sol
         }
         else{
@@ -44,7 +43,7 @@ int daqp_bnb(DAQPWorkspace* work){
     // Exploration completed 
     work->iterations = work->bnb->itercount;
     // Correct fval
-    work->fval = work->settings->fval_bound;
+    work->fval = work->settings->fval_bound/eps_r+work->settings->abs_subopt;
     work->settings->fval_bound = fval_bound0;
     if(swp_ptr==NULL)
         return EXIT_INFEASIBLE;
@@ -59,19 +58,41 @@ int process_node(DAQPNode* node, DAQPWorkspace* work){
     int exitflag;
     work->bnb->nodecount+=1;
     if(node->depth >=0){
+        // Fix a binary constraints
+        work->bnb->fixed_ids[node->depth] = node->bin_id;
+        // Setup relaxation 
         if(work->bnb->n_nodes==0 || (node-1)->depth!=node->depth){ 
             // Sibling has been processed => need to fix workspace state
             work->bnb->n_clean += (node->depth-(node+1)->depth);
             node_cleanup_workspace(work->bnb->n_clean,work);
             warmstart_node(node,work);
         }
+        else{
+            //work->bnb->n_clean = node->depth;
+            //node_cleanup_workspace(work->bnb->n_clean,work);
+            //warmstart_node(node,work);
+            add_upper_lower(node->bin_id,work);
+            work->sense[REMOVE_LOWER_FLAG(node->bin_id)] |= IMMUTABLE; // Make equality
+        }
         // Add binary constraint 
-        add_upper_lower(node->bin_id,work);
-        work->sense[REMOVE_LOWER_FLAG(node->bin_id)] |= IMMUTABLE; // Make equality
     }
     // Solve relaxation
     exitflag = daqp_ldp(work);
     work->bnb->itercount += work->iterations;
+    
+    if(exitflag == EXIT_CYCLE){// Try to repair (cold start)
+        node_cleanup_workspace(work->bnb->n_clean,work);
+        work->sing_ind=EMPTY_IND;
+        work->n_active=work->bnb->n_clean;
+        work->reuse_ind=work->bnb->n_clean;
+        for(int i=work->bnb->n_clean - work->bnb->neq; i< node->depth+1;i++){
+            add_upper_lower(work->bnb->fixed_ids[i],work);
+            SET_IMMUTABLE(REMOVE_LOWER_FLAG(work->bnb->fixed_ids[i]));
+        }
+        work->bnb->n_clean = work->bnb->neq+node->depth;
+        exitflag = daqp_ldp(work);
+        work->bnb->itercount += work->iterations;
+    }
 
     return exitflag;
 }
@@ -135,16 +156,23 @@ void node_cleanup_workspace(int n_clean, DAQPWorkspace* work){
 
 
 void warmstart_node(DAQPNode* node, DAQPWorkspace* work){
-    int i,n_clean_old;
-    n_clean_old = work->bnb->n_clean;
-    work->bnb->n_clean = work->bnb->neq+node->depth; 
-    for(i=node->WS_start + n_clean_old-work->bnb->neq; i< node->WS_end ;i++){
-        if(work->sing_ind != EMPTY_IND) break; // Abort warm start if singular basis 
-                                               // Add the constraint
-        add_upper_lower(work->bnb->tree_WS[i],work);
+    int i;
+    // Add fixed constraints
+    for(i=work->bnb->n_clean - work->bnb->neq; i< node->depth+1;i++){ 
+        add_upper_lower(work->bnb->fixed_ids[i],work);
+        SET_IMMUTABLE(REMOVE_LOWER_FLAG(work->bnb->fixed_ids[i]));
     }
-    for(i=n_clean_old;i<work->bnb->n_clean;i++) // Make binaries immutable 
-        work->sense[work->WS[i]] |= IMMUTABLE; 
+    work->bnb->n_clean = work->bnb->neq+node->depth; 
+    // Add free constraints
+    for(i=node->WS_start; i < node->WS_end; i++){
+        add_upper_lower(work->bnb->tree_WS[i],work);
+        if(work->sing_ind != EMPTY_IND) {
+            work->n_active--;
+            SET_INACTIVE(work->WS[work->n_active]);
+            work->sing_ind = EMPTY_IND;
+            break; // Abort warm start if singular basis 
+        }
+    }
     work->bnb->nWS = node->WS_start; // always move up tree after warmstart 
 }
 
@@ -152,17 +180,11 @@ void save_warmstart(DAQPNode* node, DAQPWorkspace* work){
     // Save warmstart 
     node->WS_start = work->bnb->nWS;
 
-    int nb_added = 0;
     int id_to_add;
-    work->bnb->nWS+=(node->depth+1);
     for(int i =work->bnb->neq; i<work->n_active;i++){
         id_to_add = (work->WS[i]+(IS_LOWER(work->WS[i]) << (LOWER_BIT-1)));
-        if((work->sense[work->WS[i]]&(IMMUTABLE+BINARY))==IMMUTABLE+BINARY){
-            work->bnb->tree_WS[node->WS_start+(nb_added++)]= id_to_add; 
-        }
-        else{
+        if((work->sense[work->WS[i]]&(IMMUTABLE+BINARY))!=IMMUTABLE+BINARY)
             work->bnb->tree_WS[work->bnb->nWS++]= id_to_add;
-        }
     }
     node->WS_end = work->bnb->nWS;
 }
@@ -179,30 +201,4 @@ int add_upper_lower(const int add_id, DAQPWorkspace* work){
         add_constraint(work,true_add_id,1.0);
     }
     return 1;
-}
-
-int setup_daqp_bnb(DAQPWorkspace* work, int* bin_ids, int nb){
-    if(nb > work->n) return EXIT_OVERDETERMINED_INITIAL;
-    if((work->bnb == NULL) && (nb >0)){
-        work->bnb= malloc(sizeof(DAQPBnB));
-
-        work->bnb->nb = nb;
-        work->bnb->bin_ids = bin_ids;
-
-        // Setup tree
-        work->bnb->tree= malloc((work->bnb->nb+1)*sizeof(DAQPNode));
-        work->bnb->tree_WS= malloc((work->n+1)*(work->bnb->nb+1)*sizeof(int));
-        work->bnb->n_nodes = 0; 
-        work->bnb->nWS= 0; 
-    }
-    return 1;
-}
-
-void free_daqp_bnb(DAQPWorkspace* work){
-    if(work->bnb != NULL){
-        free(work->bnb->tree);
-        free(work->bnb->tree_WS);
-        free(work->bnb);
-        work->bnb = NULL;
-    }
 }

@@ -31,7 +31,9 @@ daqp_dir = fullfile(daqp_matlab_dir, '../..');
 daqp_build_dir = fullfile(daqp_dir, 'build');
 
 % Include directory
-inc_dir = [fullfile(sprintf(' -I%s', daqp_dir), 'include')];
+inc_dir = [
+    fullfile(sprintf(' -I%s', daqp_dir), 'include'),...
+    fullfile(sprintf(' -I%s', daqp_dir), 'codegen')];
 
 %% Compiler commands and arguments 
 % Get make and mex commands
