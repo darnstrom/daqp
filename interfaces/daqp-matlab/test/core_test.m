@@ -218,8 +218,8 @@ classdef core_test < matlab.unittest.TestCase
 	  model.lb = -inf(n,1);
 	  params.OutputFlag=0;
 
-      gurobi_result = gurobi(model,params)
       if(exist('gurobi'))
+          gurobi_result = gurobi(model,params)
           rel_error = (fval-gurobi_result.objval)/fval;
           fprintf('fval_daqp:%f fval_grb:%f, rel_error:%f',fval,gurobi_result.objval,rel_error);
           testCase.verifyLessThan((fval-gurobi_result.objval)/fval,0.1);
