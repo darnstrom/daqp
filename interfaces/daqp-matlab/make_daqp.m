@@ -39,7 +39,7 @@ inc_dir = [
 % Get make and mex commands
 make_cmd = 'cmake --build .';
 mex_cmd = sprintf('mex -O -silent');
-mex_libs = '-lc';
+mex_libs = '';
 
 
 % Add arguments to cmake and mex compiler
@@ -79,6 +79,14 @@ end
 % Old-style usage of mxGetPr 
 if ~verLessThan('matlab', '9.4')
     mexoptflags = sprintf('%s %s', mexoptflags, '-R2017b');
+end
+
+% Legacy stdio for MSVC (to avoid LNK2019 for fprintf)
+if(ispc)
+    mex_comp_configs = mex.getCompilerConfigurations('C')
+    if(contains(mex_comp_configs.ShortName,'MSVC'))
+        mex_libs = sprintf('%s %s', mex_libs, '-llegacy_stdio_definitions');
+    end
 end
 
 % Set optimizer flag

@@ -26,7 +26,6 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -Wall -Wextra")
 
 target_link_libraries(daqpstat daqp)
 
-
 # Install
 include(GNUInstallDirs)
 install(TARGETS daqpstat EXPORT  ${PROJECT_NAME}
