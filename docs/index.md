@@ -16,7 +16,7 @@ $$\begin{aligned}
 & && b_l \leq A x \leq b_u, \\
 \end{aligned}$$
 
-where $$H\succ 0$$. The case when $$H\succeq 0$$ is also handled through proximal-point iterations, which in particular means that DAQP also solves linear programs (LPs). Moreover, DAQP can also solve mixed-integer QPs by handling binary constraints of the form $$Ax \in \lbrace b_l, b_u\ rbrace$$ (for which $$x_i \in \lbrace 0,1 \rbrace $$ is a special case).
+where $$H\succ 0$$. The case when $$H\succeq 0$$ is also handled through proximal-point iterations, which in particular means that DAQP also solves linear programs (LPs). Moreover, DAQP can also solve mixed-integer QPs by handling binary constraints of the form $$Ax \in \lbrace b_l, b_u \rbrace$$ (for which $$x_i \in \lbrace 0,1 \rbrace $$ is a special case).
 
 DAQP has been developed for QPs that arise in real-time Model Predictive Control (MPC) applications, with focus on fully condensed MPC formulations. As such, DAQP efficiently solves small/medium scale, dense, QPs and LPs. If your aim is to solve large-scale sparse problems, consider instead solvers, such as [OSQP](https://osqp.org/), that exploit sparsity.
 
