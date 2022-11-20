@@ -39,7 +39,7 @@ inc_dir = [
 % Get make and mex commands
 make_cmd = 'cmake --build .';
 mex_cmd = sprintf('mex -O -silent');
-mex_libs = '-lc';
+mex_libs = '';
 
 
 % Add arguments to cmake and mex compiler
