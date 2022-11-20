@@ -24,14 +24,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_C_STANDARD_LIBRARIES "${CMAKE_C_STANDARD_LIBRARIES}") # math for C api
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -Wall -Wextra")
 
-
-# prevent error LNK2019: unresolved external symbol fprintf
-if(MSVC AND NOT (MSVC_VERSION LESS 1900))
-    target_link_libraries(daqpstat "legacy_stdio_definitions.lib")
-endif()
-
 target_link_libraries(daqpstat daqp)
-
 
 # Install
 include(GNUInstallDirs)

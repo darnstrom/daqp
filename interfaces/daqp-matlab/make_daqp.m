@@ -62,7 +62,7 @@ cmake_args = sprintf('%s %s%s%s', cmake_args, ...
 if (ispc)
    ut = fullfile(matlabroot, 'extern', 'lib', computer('arch'), ...
                  'mingw64', 'libut.lib');
-   mex_libs = sprintf('%s "%s"', mex_libs, ut);
+   mex_libs = sprintf('%s "%s" -llegacy_stdio_definitions', mex_libs, ut);
 else
    mex_libs = sprintf('%s %s', mex_libs, '-lut');
 end
