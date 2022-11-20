@@ -83,7 +83,7 @@ end
 
 % Legacy stdio for MSVC (to avoid LNK2019 for fprintf)
 if(ispc)
-    mex_comp_configs = mex.getCompilerConfigurations
+    mex_comp_configs = mex.getCompilerConfigurations('C')
     if(contains(mex_comp_configs.ShortName,'MSVC'))
         mex_libs = sprintf('%s %s', mex_libs, '-llegacy_stdio_definitions');
     end
