@@ -6,7 +6,7 @@ minimize        0.5 x' H x + f' x
 subject to      l  <=  x  <= u
 		bl <=  Ax <= bu.
 ```
-Binary constraints of the form $A x \in \{b_l, b_u\}$ are also supported, allowing for mixed-integer quadratic programs to be solved.
+Binary constraints of the form $A x \in \lbrace b_l, b_u \rbrace$ are also supported, allowing for mixed-integer quadratic programs to be solved.
 
 The code is written in C and is *library free*. DAQP can be interfaced to C, Julia, MATLAB, and Python. 
 
