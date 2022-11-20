@@ -1,7 +1,11 @@
 #ifndef DAQP_TYPES_H
 # define DAQP_TYPES_H
 
+#ifdef DAQP_SINGLE_PRECISION
+typedef float c_float;
+#else
 typedef double c_float;
+#endif
 
 typedef struct{
 

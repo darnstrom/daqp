@@ -27,9 +27,6 @@ const char* SETTINGS_FIELDS[] = {
   "abs_subopt",
   "rel_subopt"};
 
-const int DAQPMEX_ISDOUBLE = (sizeof(double)==sizeof(c_float))? 1 :0;
-mxClassID DAQPMEX_FLOATTYPE = DAQPMEX_ISDOUBLE ? mxDOUBLE_CLASS : mxSINGLE_CLASS;
-
 
 /* The gateway function */
 void mexFunction( int nlhs, mxArray *plhs[],
@@ -119,9 +116,13 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  work->qp->blower= (c_float *)mxGetPr(prhs[6]);
 	  work->qp->sense= (int *)mxGetPr(prhs[7]);
 	  // Setup output 
-	  //plhs[0] = mxCreateNumericMatrix(1, (mwSize)work->n, mxDOUBLE_CLASS, mxREAL); //Exit flag
-	  plhs[0] = mxCreateNumericMatrix((mwSize)work->n,1,DAQPMEX_FLOATTYPE,mxREAL); // x_star
-	  mxArray* lam = mxCreateNumericMatrix((mwSize)work->m,1,DAQPMEX_FLOATTYPE,mxREAL); // lambda 
+#ifdef DAQP_SINGLE_PRECISION
+	  plhs[0] = mxCreateNumericMatrix((mwSize)work->n,1,mxSINGLE,mxREAL); // x_star
+	  mxArray* lam = mxCreateNumericMatrix((mwSize)work->m,1,mxSINGLE,mxREAL); // lambda 
+#else
+	  plhs[0] = mxCreateNumericMatrix((mwSize)work->n,1,mxDOUBLE_CLASS,mxREAL); // x_star
+	  mxArray* lam = mxCreateNumericMatrix((mwSize)work->m,1,mxDOUBLE_CLASS,mxREAL); // lambda 
+#endif
 	  plhs[2] = mxCreateNumericMatrix(1, 1, mxINT32_CLASS, mxREAL); //Exit flag
 
 	  result.x = (c_float *) mxGetPr(plhs[0]);
@@ -209,7 +210,11 @@ void mexFunction( int nlhs, mxArray *plhs[],
     else if (!strcmp("isdouble", cmd)) {
         plhs[0] = mxCreateNumericMatrix(1, 1, mxINT32_CLASS, mxREAL); // is_double 
         int* isdouble_ptr = (int *)mxGetPr(plhs[0]);
-        isdouble_ptr[0] = DAQPMEX_ISDOUBLE;
+#ifdef DAQP_SINGLE_PRECISION
+        isdouble_ptr[0] = 0;
+#else
+        isdouble_ptr[0] = 1;
+#endif
     }
 
   // RHS
