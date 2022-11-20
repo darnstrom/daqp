@@ -62,7 +62,7 @@ cmake_args = sprintf('%s %s%s%s', cmake_args, ...
 if (ispc)
    ut = fullfile(matlabroot, 'extern', 'lib', computer('arch'), ...
                  'mingw64', 'libut.lib');
-   mex_libs = sprintf('%s "%s" -llegacy_stdio_definitions', mex_libs, ut);
+   mex_libs = sprintf('%s "%s"', mex_libs, ut);
 else
    mex_libs = sprintf('%s %s', mex_libs, '-lut');
 end
@@ -79,6 +79,14 @@ end
 % Old-style usage of mxGetPr 
 if ~verLessThan('matlab', '9.4')
     mexoptflags = sprintf('%s %s', mexoptflags, '-R2017b');
+end
+
+% Legacy stdio for MSVC (to avoid LNK2019 for fprintf)
+if(ispc)
+    mex_comp_configs = mex.getCompilerConfigurations
+    if(contains(mex_comp_configs.ShortName,'MSVC'))
+        mex_libs = sprintf('%s %s', mex_libs, '-llegacy_stdio_definitions');
+    end
 end
 
 % Set optimizer flag
