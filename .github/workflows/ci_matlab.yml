@@ -1,12 +1,12 @@
-name: CI 
+name: Matlab CI
 on:
   pull_request:
     branches:
-      - master 
+      - master
   push:
     branches:
-      - master 
-    tags: '*'
+      - master
+    tags: "*"
 jobs:
   my-job:
     name: Make and run tests in MATLAB
