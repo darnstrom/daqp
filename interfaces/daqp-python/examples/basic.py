@@ -12,7 +12,7 @@ blower= np.array([-1,-1],dtype=c_double)
 sense = np.array([0,0],dtype=c_int)
 
 m = daqp.daqp()
-(xstar,fval,exitflag,info,lam) = m.quadprog(H,f,A,bupper,blower,sense)
+(xstar,fval,exitflag,info) = m.quadprog(H,f,A,bupper,blower,sense)
 print("Optimal solution:")
 print(xstar)
 print("Exit flag:",exitflag)

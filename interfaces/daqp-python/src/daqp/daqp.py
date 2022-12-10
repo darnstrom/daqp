@@ -7,7 +7,6 @@ import daqp.types as types
 
 class daqp:
     def __init__(self):
-
         # load library
         if platform.system()=='Windows':
             try: 
@@ -33,9 +32,8 @@ class daqp:
             A=None,bupper=None,blower=None,sense=None, bin_ids=None, **settings):
         (mA, n) = np.shape(A)
         m = np.size(bupper)
-        ms = mA-m
+        ms = m-mA
         bin_ids_cand = np.where(sense&16)[0]
-        print("id cand: ",bin_ids_cand)
         nb = np.size(bin_ids_cand) 
         if nb > 0:
             bin_ids = np.array(bin_ids_cand,dtype=c_int)
@@ -60,10 +58,12 @@ class daqp:
         # Call C api
         self._daqp.daqp_quadprog(byref(result),byref(qp),byref(daqp_options))
         # Collect results 
-        profiling = {'solve_time':result.solve_time,
+        info = {'solve_time':result.solve_time,
                 'setup_time': result.setup_time,
-                'iterations': result.iter}
-        return x, result.fval, result.exitflag, profiling, lam 
+                'iterations': result.iter,
+                'nodes': result.nodes,
+                'lam': lam}
+        return x, result.fval, result.exitflag, info
 
     def linprog(self, f=None,
             A=None,bupper=None,blower=None,sense=None, **settings):
