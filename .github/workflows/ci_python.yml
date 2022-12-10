@@ -29,8 +29,7 @@ jobs:
           cd build/
           cmake -DCMAKE_INSTALL_PREFIX:PATH=../install ..
           cmake --build . --target install
-          export LD_LIBRARY_PATH=../install/lib:$LD_LIBRARY_PATH
-          cd ..
+          echo "LD_LIBRARY_PATH=${GITHUB_WORKSPACE}/install/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
       - name: Install Python interface
         run: |
           cd interfaces/daqp-python
@@ -38,4 +37,4 @@ jobs:
           pip install numpy pytest
           pip install .
       - name: Run unit tests
-        run: python -m pytest tests/
+        run: python -m pytest interfaces/daqp-python/test/

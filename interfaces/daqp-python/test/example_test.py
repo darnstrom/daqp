@@ -24,9 +24,8 @@ class Testing(unittest.TestCase):
         blower = np.array([-1, -2, -3, -4], dtype=c_double)
         sense = np.array([0, 0, 0, 0], dtype=c_int)
         d = daqp.daqp()
-        # (xstar, fval, exitflag, info) = d.quadprog(H, f, A, bupper, blower, sense)
-        exitflag = 0
-        self.assertEqual(exitflag, 0)  # TODO(@darnstrom): update the exit flag if needed
+        (xstar, fval, exitflag, info) = d.quadprog(H, f, A, bupper, blower, sense)
+        self.assertEqual(exitflag, 1)
 
 
 if __name__ == '__main__':
