@@ -43,7 +43,9 @@ class DAQPSettings(Structure):
             "fval_bound" : 1e30,
             "eps_prox" : 0,
             "eta_prox" : 1e-6,
-            "rho_soft" :1e-3 
+            "rho_soft" :1e-3,
+            "rel_subopt" :0,
+            "abs_subopt" :0
             }
 
 class DAQPResult(Structure):
@@ -53,6 +55,7 @@ class DAQPResult(Structure):
             ('soft_slack',c_double),
             ('exitflag',c_int),
             ('iter',c_int),
+            ('nodes',c_int),
             ('solve_time',c_double),
             ('setup_time',c_double)] 
 
