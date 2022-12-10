@@ -31,7 +31,9 @@ class DAQPSettings(Structure):
             ('fval_bound', c_double),
             ('eps_prox', c_double),
             ('eta_prox', c_double),
-            ('rho_soft', c_double)]
+            ('rho_soft', c_double),
+            ('rel_subopt', c_double),
+            ('abs_subopt', c_double)]
 
     _defaults_ = { "primal_tol" : 1e-6,
             "dual_tol" : 1e-12, 
