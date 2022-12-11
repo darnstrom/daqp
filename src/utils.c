@@ -26,6 +26,17 @@ int update_ldp(const int mask, DAQPWorkspace *work){
 
     /** Update d **/
     if(mask&UPDATE_Rinv||mask&UPDATE_M||mask&UPDATE_v||mask&UPDATE_d){
+#ifndef DAQP_ASSUME_VALID
+        // Check for trivial infeasibility
+        for(int i =0;i<N_CONSTR;i++){
+            if((work->qp->bupper[i] - work->qp->blower[i])< -1e-12){
+                if(IS_IMMUTABLE(i))
+                    continue;
+                else
+                    return EXIT_INFEASIBLE;
+            }
+        }
+#endif
         update_d(work);
     }
 
