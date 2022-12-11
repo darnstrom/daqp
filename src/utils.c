@@ -29,7 +29,7 @@ int update_ldp(const int mask, DAQPWorkspace *work){
 #ifndef DAQP_ASSUME_VALID
         // Check for trivial infeasibility
         for(int i =0;i<N_CONSTR;i++){
-            if((work->qp->bupper[i] - work->qp->blower[i])< -1e-12){
+            if((work->qp->bupper[i] - work->qp->blower[i])< -work->settings->primal_tol){
                 if(IS_IMMUTABLE(i))
                     continue;
                 else
