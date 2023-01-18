@@ -117,7 +117,6 @@ int add_infeasible(DAQPWorkspace *work){
         for(k=0,Mu=0;k<NX;k++) 
             Mu+=work->M[disp++]*work->u[k];
 
-        //TODO: check correct sign for slack!
         if((work->dupper[j]-Mu)<min_val){
             add_ind = j; isupper = 1;
             min_val = work->dupper[j]-Mu;
@@ -328,34 +327,6 @@ void compute_singular_direction(DAQPWorkspace *work){
             work->lam_star[i] =-work->lam_star[i];
 }
 
-
-void reorder_LDL(DAQPWorkspace *work){
-    // Extract first column l1,: of  L 
-    // and store l1,:^2 in the beginning of L (since L will be overwritten anyways...)  
-    // (a large value of l^2 signify linear dependence with the first constraint)
-    int i,j,disp;
-    c_float swp;
-    for(i = 1, disp = 1; i < work->n_active; i++){
-        work->L[i] = work->L[disp]*work->L[disp];  
-        disp+=i+1;
-    }
-    // Sort l1,:^2 elements (and reorder the working set accordingly)
-    // Bubble sort (use disp for swapping int)
-    for(i=work->n_active-1; i>0; i--){
-        for(j=1; j<i; j++){
-
-            if(work->L[j] > work->L[j+1]){
-                // Swap
-                swp= work->L[j];
-                disp = work->WS[j]; 
-                work->L[j] = work->L[j+1];
-                work->WS[j] = work->WS[j+1];
-                work->L[j+1]= swp; 
-                work->WS[j+1]= disp; 
-            }
-        }
-    }
-}
 
 void pivot_last(DAQPWorkspace *work){
     const int rm_ind = work->n_active-2; 
