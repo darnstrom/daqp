@@ -81,7 +81,7 @@ void compute_primal_and_fval(DAQPWorkspace *work){
 int add_infeasible(DAQPWorkspace *work){
     int j,k,disp;
     c_float min_val = -work->settings->primal_tol;
-    c_float Mu;
+    c_float Mu,min_cand;
     int isupper=0, add_ind=EMPTY_IND;
     // Simple bounds 
     for(j=0, disp=0;j<N_SIMPLE;j++){
@@ -98,13 +98,17 @@ int add_infeasible(DAQPWorkspace *work){
             for(k=j,Mu=0;k<NX;k++) // 
                 Mu+=work->Rinv[disp++]*work->u[k];
         }
-        if((work->dupper[j]-Mu)<min_val){
+        min_cand = work->dupper[j]-Mu;
+        if(min_cand < min_val){
             add_ind = j; isupper = 1;
-            min_val = work->dupper[j]-Mu;
+            min_val = min_cand;
         }
-        else if(-(work->dlower[j]-Mu)<min_val){
-            add_ind = j; isupper = 0;
-            min_val = -(work->dlower[j]-Mu);
+        else{
+            min_cand = Mu - work->dlower[j];
+            if(min_cand < min_val){
+                add_ind = j; isupper = 0;
+                min_val = min_cand;
+            }
         }
     }
     /* General two-sided constraints */
@@ -117,13 +121,17 @@ int add_infeasible(DAQPWorkspace *work){
         for(k=0,Mu=0;k<NX;k++) 
             Mu+=work->M[disp++]*work->u[k];
 
-        if((work->dupper[j]-Mu)<min_val){
+        min_cand = work->dupper[j]-Mu;
+        if(min_cand < min_val){
             add_ind = j; isupper = 1;
-            min_val = work->dupper[j]-Mu;
+            min_val = min_cand;
         }
-        else if(-(work->dlower[j]-Mu)<min_val){
-            add_ind = j; isupper = 0;
-            min_val = -(work->dlower[j]-Mu);
+        else{
+            min_cand = Mu - work->dlower[j];
+            if(min_cand < min_val){
+                add_ind = j; isupper = 0;
+                min_val = min_cand;
+            }
         }
     }
     // No constraint is infeasible => return
