@@ -117,11 +117,11 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  work->qp->sense= (int *)mxGetPr(prhs[7]);
 	  // Setup output 
 #ifdef DAQP_SINGLE_PRECISION
-	  plhs[0] = mxCreateNumericMatrix((mwSize)work->n,1,mxSINGLE,mxREAL); // x_star
-	  mxArray* lam = mxCreateNumericMatrix((mwSize)work->m,1,mxSINGLE,mxREAL); // lambda 
+	  plhs[0] = mxCreateNumericMatrix((mwSize)work->n,1,mxSINGLE_CLASS,mxREAL); // x_star
+	  mxArray* lam = mxCreateNumericMatrix((mwSize)work->m,1,mxSINGLE_CLASS,mxREAL); // lambda
 #else
 	  plhs[0] = mxCreateNumericMatrix((mwSize)work->n,1,mxDOUBLE_CLASS,mxREAL); // x_star
-	  mxArray* lam = mxCreateNumericMatrix((mwSize)work->m,1,mxDOUBLE_CLASS,mxREAL); // lambda 
+	  mxArray* lam = mxCreateNumericMatrix((mwSize)work->m,1,mxDOUBLE_CLASS,mxREAL); // lambda
 #endif
 	  plhs[2] = mxCreateNumericMatrix(1, 1, mxINT32_CLASS, mxREAL); //Exit flag
 

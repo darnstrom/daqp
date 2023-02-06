@@ -51,11 +51,10 @@ void update_LDL_add(DAQPWorkspace *work, const int add_ind){
             j= start_col;
         }
         // Multiply Mk*Mi (NULL signify unity)
-        if(Mk == NULL){ 
-            if(Mi ==NULL) sum = 0;
-            else sum = Mi[j];
-        }
-        else if(Mi == NULL) sum = Mk[j];
+        if(Mk == NULL)
+            sum = (Mi ==NULL) ? 0 : Mi[j];
+        else if(Mi == NULL)
+            sum = Mk[j];
         else
             for(sum = 0;j<NX;j++)
                 sum+=Mk[j]*Mi[j];
@@ -99,34 +98,31 @@ void update_LDL_remove(DAQPWorkspace *work, const int rm_ind){
     // Remove column rm_ind (and add parts of L in its new place)
     // I.e., copy row i into i-1
     for(i = rm_ind+1;i<work->n_active;old_disp++,new_disp++,i++) //(disp++ skips blank element)..
-        for(j=0;j<i;j++){ 
+        for(j=0;j<i;j++){
             if(j!=rm_ind)
                 work->L[new_disp++]=work->L[old_disp++];
             else
                 w[w_count++] = work->L[old_disp++];
         }
-    // Algorithm C1 in Gill 1974 for low-rank update of LDL 
-    // (L2 block...)
-    // TODO the disp can most likely be done cleaner...
-    c_float p,beta,d_bar,alpha=work->D[rm_ind];
+    // Algorithm C1 in Gill 1974 for low-rank update of LDL
+    // L2 block
+    c_float p,beta,dbar,alpha=work->D[rm_ind];
     // i - Element/row to update|j - Column which is looped over|r - Row to loop over
     old_disp=ARSUM(rm_ind)+rm_ind;
-    for(j = 0, i=rm_ind; j<n_update;j++,i++){
+    for(j = 0, i=rm_ind+1;;j++,i++){
         p=w[j];
-        d_bar = work->D[i+1]+alpha*p*p; 
-        beta = p*alpha/d_bar;
-        alpha =work->D[i+1]*alpha/d_bar;
-        work->D[i] = d_bar;
-        // This means that singularity was not detected correctly before (numerical erros)
-        // TODO Do some kind of "repair" step. 
-        if(d_bar<work->settings->zero_tol){
-            //work->D[i]=0;
-            work->sing_ind=i;
-        }
-        old_disp+=i+1; 
+        dbar = work->D[i]+alpha*p*p;
+        work->D[i-1] = dbar;
+
+        if(j == n_update) break;
+
+        beta = p*alpha/dbar;
+        alpha =work->D[i]*alpha/dbar;
+
+        old_disp+=i;
         for(r=j+1, new_disp=old_disp+j;r<n_update;r++){
-            w[r] -= p*work->L[new_disp];//instead, initialize new_disp+j
-            work->L[new_disp]+= beta*w[r]; //Use sum to block register
+            w[r] -= p*work->L[new_disp];
+            work->L[new_disp]+=beta*w[r];
             new_disp+=rm_ind+r+1; //Update to the id which starts the next row in L
         }
     }
