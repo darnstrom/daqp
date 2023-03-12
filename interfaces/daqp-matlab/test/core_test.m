@@ -10,7 +10,8 @@ classdef core_test < matlab.unittest.TestCase
             kappa = 1e2;
             tol = 1e-5;
             solve_times = zeros(nQPs,1);
-            solve_errors = zeros(nQPs,1);
+            primal_errors = zeros(nQPs,1);
+            dual_errors = zeros(nQPs,1);
             for i = 1:nQPs
                 [xref,H,f,A,bupper,blower,sense]=generate_test_QP(n,m,ms,nAct,kappa);
                 d = daqp();
@@ -18,15 +19,17 @@ classdef core_test < matlab.unittest.TestCase
                 [x,fval,exitflag, info] = d.solve();
 
                 testCase.verifyEqual(exitflag,int32(1));
-                testCase.verifyLessThan(norm(x-xref),tol);
-                testCase.verifyLessThan(norm(H*x+f+[eye(ms,n);A]'*info.lambda),tol);
+                primal_errors(i) = norm(x-xref);
+                dual_errors(i) = norm(H*x+f+[eye(ms,n);A]'*info.lambda);
+                testCase.verifyLessThan(primal_errors(i),tol);
+                testCase.verifyLessThan(dual_errors(i),tol);
                 testCase.verifyLessThan(0.5*x'*H*x+f'*x-fval,tol);
                 solve_times(i) = info.solve_time;
-                solve_error(i) = norm(x-xref);
             end
             fprintf('========================== DAQP =============================\n')
             fprintf('Solve times [s]: |avg: %2.6f| max: %2.6f| min %2.6f|\n',mean(solve_times),max(solve_times),min(solve_times))
-            fprintf('Solution Errors: |avg: %2.2e| max: %2.2e| min %2.2e|\n',mean(solve_error),max(solve_error),min(solve_error))
+            fprintf('Primal Errors  : |avg: %2.2e| max: %2.2e| min %2.2e|\n',mean(primal_errors),max(primal_errors),min(primal_errors))
+            fprintf('Dual Errors    : |avg: %2.2e| max: %2.2e| min %2.2e|\n',mean(dual_errors),max(dual_errors),min(dual_errors))
             fprintf('=============================================================\n')
         end
         function prox_random_feasible_QPs(testCase)
@@ -51,11 +54,11 @@ classdef core_test < matlab.unittest.TestCase
                 testCase.verifyLessThan(norm(H*x+f+[eye(ms,n);A]'*info.lambda),tol);
                 testCase.verifyLessThan(0.5*x'*H*x+f'*x-fval,tol);
                 solve_times(i) = info.solve_time;
-                solve_error(i) = norm(x-xref);
+                solve_errors(i) = norm(x-xref);
             end
             fprintf('\n======================== DAQP PROX ==========================\n')
             fprintf('Solve times [s]: |avg: %2.6f| max: %2.6f| min %2.6f|\n',mean(solve_times),max(solve_times),min(solve_times))
-            fprintf('Solution Errors: |avg: %2.2e| max: %2.2e| min %2.2e|\n',mean(solve_error),max(solve_error),min(solve_error))
+            fprintf('Solution Errors: |avg: %2.2e| max: %2.2e| min %2.2e|\n',mean(solve_errors),max(solve_errors),min(solve_errors))
             fprintf('=============================================================\n')
         end
 
@@ -84,11 +87,11 @@ classdef core_test < matlab.unittest.TestCase
                     disp(info)
                 end
                 solve_times(i) = info.solve_time;
-                solve_error(i) = norm(x-xref);
+                solve_errors(i) = norm(x-xref);
             end
             fprintf('\n========================== DALP =============================\n')
             fprintf('Solve times [s]: |avg: %2.6f| max: %2.6f| min %2.6f|\n',mean(solve_times),max(solve_times),min(solve_times))
-            fprintf('Solution Errors: |avg: %2.2e| max: %2.2e| min %2.2e|\n',mean(solve_error),max(solve_error),min(solve_error))
+            fprintf('Solution Errors: |avg: %2.2e| max: %2.2e| min %2.2e|\n',mean(solve_errors),max(solve_errors),min(solve_errors))
             fprintf('=============================================================\n')
         end
 
