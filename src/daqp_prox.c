@@ -9,6 +9,8 @@ int daqp_prox(DAQPWorkspace *work){
     int exitflag;
     c_float *swp_ptr;
     c_float diff,eps=work->settings->eps_prox;
+    int cycle_counter = 0;
+    c_float best_fval = DAQP_INF;
     for(i=0;i < NX;i++) work->x[i] = 0; // TODO add option for user to set x0
 
     while(total_iter  <  work->settings->iter_limit){
@@ -45,11 +47,25 @@ int daqp_prox(DAQPWorkspace *work){
                 }
             }
         }
+        // For LPs, compute objective function value to detect progress
+        // TODO: add paramters to settings
+        if(work->Rinv == NULL){
+            for(i=0, diff=best_fval;i<nx;i++)
+                diff-=work->qp->f[i]*work->x[i];
+            if(diff<1e-10){
+                if(cycle_counter++ > 5) return EXIT_OPTIMAL; // assume fix point
+            }
+            else{ // Progress -> update objective function value
+                best_fval -=diff ;
+                cycle_counter=0;
+            }
+        }
 
         // ** Perturb problem **
         // Compute v = R'\(f-eps*x) (FWS Skipped if LP since R = I) 
         if(work->Rinv== NULL){ 
             eps*= (work->iterations==1) ? 10 : 0.9; // Adapt epsilon TODO: add to settings 
+            eps = (eps > 1e3) ? 1e3 : eps; // TODO: add saturation option to settings
             for(i = 0; i<nx;i++) 
                 work->v[i] = work->qp->f[i]*eps-work->x[i];
         }
