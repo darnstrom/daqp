@@ -29,8 +29,11 @@ classdef daqp< handle
                 x = [];fval=[];info=[];
                 return; 
             end
-            d.settings('eps_prox',1);
-            d.settings('eta_prox',1e-6);
+            
+            settings = d.settings;
+            settings.eps_prox = 1;
+            settings.eta_prox = 1e-6;
+            daqpmex('set_settings', d.work_ptr, settings);
             [x,fval,exitflag,info] = d.solve();
             info.setup_time = setup_time;
         end
