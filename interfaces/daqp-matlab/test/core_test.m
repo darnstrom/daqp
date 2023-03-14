@@ -25,6 +25,7 @@ classdef core_test < matlab.unittest.TestCase
                 testCase.verifyLessThan(dual_errors(i),tol);
                 testCase.verifyLessThan(0.5*x'*H*x+f'*x-fval,tol);
                 solve_times(i) = info.solve_time;
+                solve_error(i) = norm(x-xref);
             end
             fprintf('========================== DAQP =============================\n')
             fprintf('Solve times [s]: |avg: %2.6f| max: %2.6f| min %2.6f|\n',mean(solve_times),max(solve_times),min(solve_times))
