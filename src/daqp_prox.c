@@ -9,6 +9,7 @@ int daqp_prox(DAQPWorkspace *work){
     int exitflag;
     c_float *swp_ptr;
     c_float diff,eps=work->settings->eps_prox;
+    c_float tol_stat, eta=work->settings->eta_prox;
     int cycle_counter = 0;
     c_float best_fval = DAQP_INF;
     for(i=0;i < NX;i++) work->x[i] = 0; // TODO add option for user to set x0
@@ -31,9 +32,10 @@ int daqp_prox(DAQPWorkspace *work){
 
         // ** Check convergence **
         if(work->iterations==1){ // No changes to the working set 
+            tol_stat = (work->Rinv == NULL) ? eta*eps : eta/eps;
             for(i=0, diff= 0;i<nx;i++){ // ||x_old - x|| > eta  ?
                 diff= work->x[i] - work->xold[i];
-                if((diff> work->settings->eta_prox) || (diff< -work->settings->eta_prox)) break;
+                if((diff> tol_stat) || (diff< -tol_stat)) break;
             }
             if(i==nx){
                 exitflag = EXIT_OPTIMAL; // Fix point reached
@@ -53,7 +55,7 @@ int daqp_prox(DAQPWorkspace *work){
             for(i=0, diff=best_fval;i<nx;i++)
                 diff-=work->qp->f[i]*work->x[i];
             if(diff<1e-10){
-                if(cycle_counter++ > 5) return EXIT_OPTIMAL; // assume fix point
+                if(cycle_counter++ > 10) return EXIT_OPTIMAL; // assume fix point
             }
             else{ // Progress -> update objective function value
                 best_fval -=diff ;
