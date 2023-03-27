@@ -96,6 +96,24 @@ classdef core_test < matlab.unittest.TestCase
             fprintf('=============================================================\n')
         end
 
+        function feasibility(testCase)
+            n = 25; m = 500;
+            nQPs = 50;
+            r = 1e-7;
+            %r = -0.5e-5;
+            for i = 1:nQPs
+                [A,bupper,blower,sense] =generate_test_feasibility(n,m,r);
+                [x,fval,exitflag,daqp_feas_info] = daqp.quadprog([],[],A,bupper,blower,sense);
+                testCase.verifyEqual(exitflag,int32(1));
+            end
+
+            r =  -1e-6-1e-7
+            for i = 1:nQPs
+                [A,bupper,blower,sense] =generate_test_feasibility(n,m,r);
+                [x,fval,exitflag,daqp_infeas_info] = daqp.quadprog([],[],A,bupper,blower,sense);
+                testCase.verifyEqual(exitflag,int32(-1));
+            end
+        end
         function infeasible_QP(testCase)
             H = eye(2);
             f = zeros(2,1);
