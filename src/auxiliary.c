@@ -6,6 +6,7 @@ void remove_constraint(DAQPWorkspace* work, const int rm_ind){
     SET_INACTIVE(work->WS[rm_ind]); 
     update_LDL_remove(work,rm_ind);
     (work->n_active)--;
+
     for(i=rm_ind;i<work->n_active;i++){
         work->WS[i] = work->WS[i+1]; 
         work->lam[i] = work->lam[i+1]; 
@@ -14,10 +15,15 @@ void remove_constraint(DAQPWorkspace* work, const int rm_ind){
     if(rm_ind < work->reuse_ind)
         work->reuse_ind = rm_ind;
 
-    // Pivot for improved numerics
-    pivot_last(work);
+    // Check if the removal lead to singularity (can happen due to numerics)
+    if(work->n_active > 0 && work->D[work->n_active-1] < work->settings->zero_tol){
+        work->sing_ind = work->n_active-1;
+        work->D[work->n_active-1] = 0;
+    }
+    else{ // Pivot for improved numerics
+        pivot_last(work);
+    }
 }
-// Maybe take add_ind as input instead?
 void add_constraint(DAQPWorkspace *work, const int add_ind, c_float lam){
     // Update data structures  
     SET_ACTIVE(add_ind);

@@ -73,9 +73,11 @@ void update_LDL_add(DAQPWorkspace *work, const int add_ind){
     // Scale: l_i <-- l_i/d_i
     // Update d_new -= l'Dl
     sum = work->D[work->n_active];
+    c_float tmp;
     for (i =0,disp=new_L_start; i<work->n_active;i++,disp++){
+        tmp = work->L[disp];
         work->L[disp] /= work->D[i];  
-        sum -= (work->L[disp]*work->D[i])*work->L[disp];
+        sum -= tmp*work->L[disp];
     }
     work->D[work->n_active]=sum;
 
