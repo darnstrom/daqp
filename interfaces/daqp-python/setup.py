@@ -1,6 +1,7 @@
 from setuptools import setup,find_packages, Extension
 from setuptools.command.build_ext import build_ext as build_ext_orig
 import os
+from shutil import copyfile
 from platform import system
 import pathlib
 
@@ -28,8 +29,10 @@ class build_ext(build_ext_orig):
         extdir = pathlib.Path(self.get_ext_fullpath(ext.name))
         extdir.mkdir(parents=True, exist_ok=True)
 
+        config = 'Debug' if self.debug else 'Release'
         cmake_args = [
-            '-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + str(extdir.parent.absolute())
+            '-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + str(extdir.parent.absolute()),
+            '-DCMAKE_BUILD_TYPE=' + config
         ]
 
         if system() == 'Windows':
@@ -46,6 +49,10 @@ class build_ext(build_ext_orig):
             self.spawn(['cmake', '--build', '.'] + build_args)
         os.chdir(str(cwd))
 
+        if system() == 'Windows':
+            copyfile(os.path.join(build_temp,'Release','libdaqp.dll'),
+                     os.path.join(str(extdir.parent.absolute()),'daqp','libdaqp.dll'))
+
 setup(name='daqp',
         version='0.0',
         description='DAQP: A dual active-set QP solver',
@@ -57,7 +64,7 @@ setup(name='daqp',
             where='src',
             include=['daqp']),
         package_dir={"": "src"},
-        ext_modules=[CMakeExtension('daqp/c')],
+        ext_modules=[CMakeExtension('daqp')],
         cmdclass={
             'build_ext': build_ext,
             },
