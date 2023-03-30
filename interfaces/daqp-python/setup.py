@@ -50,7 +50,7 @@ class build_ext(build_ext_orig):
         os.chdir(str(cwd))
 
         if system() == 'Windows':
-            copyfile(os.path.join(build_temp,'Release','libdaqp.dll'),
+            copyfile(os.path.join(build_temp,'libdaqp.dll'),
                      os.path.join(str(extdir.parent.absolute()),'libdaqp.dll'))
 
 setup(name='daqp',
