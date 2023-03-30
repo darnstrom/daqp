@@ -51,7 +51,7 @@ class build_ext(build_ext_orig):
 
         if system() == 'Windows':
             copyfile(os.path.join(build_temp,'Release','libdaqp.dll'),
-                     os.path.join(str(extdir.parent.absolute()),'daqp','libdaqp.dll'))
+                     os.path.join(str(extdir.parent.absolute()),'libdaqp.dll'))
 
 setup(name='daqp',
         version='0.0',
@@ -64,7 +64,7 @@ setup(name='daqp',
             where='src',
             include=['daqp']),
         package_dir={"": "src"},
-        ext_modules=[CMakeExtension('daqp')],
+        ext_modules=[CMakeExtension('daqp/daqp')],
         cmdclass={
             'build_ext': build_ext,
             },
