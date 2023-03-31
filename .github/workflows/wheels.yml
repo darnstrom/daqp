@@ -1,10 +1,10 @@
 name: Python Wheels
 
 on:
-  workflow_dispatch:
   pull-request:
     branches:
       - master
+  workflow_dispatch:
   push:
     tags:
     - 'v*'
