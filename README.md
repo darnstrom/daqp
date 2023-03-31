@@ -1,3 +1,7 @@
+ [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CI](https://github.com/darnstrom/daqp/workflows/CI/badge.svg)](https://github.com/darnstrom/daqp/actions)
+[![](https://img.shields.io/badge/docs-online-brightgreen)](https://darnstrom.github.io/daqp/start)
+ 
 # DAQP
 DAQP is a dual active-set solver that solves convex quadratic programs of the form
 ```
@@ -10,7 +14,26 @@ Binary constraints of the form $A x \in \lbrace b_l, b_u \rbrace$ are also suppo
 
 The code is written in C and is *library free*. DAQP can be interfaced to C, Julia, MATLAB, and Python. 
 
-See [Documentation](https://darnstrom.github.io/daqp/) for an installation guide and basic use of the interfaces. 
+## Quick Install 
+
+### Julia 
+```bash
+   ] add DAQP
+```
+
+### MATLAB 
+```bash
+   websave('install_daqp','https://raw.githubusercontent.com/darnstrom/daqp/master/interfaces/daqp-matlab/install_daqp.m')
+   install_daqp
+```
+
+### Python
+```bash
+   pip install daqp
+```
+
+### Deatils 
+See the [Documentation](https://darnstrom.github.io/daqp/start) for more detailed installation instructions and basic use of the interfaces. 
 
 ## Citing DAQP
 ```
@@ -25,4 +48,3 @@ See [Documentation](https://darnstrom.github.io/daqp/) for an installation guide
   doi={10.1109/TAC.2022.3176430}
 }
 ```
-
