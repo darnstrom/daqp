@@ -37,8 +37,8 @@ class DAQPSettings(Structure):
 
     _defaults_ = { "primal_tol" : 1e-6,
             "dual_tol" : 1e-12, 
-            "zero_tol" : 1e-14,
-            "pivot_tol" : 1e-4,
+            "zero_tol" : 1e-11,
+            "pivot_tol" : 1e-6,
             "progress_tol" : 1e-14,
             "cycle_tol" : 10,
             "iter_limit" : 1000,

@@ -24,7 +24,7 @@ class daqp:
         self._daqp.daqp_solve(self.work)
 
     def quadprog(self, H=None,f=None,
-            A=None,bupper=None,blower=None,sense=None, bin_ids=None, **settings):
+            A=None,bupper=None,blower=None,sense=None, settings={}):
         (mA, n) = np.shape(A)
         m = np.size(bupper)
         ms = m-mA
@@ -32,6 +32,8 @@ class daqp:
         nb = np.size(bin_ids_cand) 
         if nb > 0:
             bin_ids = np.array(bin_ids_cand,dtype=c_int)
+        else:
+            bin_ids = None
 
         # Setup qp, settings and result
         qp = types.QP(n,m,ms,
@@ -43,7 +45,12 @@ class daqp:
                 np.ascontiguousarray(sense).ctypes.data_as(POINTER(c_int)),
                 np.ascontiguousarray(bin_ids).ctypes.data_as(POINTER(c_int)),
                 nb)
-        daqp_options = types.DAQPSettings()
+        if settings:
+            daqp_options = types.DAQPSettings(**settings)
+            opts_ptr = byref(daqp_options)
+        else:
+            opts_ptr = None
+
         # Create struct to put result in
         result = types.DAQPResult()
         x = np.zeros([n,1]);
@@ -51,7 +58,7 @@ class daqp:
         result.x = np.ascontiguousarray(x).ctypes.data_as(POINTER(c_double));
         result.lam = np.ascontiguousarray(lam).ctypes.data_as(POINTER(c_double));
         # Call C api
-        self._daqp.daqp_quadprog(byref(result),byref(qp),byref(daqp_options))
+        self._daqp.daqp_quadprog(byref(result),byref(qp),opts_ptr)
         # Collect results 
         info = {'solve_time':result.solve_time,
                 'setup_time': result.setup_time,
@@ -61,5 +68,5 @@ class daqp:
         return x, result.fval, result.exitflag, info
 
     def linprog(self, f=None,
-            A=None,bupper=None,blower=None,sense=None, **settings):
+            A=None,bupper=None,blower=None,sense=None, settings={}):
         self.quadprog(None,f,A,bupper,blower,sense, settings)
