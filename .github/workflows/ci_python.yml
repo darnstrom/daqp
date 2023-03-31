@@ -22,14 +22,6 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Build
-        run: |
-          mkdir build
-          mkdir install
-          cd build/
-          cmake -DCMAKE_INSTALL_PREFIX:PATH=../install ..
-          cmake --build . --target install
-          echo "LD_LIBRARY_PATH=${GITHUB_WORKSPACE}/install/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
       - name: Install Python interface
         run: |
           cd interfaces/daqp-python
