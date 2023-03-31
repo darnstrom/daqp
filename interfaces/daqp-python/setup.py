@@ -72,7 +72,7 @@ class build_ext(build_ext_orig):
 
 
 setup(name='daqp',
-        version='0.0',
+        version='0.1.0',
         description='DAQP: A dual active-set QP solver',
         url='http://github.com/darnstrom/daqp',
         author='Daniel Arnström',

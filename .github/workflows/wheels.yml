@@ -1,10 +1,10 @@
 name: Python Wheels
 
 on:
+  workflow_dispatch:
   pull_request:
     branches:
       - master
-  workflow_dispatch:
   push:
     tags:
     - 'v*'
@@ -47,7 +47,7 @@ jobs:
         python -m build . --sdist --outdir wheelhouse
 
     - name: Release to pypi
-      if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags')
+      if: github.event_name = "workflow_dispatch" || (github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags'))
       env:
         TWINE_USERNAME: __token__
         TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN}}
