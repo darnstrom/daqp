@@ -16,6 +16,8 @@ if os.path.exists(src_path):
     copytree(os.path.join(src_path,'codegen'),os.path.join(csrc_dir,'codegen'))
     copyfile(os.path.join(src_path,'CMakeLists.txt'),os.path.join(csrc_dir,'CMakeLists.txt'))
     copyfile(os.path.join(src_path,'LICENSE'),pathlib.Path('./LICENSE'))
+else:
+    print("Could not find daqp directory")
 
 
 class CMakeExtension(Extension):
