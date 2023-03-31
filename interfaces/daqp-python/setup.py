@@ -9,7 +9,7 @@ import pathlib
 # Copy C source
 src_path = pathlib.Path(os.environ["PWD"], "../../../daqp")
 csrc_dir = pathlib.Path('./csrc')
-if os.path.exists(src_path):
+if os.path.exists(src_path) and not os.path.exists(csrc_dir):
     os.mkdir(csrc_dir)
     copytree(os.path.join(src_path,'src'),os.path.join(csrc_dir,'src'))
     copytree(os.path.join(src_path,'include'),os.path.join(csrc_dir,'include'))
