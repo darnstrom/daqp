@@ -23,6 +23,11 @@ class daqp:
     def solve(self):
         self._daqp.daqp_solve(self.work)
 
+    def default_settings(self):
+        opts = types.DAQPSettings()
+        self._daqp.daqp_default_settings(byref(opts))
+        return opts
+
     def quadprog(self, H=None,f=None,
             A=None,bupper=None,blower=None,sense=None, settings={}):
         (mA, n) = np.shape(A)
@@ -35,7 +40,7 @@ class daqp:
         else:
             bin_ids = None
 
-        # Setup qp, settings and result
+        # Setup qp
         qp = types.QP(n,m,ms,
                 np.ascontiguousarray(H).ctypes.data_as(POINTER(c_double)),
                 np.ascontiguousarray(f).ctypes.data_as(POINTER(c_double)),
@@ -45,9 +50,12 @@ class daqp:
                 np.ascontiguousarray(sense).ctypes.data_as(POINTER(c_int)),
                 np.ascontiguousarray(bin_ids).ctypes.data_as(POINTER(c_int)),
                 nb)
+        # Setup settings
         if settings:
-            daqp_options = types.DAQPSettings(**settings)
-            opts_ptr = byref(daqp_options)
+            opts = self.default_settings()
+            for key, val in settings.items():
+                setattr(opts,key,val)
+            opts_ptr = byref(opts)
         else:
             opts_ptr = None
 

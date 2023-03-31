@@ -15,11 +15,6 @@ class QP(Structure):
             ('nb', c_int)]
 
 class DAQPSettings(Structure):
-    def __init__(self, **kwargs):
-        values = type(self)._defaults_.copy()
-        for (key, val) in kwargs.items():
-            values[key] = val
-        super(DAQPSettings, self).__init__(**values)     
     
     _fields_= [('primal_tol', c_double),
             ('dual_tol', c_double),
@@ -34,21 +29,6 @@ class DAQPSettings(Structure):
             ('rho_soft', c_double),
             ('rel_subopt', c_double),
             ('abs_subopt', c_double)]
-
-    _defaults_ = { "primal_tol" : 1e-6,
-            "dual_tol" : 1e-12, 
-            "zero_tol" : 1e-11,
-            "pivot_tol" : 1e-6,
-            "progress_tol" : 1e-14,
-            "cycle_tol" : 10,
-            "iter_limit" : 1000,
-            "fval_bound" : 1e30,
-            "eps_prox" : 0,
-            "eta_prox" : 1e-6,
-            "rho_soft" :1e-3,
-            "rel_subopt" :0,
-            "abs_subopt" :0
-            }
 
 class DAQPResult(Structure):
     _fields_ = [('x', POINTER(c_double)),
