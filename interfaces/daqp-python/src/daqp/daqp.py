@@ -8,22 +8,17 @@ import daqp.types as types
 class daqp:
     def __init__(self):
         # load library
-        if platform.system()=='Windows':
+        ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
+        libdaqp = [os.path.join(ROOT_PATH,f) for f in os.listdir(ROOT_PATH)
+                if f.startswith('libdaqp')]
+        if not libdaqp:
+            print("Could not find dynamic library")
+        else:
             try: 
-                self._daqp=CDLL("libdaqp.dll")
+                self._daqp=CDLL(os.path.join(ROOT_PATH,libdaqp[0]))
             except:
-                try: 
-                    self._daqp=CDLL("daqp.dll")
-                except:
-                    print("Could not locate .dll; Make sure DAQP is installed correctly.")
-        else: # Unix
-            try:
-                self._daqp=CDLL("libdaqp.so")
-            except:
-                try:
-                    self._daqp=CDLL("/usr/local/lib/libdaqp.so")
-                except:
-                    print("Could not locate .so; Make sure DAQP is installed correctly.")
+                print("CDLL failed")
+
 
     def solve(self):
         self._daqp.daqp_solve(self.work)
