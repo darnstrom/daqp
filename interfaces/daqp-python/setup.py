@@ -1,10 +1,22 @@
 from setuptools import setup,find_packages, Extension
 from setuptools.command.build_ext import build_ext as build_ext_orig
 import os
-from shutil import copyfile
+from shutil import copyfile,copytree,rmtree
 from platform import system
 import pathlib
 
+
+# Copy C source
+src_path = pathlib.Path(os.environ["PWD"], "../../../daqp")
+csrc_dir = pathlib.Path('./csrc')
+if os.path.exists(src_path):
+    os.mkdir(csrc_dir)
+    copytree(os.path.join(src_path,'src'),os.path.join(csrc_dir,'src'))
+    copytree(os.path.join(src_path,'include'),os.path.join(csrc_dir,'include'))
+    copytree(os.path.join(src_path,'codegen'),os.path.join(csrc_dir,'codegen'))
+    copyfile(os.path.join(src_path,'CMakeLists.txt'),os.path.join(csrc_dir,'CMakeLists.txt'))
+    copyfile(os.path.join(src_path,'LICENSE'),pathlib.Path('./LICENSE'))
+    copyfile(os.path.join(src_path,'README.md'),pathlib.Path('./README.md'))
 
 
 class CMakeExtension(Extension):
@@ -22,7 +34,8 @@ class build_ext(build_ext_orig):
 
     def build_cmake(self, ext):
         cwd = pathlib.Path().absolute()
-        cmake_path = pathlib.Path().absolute().parents[1]
+        cmake_path = os.path.join(pathlib.Path().absolute(),'csrc')
+
 
         build_temp = pathlib.Path(self.build_temp)
         build_temp.mkdir(parents=True, exist_ok=True)
@@ -53,6 +66,10 @@ class build_ext(build_ext_orig):
             copyfile(os.path.join(build_temp,'libdaqp.dll'),
                      os.path.join(str(extdir.parent.absolute()),'libdaqp.dll'))
 
+def long_description():
+    with open('README.md') as f:
+        return f.read()
+
 setup(name='daqp',
         version='0.0',
         description='DAQP: A dual active-set QP solver',
@@ -64,8 +81,15 @@ setup(name='daqp',
             where='src',
             include=['daqp']),
         package_dir={"": "src"},
+        long_description=long_description(),
         ext_modules=[CMakeExtension('daqp/daqp')],
         cmdclass={
             'build_ext': build_ext,
             },
         zip_safe=False)
+
+# Cleanup C-source
+if os.path.exists(src_path):
+    rmtree(csrc_dir)
+    os.remove(pathlib.Path('./LICENSE'))
+    os.remove(pathlib.Path('./README.md'))
