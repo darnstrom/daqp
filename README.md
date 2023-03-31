@@ -14,7 +14,7 @@ Binary constraints of the form $A x \in \lbrace b_l, b_u \rbrace$ are also suppo
 
 The code is written in C and is *library free*. DAQP can be interfaced to C, Julia, MATLAB, and Python. 
 
-## Quick Install 
+## Quick installation
 
 ### Julia 
 ```bash
