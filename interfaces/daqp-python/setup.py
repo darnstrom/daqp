@@ -83,6 +83,7 @@ setup(name='daqp',
             include=['daqp']),
         package_dir={"": "src"},
         long_description=open('README.md','r').read(),
+        long_description_content_type='text/markdown',
         ext_modules=[CMakeExtension('daqp/daqp')],
         cmdclass={
             'build_ext': build_ext,
