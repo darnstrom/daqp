@@ -2,7 +2,7 @@
 # DAQP
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/darnstrom/daqp/workflows/CI/badge.svg)](https://github.com/darnstrom/daqp/actions)
-[![](https://img.shields.io/badge/docs-online-brightgreen)](https://darnstrom.github.io/daqp/start)
+[![](https://img.shields.io/badge/docs-online-brightgreen)](https://darnstrom.github.io/daqp)
 
 DAQP is a dual active-set solver that solves convex quadratic programs of the form
 ```
