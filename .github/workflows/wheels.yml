@@ -27,11 +27,20 @@ jobs:
 
     - name: Build wheels
       run: |
+        mkdir interfaces/daqp-python/csrc
+        cp -r src interfaces/daqp-python/csrc/src
+        cp -r include interfaces/daqp-python/csrc/include
+        cp -r codegen interfaces/daqp-python/csrc/codegen
+        cp CMakeLists.txt interfaces/daqp-python/csrc/CMakeLists.txt
+        cp LICENSE interfaces/daqp-python/LICENSE
+
         cd interfaces/daqp-python
         python -m pip install --upgrade pip
         python -m pip install --upgrade build
         python -m pip install cibuildwheel
         python -m cibuildwheel --output-dir wheelhouse
+
+        rm -rf csrc
 
     - name: Build source
       if: startsWith(matrix.os, 'ubuntu')
