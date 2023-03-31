@@ -12,7 +12,7 @@ class daqp:
         libdaqp = [os.path.join(ROOT_PATH,f) for f in os.listdir(ROOT_PATH)
                 if f.startswith('libdaqp')]
         if not libdaqp:
-            print("Could not locale dynamic library")
+            print("Could not find dynamic library")
         else:
             try: 
                 self._daqp=CDLL(os.path.join(ROOT_PATH,libdaqp[0]))

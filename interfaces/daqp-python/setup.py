@@ -16,7 +16,6 @@ if os.path.exists(src_path):
     copytree(os.path.join(src_path,'codegen'),os.path.join(csrc_dir,'codegen'))
     copyfile(os.path.join(src_path,'CMakeLists.txt'),os.path.join(csrc_dir,'CMakeLists.txt'))
     copyfile(os.path.join(src_path,'LICENSE'),pathlib.Path('./LICENSE'))
-    copyfile(os.path.join(src_path,'README.md'),pathlib.Path('./README.md'))
 
 
 class CMakeExtension(Extension):
@@ -66,9 +65,6 @@ class build_ext(build_ext_orig):
             copyfile(os.path.join(build_temp,'libdaqp.dll'),
                      os.path.join(str(extdir.parent.absolute()),'libdaqp.dll'))
 
-def long_description():
-    with open('README.md') as f:
-        return f.read()
 
 setup(name='daqp',
         version='0.0',
@@ -81,7 +77,7 @@ setup(name='daqp',
             where='src',
             include=['daqp']),
         package_dir={"": "src"},
-        long_description=long_description(),
+        long_description=open('README.md','r').read(),
         ext_modules=[CMakeExtension('daqp/daqp')],
         cmdclass={
             'build_ext': build_ext,
@@ -92,4 +88,3 @@ setup(name='daqp',
 if os.path.exists(src_path):
     rmtree(csrc_dir)
     os.remove(pathlib.Path('./LICENSE'))
-    os.remove(pathlib.Path('./README.md'))
