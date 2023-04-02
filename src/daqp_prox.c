@@ -128,8 +128,8 @@ static int gradient_step(DAQPWorkspace* work){
         delta_s +=Ax;
 
         if(work->scaling != NULL){
-            Ax *= work->scaling[j];
-            delta_s *= work->scaling[j];
+            Ax /= work->scaling[j];
+            delta_s /= work->scaling[j];
         }
         if(delta_s>0 && // Feasible descent direction
                 work->qp->bupper[j]<DAQP_INF && // Not single-sided

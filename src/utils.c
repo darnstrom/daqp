@@ -58,10 +58,10 @@ int update_ldp(const int mask, DAQPWorkspace *work){
     // TODO: Use mask or something to avoid scaling something more times... 
     if(work->d_ls != NULL && work->scaling !=NULL){
         for(int i=0;i<N_CONSTR; i++){
-            work->d_ls[i]*=work->scaling[i];
-            work->d_us[i]*=work->scaling[i];
-            work->rho_ls[i]/=SQUARE(work->scaling[i]);
-            work->rho_us[i]/=SQUARE(work->scaling[i]);
+            work->d_ls[i]/=work->scaling[i];
+            work->d_us[i]/=work->scaling[i];
+            work->rho_ls[i]*=SQUARE(work->scaling[i]);
+            work->rho_us[i]*=SQUARE(work->scaling[i]);
         }
     }
 #endif
@@ -154,8 +154,8 @@ void update_M(DAQPWorkspace *work, const int mask){
             }
             for(; j<n; ++j){// Take into account scaling in Rinv 
                 for(i=0;i<j;++i)
-                    work->M[disp2-i] += work->scaling[n-j-1]*work->Rinv[--disp]*work->qp->A[disp2-j];
-                work->M[disp2-j]=work->scaling[n-j-1]*work->Rinv[--disp]*work->qp->A[disp2-j];
+                    work->M[disp2-i] += (work->Rinv[--disp]/work->scaling[n-j-1])*work->qp->A[disp2-j];
+                work->M[disp2-j]=(work->Rinv[--disp]/work->scaling[n-j-1])*work->qp->A[disp2-j];
             }
         }
     }
@@ -196,8 +196,8 @@ void update_v(c_float *f, DAQPWorkspace *work, const int mask){
     }
     for(;j>=0;j--){// Take into accoutn scaling in Rinv
         for(i=n-1;i>j;i--)
-            work->v[i] +=work->scaling[j]*work->Rinv[--disp]*f[j];
-        work->v[j]=work->scaling[j]*work->Rinv[--disp]*f[j];
+            work->v[i] +=(work->Rinv[--disp]/work->scaling[j])*f[j];
+        work->v[j]=(work->Rinv[--disp]/work->scaling[j])*f[j];
     }
 }
 
@@ -210,8 +210,8 @@ void update_d(DAQPWorkspace *work){
     // Take into scaling of constraints
     if(work->scaling != NULL){
         for(i = 0;i<N_CONSTR;i++){
-            work->dupper[i] = work->qp->bupper[i]/work->scaling[i];
-            work->dlower[i] = work->qp->blower[i]/work->scaling[i];
+            work->dupper[i] = work->qp->bupper[i]*work->scaling[i];
+            work->dlower[i] = work->qp->blower[i]*work->scaling[i];
         }
     }
     else{
@@ -256,15 +256,15 @@ void normalize_Rinv(DAQPWorkspace* work){
             for(j=i; j < NX; j++,disp++){
                 scaling_i+=work->Rinv[disp]*work->Rinv[disp];
             }
-            scaling_i = sqrt(scaling_i);
+            scaling_i = 1/sqrt(scaling_i);
             work->scaling[i] = scaling_i; // Need to save to correctly retrieve solution
             for(j=i,disp-=(NX-i); j < NX; j++,disp++)
-                work->Rinv[disp]/= scaling_i;
+                work->Rinv[disp]*= scaling_i;
         }
     }
     else if(work->RinvD != NULL){
         for(i=0;i<N_SIMPLE;i++)
-            work->scaling[i] = work->RinvD[i];
+            work->scaling[i] = 1/work->RinvD[i];
     }
 }
 void normalize_M(DAQPWorkspace* work){
@@ -279,10 +279,10 @@ void normalize_M(DAQPWorkspace* work){
             work->sense[i] = IMMUTABLE; // ignore zero-row constraint
             continue; // TODO: mark infeasibility if dupper & dlower are nonzero
         }
-        scaling_i = sqrt(scaling_i);
+        scaling_i = 1/sqrt(scaling_i);
         work->scaling[i]=scaling_i;
         for(j=0, disp-=NX;j<NX;j++,disp++)
-            work->M[disp]/=scaling_i;
+            work->M[disp]*=scaling_i;
     }
 }
 
