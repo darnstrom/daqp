@@ -20,17 +20,21 @@ int update_ldp(const int mask, DAQPWorkspace *work){
         error_flag = update_Rinv(work);
         if(error_flag<0)
             return error_flag;
-        normalize_Rinv(work);
     }
     /** Update M **/
     if(mask&UPDATE_Rinv||mask&UPDATE_M){
-        update_M(work);
+        update_M(work,mask);
         normalize_M(work);
     }
 
     /** Update v **/
     if(mask&UPDATE_Rinv||mask&UPDATE_v){
-        update_v(work->qp->f,work);
+        update_v(work->qp->f,work,mask);
+    }
+
+    // Normalize Rinv
+    if(mask&UPDATE_Rinv){
+        normalize_Rinv(work);
     }
 
     /** Update d **/
@@ -135,14 +139,15 @@ int update_Rinv(DAQPWorkspace *work){
     return 1;
 }
 
-void update_M(DAQPWorkspace *work){
+void update_M(DAQPWorkspace *work, const int mask){
     int i,j,k,disp,disp2;
     const int n = NX;
     const int mA = N_CONSTR-N_SIMPLE;
+    int stop_id =  (UPDATE_Rinv &mask) ? NX : NX-N_SIMPLE;
     if(work->Rinv != NULL){
         for(k = 0,disp2=n*mA-1;k<mA;k++,disp2-=n){
             disp=ARSUM(n);
-            for(j = 0; j<NX-N_SIMPLE; ++j){
+            for(j = 0; j< stop_id ; ++j){
                 for(i=0;i<j;++i)
                     work->M[disp2-i] += work->Rinv[--disp]*work->qp->A[disp2-j];
                 work->M[disp2-j]=work->Rinv[--disp]*work->qp->A[disp2-j];
@@ -164,7 +169,7 @@ void update_M(DAQPWorkspace *work){
     reset_daqp_workspace(work); // Internal factorizations need to be redone!
 }
 
-void update_v(c_float *f, DAQPWorkspace *work){
+void update_v(c_float *f, DAQPWorkspace *work, const int mask){
     int i,j,disp;
     const int n = NX;
     if(work->v == NULL || f == NULL) return;
@@ -175,7 +180,8 @@ void update_v(c_float *f, DAQPWorkspace *work){
             for(i=0;i<n;++i) work->v[i] = f[i];
         return;
     }
-    for(j=n-1,disp=ARSUM(n);j>=N_SIMPLE;j--){
+    int stop_id =  (mask & UPDATE_Rinv) ? 0 : N_SIMPLE;
+    for(j=n-1,disp=ARSUM(n);j>=stop_id;j--){
         for(i=n-1;i>j;i--)
             work->v[i] +=work->Rinv[--disp]*f[j];
         work->v[j]=work->Rinv[--disp]*f[j];
