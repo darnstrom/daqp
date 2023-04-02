@@ -65,6 +65,36 @@ int update_ldp(const int mask, DAQPWorkspace *work){
 int update_Rinv(DAQPWorkspace *work){
     int i,j,k,disp,disp2,disp3;
     const int n = NX; 
+        // Check if diagonal
+    int is_diagonal = 1;
+    for (i=0,disp=1; i<n; i++, disp+=i+1){
+        for (j=1; j<n-i; j++,disp++) {
+            if(work->qp->H[disp] > 1e-12 || work->qp->H[disp] < -1e-12){
+                is_diagonal=0;
+                break;
+            }
+        }
+        if(is_diagonal == 0) break;
+    }
+
+    // If diagonal, just keep track of variable scaling and use Rinv = I
+    if(is_diagonal==1){
+        work->RinvD = work->Rinv;
+        work->Rinv = NULL;
+        for(i=0, disp=0; i < n; i++,disp+=n){
+            if (work->qp->H[disp] <= 0) return EXIT_NONCONVEX;
+            work->RinvD[i] = 1/sqrt(work->qp->H[disp++]);
+        }
+        return 1;
+    }
+    // Make sure Rinv can be assinged if not diagonal
+    //(necessary if H change from diagonal to non-diagonal)
+    if(work->RinvD != NULL && work->Rinv ==NULL){
+        work->Rinv= work->RinvD;
+        work->RinvD = NULL;
+    }
+
+
     // Cholesky
     for (i=0,disp=0,disp3=0; i<n; disp+=n-i,i++,disp3+=i) {
         // Diagonal element
@@ -72,7 +102,7 @@ int update_Rinv(DAQPWorkspace *work){
         for (k=0,disp2=i; k<i; k++,disp2+=n-k) 
             work->Rinv[disp] -= work->Rinv[disp2]*work->Rinv[disp2];
         if (work->Rinv[disp] <= 0) return EXIT_NONCONVEX; // Not positive definite 
-                                                          //TODO: handle singular case by regularization
+
         work->Rinv[disp] = sqrt(work->Rinv[disp]);
 
         // Off-diagonal elements
@@ -107,19 +137,28 @@ void update_M(DAQPWorkspace *work){
     int i,j,k,disp,disp2;
     const int n = NX;
     const int mA = N_CONSTR-N_SIMPLE;
-    for(k = 0,disp2=n*mA-1;k<mA;k++,disp2-=n){
-        disp=ARSUM(n);
-        for(j = 0; j<NX-N_SIMPLE; ++j){
-            for(i=0;i<j;++i)
-                work->M[disp2-i] += work->Rinv[--disp]*work->qp->A[disp2-j];
-            work->M[disp2-j]=work->Rinv[--disp]*work->qp->A[disp2-j];
-        }
-        for(; j<n; ++j){// Take into account scaling in Rinv 
-            for(i=0;i<j;++i)
-                work->M[disp2-i] += work->scaling[n-j-1]*work->Rinv[--disp]*work->qp->A[disp2-j];
-            work->M[disp2-j]=work->scaling[n-j-1]*work->Rinv[--disp]*work->qp->A[disp2-j];
+    if(work->Rinv != NULL){
+        for(k = 0,disp2=n*mA-1;k<mA;k++,disp2-=n){
+            disp=ARSUM(n);
+            for(j = 0; j<NX-N_SIMPLE; ++j){
+                for(i=0;i<j;++i)
+                    work->M[disp2-i] += work->Rinv[--disp]*work->qp->A[disp2-j];
+                work->M[disp2-j]=work->Rinv[--disp]*work->qp->A[disp2-j];
+            }
+            for(; j<n; ++j){// Take into account scaling in Rinv 
+                for(i=0;i<j;++i)
+                    work->M[disp2-i] += work->scaling[n-j-1]*work->Rinv[--disp]*work->qp->A[disp2-j];
+                work->M[disp2-j]=work->scaling[n-j-1]*work->Rinv[--disp]*work->qp->A[disp2-j];
+            }
         }
     }
+    else if(work->RinvD != NULL){ 
+        for(k = 0,disp=0;k<mA;k++){
+            for(i=0;i<NX;i++,disp++)
+                work->M[disp] = work->qp->A[disp]*work->RinvD[i];
+        }
+    }
+
     reset_daqp_workspace(work); // Internal factorizations need to be redone!
 }
 
@@ -128,7 +167,10 @@ void update_v(c_float *f, DAQPWorkspace *work){
     const int n = NX;
     if(work->v == NULL || f == NULL) return;
     if(work->Rinv == NULL){// Rinv = I => v = R'\v = f
-        for(i=0;i<n;++i) work->v[i] = f[i];
+        if(work->RinvD != NULL)
+            for(i=0;i<n;++i) work->v[i] = f[i]*work->RinvD[i];
+        else
+            for(i=0;i<n;++i) work->v[i] = f[i];
         return;
     }
     for(j=n-1,disp=ARSUM(n);j>=N_SIMPLE;j--){
@@ -203,6 +245,10 @@ void normalize_Rinv(DAQPWorkspace* work){
             for(j=i,disp-=(NX-i); j < NX; j++,disp++)
                 work->Rinv[disp]/= scaling_i;
         }
+    }
+    else if(work->RinvD != NULL){
+        for(i=0;i<N_SIMPLE;i++)
+            work->scaling[i] = work->RinvD[i];
     }
 }
 void normalize_M(DAQPWorkspace* work){

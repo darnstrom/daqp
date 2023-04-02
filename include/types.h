@@ -100,6 +100,7 @@ typedef struct{
     c_float *v; // v = R'\f (used to transform QP to LDP 
     int *sense; // State of constraints  
     c_float *scaling; // normalizations 
+    c_float *RinvD; // in case Rinv is diagonal
 
 
     // Iterates

@@ -83,6 +83,9 @@ void ldp2qp_solution(DAQPWorkspace *work){
                 work->lam_star[i]/=work->scaling[work->WS[i]];
         }
     }
+    else if(work->RinvD != NULL){
+        for(i=0;i<NX;i++) work->x[i] *= work->RinvD[i];
+    }
 }
 
 void warmstart_workspace(DAQPWorkspace* work, int* WS, const int n_active){
