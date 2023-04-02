@@ -87,9 +87,22 @@ int update_Rinv(DAQPWorkspace *work){
     if(is_diagonal==1){
         work->RinvD = work->Rinv;
         work->Rinv = NULL;
-        for(i=0, disp=0; i < n; i++,disp+=n){
-            if (work->qp->H[disp] <= 0) return EXIT_NONCONVEX;
-            work->RinvD[i] = 1/sqrt(work->qp->H[disp++]);
+        c_float Hi;
+        i=0; disp=0;
+        if(work->scaling != NULL){
+            for(;i<N_SIMPLE;i++,disp+=n){ // Combine with settings scaling
+                Hi = work->qp->H[disp++];
+                if (Hi <= 0) return EXIT_NONCONVEX;
+                Hi = sqrt(Hi);
+                work->RinvD[i] = 1/Hi;
+                work->scaling[i] = Hi;
+            }
+        }
+        for(;i<n;i++,disp+=n){
+            Hi = work->qp->H[disp++];
+            if (Hi <= 0) return EXIT_NONCONVEX;
+            Hi = sqrt(Hi);
+            work->RinvD[i] = 1/Hi;
         }
         return 1;
     }
@@ -261,10 +274,6 @@ void normalize_Rinv(DAQPWorkspace* work){
             for(j=i,disp-=(NX-i); j < NX; j++,disp++)
                 work->Rinv[disp]*= scaling_i;
         }
-    }
-    else if(work->RinvD != NULL){
-        for(i=0;i<N_SIMPLE;i++)
-            work->scaling[i] = 1/work->RinvD[i];
     }
 }
 void normalize_M(DAQPWorkspace* work){
