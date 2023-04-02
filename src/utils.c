@@ -159,10 +159,18 @@ void update_M(DAQPWorkspace *work, const int mask){
             }
         }
     }
-    else if(work->RinvD != NULL){ 
-        for(k = 0,disp=0;k<mA;k++){
-            for(i=0;i<NX;i++,disp++)
-                work->M[disp] = work->qp->A[disp]*work->RinvD[i];
+    else{
+        if(work->RinvD == NULL){ // Copy A to M 
+            for(k = 0,disp=0;k<mA;k++){
+                for(i=0;i<NX;i++,disp++)
+                    work->M[disp] = work->qp->A[disp];
+            }
+        }
+        else{
+            for(k = 0,disp=0;k<mA;k++){
+                for(i=0;i<NX;i++,disp++)
+                    work->M[disp] = work->qp->A[disp]*work->RinvD[i];
+            }
         }
     }
 

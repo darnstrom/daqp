@@ -81,8 +81,10 @@ int daqp_prox(DAQPWorkspace *work){
     }
     // Finalize results
     if(total_iter >= work->settings->iter_limit) exitflag = EXIT_ITERLIMIT; 
-    if(work->Rinv == NULL)
-        for(i = 0; i<work->n_active;i++) work->lam_star[i]/=eps;// Rescale dual variables
+    if(work->Rinv == NULL){
+        for(i = 0; i<work->n_active;i++) 
+            work->lam_star[i]/=eps;// Rescale dual variables
+    }
     work->iterations = total_iter;
     return exitflag;
 }
@@ -125,6 +127,10 @@ static int gradient_step(DAQPWorkspace* work){
         }
         delta_s +=Ax;
 
+        if(work->scaling != NULL){
+            Ax *= work->scaling[j];
+            delta_s *= work->scaling[j];
+        }
         if(delta_s>0 && // Feasible descent direction
                 work->qp->bupper[j]<DAQP_INF && // Not single-sided
                 work->qp->bupper[j]-Ax < delta_s*min_alpha){
