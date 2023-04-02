@@ -6,6 +6,15 @@
 int update_ldp(const int mask, DAQPWorkspace *work){
     // TODO: copy dimensions from work->qp? 
     int error_flag;
+
+    /** Update constraint sense **/
+    if(mask&UPDATE_sense){
+        if(work->qp->sense == NULL) // Assume all constraints are "normal" inequality constraints
+            for(int i=0;i<N_CONSTR;i++) work->sense[i] = 0;
+        else
+            for(int i=0;i<N_CONSTR;i++) work->sense[i] = work->qp->sense[i];
+    }
+
     /** Update Rinv **/
     if(mask&UPDATE_Rinv){
         error_flag = update_Rinv(work);
@@ -40,13 +49,6 @@ int update_ldp(const int mask, DAQPWorkspace *work){
         update_d(work);
     }
 
-    /** Update constraint sense **/
-    if(mask&UPDATE_sense){
-        if(work->qp->sense == NULL) // Assume all constraints are "normal" inequality constraints
-            for(int i=0;i<N_CONSTR;i++) work->sense[i] = 0;
-        else
-            for(int i=0;i<N_CONSTR;i++) work->sense[i] = work->qp->sense[i];
-    }
 
 #ifdef SOFT_WEIGHTS
     // TODO: Use mask or something to avoid scaling something more times... 
@@ -259,13 +261,12 @@ void normalize_M(DAQPWorkspace* work){
         scaling_i = 0;
         for(j=0;j<NX;disp++,j++)
             scaling_i+=work->M[disp]*work->M[disp];
-        //if(!(scaling_i >= 0)) return EXIT_ILLPOSED;
-        scaling_i = sqrt(scaling_i); 
-        work->scaling[i]=scaling_i;
         if(scaling_i < work->settings->zero_tol){
             work->sense[i] = IMMUTABLE; // ignore zero-row constraint
             continue; // TODO: mark infeasibility if dupper & dlower are nonzero
         }
+        scaling_i = sqrt(scaling_i);
+        work->scaling[i]=scaling_i;
         for(j=0, disp-=NX;j<NX;j++,disp++)
             work->M[disp]/=scaling_i;
     }
