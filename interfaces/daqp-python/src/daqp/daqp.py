@@ -61,8 +61,8 @@ class daqp:
 
         # Create struct to put result in
         result = types.DAQPResult()
-        x = np.zeros([n,1]);
-        lam = np.zeros([m,1]);
+        x = np.zeros(n);
+        lam = np.zeros(m);
         result.x = np.ascontiguousarray(x).ctypes.data_as(POINTER(c_double));
         result.lam = np.ascontiguousarray(lam).ctypes.data_as(POINTER(c_double));
         # Call C api
