@@ -53,7 +53,6 @@ In the REPL run the command
 ```
 
 ## Installing the Python interface
-Move to the `daqp-python` subdirectory and call pip from the shell:
 ```shell
-pip install .
+pip install daqp 
 ```

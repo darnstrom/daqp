@@ -71,7 +71,7 @@ void compute_primal_and_fval(DAQPWorkspace *work){
             else
                 fval+=SQUARE(work->lam_star[i])*work->rho_us[work->WS[i]];
 #else
-            fval+= SQUARE(work->lam_star[i])/SQUARE(work->scaling[work->WS[i]]);
+            fval+= SQUARE(work->lam_star[i]*work->scaling[work->WS[i]]);
 #endif
         }
     }
@@ -86,7 +86,8 @@ void compute_primal_and_fval(DAQPWorkspace *work){
 }
 int add_infeasible(DAQPWorkspace *work){
     int j,k,disp;
-    c_float min_val = -work->settings->primal_tol;
+    c_float ep = -work->settings->primal_tol;
+    c_float min_val = ep;
     c_float Mu,min_cand;
     int isupper=0, add_ind=EMPTY_IND;
     // Simple bounds 
@@ -105,13 +106,13 @@ int add_infeasible(DAQPWorkspace *work){
                 Mu+=work->Rinv[disp++]*work->u[k];
         }
         min_cand = work->dupper[j]-Mu;
-        if(min_cand < min_val){
+        if(min_cand < min_val && (work->scaling == NULL || min_cand < ep*work->scaling[j])){
             add_ind = j; isupper = 1;
             min_val = min_cand;
         }
         else{
             min_cand = Mu - work->dlower[j];
-            if(min_cand < min_val){
+            if(min_cand < min_val && (work->scaling == NULL || min_cand < ep*work->scaling[j])){
                 add_ind = j; isupper = 0;
                 min_val = min_cand;
             }
@@ -128,13 +129,13 @@ int add_infeasible(DAQPWorkspace *work){
             Mu+=work->M[disp++]*work->u[k];
 
         min_cand = work->dupper[j]-Mu;
-        if(min_cand < min_val){
+        if(min_cand < min_val && (work->scaling == NULL || min_cand < ep*work->scaling[j])){
             add_ind = j; isupper = 1;
             min_val = min_cand;
         }
         else{
             min_cand = Mu - work->dlower[j];
-            if(min_cand < min_val){
+            if(min_cand < min_val && (work->scaling == NULL || min_cand < ep*work->scaling[j])){
                 add_ind = j; isupper = 0;
                 min_val = min_cand;
             }

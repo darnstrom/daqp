@@ -96,6 +96,47 @@ classdef core_test < matlab.unittest.TestCase
             fprintf('=============================================================\n')
         end
 
+        function random_feasible_LDPs(testCase)
+            % Test on randomly generated feasible LPs
+            rng('default');
+            nQPs = 50;
+            n = 100; m = 500; ms = 50;
+            nAct = 80;
+            cond = 1e2;
+            tol = 1e-5;
+            solve_times = zeros(nQPs,1);
+            solve_errors = zeros(nQPs,1);
+            for i = 1:nQPs
+                [uref,M,dupper,dlower,sense]=generate_test_LDP(n,m,ms,nAct,cond);
+                d = daqp();
+                d.setup([],[],M,dupper,dlower,sense);
+                [u,fval,exitflag, info] = d.solve();
+
+                testCase.verifyEqual(exitflag,int32(1));
+                testCase.verifyLessThan(norm(u-uref),tol);
+                testCase.verifyLessThan(norm(u+[eye(ms,n);M]'*info.lambda),tol);
+                solve_times(i) = info.solve_time;
+                solve_errors(i) = norm(u-uref);
+            end
+            fprintf('\n========================== DALDP ============================\n')
+            fprintf('Solve times [s]: |avg: %2.6f| max: %2.6f| min %2.6f|\n',mean(solve_times),max(solve_times),min(solve_times))
+            fprintf('Solution Errors: |avg: %2.2e| max: %2.2e| min %2.2e|\n',mean(solve_errors),max(solve_errors),min(solve_errors))
+            fprintf('=============================================================\n')
+        end
+
+        function diagonalTest(testCase)
+            nQPs = 10;
+            n=50; m= 500; ms= 25;
+            nAct = 25; kappa = 1e2;
+            tol = 1e-5;
+            for i = 1:nQPs
+                [xref,H,f,A,bupper,blower,sense]=generate_test_QP(n,m,ms,nAct,kappa,1);
+                [x,fval,exitflag,info] = daqp.quadprog(H,f,A,bupper,blower,sense);
+                testCase.verifyLessThan(norm(x-xref),tol);
+            end
+
+        end
+
         function feasibility(testCase)
             n = 25; m = 500;
             nQPs = 50;
@@ -107,7 +148,7 @@ classdef core_test < matlab.unittest.TestCase
                 testCase.verifyEqual(exitflag,int32(1));
             end
 
-            r =  -1e-6-1e-7
+            r =  -1e-6-1e-7;
             for i = 1:nQPs
                 [A,bupper,blower,sense] =generate_test_feasibility(n,m,r);
                 [x,fval,exitflag,daqp_infeas_info] = daqp.quadprog([],[],A,bupper,blower,sense);

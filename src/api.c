@@ -114,36 +114,31 @@ int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp){
     work->ms = qp->ms;
     work->qp = qp;
 
-    // Allocate memory for Rinv and M 
+    // Always allocate scaling, M ,dupper, dlower,sense
+    work->scaling= malloc(qp->m*sizeof(c_float));
+    for(int i =0; i < work->qp->ms; i++) work->scaling[i] =1;
+    work->M = malloc(qp->n*(qp->m-qp->ms)*sizeof(c_float));
+    work->dupper = malloc(qp->m*sizeof(c_float));
+    work->dlower = malloc(qp->m*sizeof(c_float));
+    work->sense = malloc(qp->m*sizeof(int));
+    update_mask += UPDATE_M+UPDATE_d+UPDATE_sense;
+
+    // Allocate memory for Rinv
+    work->RinvD = NULL;
     if(qp->H!=NULL){ 
         work->Rinv = malloc(((qp->n+1)*qp->n/2)*sizeof(c_float));
-        work->M = malloc(qp->n*(qp->m-qp->ms)*sizeof(c_float));
-        work->scaling= malloc(qp->m*sizeof(c_float));
-        update_mask += UPDATE_Rinv+UPDATE_M;
+        update_mask += UPDATE_Rinv;
     }
-    else{// H = I =>  no need to transform H->Rinv and M->A 
+    else// H = I =>  no need to transform H->Rinv
         work->Rinv = NULL;
-        work->M = qp->A;
-        work->scaling = NULL;
-    }
 
     // Allocate memory for d and v 
     if(qp->f!=NULL || work->settings->eps_prox != 0){
-        work->dupper = malloc(qp->m*sizeof(c_float));
-        work->dlower = malloc(qp->m*sizeof(c_float));
         work->v = malloc(qp->n*sizeof(c_float));
-        update_mask+=UPDATE_v+UPDATE_d;
+        update_mask+=UPDATE_v;
     }
-    else{ // f = 0 => no need to transform f->v and b->d 
+    else // f = 0 => no need to transform f->v
         work->v= NULL;
-        work->dupper = qp->bupper; 
-        work->dlower = qp->blower; 
-    }
-
-    // Allocate memory for local constraint states
-    work->sense = malloc(qp->m*sizeof(int));
-    update_mask += UPDATE_sense;
-
 
 #ifdef SOFT_WEIGHTS
     // Allocate memory for soft weights
@@ -192,11 +187,16 @@ void free_daqp_ldp(DAQPWorkspace *work){
     free(work->sense);
     if(work->Rinv != NULL){
         free(work->Rinv);
-        free(work->scaling);
-        free(work->M);
+    }
+    if(work->RinvD != NULL){
+        free(work->RinvD);
     }
     if(work->v != NULL){
         free(work->v);
+    }
+    if(work->scaling != NULL){
+        free(work->scaling);
+        free(work->M);
         free(work->dupper);
         free(work->dlower);
     }

@@ -4,8 +4,8 @@
 // Utils for transforming QP to LDP
 int update_ldp(const int mask, DAQPWorkspace *work);
 int update_Rinv(DAQPWorkspace *work);
-void update_M(DAQPWorkspace *work);
-void update_v(c_float *f, DAQPWorkspace *work);
+void update_M(DAQPWorkspace *work, const int mask);
+void update_v(c_float *f, DAQPWorkspace *work, const int mask);
 void update_d(DAQPWorkspace *work);
 void normalize_Rinv(DAQPWorkspace *work);
 void normalize_M(DAQPWorkspace *work);
