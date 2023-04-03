@@ -1,15 +1,24 @@
-function [x,H,f,A,bupper,blower,sense] = generate_test_QP(n,m,ms,nActive,kappa)
+function [x,H,f,A,bupper,blower,sense] = generate_test_QP(n,m,ms,nActive,kappa,makediag)
   % * Transform QP to LDP with T = L Q' (where L is diagonal and Q is orthogonal) 
   % to get solution  u =T(x+f) (=> H = T'*T, f = T'*v) 
   % Construct eigenvalues such that cond(H) = kappa 
-  eigens = zeros(n,1);   
-  eigens(1) = 1; eigens(2) = kappa;
-  eigens(3:end) = 1+(kappa-1)*rand(n-2,1);
-  % Randomly generate an orthogonal matrix 
-  [Q,~] = qr(randn(n));
-  T= diag(sqrt(eigens))*Q';
-  Tinv = Q*diag(1./sqrt(eigens));
-  H = T' * T;
+  if(nargin<6)
+      makediag = 0;
+  end
+  if(makediag == 0)
+      eigens = zeros(n,1);   
+      eigens(1) = 1; eigens(2) = kappa;
+      eigens(3:end) = 1+(kappa-1)*rand(n-2,1);
+      % Randomly generate an orthogonal matrix 
+      [Q,~] = qr(randn(n));
+      T= diag(sqrt(eigens))*Q';
+      Tinv = Q*diag(1./sqrt(eigens));
+      H = T' * T;
+  else
+      T = diag(sqrt(linspace(1,kappa,n)));
+      H = T'*T;
+      Tinv = inv(T);
+  end
   
   % * Generate solution to min ||u||_2^2 s.t. dlower <= M u <= dupper *
   M = [Tinv(1:ms,:);randn(m-ms,n)]; % First row ms rows corresponds to simple bounds 
