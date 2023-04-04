@@ -1,9 +1,10 @@
 from setuptools import setup,find_packages, Extension
-from setuptools.command.build_ext import build_ext as build_ext_orig
 import os
 from shutil import copyfile,copytree,rmtree
 from platform import system
 import pathlib
+from Cython.Distutils import build_ext 
+from Cython.Build import cythonize
 
 
 # Copy C source
@@ -22,19 +23,19 @@ if src_path and os.path.exists(src_path) and not os.path.exists(csrc_dir):
 else:
     print("Could not find daqp directory")
 
-
 class CMakeExtension(Extension):
-
     def __init__(self, name):
         super().__init__(name, sources=[])
 
-
-class build_ext(build_ext_orig):
-
-    def run(self):
-        for ext in self.extensions:
-            self.build_cmake(ext)
+class ExtensionBuilder(build_ext):
+    def run(self) -> None:
         super().run()
+
+    def build_extension(self, ext: Extension) -> None:
+        if isinstance(ext, CMakeExtension):
+            self.build_cmake(ext)
+        else:
+            super().build_extension(ext)
 
     def build_cmake(self, ext):
         cwd = pathlib.Path().absolute()
@@ -70,6 +71,11 @@ class build_ext(build_ext_orig):
             copyfile(os.path.join(build_temp,'libdaqp.dll'),
                      os.path.join(str(extdir.parent.absolute()),'libdaqp.dll'))
 
+cython_ext = Extension('daqp',
+        ['daqp.pyx','daqp.pxd'],
+        libraries=['daqp'],
+        library_dirs=['.'],
+        include_dirs=['csrc/include'])
 
 setup(name='daqp',
         version='0.1.0',
@@ -78,16 +84,15 @@ setup(name='daqp',
         author='Daniel Arnström',
         author_email='daniel.arnstrom@liu.se',
         license='MIT',
-        packages=find_packages(
-            where='src',
-            include=['daqp']),
-        package_dir={"": "src"},
         long_description=open('README.md','r').read(),
         long_description_content_type='text/markdown',
-        ext_modules=[CMakeExtension('daqp/daqp')],
-        cmdclass={
-            'build_ext': build_ext,
-            },
+        ext_modules=[CMakeExtension('daqplib'),cython_ext],
+        cmdclass={'build_ext': ExtensionBuilder},
+        #cmdclass={
+        #    'build_ext': build_ext,
+        #    },
+        package_data = {'':["daqp.pyx","daqp.pxd"]},
+        include_package_data = True,
         zip_safe=False)
 
 # Cleanup C-source

@@ -23,8 +23,7 @@ class Testing(unittest.TestCase):
         bupper = np.array([1, 2, 3, 4], dtype=c_double)
         blower = np.array([-1, -2, -3, -4], dtype=c_double)
         sense = np.array([0, 0, 0, 0], dtype=c_int)
-        d = daqp.daqp()
-        (xstar, fval, exitflag, info) = d.quadprog(H, f, A, bupper, blower, sense)
+        xstar, fval, exitflag, lam = daqp.solve(H, f, A, bupper, blower, sense)
         self.assertEqual(exitflag, 1)
 
 
