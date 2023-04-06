@@ -23,58 +23,19 @@ if src_path and os.path.exists(src_path) and not os.path.exists(csrc_dir):
 else:
     print("Could not find daqp directory")
 
-class CMakeExtension(Extension):
-    def __init__(self, name):
-        super().__init__(name, sources=[])
-
-class ExtensionBuilder(build_ext):
-    def run(self) -> None:
-        super().run()
-
-    def build_extension(self, ext: Extension) -> None:
-        if isinstance(ext, CMakeExtension):
-            self.build_cmake(ext)
-        else:
-            super().build_extension(ext)
-
-    def build_cmake(self, ext):
-        cwd = pathlib.Path().absolute()
-        cmake_path = os.path.join(pathlib.Path().absolute(),'csrc')
-
-
-        build_temp = pathlib.Path(self.build_temp)
-        build_temp.mkdir(parents=True, exist_ok=True)
-        extdir = pathlib.Path(self.get_ext_fullpath(ext.name))
-        extdir.mkdir(parents=True, exist_ok=True)
-
-        config = 'Debug' if self.debug else 'Release'
-        cmake_args = [
-            '-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + str(extdir.parent.absolute()),
-            '-DCMAKE_BUILD_TYPE=' + config
-        ]
-
-        if system() == 'Windows':
-            cmake_args += ['-G', 'MinGW Makefiles']
-        else:  # Unix 
-            cmake_args += ['-G', 'Unix Makefiles']
-
-        build_args = [
-        ]
-
-        os.chdir(str(build_temp))
-        self.spawn(['cmake', str(cmake_path)] + cmake_args)
-        if not self.dry_run:
-            self.spawn(['cmake', '--build', '.'] + build_args)
-        os.chdir(str(cwd))
-
-        if system() == 'Windows':
-            copyfile(os.path.join(build_temp,'libdaqp.dll'),
-                     os.path.join(str(extdir.parent.absolute()),'libdaqp.dll'))
 
 cython_ext = Extension('daqp',
-        ['daqp.pyx','daqp.pxd'],
-        libraries=['daqp'],
+        sources = ['daqp.pyx','daqp.pxd', 
+            'csrc/src/api.c', 
+            'csrc/src/auxiliary.c', 
+            'csrc/src/bnb.c', 
+            'csrc/src/daqp.c', 
+            'csrc/src/daqp_prox.c', 
+            'csrc/src/factorization.c', 
+            'csrc/src/utils.c', 
+            ],
         library_dirs=['.'],
+        extra_compile_args=["-O3"],
         include_dirs=['csrc/include'])
 
 setup(name='daqp',
@@ -86,11 +47,8 @@ setup(name='daqp',
         license='MIT',
         long_description=open('README.md','r').read(),
         long_description_content_type='text/markdown',
-        ext_modules=[CMakeExtension('daqplib'),cython_ext],
-        cmdclass={'build_ext': ExtensionBuilder},
-        #cmdclass={
-        #    'build_ext': build_ext,
-        #    },
+        ext_modules=cythonize(cython_ext),
+        cmdclass={'build_ext': build_ext},
         package_data = {'':["daqp.pyx","daqp.pxd"]},
         include_package_data = True,
         zip_safe=False)
