@@ -50,3 +50,5 @@ cdef extern from "api.h":
     
     cdef extern nogil:
         int daqp_quadprog(DAQPResult *res, DAQPProblem *prob, DAQPSettings *settings)
+    cdef extern nogil:
+        int daqp_default_settings(DAQPSettings *settings)

@@ -1,5 +1,5 @@
 ## Test quadprog
-import daqpcy
+import daqp
 import numpy as np
 from ctypes import * 
 import ctypes.util
@@ -11,7 +11,8 @@ bupper = np.array([1,1],dtype=c_double)
 blower= np.array([-1,-1],dtype=c_double)
 sense = np.array([0,0],dtype=c_int)
 
-x,fval,exitflag,lam = daqpcy.solve(H,f,A,bupper,blower,sense)
+x,fval,exitflag,info = daqp.solve(H,f,A,bupper,blower,sense)
 print("Optimal solution:")
 print(x)
 print("Exit flag:",exitflag)
+print("Info:",info)
