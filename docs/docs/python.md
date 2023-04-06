@@ -32,8 +32,7 @@ sense = np.array([0,0,0,0],dtype=c_int)
 Note: When $$b_u$$ and $$b_l$$ has more elements than the number of rows in $$A$$, the first elements in $$b_u$$ and $$b_l$$ are interpreted as simple bounds. 
 
 ## Calling DAQP
-DAQP can be called through a quadprog call: 
+DAQP can be called as: 
 ```python
-d = daqp.daqp()
-(xstar,fval,exitflag,info) = d.quadprog(H,f,A,bupper,blower,sense)
+(xstar,fval,exitflag,info) = daqp.solve(H,f,A,bupper,blower,sense)
 ```
