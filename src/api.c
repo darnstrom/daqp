@@ -49,6 +49,7 @@ void daqp_quadprog(DAQPResult *res, DAQPProblem* qp, DAQPSettings *settings){
     if(setup_flag >= 0){
         daqp_solve(res,&work);
         // Free memory
+        if(settings != NULL) work.settings = NULL;
         free_daqp_workspace(&work);
         free_daqp_ldp(&work);
     }
