@@ -34,7 +34,6 @@ void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
 #else
     res->solve_time = 0; 
 #endif
-    res->setup_time = 0; 
 }
 
 // Setup and solve problem

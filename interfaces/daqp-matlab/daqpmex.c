@@ -132,6 +132,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  // Solve problem
 	  daqp_solve(&result,work); 
 	  // Extract solution information
+	  result.setup_time = 0; // solve is called on a setup problem
 	  exitflag[0] = result.exitflag; 
 	  plhs[1] = mxCreateDoubleScalar(result.fval);
 
