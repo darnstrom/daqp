@@ -39,7 +39,7 @@ cython_ext = Extension('daqp',
         include_dirs=['csrc/include'])
 
 setup(name='daqp',
-        version='0.4.0',
+        version='0.4.1',
         description='DAQP: A dual active-set QP solver',
         url='http://github.com/darnstrom/daqp',
         author='Daniel Arnström',
@@ -49,8 +49,6 @@ setup(name='daqp',
         long_description_content_type='text/markdown',
         ext_modules=cythonize(cython_ext),
         cmdclass={'build_ext': build_ext},
-        package_data = {'':["daqp.pyx","daqp.pxd"]},
-        include_package_data = True,
         zip_safe=False)
 
 # Cleanup C-source

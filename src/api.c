@@ -34,35 +34,30 @@ void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
 #else
     res->solve_time = 0; 
 #endif
-    res->setup_time = 0; 
 }
 
 // Setup and solve problem
 void daqp_quadprog(DAQPResult *res, DAQPProblem* qp, DAQPSettings *settings){
     int setup_flag;
-    c_float setup_time=0;
 
     DAQPWorkspace work;
-    work.settings = NULL;
-    setup_flag = setup_daqp(qp,&work,&setup_time);
-    if(settings!=NULL) 
-        *(work.settings) = *settings; 
+    work.settings = settings;
+    setup_flag = setup_daqp(qp,&work,&(res->setup_time));
+    res->exitflag = setup_flag;
 
-    if(setup_flag >= 0)
+    if(setup_flag >= 0){
         daqp_solve(res,&work);
-    else
-        res->exitflag = setup_flag;
-
-    // Add setup time to result 
-    res->setup_time = setup_time; 
-    // Free memory
-    free_daqp_workspace(&work);
-    free_daqp_ldp(&work);
+        // Free memory
+        if(settings != NULL) work.settings = NULL;
+        free_daqp_workspace(&work);
+        free_daqp_ldp(&work);
+    }
 }
 
 // Setup workspace and transform QP to LDP
 int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time){
     int errorflag;
+    int own_settings=1;
 #ifdef PROFILING
     DAQPtimer timer;
     if(setup_time != NULL){
@@ -73,26 +68,32 @@ int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time){
     // Check if QP is well-posed
     //validate_QP(qp);
 
-
-    //
+    // Count number of soft constraints
+    // (to account for it in allocation)
     int ns = 0;
     for(int i = 0; i < qp->m ; i++)
         if(qp->sense[i] & SOFT) ns++;
     // Setup workspace
-    allocate_daqp_settings(work);
+    if(work->settings == NULL)
+        allocate_daqp_settings(work);
+    else
+        own_settings = 0;
     allocate_daqp_workspace(work,qp->n,ns);
     errorflag = setup_daqp_ldp(work,qp);
     if(errorflag < 0){
+        if(own_settings==0) work->settings = NULL;
         free_daqp_workspace(work);
         return errorflag;
     }
     errorflag = setup_daqp_bnb(work,qp->bin_ids,qp->nb, ns);
     if(errorflag < 0){
+        if(own_settings==0) work->settings = NULL;
         free_daqp_workspace(work);
         return errorflag;
     }
     errorflag = activate_constraints(work);
     if(errorflag < 0){
+        if(own_settings==0) work->settings = NULL;
         free_daqp_workspace(work);
         return errorflag;
     }
