@@ -39,7 +39,7 @@ cython_ext = Extension('daqp',
         include_dirs=['csrc/include'])
 
 setup(name='daqp',
-        version='0.4.0',
+        version='0.4.1',
         description='DAQP: A dual active-set QP solver',
         url='http://github.com/darnstrom/daqp',
         author='Daniel Arnström',
