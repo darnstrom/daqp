@@ -1,4 +1,4 @@
-name: Python Wheels
+name: aarch64 Wheels
 
 on:
   workflow_dispatch:
@@ -15,7 +15,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-2019]
+        os: [ubuntu-latest]
 
     steps:
     - uses: actions/checkout@master
@@ -24,6 +24,9 @@ jobs:
       name: Install Python
       with:
         python-version: '3.9'
+
+    - uses: docker/setup-qemu-action@v1
+      name: Set up QEMU (emulator for arm64)
 
     - name: Build wheels
       run: |
@@ -40,15 +43,9 @@ jobs:
         python -m pip install cibuildwheel
         python -m cibuildwheel --output-dir wheelhouse
       env:
-        CIBW_SKIP: "*-manylinux_i686 *-musllinux*" # Skip 32 bit linux
+        CIBW_ARCHS_LINUX: "aarch64"
         CIBW_TEST_REQUIRES: "pytest numpy"
         CIBW_TEST_COMMAND: "pytest -s {project}/test"
-
-    - name: Build source
-      if: startsWith(matrix.os, 'ubuntu')
-      run: |
-        cd interfaces/daqp-python
-        python -m build . --sdist --outdir wheelhouse
 
     - name: Release to pypi
       if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags'))
