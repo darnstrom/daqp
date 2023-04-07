@@ -49,8 +49,6 @@ setup(name='daqp',
         long_description_content_type='text/markdown',
         ext_modules=cythonize(cython_ext),
         cmdclass={'build_ext': build_ext},
-        package_data = {'':["daqp.pyx","daqp.pxd"]},
-        include_package_data = True,
         zip_safe=False)
 
 # Cleanup C-source
