@@ -39,6 +39,10 @@ jobs:
         python -m pip install --upgrade build
         python -m pip install cibuildwheel
         python -m cibuildwheel --output-dir wheelhouse
+      env:
+        CIBW_ARCHS_LINUX: "auto aarch64"
+        CIBW_TEST_REQUIRES: "pytest"
+        CIBW_TEST_COMMAND: "pytest -s {project}/test"
 
     - name: Build source
       if: startsWith(matrix.os, 'ubuntu')
