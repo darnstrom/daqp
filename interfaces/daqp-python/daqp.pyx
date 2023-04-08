@@ -21,7 +21,7 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
         sense = np.zeros(m, dtype=int)
 
     cdef DAQPProblem problem = [n,m,m-mA, &H[0,0], &f[0], 
-            &A[0,0], &bupper[0], &blower[0], &sense[0], NULL,0]
+            &A[0,0], &bupper[0], &blower[0], &sense[0]]
 
     # Setup settings
     cdef DAQPSettings settings = [primal_tol, dual_tol, zero_tol, pivot_tol,

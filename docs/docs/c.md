@@ -21,9 +21,8 @@ double f[2] = {1,1};
 double A[4] = {1, 1, 1, -1};
 double bupper[4] = {1, 2, 3, 4};
 double blower[4] = {-1, -2, -3, -4};
-int sense[4] = {0,0,0,0}; 
-int *bin_ids = NULL; int nbin = 0; // No binary constraints
-DAQPProblem qp = {n,m,ms,H,f,A,bupper,blower,sense,bin_ids,nbin};
+int sense[4] = {0,0,0,0}; // Only inequality constraints
+DAQPProblem qp = {n,m,ms,H,f,A,bupper,blower,sense};
 ```
 `sense` determines the type of the constraints (more details are given [here](/daqp/parameters/#constraint-classification)).
 

@@ -23,7 +23,7 @@ typedef struct{
     // (The number of rows in A is hence m-ms)
 
     // sense define the state of the constraints 
-    // (active, immutable, upper/lower, soft). 
+    // (active, immutable, upper/lower, soft, binary).
 
     int n;
     int m;
@@ -38,8 +38,6 @@ typedef struct{
 
     int* sense; 
 
-    int* bin_ids;
-    int nb;
 }DAQPProblem;
 
 typedef struct{
