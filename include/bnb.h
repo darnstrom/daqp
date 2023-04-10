@@ -1,10 +1,13 @@
 #ifndef DAQP_BNB_H 
 # define DAQP_BNB_H 
 
+# ifdef __cplusplus
+extern "C" {
+# endif // ifdef __cplusplus
+
 #include "types.h"
 #include "constants.h"
 #include "daqp.h"
-
 
 int daqp_bnb(DAQPWorkspace* work);
 int process_node(DAQPNode* node, DAQPWorkspace* work);
@@ -21,5 +24,9 @@ int add_upper_lower(const int add_id, DAQPWorkspace* work);
 #define REMOVE_LOWER_FLAG(x) (x&~(1<<LOWER_BIT))
 #define ADD_LOWER_FLAG(x) (x|(1<<LOWER_BIT))
 #define TOGGLE_LOWER_FLAG(x) (x^(1<<LOWER_BIT))
+
+# ifdef __cplusplus
+}
+# endif // ifdef __cplusplus
 
 #endif //ifndef DAQP_BNB_H 

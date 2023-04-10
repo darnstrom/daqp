@@ -1,5 +1,10 @@
 #ifndef DAQP_UTILS_H
 # define DAQP_UTILS_H
+
+# ifdef __cplusplus
+extern "C" {
+# endif // ifdef __cplusplus
+
 #include "daqp.h"
 // Utils for transforming QP to LDP
 int update_ldp(const int mask, DAQPWorkspace *work);
@@ -31,5 +36,9 @@ void tic(DAQPtimer *timer);
 void toc(DAQPtimer *timer);
 double get_time(DAQPtimer *timer);
 #endif // PROFILING
+
+# ifdef __cplusplus
+}
+# endif // ifdef __cplusplus
 
 #endif //ifndef DAQP_UTILS_H

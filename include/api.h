@@ -1,5 +1,10 @@
 #ifndef DAQP_API_H
 # define DAQP_API_H
+
+# ifdef __cplusplus
+extern "C" {
+# endif // ifdef __cplusplus
+
 #include "daqp.h"
 #include "daqp_prox.h"
 #include "bnb.h"
@@ -33,4 +38,9 @@ void free_daqp_bnb(DAQPWorkspace* work);
 
 void daqp_extract_result(DAQPResult* res, DAQPWorkspace* work);
 void daqp_default_settings(DAQPSettings *settings);
+
+# ifdef __cplusplus
+}
+# endif // ifdef __cplusplus
+
 #endif //ifndef DAQP_API_H

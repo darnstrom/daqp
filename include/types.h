@@ -1,6 +1,10 @@
 #ifndef DAQP_TYPES_H
 # define DAQP_TYPES_H
 
+# ifdef __cplusplus
+extern "C" {
+# endif // ifdef __cplusplus
+
 #ifdef DAQP_SINGLE_PRECISION
 typedef float c_float;
 #else
@@ -149,5 +153,9 @@ typedef struct{
     // BnB
     DAQPBnB* bnb;
 }DAQPWorkspace;
+
+# ifdef __cplusplus
+}
+# endif // ifdef __cplusplus
 
 #endif //ifndef DAQP_TYPES_H
