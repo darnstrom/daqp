@@ -94,7 +94,7 @@ int update_Rinv(DAQPWorkspace *work){
         i=0; disp=0;
         if(work->scaling != NULL){
             for(;i<N_SIMPLE;i++,disp+=n){ // Combine with settings scaling
-                Hi = work->qp->H[disp++];
+                Hi = work->qp->H[disp++]+work->settings->eps_prox;
                 if (Hi <= 0) return EXIT_NONCONVEX;
                 Hi = sqrt(Hi);
                 work->RinvD[i] = 1/Hi;
@@ -102,7 +102,7 @@ int update_Rinv(DAQPWorkspace *work){
             }
         }
         for(;i<n;i++,disp+=n){
-            Hi = work->qp->H[disp++];
+            Hi = work->qp->H[disp++] + work->settings->eps_prox;
             if (Hi <= 0) return EXIT_NONCONVEX;
             Hi = sqrt(Hi);
             work->RinvD[i] = 1/Hi;

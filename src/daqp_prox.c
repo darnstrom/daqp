@@ -32,7 +32,7 @@ int daqp_prox(DAQPWorkspace *work){
 
         // ** Check convergence **
         if(work->iterations==1){ // No changes to the working set 
-            tol_stat = (work->Rinv == NULL) ? eta*eps : eta/eps;
+            tol_stat = (work->Rinv == NULL && work->RinvD == NULL) ? eta*eps : eta/eps;
             for(i=0, diff= 0;i<nx;i++){ // ||x_old - x|| > eta  ?
                 diff= work->x[i] - work->xold[i];
                 if((diff> tol_stat) || (diff< -tol_stat)) break;
@@ -42,7 +42,7 @@ int daqp_prox(DAQPWorkspace *work){
                 break;
             }
             // Take gradient step if LP (and the iterate is not constrained to a vertex)
-            if((work->Rinv == NULL)&&(work->n_active != NX)){
+            if((work->Rinv == NULL && work->RinvD ==NULL )&&(work->n_active != NX)){
                 if(gradient_step(work)==EMPTY_IND){
                     exitflag= EXIT_UNBOUNDED;
                     break;
@@ -51,7 +51,7 @@ int daqp_prox(DAQPWorkspace *work){
         }
         // For LPs, compute objective function value to detect progress
         // TODO: add paramters to settings
-        if(work->Rinv == NULL){
+        if(work->Rinv == NULL && work->RinvD == NULL){
             for(i=0, diff=best_fval;i<nx;i++)
                 diff-=work->qp->f[i]*work->x[i];
             if(diff<1e-10){
@@ -65,7 +65,7 @@ int daqp_prox(DAQPWorkspace *work){
 
         // ** Perturb problem **
         // Compute v = R'\(f-eps*x) (FWS Skipped if LP since R = I) 
-        if(work->Rinv== NULL){ 
+        if(work->Rinv== NULL && work->RinvD == NULL){ 
             eps*= (work->iterations==1) ? 10 : 0.9; // Adapt epsilon TODO: add to settings 
             eps = (eps > 1e3) ? 1e3 : eps; // TODO: add saturation option to settings
             for(i = 0; i<nx;i++) 
@@ -81,7 +81,7 @@ int daqp_prox(DAQPWorkspace *work){
     }
     // Finalize results
     if(total_iter >= work->settings->iter_limit) exitflag = EXIT_ITERLIMIT; 
-    if(work->Rinv == NULL){
+    if(work->Rinv == NULL && work->RinvD == NULL){
         for(i = 0; i<work->n_active;i++) 
             work->lam_star[i]/=eps;// Rescale dual variables
     }

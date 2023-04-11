@@ -319,13 +319,14 @@ void daqp_extract_result(DAQPResult* res, DAQPWorkspace* work){
     }
 
     // Shift back function value
-    if(work->v != NULL && (work->settings->eps_prox == 0 || work->Rinv != NULL)){ // Normal QP
+    if(work->v != NULL && (work->settings->eps_prox == 0
+                || work->Rinv != NULL || work->RinvD != NULL)){ // Normal QP
         res->fval = work->fval;
         for(i=0;i<work->n;i++) res->fval-=work->v[i]*work->v[i];
         res->fval *=0.5;
         if(work->settings->eps_prox != 0)
-        for(i=0;i<work->n;i++) // compensate for proximal iterations
-            res->fval+= work->settings->eps_prox*work->x[i]*work->x[i];
+            for(i=0;i<work->n;i++) // compensate for proximal iterations
+                res->fval+= work->settings->eps_prox*work->x[i]*work->x[i];
     }
     else if(work->qp != NULL && work->qp->f != NULL ){ // LP
         res->fval = 0;
