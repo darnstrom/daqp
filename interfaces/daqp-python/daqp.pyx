@@ -81,6 +81,8 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
     # Setup problem
     cdef int n,m,ms,nb
     cdef int* bin_ids_cand 
+    cdef double *A_ptr, *bu_ptr, *bl_ptr
+    cdef int* sense_ptr
     A = np.ascontiguousarray(A)
     mA, n = np.shape(A)
     m = np.size(bupper)
@@ -109,6 +111,7 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
     # Setup output
     cdef double[::1] x = np.zeros(n)
     cdef double[::1] lam = np.zeros(m)
+    cdef double *lam_ptr
     lam_ptr = NULL if m == 0 else &lam[0]
     cdef DAQPResult res  = [&x[0],lam_ptr,0,0,0,0,0,0,0]
 
