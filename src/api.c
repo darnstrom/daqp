@@ -68,11 +68,13 @@ int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time){
     // Check if QP is well-posed
     //validate_QP(qp);
 
-    // Count number of soft constraints
+    // Count number of soft/binary constraints 
     // (to account for it in allocation)
-    int ns = 0;
-    for(int i = 0; i < qp->m ; i++)
+    int ns = 0, nb = 0;
+    for(int i = 0; i < qp->m ; i++){
         if(qp->sense[i] & SOFT) ns++;
+        if(qp->sense[i] & BINARY) nb++;
+    }
     // Setup workspace
     if(work->settings == NULL)
         allocate_daqp_settings(work);
@@ -85,7 +87,7 @@ int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time){
         free_daqp_workspace(work);
         return errorflag;
     }
-    errorflag = setup_daqp_bnb(work,qp->bin_ids,qp->nb, ns);
+    errorflag = setup_daqp_bnb(work, nb, ns);
     if(errorflag < 0){
         if(own_settings==0) work->settings = NULL;
         free_daqp_workspace(work);
@@ -164,20 +166,25 @@ int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp){
     return 1;
 }
 
-int setup_daqp_bnb(DAQPWorkspace* work, int* bin_ids, int nb, int ns){
+int setup_daqp_bnb(DAQPWorkspace* work, int nb, int ns){
     if(nb > work->n) return EXIT_OVERDETERMINED_INITIAL;
     if((work->bnb == NULL) && (nb >0)){
         work->bnb= malloc(sizeof(DAQPBnB));
 
         work->bnb->nb = nb;
-        work->bnb->bin_ids = bin_ids;
+        // Detect which constraints are binary
+        work->bnb->bin_ids = malloc(nb*sizeof(int));
+        for(int i = 0, nadded = 0; nadded < nb; i++){
+            if(work->qp->sense[i] & BINARY)
+                work->bnb->bin_ids[nadded++] = i;
+        }
 
         // Setup tree
         work->bnb->tree= malloc((work->bnb->nb+1)*sizeof(DAQPNode));
-        work->bnb->tree_WS= malloc((work->n+ns+1)*(work->bnb->nb+1)*sizeof(int));
+        work->bnb->tree_WS= malloc((work->n+ns+1)*(nb+1)*sizeof(int));
         work->bnb->n_nodes = 0; 
         work->bnb->nWS= 0; 
-        work->bnb->fixed_ids= malloc((work->bnb->nb+1)*sizeof(int));
+        work->bnb->fixed_ids= malloc((nb+1)*sizeof(int));
     }
     return 1;
 }
@@ -312,13 +319,14 @@ void daqp_extract_result(DAQPResult* res, DAQPWorkspace* work){
     }
 
     // Shift back function value
-    if(work->v != NULL && (work->settings->eps_prox == 0 || work->Rinv != NULL)){ // Normal QP
+    if(work->v != NULL && (work->settings->eps_prox == 0
+                || work->Rinv != NULL || work->RinvD != NULL)){ // Normal QP
         res->fval = work->fval;
         for(i=0;i<work->n;i++) res->fval-=work->v[i]*work->v[i];
         res->fval *=0.5;
         if(work->settings->eps_prox != 0)
-        for(i=0;i<work->n;i++) // compensate for proximal iterations
-            res->fval+= work->settings->eps_prox*work->x[i]*work->x[i];
+            for(i=0;i<work->n;i++) // compensate for proximal iterations
+                res->fval+= work->settings->eps_prox*work->x[i]*work->x[i];
     }
     else if(work->qp != NULL && work->qp->f != NULL ){ // LP
         res->fval = 0;

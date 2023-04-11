@@ -40,14 +40,17 @@ int update_ldp(const int mask, DAQPWorkspace *work){
     /** Update d **/
     if(mask&UPDATE_Rinv||mask&UPDATE_M||mask&UPDATE_v||mask&UPDATE_d){
 #ifndef DAQP_ASSUME_VALID
-        // Check for trivial infeasibility
+        c_float diff;
         for(int i =0;i<N_CONSTR;i++){
-            if((work->qp->bupper[i] - work->qp->blower[i])< -work->settings->primal_tol){
-                if(IS_IMMUTABLE(i))
-                    continue;
-                else
-                    return EXIT_INFEASIBLE;
+            if(IS_IMMUTABLE(i)) continue;
+            diff = work->qp->bupper[i] - work->qp->blower[i];
+            // Check for trivial infeasibility
+            if ( diff < -work->settings->primal_tol ){
+                return EXIT_INFEASIBLE;
             }
+            // Check for unmarked equality constraint (blower == bupper)
+            else if ( diff < work->settings->zero_tol )
+                work->sense[i] |= ACTIVE + IMMUTABLE;
         }
 #endif
         update_d(work);
@@ -91,7 +94,7 @@ int update_Rinv(DAQPWorkspace *work){
         i=0; disp=0;
         if(work->scaling != NULL){
             for(;i<N_SIMPLE;i++,disp+=n){ // Combine with settings scaling
-                Hi = work->qp->H[disp++];
+                Hi = work->qp->H[disp++]+work->settings->eps_prox;
                 if (Hi <= 0) return EXIT_NONCONVEX;
                 Hi = sqrt(Hi);
                 work->RinvD[i] = 1/Hi;
@@ -99,7 +102,7 @@ int update_Rinv(DAQPWorkspace *work){
             }
         }
         for(;i<n;i++,disp+=n){
-            Hi = work->qp->H[disp++];
+            Hi = work->qp->H[disp++] + work->settings->eps_prox;
             if (Hi <= 0) return EXIT_NONCONVEX;
             Hi = sqrt(Hi);
             work->RinvD[i] = 1/Hi;

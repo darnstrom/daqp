@@ -1,6 +1,10 @@
 #ifndef DAQP_TYPES_H
 # define DAQP_TYPES_H
 
+# ifdef __cplusplus
+extern "C" {
+# endif // ifdef __cplusplus
+
 #ifdef DAQP_SINGLE_PRECISION
 typedef float c_float;
 #else
@@ -23,7 +27,7 @@ typedef struct{
     // (The number of rows in A is hence m-ms)
 
     // sense define the state of the constraints 
-    // (active, immutable, upper/lower, soft). 
+    // (active, immutable, upper/lower, soft, binary).
 
     int n;
     int m;
@@ -38,8 +42,6 @@ typedef struct{
 
     int* sense; 
 
-    int* bin_ids;
-    int nb;
 }DAQPProblem;
 
 typedef struct{
@@ -151,5 +153,9 @@ typedef struct{
     // BnB
     DAQPBnB* bnb;
 }DAQPWorkspace;
+
+# ifdef __cplusplus
+}
+# endif // ifdef __cplusplus
 
 #endif //ifndef DAQP_TYPES_H

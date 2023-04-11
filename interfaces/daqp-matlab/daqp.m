@@ -7,7 +7,6 @@ classdef daqp< handle
         n = 0; m = 0; ms = 0
         H; f;
         A; bupper; blower; sense;
-        bin_ids;
     end
 
     methods(Static)
@@ -76,8 +75,7 @@ classdef daqp< handle
                 this.blower = single(blower);
             end
             this.sense = int32(sense);
-            this.bin_ids= int32(find(bitand(this.sense,16))-1);
-            [exitflag,setup_time] = daqpmex('setup', this.work_ptr,this.H,this.f,this.A,this.bupper,this.blower,this.sense,this.bin_ids);
+            [exitflag,setup_time] = daqpmex('setup', this.work_ptr,this.H,this.f,this.A,this.bupper,this.blower,this.sense);
         end
 
         function settings = settings(this,varargin)

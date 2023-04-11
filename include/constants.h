@@ -1,6 +1,10 @@
 #ifndef DAQP_CONSTANTS_H
 #define DAQP_CONSTANTS_H
 
+# ifdef __cplusplus
+extern "C" {
+# endif // ifdef __cplusplus
+
 #include <stddef.h>
 
 #define EMPTY_IND -1 
@@ -81,5 +85,8 @@
 
 #define IS_SIMPLE(x) (x < work->ms)
 
+# ifdef __cplusplus
+}
+# endif // ifdef __cplusplus
 
 #endif //ifndef DAQP_CONSTANTS_H

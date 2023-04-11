@@ -13,9 +13,6 @@ cdef extern from "types.h":
     
         int* sense
     
-        int* bin_ids
-        int nb
-    
     ctypedef struct DAQPSettings:
         double primal_tol;
         double dual_tol;
