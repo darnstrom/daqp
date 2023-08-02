@@ -50,7 +50,7 @@ install(TARGETS daqp EXPORT  ${PROJECT_NAME}
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 install(FILES ${daqp_headers} ${daqp_codegen_headers} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/daqp")
 
-install(EXPORT ${PROJECT_NAME} DESTINATION cmake)
+install(EXPORT ${PROJECT_NAME} DESTINATION cmake/daqp)
 
 if(MATLAB)
   find_package(Matlab)
