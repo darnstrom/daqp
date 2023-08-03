@@ -3,7 +3,6 @@ project(daqp VERSION 0.5.0)
 
 add_subdirectory(src)
 add_subdirectory(include)
-add_subdirectory(codegen)
 
 option (PROFILING "Enable profiling" ON)
 if(PROFILING)
@@ -16,21 +15,18 @@ if(SOFT_WEIGHTS)
 endif()
 
 # Static lib
-add_library(daqpstat STATIC ${daqp_src} ${daqp_headers} ${daqp_codegen_src} ${daqp_codegen_headers})
+add_library(daqpstat STATIC ${daqp_src})
 target_include_directories(daqpstat PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/codegen>
-    $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}/include>
-    $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}/codegen>
+    $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}/daqp>
 )
 # Shared lib
-add_library(daqp SHARED ${daqp_src} ${daqp_headers} ${daqp_codegen_src} ${daqp_codegen_headers})
+add_library(daqp SHARED ${daqp_src})
 target_include_directories(daqp PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/codegen>
-    $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}/include>
-    $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}/codegen>
+    $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}/daqp>
 )
+add_library(daqp::daqp ALIAS daqp)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_C_STANDARD_LIBRARIES "${CMAKE_C_STANDARD_LIBRARIES}") # math for C api
@@ -48,7 +44,7 @@ install(TARGETS daqp EXPORT  ${PROJECT_NAME}
   ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
-install(FILES ${daqp_headers} ${daqp_codegen_headers} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/daqp")
+install(FILES ${daqp_headers} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/daqp")
 
 install(EXPORT ${PROJECT_NAME} DESTINATION cmake/daqp)
 

@@ -1,5 +1,5 @@
-#include "daqp.h"
-#include "utils.h"
+#include "daqp/daqp.h"
+#include "daqp/utils.h"
 #include <math.h>
 #include <stdio.h>
 

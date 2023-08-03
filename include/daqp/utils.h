@@ -5,7 +5,7 @@
 extern "C" {
 # endif // ifdef __cplusplus
 
-#include "daqp.h"
+#include "daqp/daqp.h"
 // Utils for transforming QP to LDP
 int update_ldp(const int mask, DAQPWorkspace *work);
 int update_Rinv(DAQPWorkspace *work);

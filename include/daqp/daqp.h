@@ -5,9 +5,9 @@
 extern "C" {
 # endif // ifdef __cplusplus
 
-#include "factorization.h" 
-#include "constants.h"
-#include "auxiliary.h"
+#include "daqp/factorization.h" 
+#include "daqp/constants.h"
+#include "daqp/auxiliary.h"
 
 int daqp_ldp(DAQPWorkspace *work);
 void ldp2qp_solution(DAQPWorkspace *work);

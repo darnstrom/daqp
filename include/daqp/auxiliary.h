@@ -5,8 +5,8 @@
 extern "C" {
 # endif // ifdef __cplusplus
 
-#include "types.h"
-#include "constants.h"
+#include "daqp/types.h"
+#include "daqp/constants.h"
 
 void remove_constraint(DAQPWorkspace* work, const int rm_ind);
 void add_constraint(DAQPWorkspace *work, const int add_ind, c_float lam);

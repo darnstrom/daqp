@@ -1,5 +1,5 @@
-#include "auxiliary.h"
-#include "factorization.h"
+#include "daqp/auxiliary.h"
+#include "daqp/factorization.h"
 void remove_constraint(DAQPWorkspace* work, const int rm_ind){
     int i;
     // Update data structures

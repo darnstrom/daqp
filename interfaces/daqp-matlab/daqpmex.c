@@ -1,7 +1,7 @@
 #include "mex.h"
-#include "api.h"
-#include "utils.h"
-#include "codegen.h"
+#include "daqp/api.h"
+#include "daqp/utils.h"
+#include "daqp/codegen.h"
 #include <string.h>
 
 const char* INFO_FIELDS[] = {

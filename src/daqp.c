@@ -1,4 +1,4 @@
-#include "daqp.h" 
+#include "daqp/daqp.h" 
 
 int daqp_ldp(DAQPWorkspace *work){
     int exitflag=EXIT_ITERLIMIT,iter;

@@ -1,5 +1,5 @@
-#include "api.h" 
-#include "utils.h"
+#include "daqp/api.h" 
+#include "daqp/utils.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>

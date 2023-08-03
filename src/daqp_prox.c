@@ -1,5 +1,5 @@
-#include "daqp_prox.h"
-#include "utils.h"
+#include "daqp/daqp_prox.h"
+#include "daqp/utils.h"
 
 static int gradient_step(DAQPWorkspace* work);
 

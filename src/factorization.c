@@ -1,4 +1,4 @@
-#include "factorization.h"
+#include "daqp/factorization.h"
 
 void update_LDL_add(DAQPWorkspace *work, const int add_ind){
     work->sing_ind = EMPTY_IND;

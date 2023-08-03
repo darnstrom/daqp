@@ -5,9 +5,9 @@
 extern "C" {
 # endif // ifdef __cplusplus
 
-#include "daqp.h"
-#include "daqp_prox.h"
-#include "bnb.h"
+#include "daqp/daqp.h"
+#include "daqp/daqp_prox.h"
+#include "daqp/bnb.h"
 
 typedef struct{
     c_float *x;

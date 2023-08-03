@@ -1,4 +1,4 @@
-#include "bnb.h"
+#include "daqp/bnb.h"
 
 int daqp_bnb(DAQPWorkspace* work){
     int branch_id, exitflag;

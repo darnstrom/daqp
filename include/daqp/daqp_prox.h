@@ -5,9 +5,9 @@
 extern "C" {
 # endif // ifdef __cplusplus
 
-#include "types.h"
-#include "constants.h"
-#include "daqp.h"
+#include "daqp/types.h"
+#include "daqp/constants.h"
+#include "daqp/daqp.h"
 
 int daqp_prox(DAQPWorkspace *work);
 
