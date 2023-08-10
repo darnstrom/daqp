@@ -36,6 +36,27 @@ void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
 #endif
 }
 
+void daqp_solve_warm(DAQPResult *res, DAQPWorkspace *work, const int WARM_START){
+    int update_mask = 0;
+    if(WARM_START < 2){ // Hot start (H and A same)
+        update_mask += UPDATE_Rinv + UPDATE_M;
+    }
+    update_mask += UPDATE_v + UPDATE_d; // Update f & bupper/blower
+
+    if(WARM_START == 0){ // Cold start
+        deactivate_constraints(work);
+    }
+
+    // Update internal problem representation
+    update_ldp(update_mask,work);
+
+    if(WARM_START == 1){// Reuse previous working set
+        activate_constraints(work);
+    }
+
+    daqp_solve(res,work);
+}
+
 // Setup and solve problem
 void daqp_quadprog(DAQPResult *res, DAQPProblem* qp, DAQPSettings *settings){
     int setup_flag;
