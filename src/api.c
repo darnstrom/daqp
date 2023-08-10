@@ -379,3 +379,8 @@ void daqp_default_settings(DAQPSettings* settings){
     settings->rel_subopt = DEFAULT_REL_SUBOPT;
     settings->abs_subopt = DEFAULT_ABS_SUBOPT;
 }
+
+void free_daqp(DAQPWorkspace* work){
+    free_daqp_workspace(work);
+    free_daqp_ldp(work);
+}

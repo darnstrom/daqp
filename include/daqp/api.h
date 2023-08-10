@@ -36,6 +36,7 @@ void allocate_daqp_workspace(DAQPWorkspace *work, int n, int ns);
 void free_daqp_ldp(DAQPWorkspace *work);
 void free_daqp_workspace(DAQPWorkspace *work);
 void free_daqp_bnb(DAQPWorkspace* work);
+void free_daqp(DAQPWorkspace* work);
 
 void daqp_extract_result(DAQPResult* res, DAQPWorkspace* work);
 void daqp_default_settings(DAQPSettings *settings);
