@@ -74,6 +74,12 @@ int update_ldp(const int mask, DAQPWorkspace *work){
 int update_Rinv(DAQPWorkspace *work){
     int i,j,k,disp,disp2,disp3;
     const int n = NX; 
+    // Make sure Rinv can be assinged if not diagonal
+    //(necessary if H change from diagonal to non-diagonal)
+    if(work->RinvD != NULL && work->Rinv ==NULL){
+        work->Rinv= work->RinvD;
+        work->RinvD = NULL;
+    }
         // Check if diagonal
     int is_diagonal = 1;
     for (i=0,disp=1; i<n; i++, disp+=i+1){
@@ -108,12 +114,6 @@ int update_Rinv(DAQPWorkspace *work){
             work->RinvD[i] = 1/Hi;
         }
         return 1;
-    }
-    // Make sure Rinv can be assinged if not diagonal
-    //(necessary if H change from diagonal to non-diagonal)
-    if(work->RinvD != NULL && work->Rinv ==NULL){
-        work->Rinv= work->RinvD;
-        work->RinvD = NULL;
     }
 
 
