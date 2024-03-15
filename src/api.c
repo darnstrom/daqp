@@ -71,7 +71,8 @@ int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time){
     // Count number of soft/binary constraints 
     // (to account for it in allocation)
     int ns = 0, nb = 0;
-    for(int i = 0; i < qp->m ; i++){
+    int i;
+    for(i = 0; i < qp->m ; i++){
         if(qp->sense[i] & SOFT) ns++;
         if(qp->sense[i] & BINARY) nb++;
     }
@@ -111,7 +112,7 @@ int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time){
 //  Setup LDP from QP  
 int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp){
     int error_flag,update_mask=0;
-
+    int i;
     work->n = qp->n;
     work->m = qp->m;
     work->ms = qp->ms;
@@ -119,7 +120,7 @@ int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp){
 
     // Always allocate scaling, M ,dupper, dlower,sense
     work->scaling= malloc(qp->m*sizeof(c_float));
-    for(int i =0; i < work->qp->ms; i++) work->scaling[i] =1;
+    for(i =0; i < work->qp->ms; i++) work->scaling[i] =1;
     work->M = malloc(qp->n*(qp->m-qp->ms)*sizeof(c_float));
     work->dupper = malloc(qp->m*sizeof(c_float));
     work->dlower = malloc(qp->m*sizeof(c_float));
@@ -149,7 +150,7 @@ int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp){
     work->d_us = malloc(qp->m*sizeof(c_float));
     work->rho_ls= malloc(qp->m*sizeof(c_float));
     work->rho_us= malloc(qp->m*sizeof(c_float));
-    for(int i = 0; i< qp->m; i++){
+    for(i = 0; i< qp->m; i++){
         work->d_ls[i] = 0;
         work->d_us[i] = 0;
         work->rho_ls[i] = DEFAULT_RHO_SOFT;
@@ -167,6 +168,7 @@ int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp){
 }
 
 int setup_daqp_bnb(DAQPWorkspace* work, int nb, int ns){
+    int i, nadded;
     if(nb > work->n) return EXIT_OVERDETERMINED_INITIAL;
     if((work->bnb == NULL) && (nb >0)){
         work->bnb= malloc(sizeof(DAQPBnB));
@@ -174,7 +176,7 @@ int setup_daqp_bnb(DAQPWorkspace* work, int nb, int ns){
         work->bnb->nb = nb;
         // Detect which constraints are binary
         work->bnb->bin_ids = malloc(nb*sizeof(int));
-        for(int i = 0, nadded = 0; nadded < nb; i++){
+        for(i = 0, nadded = 0; nadded < nb; i++){
             if(work->qp->sense[i] & BINARY)
                 work->bnb->bin_ids[nadded++] = i;
         }
