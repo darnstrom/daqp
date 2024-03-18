@@ -165,7 +165,7 @@ int remove_blocking(DAQPWorkspace *work){
     c_float alpha_cand, lam_slack;
     const c_float dual_tol = work->settings->dual_tol;
     c_float p;
-    for(int i=0;i<work->n_active;i++){
+    for(i=0;i<work->n_active;i++){
         ind = work->WS[i];
         if(IS_IMMUTABLE(ind)) continue;
         lam_slack = work->lam[i];
@@ -246,7 +246,7 @@ int remove_blocking(DAQPWorkspace *work){
     c_float alpha=DAQP_INF;
     c_float alpha_cand;
     const c_float dual_tol = work->settings->dual_tol;
-    for(int i=0;i<work->n_active;i++){
+    for(i=0;i<work->n_active;i++){
         if(IS_IMMUTABLE(work->WS[i])) continue;
         if(IS_LOWER(work->WS[i])){
             if(work->lam_star[i]<dual_tol) continue; //lam <= 0 for lower -> dual feasible
@@ -398,7 +398,8 @@ int activate_constraints(DAQPWorkspace *work){
 
 // Deactivate all active constraints that are mutable (i.e., not equality constraints)
 void deactivate_constraints(DAQPWorkspace *work){
-    for(int i =0;i<work->n_active;i++){
+    int i;
+    for(i =0;i<work->n_active;i++){
         if(IS_IMMUTABLE(work->WS[i])) continue; 
         SET_INACTIVE(work->WS[i]); 
     }

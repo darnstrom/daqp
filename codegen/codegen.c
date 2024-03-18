@@ -72,12 +72,12 @@ void render_daqp_workspace(DAQPWorkspace* work, const char *fname, const char *d
 }
 
 void write_daqp_workspace_h(FILE *f, DAQPWorkspace* work){
-
+    int i;
     const int n = work->n;
     const int m = work->m;
     const int ms = work->ms;
     int ntot = n;
-    for(int i = 0; i < m ; i++) 
+    for(i = 0; i < m ; i++) 
         if(work->sense[i] & SOFT) ntot++;
 
     // Refdefine NX, N_CONSTR and N_SIMPLE to static
@@ -116,11 +116,12 @@ void write_daqp_workspace_h(FILE *f, DAQPWorkspace* work){
 }
 
 void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work){
+    int i;
     int n = work->n;
     int m = work->m;
     int ms = work->ms;
     int ntot = n;
-    for(int i = 0; i < m ; i++) 
+    for(i = 0; i < m ; i++) 
         if(work->sense[i] & SOFT) ntot++;
 
     fprintf(f, "// Workspace\n");
@@ -234,13 +235,12 @@ void write_daqp_bnb_src(FILE*  f, DAQPBnB* bnb, const int n){
 }
 
 void write_float_array(FILE *f, c_float* a, const int N, const char *name){
-
     if(a == NULL)
         fprintf(f, "c_float %s[%d];\n", name, N);
     else{
-
+        int i;
         fprintf(f, "c_float %s[%d] = {\n", name, N);
-        for(int i = 0; i < N; i++)
+        for(i = 0; i < N; i++)
             fprintf(f, "(c_float)%.20f,\n", a[i]);
         fprintf(f, "};\n");
     }
@@ -250,8 +250,9 @@ void write_int_array(FILE *f, int* a, const int N, const char *name){
     if(a == NULL)
         fprintf(f, "int %s[%d];\n", name, N);
     else{
+        int i;
         fprintf(f, "int %s[%d] = {\n", name, N);
-        for(int i = 0; i < N; i++)
+        for(i = 0; i < N; i++)
             fprintf(f, "(int)%i,\n", a[i]);
         fprintf(f, "};\n");
     }

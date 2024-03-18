@@ -55,7 +55,7 @@ int daqp_bnb(DAQPWorkspace* work){
 }
 
 int process_node(DAQPNode* node, DAQPWorkspace* work){
-    int exitflag;
+    int exitflag, i;
     work->bnb->nodecount+=1;
     if(node->depth >=0){
         // Fix a binary constraints
@@ -85,7 +85,7 @@ int process_node(DAQPNode* node, DAQPWorkspace* work){
         work->sing_ind=EMPTY_IND;
         work->n_active=work->bnb->n_clean;
         work->reuse_ind=work->bnb->n_clean;
-        for(int i=work->bnb->n_clean - work->bnb->neq; i< node->depth+1;i++){
+        for(i=work->bnb->n_clean - work->bnb->neq; i< node->depth+1;i++){
             add_upper_lower(work->bnb->fixed_ids[i],work);
             SET_IMMUTABLE(REMOVE_LOWER_FLAG(work->bnb->fixed_ids[i]));
         }
@@ -145,8 +145,9 @@ void spawn_children(DAQPNode* node, const int branch_id, DAQPWorkspace* work){
 }
 
 void node_cleanup_workspace(int n_clean, DAQPWorkspace* work){
+    int i;
     // Cleanup sense 
-    for(int i=n_clean; i<work->n_active; i++)
+    for(i=n_clean; i<work->n_active; i++)
         work->sense[work->WS[i]]&= IS_BINARY(work->WS[i]) ? ~(ACTIVE+IMMUTABLE): ~ACTIVE;
     // Reset workspace
     work->sing_ind=EMPTY_IND;
@@ -177,11 +178,11 @@ void warmstart_node(DAQPNode* node, DAQPWorkspace* work){
 }
 
 void save_warmstart(DAQPNode* node, DAQPWorkspace* work){
+    int id_to_add, i;
     // Save warmstart 
     node->WS_start = work->bnb->nWS;
 
-    int id_to_add;
-    for(int i =work->bnb->neq; i<work->n_active;i++){
+    for(i =work->bnb->neq; i<work->n_active;i++){
         id_to_add = (work->WS[i]+(IS_LOWER(work->WS[i]) << (LOWER_BIT-1)));
         if((work->sense[work->WS[i]]&(IMMUTABLE+BINARY))!=IMMUTABLE+BINARY)
             work->bnb->tree_WS[work->bnb->nWS++]= id_to_add;

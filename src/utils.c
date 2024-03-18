@@ -5,14 +5,14 @@
 
 int update_ldp(const int mask, DAQPWorkspace *work){
     // TODO: copy dimensions from work->qp? 
-    int error_flag;
+    int error_flag, i;
 
     /** Update constraint sense **/
     if(mask&UPDATE_sense){
         if(work->qp->sense == NULL) // Assume all constraints are "normal" inequality constraints
-            for(int i=0;i<N_CONSTR;i++) work->sense[i] = 0;
+            for(i=0;i<N_CONSTR;i++) work->sense[i] = 0;
         else
-            for(int i=0;i<N_CONSTR;i++) work->sense[i] = work->qp->sense[i];
+            for(i=0;i<N_CONSTR;i++) work->sense[i] = work->qp->sense[i];
     }
 
     /** Update Rinv **/
@@ -41,7 +41,7 @@ int update_ldp(const int mask, DAQPWorkspace *work){
     if(mask&UPDATE_Rinv||mask&UPDATE_M||mask&UPDATE_v||mask&UPDATE_d){
 #ifndef DAQP_ASSUME_VALID
         c_float diff;
-        for(int i =0;i<N_CONSTR;i++){
+        for(i =0;i<N_CONSTR;i++){
             if(IS_IMMUTABLE(i)) continue;
             diff = work->qp->bupper[i] - work->qp->blower[i];
             // Check for trivial infeasibility
@@ -60,7 +60,7 @@ int update_ldp(const int mask, DAQPWorkspace *work){
 #ifdef SOFT_WEIGHTS
     // TODO: Use mask or something to avoid scaling something more times... 
     if(work->d_ls != NULL && work->scaling !=NULL){
-        for(int i=0;i<N_CONSTR; i++){
+        for(i=0;i<N_CONSTR; i++){
             work->d_ls[i]/=work->scaling[i];
             work->d_us[i]/=work->scaling[i];
             work->rho_ls[i]*=SQUARE(work->scaling[i]);
