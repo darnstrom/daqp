@@ -30,6 +30,10 @@ D. Arnström, A. Bemporad, D. Axehill <br>
 D. Arnström, A. Bemporad, D. Axehill <br>
 *IEEE Control Systems Letters*, vol. 6, pp. 2066-2071, 2022
 
+**BnB-DAQP: A Mixed-Integer QP Solver for Embedded Applications** <br>
+D. Arnström, D. Axehill <br>
+*Proceedings of the 2023 IFAC World Congress*, 2023
+
 ## Code
 *Available [here](https://github.com/darnstrom/daqp)*. <br>
 The solver is written in C and is *library free*. DAQP can be interfaced to C, Julia, MATLAB, and Python.  
