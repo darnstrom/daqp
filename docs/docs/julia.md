@@ -15,7 +15,7 @@ In Julia we define the problem as
 # Define the problem
 H = [1.0 0; 0 1];
 f = [1.0 ;1];
-A = [1.0 1; 1 -1];
+A = [1.0 2; 1 -1];
 bupper = [1.0 ; 2; 3; 4];
 blower = [-1.0; -2; -3; -4];
 sense = zeros(Cint,4);
@@ -57,7 +57,7 @@ model = Model(DAQP.Optimizer)
 @variable(model, -1<= x1 <=1)
 @variable(model, -2<= x2 <=2)
 @objective(model, Min, 0.5*(x1^2+x2^2)+x1+x2)
-@constraint(model, c1, -3 <= x1 + x2 <= 3)
+@constraint(model, c1, -3 <= x1 + 2*x2 <= 3)
 @constraint(model, c2, -4 <= x1 - x2 <= 4)
 
 ## Solve problem
