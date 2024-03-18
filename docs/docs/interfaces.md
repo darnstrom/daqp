@@ -14,7 +14,7 @@ $$\begin{aligned}
 &\underset{x_1, x_2}{\text{minimize}}&& \frac{1}{2} (x_1^2 + x_2^2) + x_1 + x_2\\
 &\text{subject to}  &&-1\leq x_1\leq 1 \\
 & &&-2\leq x_2\leq 2 \\
-& &&-3\leq x_1 + x_2\leq 3 \\
+& &&-3\leq x_1 + 2 x_2\leq 3 \\
 & &&-4\leq x_1 - x_2\leq 4, \\
 \end{aligned}$$
 
@@ -35,7 +35,7 @@ $$
 $$
 u =\begin{pmatrix} 1 \\ 2 \end{pmatrix}, \quad
 l =-\begin{pmatrix} 1 \\ 2 \end{pmatrix}, \quad
-A = \begin{pmatrix} 1 & 1 \\ 1 & -1 \end{pmatrix},\quad 
+A = \begin{pmatrix} 1 & 2 \\ 1 & -1 \end{pmatrix},\quad 
 b_u =\begin{pmatrix} 3 \\ 4 \end{pmatrix},\quad
 b_l =-\begin{pmatrix} 3 \\ 4 \end{pmatrix}
 $$
