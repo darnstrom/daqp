@@ -16,8 +16,8 @@ typedef struct{
     // Data for the QP problem
     //
     // min  0.5 x'*H*x + f'x
-    // s.t  lbA <= A*x <= ubA
-    //      lb  <=  x  <= ub
+    // s.t   lb  <=  x  <= ub
+    //       lbA <= A*x <= ubA
     //
     // n  - dimension of x
     // m  - total number of constraints
