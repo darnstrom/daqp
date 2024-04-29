@@ -58,6 +58,7 @@ void daqp_quadprog(DAQPResult *res, DAQPProblem* qp, DAQPSettings *settings){
 int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time){
     int errorflag;
     int own_settings=1;
+    (void)setup_time; // avoids warning when compiling without profiling
 #ifdef PROFILING
     DAQPtimer timer;
     if(setup_time != NULL){

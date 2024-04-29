@@ -88,8 +88,10 @@ int update_Rinv(DAQPWorkspace *work){
 
     // If diagonal, just keep track of variable scaling and use Rinv = I
     if(is_diagonal==1){
-        work->RinvD = work->Rinv;
-        work->Rinv = NULL;
+        if(work->Rinv != NULL){
+            work->RinvD = work->Rinv;
+            work->Rinv = NULL;
+        }
         c_float Hi;
         i=0; disp=0;
         if(work->scaling != NULL){
