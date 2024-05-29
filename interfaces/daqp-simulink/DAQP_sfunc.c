@@ -16,7 +16,7 @@
  * PARAMETERS:
  * 1. n: Number of decision variables
  * 2. mg: Number of general constraints (mg = m - ms)
- * 3. maxIter: Maximum number of iterations (currently not used)
+ * 3. maxIter: Maximum number of iterations 
  * 
  * OUTPUTS:
  * 1. x_opt: Optimal solution of the decision variables [n x 1]
@@ -189,11 +189,15 @@ static void mdlOutputs(SimStruct *S, int_T tid) {
     DAQPResult result;
     result.x = x_opt; // primal variable
     result.lam = lambda; // dual variable
+    
+    DAQPSettings settings;
+    daqp_default_settings(&settings);
+    settings.iter_limit = maxIter;
 
     // ----------------------------- DAQP -----------------------------
     DAQPProblem qp = {n,m,ms,H,g,A,ub,lb,sense};
     
-    daqp_quadprog(&result,&qp,NULL);
+    daqp_quadprog(&result,&qp,&settings);
 
     // ------------------------- WRITE OUTPUTS -------------------------
     int_T i;

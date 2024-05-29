@@ -7,7 +7,7 @@ Model {
     NumRootInports	    0
     NumRootOutports	    0
     ParameterArgumentNames  ""
-    ComputedModelVersion    "9.19"
+    ComputedModelVersion    "9.20"
     NumModelReferences	    0
     NumTestPointedSignals   0
     NumProvidedFunctions    0
@@ -162,9 +162,9 @@ Model {
   ModifiedByFormat	  "%<Auto>"
   LastModifiedBy	  "Sc"
   ModifiedDateFormat	  "%<Auto>"
-  LastModifiedDate	  "Wed May 29 10:41:30 2024"
-  RTWModifiedTimeStamp	  638878920
-  ModelVersionFormat	  "%<AutoIncrement:9.19>"
+  LastModifiedDate	  "Wed May 29 10:45:42 2024"
+  RTWModifiedTimeStamp	  638880295
+  ModelVersionFormat	  "%<AutoIncrement:9.20>"
   SampleTimeColors	  off
   SampleTimeAnnotations	  off
   LibraryLinkDisplay	  "disabled"
