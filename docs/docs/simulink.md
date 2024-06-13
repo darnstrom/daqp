@@ -48,7 +48,7 @@ The block has the following outputs:
 | --- | --- | --- |
 | $x$ | The optimal solution | [$n$ x 1] |
 | $\lambda$ | The optimal Lagrange multipliers | [$m_g$ x 1] |
-| fval | The optimal value of the objective function | 1 |
+| $f_{val}$ | The optimal value of the objective function | 1 |
 | exitflag | The exit flag of the solver | 1 |
 | iter | The number of iterations used by the solver | 1 |
 
@@ -64,4 +64,4 @@ $$\begin{aligned}
 & && 2.6 \leq \:x_1 + x_2 \: \leq inf, \\
 \end{aligned}$$
 
-The solution of the problem is $x = [0.6, 2]^T$.
+The solution of the problem is $x = [0.6, 2]^T$ and $f_{val} = 2.18 = \frac12 \left(0.6^2 + 2^2\right)$.

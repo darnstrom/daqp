@@ -1,9 +1,13 @@
 /*
  * Author: Christopher Schulte, RWTH Aachen University, IRT
  *         christopher.schulte@rwth-aachen.de
- *        https://www.irt.rwth-aachen.de/
+ *        https://irt.rwth-aachen.de/
  * 
  * This file is part of the DAQP project.
+ * 
+ * mg = number of matrix constraints
+ * m = number of constraints
+ * n = number of decision variables
  * 
  * INPUTS:
  * 1. H: Quadratic term of the objective function [n x n]
@@ -14,9 +18,7 @@
  * 6. sense: Sense of the constraints [m x 1]
  * 
  * PARAMETERS:
- * 1. n: Number of decision variables
- * 2. mg: Number of general constraints (mg = m - ms)
- * 3. maxIter: Maximum number of iterations 
+ * 1. maxIter: Maximum number of iterations 
  * 
  * OUTPUTS:
  * 1. x_opt: Optimal solution of the decision variables [n x 1]
@@ -35,15 +37,14 @@
  */
 #include "simstruc.h"
 
+
+
 #include "types.h"
 #include "daqp.h"
 #include "api.h"
 #include <stdlib.h> // For malloc und free
-
-
-/*====================*
- * S-function methods *
- *====================*/
+#include "mex.h"
+#include <math.h>
 
 /* Function: mdlInitializeSizes ===============================================
  * Abstract:
@@ -59,74 +60,84 @@ static void mdlInitializeSizes(SimStruct *S)
     ssSetNumIWork(S, 0);
     ssSetNumModes(S, 0);
     ssSetNumNonsampledZCs(S, 0);
-//     ssSetOperatingPointCompliance(S, USE_DEFAULT_OPERATING_POINT);
-//     ssSetRuntimeThreadSafetyCompliance(S, RUNTIME_THREAD_SAFETY_COMPLIANCE_TRUE);
     ssSetOptions(S, SS_OPTION_EXCEPTION_FREE_CODE);
     
     // --------------------------- PARAMETERS -----------------------------
-    ssSetNumSFcnParams(S, 3);  /* Number of expected parameters */
+    ssSetNumSFcnParams(S, 1);  /* Number of expected parameters */
     if (ssGetNumSFcnParams(S) != ssGetSFcnParamsCount(S)) {
         /* Return if number of expected != number of actual parameters */
         return;
     }
-    const mxArray* in_dimU = ssGetSFcnParam(S, 0);
-	int_T dimU = (int_T)((mxGetPr(in_dimU))[0]);	
-    
-    const mxArray* in_dimA = ssGetSFcnParam(S, 1);
-	int_T dimA = (int_T)((mxGetPr(in_dimA))[0]);
-    
    
     // ----------------------------- INPUTS -----------------------------
     if (!ssSetNumInputPorts(S, 6)) return;
-    ssSetInputPortWidth(S, 0, dimU*dimU ); /* H */
-    ssSetInputPortRequiredContiguous(S, 0, true); /*direct input signal access*/
+    ssSetInputPortWidth(S, 0, DYNAMICALLY_SIZED ); /* H */
     ssSetInputPortDirectFeedThrough(S, 0, 1);
 
-    ssSetInputPortWidth(S, 1, dimU ); /* g */
-    ssSetInputPortRequiredContiguous(S, 1, true); /*direct input signal access*/
+    ssSetInputPortWidth(S, 1, DYNAMICALLY_SIZED ); /* g */
     ssSetInputPortDirectFeedThrough(S, 1, 1);
     
-    ssSetInputPortWidth(S, 2, dimU*dimA ); /* A */
-    ssSetInputPortRequiredContiguous(S, 2, true); /*direct input signal access*/
+    ssSetInputPortWidth(S, 2, DYNAMICALLY_SIZED ); /* A */
     ssSetInputPortDirectFeedThrough(S, 2, 1);
     
     ssSetInputPortWidth(S, 3, DYNAMICALLY_SIZED ); /* lb */
-    ssSetInputPortRequiredContiguous(S, 3, true); /*direct input signal access*/
     ssSetInputPortDirectFeedThrough(S, 3, 1);
     
     ssSetInputPortWidth(S, 4, DYNAMICALLY_SIZED ); /* ub */
-    ssSetInputPortRequiredContiguous(S, 4, true); /*direct input signal access*/
     ssSetInputPortDirectFeedThrough(S, 4, 1);
     
     ssSetInputPortWidth(S, 5, DYNAMICALLY_SIZED ); /* sense */
-    ssSetInputPortRequiredContiguous(S, 5, true); /*direct input signal access*/
     ssSetInputPortDirectFeedThrough(S, 5, 1);
     	
     
     // ----------------------------- WORK -------------------------------
-    ssSetNumPWork(S, 2);
+    ssSetNumPWork(S, 0);
     
     
     // ----------------------------- OUTPUTS -----------------------------
     if (!ssSetNumOutputPorts(S, 5)) return;
-    ssSetOutputPortWidth(S, 0, dimU); /* x_opt */
-    ssSetOutputPortWidth(S, 1, dimA); /* lambda */
+    ssSetOutputPortWidth(S, 0, DYNAMICALLY_SIZED); /* x_opt */
+    ssSetOutputPortWidth(S, 1, DYNAMICALLY_SIZED); /* lambda */
     ssSetOutputPortWidth(S, 2, 1); /* fval */
     ssSetOutputPortWidth(S, 3, 1); /* flag */
     ssSetOutputPortWidth(S, 4, 1); /* iteration */
 }
 
+
+/* Function: mdlStart =========================================================
+ * Abstract:
+ *    This function is called once at start of the model execution. If you
+ *    have states that should be initialized once, this is the place to do it.
+ */
 #define MDL_START
 static void mdlStart(SimStruct *S)
 {
-    const mxArray* in_dimU = ssGetSFcnParam(S, 0);
-	int_T dimU = (int_T)((mxGetPr(in_dimU))[0]);	
+    const mxArray* in_maxIter = ssGetSFcnParam(S, 0);
+    int maxIter = (int)((mxGetPr(in_maxIter))[0]);    // Maximum number of iterations
+
+    if (maxIter <= 0) {
+        mexErrMsgTxt( "ERROR (DAQP): Maximum number of iterations must be greater than zero." );
+    }
     
-    const mxArray* in_dimA = ssGetSFcnParam(S, 1);
-	int_T dimA = (int_T)((mxGetPr(in_dimA))[0]);
-    
-    ssGetPWork(S)[0] = (void *) calloc( dimU, sizeof(real_T) );
-    ssGetPWork(S)[1] = (void *) calloc( dimA, sizeof(real_T) );
+    int_T size_H = ssGetInputPortWidth(S, 0);
+    int_T size_g = ssGetInputPortWidth(S, 1);
+    int_T size_A = ssGetInputPortWidth(S, 2);
+    int_T size_lb = ssGetInputPortWidth(S, 3);
+    int_T size_ub = ssGetInputPortWidth(S, 4);
+    int_T size_sense = ssGetInputPortWidth(S, 5);
+
+
+    // ------------------------- Check for sizes -------------------------
+    if (size_H == 0) mexErrMsgTxt( "ERROR (DAQP): Quadratic term of the objective function H is empty." );
+    if (size_g == 0) mexErrMsgTxt( "ERROR (DAQP): Linear term of the objective function g is empty." );
+    if (size_A == 0) mexErrMsgTxt( "ERROR (DAQP): Matrix of the linear constraints A is empty." );
+    if (size_lb == 0) mexErrMsgTxt( "ERROR (DAQP): Lower bounds b_lower are empty." );
+    if (size_ub == 0) mexErrMsgTxt( "ERROR (DAQP): Upper bounds b_upper are empty." );
+    if (size_sense == 0) mexErrMsgTxt( "ERROR (DAQP): Sense of the constraints is empty." );
+    if (sqrt((real_T)size_H) != (real_T) size_g) mexErrMsgTxt( "ERROR (DAQP): Dimension mismatch between the quadratic term H and the linear term g of the objective function." );
+    if (size_A % size_g != 0) mexErrMsgTxt( "ERROR (DAQP): Dimension mismatch in the matrix of the linear constraints A." );
+    if (size_lb != size_sense) mexErrMsgTxt( "ERROR (DAQP): Dimension mismatch in the lower bounds b_lower or sense." );
+    if (size_ub != size_sense) mexErrMsgTxt( "ERROR (DAQP): Dimension mismatch in the upper bounds b_upper or sense." );
 }
 
 /* Function: mdlInitializeSampleTimes =========================================
@@ -149,25 +160,80 @@ static void mdlInitializeSampleTimes(SimStruct *S)
  */
 static void mdlOutputs(SimStruct *S, int_T tid) {
     // ----------------------------- PARAMS -----------------------------
-    // Get number of maximum working set iterations, currently not used
-	const mxArray* in_maxIter = ssGetSFcnParam(S, 2);
-	int maxIter = (int)((mxGetPr(in_maxIter))[0]);	
+    // Get number of maximum working set iterations
+	const mxArray* in_maxIter = ssGetSFcnParam(S, 0);
+	int maxIter = (int)((mxGetPr(in_maxIter))[0]);	// Maximum number of iterations
     
+
     // ----------------------------- INPUTS -----------------------------
-    real_T *H = (real_T*) ssGetInputPortSignal(S,0);
-    real_T *g = (real_T*) ssGetInputPortSignal(S,1);
-    real_T *A = (real_T*) ssGetInputPortSignal(S,2);
-    real_T *lb = (real_T*) ssGetInputPortSignal(S,3);
-    real_T *ub = (real_T*) ssGetInputPortSignal(S,4);
-    int_T *sense = (int_T*) ssGetInputPortSignal(S,5);
+    InputRealPtrsType in_H, in_g, in_A, in_lb, in_ub, in_sense;
+    in_H     = ssGetInputPortRealSignalPtrs(S, 0); // Quadratic term of the objective function
+	in_g     = ssGetInputPortRealSignalPtrs(S, 1); // Linear term of the objective function
+	in_A     = ssGetInputPortRealSignalPtrs(S, 2); // Matrix of the linear constraints
+	in_lb    = ssGetInputPortRealSignalPtrs(S, 3); // Lower bounds
+	in_ub    = ssGetInputPortRealSignalPtrs(S, 4); // Upper bounds
+	in_sense = ssGetInputPortRealSignalPtrs(S, 5); // Sense of the constraints
     
-    int_T size_H = ssGetInputPortWidth(S, 0);
-    int_T size_g = ssGetInputPortWidth(S, 1);
-    int_T size_A = ssGetInputPortWidth(S, 2);
-    int_T size_lb = ssGetInputPortWidth(S, 3);
-    int_T size_ub = ssGetInputPortWidth(S, 4);
-    int_T size_sense = ssGetInputPortWidth(S, 5);
+    int_T size_H = ssGetInputPortWidth(S, 0); // Size of the quadratic term of the objective function
+    int_T size_g = ssGetInputPortWidth(S, 1); // Size of the linear term of the objective function
+    int_T size_A = ssGetInputPortWidth(S, 2); // Size of the matrix of the linear constraints
+    int_T size_lb = ssGetInputPortWidth(S, 3); // Size of the lower bounds
+    int_T size_ub = ssGetInputPortWidth(S, 4); // Size of the upper bounds
+    int_T size_sense = ssGetInputPortWidth(S, 5); // Size of the sense of the constraints
     
+
+    // ------------------------- sizes ------------------------------
+    int n = (int) size_g; // Number of decision variables
+    int mg = (int)((real_T) size_A / (real_T) size_g); // Number of matrix constraints (lb < Ax < ub)
+    int m = (int) size_lb; // Number of constraints
+    int ms = m - mg; // Number of simple constraints
+    
+
+    // ----------------------- Create  Work -------------------------
+    c_float *x_opt  = (c_float *) calloc( n, sizeof(c_float) );
+    c_float *lambda = (c_float *) calloc( mg, sizeof(c_float) );
+    c_float *H      = (c_float *) calloc( n*n, sizeof(c_float) );
+	c_float *g      = (c_float *) calloc( n, sizeof(c_float) );
+	c_float *A      = (c_float *) calloc( mg*n, sizeof(c_float) );
+	c_float *lb     = (c_float *) calloc( size_sense, sizeof(c_float) );
+	c_float *ub     = (c_float *) calloc( size_sense, sizeof(c_float) );
+	int *sense      = (int *) calloc( size_sense, sizeof(int) );
+
+
+    // --------------------- CHECK FOR NULL ------------------------
+    if ( x_opt == NULL || lambda == NULL || H == NULL || g == NULL || A == NULL || lb == NULL || ub == NULL || sense == NULL) {
+        mexErrMsgTxt( "ERROR (DAQP): Memory allocation failed." );
+    }
+    
+
+    // --------------------- Write to Work ----------------------
+    int_T i;
+    if ( H != 0 && size_H == n*n) {
+		for ( i=0; i<size_H; ++i )
+			H[i] = (c_float)(*in_H)[i];
+	}
+    if ( g != 0 && size_g == n) {
+		for ( i=0; i<size_g; ++i )
+			g[i] = (c_float)(*in_g)[i];
+	}
+    if ( A != 0 && size_A == mg*n) {
+		for ( i=0; i<size_A; ++i )
+			A[i] = (c_float)(*in_A)[i];
+	}
+    if ( lb != 0 && size_lb == size_sense) {
+		for ( i=0; i<size_lb; ++i )
+			lb[i] = (c_float)(*in_lb)[i];
+	}
+    if ( ub != 0  && size_ub == size_sense) {
+		for ( i=0; i<size_ub; ++i )
+			ub[i] = (c_float)(*in_ub)[i];
+	}
+    if ( sense != 0 ) {
+		for ( i=0; i<size_sense; ++i )
+			sense[i] = (int)(*in_sense)[i];
+	}	
+    
+
     // ----------------------------- OUTPUTS -----------------------------
     real_T *out_x_opt   = ssGetOutputPortRealSignal(S, 0);
 	real_T *out_lambda = ssGetOutputPortRealSignal(S, 1);
@@ -175,32 +241,24 @@ static void mdlOutputs(SimStruct *S, int_T tid) {
 	real_T *out_flag = ssGetOutputPortRealSignal(S, 3);
 	real_T *out_iteration = ssGetOutputPortRealSignal(S, 4);
 
-    int_T n = size_g; // Number of decision variables
-    int_T mg = (int_T)((real_T) size_A / (real_T) size_g); // Number of matrix constraints (lb < Ax < ub)
-    int_T m = size_lb; // Number of constraints
-    int_T ms= m - mg; // Number of simple constraints
-    
 
-    // ----------------------------- WORK -----------------------------
-    real_T *x_opt, *lambda;
-    x_opt = (real_T *) ssGetPWork(S)[0];
-	lambda = (real_T *) ssGetPWork(S)[1];
-    
+    // --------------------- Result and settings ----------------------
     DAQPResult result;
     result.x = x_opt; // primal variable
     result.lam = lambda; // dual variable
     
     DAQPSettings settings;
     daqp_default_settings(&settings);
-    settings.iter_limit = maxIter;
+    settings.iter_limit = (int) maxIter;
+
 
     // ----------------------------- DAQP -----------------------------
     DAQPProblem qp = {n,m,ms,H,g,A,ub,lb,sense};
     
     daqp_quadprog(&result,&qp,&settings);
 
+
     // ------------------------- WRITE OUTPUTS -------------------------
-    int_T i;
     for ( i=0; i<size_g; ++i )
 		out_x_opt[i] = (real_T)(x_opt[i]);
     
@@ -210,6 +268,17 @@ static void mdlOutputs(SimStruct *S, int_T tid) {
     out_fval[0] = (real_T)(result.fval);
     out_flag[0] = (real_T)(result.exitflag);
     out_iteration[0] = (real_T)(result.iter);
+
+
+    // -------------------------- FREE MEMORY --------------------------
+    free( H );
+    free( g );
+    free( A );
+    free( lb );
+    free( ub );
+    free( sense );
+    free( x_opt );
+    free( lambda );
 }
 
 /* Function: mdlTerminate =====================================================
@@ -221,12 +290,11 @@ static void mdlOutputs(SimStruct *S, int_T tid) {
 static void mdlTerminate(SimStruct *S)
 {
     // Free memory
-    int i;
-	for ( i=0; i<2; ++i )
-	{
-		if ( ssGetPWork(S)[i] != 0 )
-			free( ssGetPWork(S)[i] );
-	}
+    // int i;
+	// for ( i=0; i<8; ++i ) {
+	// 	if ( ssGetPWork(S)[i] != 0 )
+	// 		free( ssGetPWork(S)[i] );
+	// }
 }
 
 
@@ -238,6 +306,7 @@ static void mdlTerminate(SimStruct *S)
  */
 #define MDL_SET_INPUT_PORT_DIMENSION_INFO
 #define MDL_SET_OUTPUT_PORT_DIMENSION_INFO
+#define MDL_SET_DEFAULT_PORT_DIMENSION_INFO
 
 static void mdlSetInputPortDimensionInfo(SimStruct *S, int_T port, const DimsInfo_T *dimsInfo)
 {
@@ -249,6 +318,30 @@ static void mdlSetOutputPortDimensionInfo(SimStruct *S, int_T port, const DimsIn
 {
 	if ( !ssSetOutputPortDimensionInfo(S, port, dimsInfo) )
 		return;
+}
+
+static void mdlSetDefaultPortDimensionInfo(SimStruct *S) {
+    int_T size_H = ssGetInputPortWidth(S, 0);
+    int_T size_g = ssGetInputPortWidth(S, 1);
+    int_T size_A = ssGetInputPortWidth(S, 2);
+    int_T size_lb = ssGetInputPortWidth(S, 3);
+    int_T size_ub = ssGetInputPortWidth(S, 4);
+    int_T size_sense = ssGetInputPortWidth(S, 5);
+    
+    int_T mg = (int_T)((real_T) size_A / (real_T) size_g);
+    
+    // if (ssGetOutputPortWidth(S, 0) == DYNAMICALLY_SIZED) {
+    //     ssSetOutputPortMatrixDimensions(S, 0, size_g, 1 );
+    // }
+    // if (ssGetOutputPortWidth(S, 1) == DYNAMICALLY_SIZED) {
+    //     ssSetOutputPortMatrixDimensions(S, 1, mg, 1 );
+    // }
+    if (ssGetOutputPortWidth(S, 0) == DYNAMICALLY_SIZED) {
+        ssSetOutputPortMatrixDimensions(S, 0, 2, 1 );
+    }
+    if (ssGetOutputPortWidth(S, 1) == DYNAMICALLY_SIZED) {
+        ssSetOutputPortMatrixDimensions(S, 1, 1, 1 );
+    }
 }
 
 #endif

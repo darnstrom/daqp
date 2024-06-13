@@ -1,4 +1,4 @@
-function make_sfunc()
+function make_sfunc(do_debug)
 %-------------------------------------------------------------------------%
 % 
 %   Description : MEX-compilation of the daqp solver for simulink with code 
@@ -7,6 +7,10 @@ function make_sfunc()
 %                 christopher.schulte@rwth-aachen.de
 % 
 %-------------------------------------------------------------------------%
+
+if nargin == 0
+    do_debug = false;
+end
 
 current_dir = pwd;
 
@@ -30,10 +34,18 @@ source_files = {'daqp.c', ...
 sfunc = 'daqp_sfunc.c';
     
 % Construct compile command
-cmd = [ 'mex ', sfunc ];
+if do_debug
+    cmd = [ 'mex -g ', sfunc ];
+else
+    cmd = [ 'mex ', sfunc ];
+end
+
+% Add source file path
 for ii = 1:length(source_files)
     cmd = sprintf('%s "%s"', cmd, fullfile(source_dir,source_files{ii}));
 end
+
+% Add include directories
 for ii = 1:length( include_dir )
     cmd = sprintf('%s -I"%s"', cmd, include_dir{ii});
 end
