@@ -6,7 +6,7 @@ Model {
     NumRootInports	    0
     NumRootOutports	    0
     ParameterArgumentNames  ""
-    ComputedModelVersion    "28"
+    ComputedModelVersion    "50"
     NumModelReferences	    0
     NumTestPointedSignals   0
     NumProvidedFunctions    0
@@ -41,7 +41,7 @@ Model {
       $ObjectID		      2
       $ClassName	      "Simulink.WindowInfo"
       IsActive		      [1]
-      Location		      [2553.0, 360.0, 974.0, 1039.0]
+      Location		      [1912.0, -8.0, 1936.0, 1056.0]
       Object {
 	$PropName		"ModelBrowserInfo"
 	$ObjectID		3
@@ -65,9 +65,9 @@ Model {
 	IsActive		[1]
 	ViewObjType		"SimulinkTopLevel"
 	LoadSaveID		"0"
-	Extents			[924.0, 857.0]
-	ZoomFactor		[1.25]
-	Offset			[47.782073432822806, 656.92313988095145]
+	Extents			[1886.0, 877.0]
+	ZoomFactor		[1.0]
+	Offset			[-197.75925926629495, 587.16144732100292]
       }
       Object {
 	$PropName		"DockComponentsInfo"
@@ -88,11 +88,11 @@ Model {
       "ABvAG4AZQBuAHQALwBHAEwAVQBFADIAIAB0AHIAZQBlACAAYwBvAG0AcABvAG4AZQBuAHQAAAAAAP////8AAABfAP////sAAABgAFMAaQBtAHUAb"
       "ABpAG4AawA6AEUAZABpAHQAbwByADoAUgBlAGYAZQByAGUAbgBjAGUAZABGAGkAbABlAHMALwBSAGUAZgBlAHIAZQBuAGMAZQBkACAARgBpAGwAZ"
       "QBzAAAAAAD/////AAAAAAAAAAAAAAABAAAAAAAAAAD8AgAAAAH7AAAAVABHAEwAVQBFADIAOgBQAHIAbwBwAGUAcgB0AHkASQBuAHMAcABlAGMAd"
-      "ABvAHIALwBQAHIAbwBwAGUAcgB0AHkAIABJAG4AcwBwAGUAYwB0AG8AcgAAAAAA/////wAAACcA////AAADvgAAA5EAAAABAAAAAgAAAAEAAAAC/"
+      "ABvAHIALwBQAHIAbwBwAGUAcgB0AHkAIABJAG4AcwBwAGUAYwB0AG8AcgAAAAAA/////wAAACYA////AAAHgAAAA6IAAAABAAAAAgAAAAEAAAAC/"
       "AAAAAQAAAAAAAAAAAAAAAEAAAAAAAAAAgAAAA//////AAAAAAD/////AAAAAAAAAAD/////AQAAAAD/////AAAAAAAAAAD/////AAAAAAD/////A"
       "AAAAAAAAAD/////AAAAAAD/////AAAAAAAAAAD/////AAAAAAD/////AAAAAAAAAAD/////AQAAAHn/////AAAAAAAAAAD/////AQAAANr/////A"
       "AAAAAAAAAD/////AAAAAAD/////AAAAAAAAAAD/////AQAAAVP/////AAAAAAAAAAD/////AAAAAAD/////AAAAAAAAAAD/////AAAAAAD/////A"
-      "AAAAAAAAAD/////AAAAAAD/////AAAAAAAAAAD/////AQAAAyv/////AAAAAAAAAAD/////AQAAA1r/////AAAAAAAAAAD/////AAAAAAD/////A"
+      "AAAAAAAAAD/////AAAAAAD/////AAAAAAAAAAD/////AQAAAyH/////AAAAAAAAAAD/////AQAAA1D/////AAAAAAAAAAD/////AAAAAAD/////A"
       "AAAAAAAAAAAAAADAAAAAA=="
     }
   }
@@ -100,11 +100,11 @@ Model {
   Creator		  "Chr_S"
   UpdateHistory		  "UpdateHistoryNever"
   ModifiedByFormat	  "%<Auto>"
-  LastModifiedBy	  "Chr_S"
+  LastModifiedBy	  "Sc"
   ModifiedDateFormat	  "%<Auto>"
-  LastModifiedDate	  "Thu Jun 13 14:22:03 2024"
-  RTWModifiedTimeStamp	  640189299
-  ModelVersionFormat	  "%<AutoIncrement:28>"
+  LastModifiedDate	  "Wed Jun 19 17:51:34 2024"
+  RTWModifiedTimeStamp	  640720291
+  ModelVersionFormat	  "%<AutoIncrement:50>"
   ConfigurationManager	  "none"
   SampleTimeColors	  on
   SampleTimeAnnotations	  on
@@ -274,7 +274,7 @@ Model {
 	  DisabledProps		  []
 	  Description		  ""
 	  StartTime		  "0.0"
-	  StopTime		  "100000"
+	  StopTime		  "10"
 	  AbsTol		  "auto"
 	  FixedStep		  "1"
 	  InitialStep		  "auto"
@@ -1059,21 +1059,6 @@ Model {
       Interpolate	      on
     }
     Block {
-      BlockType		      Math
-      Operator		      "exp"
-      OutputSignalType	      "auto"
-      SampleTime	      "-1"
-      OutMin		      "[]"
-      OutMax		      "[]"
-      OutDataTypeStr	      "Inherit: Same as first input"
-      LockScale		      off
-      RndMeth		      "Floor"
-      SaturateOnIntegerOverflow	on
-      IntermediateResultsDataTypeStr "Inherit: Inherit via internal rule"
-      AlgorithmType	      "Newton-Raphson"
-      Iterations	      "3"
-    }
-    Block {
       BlockType		      Outport
       Port		      "1"
       OutMin		      "[]"
@@ -1091,11 +1076,6 @@ Model {
       SourceOfInitialOutputValue "Dialog"
       OutputWhenDisabled      "held"
       InitialOutput	      "[]"
-    }
-    Block {
-      BlockType		      Reshape
-      OutputDimensionality    "1-D array"
-      OutputDimensions	      "[1,1]"
     }
     Block {
       BlockType		      S-Function
@@ -1163,7 +1143,7 @@ Model {
   }
   System {
     Name		    "example_daqp"
-    Location		    [2553, 360, 3527, 1399]
+    Location		    [1912, -8, 3848, 1048]
     Open		    on
     ModelBrowserVisibility  off
     ModelBrowserWidth	    200
@@ -1175,23 +1155,25 @@ Model {
     TiledPaperMargins	    [0.500000, 0.500000, 0.500000, 0.500000]
     TiledPageScale	    1
     ShowPageBoundaries	    off
-    ZoomFactor		    "125"
+    ZoomFactor		    "100"
     ReportName		    "simulink-default.rpt"
-    SIDHighWatermark	    "75"
+    SIDHighWatermark	    "80"
     Block {
       BlockType		      Constant
       Name		      "A"
       SID		      "25"
-      Position		      [70, 927, 195, 983]
+      Position		      [143, 922, 268, 978]
       ZOrder		      28
-      Value		      "[1,1]"
+      Value		      "[1,0.5]"
+      VectorParams1D	      off
+      SampleTime	      "-1"
     }
     Block {
       BlockType		      Display
       Name		      "Display"
       SID		      "18"
       Ports		      [1]
-      Position		      [750, 794, 825, 836]
+      Position		      [848, 789, 923, 831]
       ZOrder		      18
       Decimation	      "1"
     }
@@ -1200,7 +1182,7 @@ Model {
       Name		      "Display1"
       SID		      "20"
       Ports		      [1]
-      Position		      [745, 874, 835, 936]
+      Position		      [848, 871, 923, 929]
       ZOrder		      20
       Decimation	      "1"
     }
@@ -1209,7 +1191,7 @@ Model {
       Name		      "Display2"
       SID		      "35"
       Ports		      [1]
-      Position		      [745, 984, 835, 1006]
+      Position		      [845, 979, 920, 1001]
       ZOrder		      271
       Decimation	      "1"
     }
@@ -1218,7 +1200,7 @@ Model {
       Name		      "Display3"
       SID		      "36"
       Ports		      [1]
-      Position		      [745, 1074, 835, 1096]
+      Position		      [845, 1069, 920, 1091]
       ZOrder		      272
       Decimation	      "1"
     }
@@ -1227,7 +1209,7 @@ Model {
       Name		      "Display4"
       SID		      "37"
       Ports		      [1]
-      Position		      [745, 1164, 835, 1186]
+      Position		      [845, 1159, 920, 1181]
       ZOrder		      273
       Decimation	      "1"
     }
@@ -1236,7 +1218,7 @@ Model {
       Name		      "Display5"
       SID		      "68"
       Ports		      [1]
-      Position		      [1280, 995, 1365, 1045]
+      Position		      [1350, 1000, 1425, 1040]
       ZOrder		      278
       Decimation	      "1"
     }
@@ -1244,32 +1226,16 @@ Model {
       BlockType		      Constant
       Name		      "H"
       SID		      "26"
-      Position		      [70, 777, 195, 833]
+      Position		      [143, 772, 268, 828]
       ZOrder		      25
       Value		      "[1,0;0,1]"
-    }
-    Block {
-      BlockType		      Reshape
-      Name		      "Reshape2"
-      SID		      "27"
-      Ports		      [1, 1]
-      Position		      [305, 793, 340, 817]
-      ZOrder		      26
-    }
-    Block {
-      BlockType		      Reshape
-      Name		      "Reshape3"
-      SID		      "28"
-      Ports		      [1, 1]
-      Position		      [305, 943, 340, 967]
-      ZOrder		      32
     }
     Block {
       BlockType		      S-Function
       Name		      "S-Function1"
       SID		      "16"
       Ports		      [6, 5]
-      Position		      [380, 768, 610, 1217]
+      Position		      [453, 763, 683, 1212]
       ZOrder		      16
       FunctionName	      "DAQP_sfunc"
       Parameters	      "100"
@@ -1312,7 +1278,7 @@ Model {
       Name		      "Simulink Function - daqp"
       SID		      "39"
       Ports		      [0, 0, 0, 1]
-      Position		      [965, 737, 1265, 859]
+      Position		      [1035, 737, 1335, 859]
       ZOrder		      274
       TreatAsAtomicUnit	      on
       RequestExecContextInheritance off
@@ -1320,7 +1286,7 @@ Model {
       ContentPreviewEnabled   on
       System {
 	Name			"Simulink Function - daqp"
-	Location		[2552, 352, 4488, 1400]
+	Location		[1912, -8, 3848, 1048]
 	Open			off
 	ModelBrowserVisibility	off
 	ModelBrowserWidth	200
@@ -1345,22 +1311,6 @@ Model {
 	  FunctionName		  "daqp"
 	  VariantControl	  "(inherit)"
 	  StatesWhenEnabling	  "held"
-	}
-	Block {
-	  BlockType		  Reshape
-	  Name			  "Reshape2"
-	  SID			  "45"
-	  Ports			  [1, 1]
-	  Position		  [605, 283, 640, 307]
-	  ZOrder		  272
-	}
-	Block {
-	  BlockType		  Reshape
-	  Name			  "Reshape3"
-	  SID			  "46"
-	  Ports			  [1, 1]
-	  Position		  [605, 433, 640, 457]
-	  ZOrder		  273
 	}
 	Block {
 	  BlockType		  S-Function
@@ -1404,15 +1354,6 @@ Model {
 	    RTWStorageClass	    "Auto"
 	    DataLoggingNameMode	    "SignalName"
 	  }
-	}
-	Block {
-	  BlockType		  Math
-	  Name			  "Transpose"
-	  SID			  "49"
-	  Ports			  [1, 1]
-	  Position		  [535, 429, 565, 461]
-	  ZOrder		  275
-	  Operator		  "transpose"
 	}
 	Block {
 	  BlockType		  ArgIn
@@ -1542,20 +1483,6 @@ Model {
 	  ArgumentName		  "iter"
 	}
 	Line {
-	  ZOrder		  2
-	  SrcBlock		  "Transpose"
-	  SrcPort		  1
-	  DstBlock		  "Reshape3"
-	  DstPort		  1
-	}
-	Line {
-	  ZOrder		  12
-	  SrcBlock		  "H"
-	  SrcPort		  1
-	  DstBlock		  "Reshape2"
-	  DstPort		  1
-	}
-	Line {
 	  ZOrder		  28
 	  SrcBlock		  "f"
 	  SrcPort		  1
@@ -1563,15 +1490,15 @@ Model {
 	  DstPort		  2
 	}
 	Line {
-	  ZOrder		  8
-	  SrcBlock		  "Reshape3"
+	  ZOrder		  42
+	  SrcBlock		  "A"
 	  SrcPort		  1
 	  DstBlock		  "S-Function1"
 	  DstPort		  3
 	}
 	Line {
-	  ZOrder		  9
-	  SrcBlock		  "Reshape2"
+	  ZOrder		  40
+	  SrcBlock		  "H"
 	  SrcPort		  1
 	  DstBlock		  "S-Function1"
 	  DstPort		  1
@@ -1583,13 +1510,6 @@ Model {
 	  SrcBlock		  "S-Function1"
 	  SrcPort		  1
 	  DstBlock		  "x"
-	  DstPort		  1
-	}
-	Line {
-	  ZOrder		  14
-	  SrcBlock		  "A"
-	  SrcPort		  1
-	  DstBlock		  "Transpose"
 	  DstPort		  1
 	}
 	Line {
@@ -1661,19 +1581,10 @@ Model {
       }
     }
     Block {
-      BlockType		      Math
-      Name		      "Transpose"
-      SID		      "34"
-      Ports		      [1, 1]
-      Position		      [235, 939, 265, 971]
-      ZOrder		      270
-      Operator		      "transpose"
-    }
-    Block {
       BlockType		      Constant
       Name		      "b_lower"
       SID		      "30"
-      Position		      [70, 1012, 195, 1048]
+      Position		      [143, 1007, 268, 1043]
       ZOrder		      29
       Value		      "[0.5;2;2.6]"
     }
@@ -1681,7 +1592,7 @@ Model {
       BlockType		      Constant
       Name		      "b_upper"
       SID		      "32"
-      Position		      [70, 1077, 195, 1133]
+      Position		      [143, 1072, 268, 1128]
       ZOrder		      30
       Value		      "[inf;inf;inf]"
     }
@@ -1690,7 +1601,7 @@ Model {
       Name		      "call daqp"
       SID		      "44"
       Ports		      [1, 1]
-      Position		      [1115, 982, 1230, 1058]
+      Position		      [1180, 982, 1295, 1058]
       ZOrder		      275
       ErrorFcn		      "Stateflow.Translate.translate"
       PermitHierarchicalResolution "ExplicitOnly"
@@ -1714,7 +1625,7 @@ Model {
 	TiledPageScale		1
 	ShowPageBoundaries	off
 	ZoomFactor		"100"
-	SIDHighWatermark	"27"
+	SIDHighWatermark	"30"
 	Block {
 	  BlockType		  Inport
 	  Name			  "sum_max"
@@ -1726,21 +1637,21 @@ Model {
 	Block {
 	  BlockType		  Demux
 	  Name			  " Demux "
-	  SID			  "44::26"
+	  SID			  "44::29"
 	  Ports			  [1, 1]
 	  Position		  [270, 230, 320, 270]
-	  ZOrder		  17
+	  ZOrder		  20
 	  Outputs		  "1"
 	  DisplayOption		  "bar"
 	}
 	Block {
 	  BlockType		  S-Function
 	  Name			  " SFunction "
-	  SID			  "44::25"
+	  SID			  "44::28"
 	  Tag			  "Stateflow S-Function example_daqp 2"
 	  Ports			  [1, 2]
 	  Position		  [180, 100, 230, 160]
-	  ZOrder		  16
+	  ZOrder		  19
 	  FunctionName		  "sf_sfun"
 	  PortCounts		  "[1 2]"
 	  SFunctionDeploymentMode off
@@ -1756,9 +1667,9 @@ Model {
 	Block {
 	  BlockType		  Terminator
 	  Name			  " Terminator "
-	  SID			  "44::27"
+	  SID			  "44::30"
 	  Position		  [460, 241, 480, 259]
-	  ZOrder		  18
+	  ZOrder		  21
 	}
 	Block {
 	  BlockType		  Outport
@@ -1769,7 +1680,7 @@ Model {
 	  IconDisplay		  "Port number"
 	}
 	Line {
-	  ZOrder		  9
+	  ZOrder		  13
 	  SrcBlock		  "sum_max"
 	  SrcPort		  1
 	  DstBlock		  " SFunction "
@@ -1777,7 +1688,7 @@ Model {
 	}
 	Line {
 	  Name			  "x"
-	  ZOrder		  10
+	  ZOrder		  14
 	  Labels		  [0, 0]
 	  SrcBlock		  " SFunction "
 	  SrcPort		  2
@@ -1785,14 +1696,14 @@ Model {
 	  DstPort		  1
 	}
 	Line {
-	  ZOrder		  11
+	  ZOrder		  15
 	  SrcBlock		  " Demux "
 	  SrcPort		  1
 	  DstBlock		  " Terminator "
 	  DstPort		  1
 	}
 	Line {
-	  ZOrder		  12
+	  ZOrder		  16
 	  SrcBlock		  " SFunction "
 	  SrcPort		  1
 	  DstBlock		  " Demux "
@@ -1804,7 +1715,7 @@ Model {
       BlockType		      Constant
       Name		      "f"
       SID		      "29"
-      Position		      [70, 852, 195, 908]
+      Position		      [143, 847, 268, 903]
       ZOrder		      27
       Value		      "[0,0]"
     }
@@ -1812,7 +1723,7 @@ Model {
       BlockType		      Constant
       Name		      "sense"
       SID		      "31"
-      Position		      [70, 1152, 195, 1208]
+      Position		      [143, 1147, 268, 1203]
       ZOrder		      31
       Value		      "zeros(3,1)"
       SampleTime	      "1"
@@ -1822,7 +1733,7 @@ Model {
       Name		      "set daqp sizes"
       SID		      "63"
       Ports		      []
-      Position		      [1310, 774, 1395, 821]
+      Position		      [1380, 774, 1465, 821]
       ZOrder		      276
       RequestExecContextInheritance off
       Variant		      off
@@ -1917,7 +1828,7 @@ Model {
       BlockType		      Constant
       Name		      "sum_max"
       SID		      "69"
-      Position		      [1040, 1005, 1070, 1035]
+      Position		      [1110, 1005, 1140, 1035]
       ZOrder		      279
       Value		      "2.6"
     }
@@ -1940,8 +1851,8 @@ Model {
       DstPort		      1
     }
     Line {
-      ZOrder		      37
-      SrcBlock		      "Reshape3"
+      ZOrder		      92
+      SrcBlock		      "A"
       SrcPort		      1
       DstBlock		      "S-Function1"
       DstPort		      3
@@ -1968,22 +1879,8 @@ Model {
       DstPort		      5
     }
     Line {
-      ZOrder		      31
+      ZOrder		      89
       SrcBlock		      "H"
-      SrcPort		      1
-      DstBlock		      "Reshape2"
-      DstPort		      1
-    }
-    Line {
-      ZOrder		      32
-      SrcBlock		      "A"
-      SrcPort		      1
-      DstBlock		      "Transpose"
-      DstPort		      1
-    }
-    Line {
-      ZOrder		      35
-      SrcBlock		      "Reshape2"
       SrcPort		      1
       DstBlock		      "S-Function1"
       DstPort		      1
@@ -1994,13 +1891,6 @@ Model {
       SrcPort		      1
       DstBlock		      "S-Function1"
       DstPort		      2
-    }
-    Line {
-      ZOrder		      48
-      SrcBlock		      "Transpose"
-      SrcPort		      1
-      DstBlock		      "Reshape3"
-      DstPort		      1
     }
     Line {
       Name		      "fval"
@@ -2046,7 +1936,7 @@ Model {
     Annotation {
       SID		      "38"
       Name		      "Example 2"
-      Position		      [922, 694, 1437, 1268]
+      Position		      [992, 694, 1507, 1268]
       InternalMargins	      [0, 0, 0, 0]
       FixedHeight	      on
       FixedWidth	      on
@@ -2054,13 +1944,13 @@ Model {
       BackgroundColor	      "[0.901961, 0.901961, 1.000000]"
       DropShadow	      on
       AnnotationType	      "area_annotation"
-      ZOrder		      113
+      ZOrder		      186
       FontSize		      12
     }
     Annotation {
       SID		      "43"
       Name		      "Example 1"
-      Position		      [47, 694, 877, 1268]
+      Position		      [115, 696, 965, 1265]
       InternalMargins	      [0, 0, 0, 0]
       FixedHeight	      on
       FixedWidth	      on
@@ -2068,13 +1958,13 @@ Model {
       BackgroundColor	      "[0.901961, 0.901961, 1.000000]"
       DropShadow	      on
       AnnotationType	      "area_annotation"
-      ZOrder		      112
+      ZOrder		      187
       FontSize		      12
     }
     Annotation {
       SID		      "70"
       Name		      "Mask of s-function block: \nParameter: max iteration"
-      Position		      [426, 726, 540, 754]
+      Position		      [499, 721, 613, 749]
       InternalMargins	      [0, 0, 0, 0]
       FixedHeight	      off
       FixedWidth	      off
