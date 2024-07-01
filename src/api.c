@@ -361,3 +361,34 @@ void daqp_default_settings(DAQPSettings* settings){
     settings->rel_subopt = DEFAULT_REL_SUBOPT;
     settings->abs_subopt = DEFAULT_ABS_SUBOPT;
 }
+
+/* Remove redundant constraints*/
+// Determine reundant constraint of the polyhedron A*x <= b
+void daqp_minrep(int* is_redundant, c_float* A, c_float* b, int n, int m, int ms)
+{
+    int i;
+    // Setup workspace
+    DAQPWorkspace work;
+    work.settings = NULL;
+    allocate_daqp_workspace(&work,n,0);
+    allocate_daqp_settings(&work);
+    work.M = A;
+    work.dupper = b;
+    work.m = m;
+    work.ms = ms;
+
+    work.dlower = malloc(m*sizeof(c_float));
+    work.sense = malloc(m*sizeof(int));
+    for(i = 0; i<m; i++){
+        work.dlower[i] = -DAQP_INF;
+        work.sense[i] = 0;
+    }
+
+
+    // Solve minrep
+    daqp_minrep_work(is_redundant, &work);
+    // free
+    free_daqp_workspace(&work);
+    free(work.dlower);
+    free(work.sense);
+}

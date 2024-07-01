@@ -300,6 +300,36 @@ void normalize_M(DAQPWorkspace* work){
     }
 }
 
+/* Remove Minrep */
+void daqp_minrep_work(int* is_redundant, DAQPWorkspace* work){
+    int i,j,exitflag;
+
+    for(i=0; i < work->m; i++)
+        is_redundant[i] = -1;
+
+    for(i=0; i < work->m; i++){
+        if(is_redundant[i] != -1 || (work->sense[i]&IMMUTABLE) !=  0) continue;
+        reset_daqp_workspace(work);
+        work->sense[i] = 5;
+        add_constraint(work,i,1.0);
+        //work->dupper[i] += tol_weak; TODO support weaky infeasible constraints
+        exitflag = daqp_ldp(work);
+        if(exitflag== EXIT_INFEASIBLE){
+            is_redundant[i] = 1;
+            work->sense[i] &=~ACTIVE; // deactive (remains immutable, so will be ignored)
+        }
+        else{
+            is_redundant[i] = 0;
+            work->sense[i] &=~IMMUTABLE;
+            if(exitflag==EXIT_OPTIMAL)
+                for(j=0; j < work->n_active; j++) // all active constraint must also be nonredundant
+                    is_redundant[work->WS[j]] = 0;
+        }
+        // work->dupper[i] -= tol_weak; // TODO support weakly infeasible constraints
+        deactivate_constraints(work);
+    }
+}
+
 /* Profiling */
 #ifdef PROFILING
 #ifdef _WIN32

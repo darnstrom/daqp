@@ -15,6 +15,7 @@ void update_d(DAQPWorkspace *work);
 void normalize_Rinv(DAQPWorkspace *work);
 void normalize_M(DAQPWorkspace *work);
 //
+void daqp_minrep_work(int* is_redundant,DAQPWorkspace* work);
 // Utils for profiling
 #ifdef PROFILING
 #ifdef _WIN32
