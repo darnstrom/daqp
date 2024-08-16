@@ -32,7 +32,7 @@ int daqp_bnb(DAQPWorkspace* work){
         // Find index to branch over 
         branch_id = get_branch_id(work); 
         if(branch_id==-1){// Nothing to branch over => integer feasible
-            work->settings->fval_bound = (work->fval - work->settings->abs_subopt)*eps_r;
+            work->settings->fval_bound = (0.5*work->fval - work->settings->abs_subopt)*eps_r;
             swp_ptr=work->xold; work->xold= work->u; work->u=swp_ptr; // Store feasible sol
         }
         else{
@@ -43,7 +43,7 @@ int daqp_bnb(DAQPWorkspace* work){
     // Exploration completed 
     work->iterations = work->bnb->itercount;
     // Correct fval
-    work->fval = work->settings->fval_bound/eps_r+work->settings->abs_subopt;
+    work->fval = 2*work->settings->fval_bound/eps_r+work->settings->abs_subopt;
     work->settings->fval_bound = fval_bound0;
     if(swp_ptr==NULL)
         return EXIT_INFEASIBLE;
