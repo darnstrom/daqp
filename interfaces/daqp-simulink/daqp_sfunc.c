@@ -52,13 +52,12 @@
 #include <math.h> // For isnan, sqrt
 
 
-#define INFINITY 1.0e20
 static void removeNaN(real_T *x, int_T n) {
     // Replace NaN values with near infinity
     int_T i;
     for (i = 0; i < n; i++) {
         if (isnan(x[i])) {
-            x[i] = INFINITY;
+            x[i] = DAQP_INF;
         }
     }
 }
