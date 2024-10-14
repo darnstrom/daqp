@@ -6,13 +6,16 @@
 int update_ldp(const int mask, DAQPWorkspace *work){
     // TODO: copy dimensions from work->qp? 
     int error_flag, i;
+    int do_activate = 0;
 
     /** Update constraint sense **/
     if(mask&UPDATE_sense){
         if(work->qp->sense == NULL) // Assume all constraints are "normal" inequality constraints
             for(i=0;i<N_CONSTR;i++) work->sense[i] = 0;
-        else
+        else{
             for(i=0;i<N_CONSTR;i++) work->sense[i] = work->qp->sense[i];
+            do_activate = 1;
+        }
     }
 
     /** Update Rinv **/
@@ -49,13 +52,14 @@ int update_ldp(const int mask, DAQPWorkspace *work){
                 return EXIT_INFEASIBLE;
             }
             // Check for unmarked equality constraint (blower == bupper)
-            else if ( diff < work->settings->zero_tol )
+            else if ( diff < work->settings->zero_tol ){
                 work->sense[i] |= ACTIVE + IMMUTABLE;
+                do_activate = 1;
+            }
         }
 #endif
         update_d(work);
     }
-
 
 #ifdef SOFT_WEIGHTS
     // TODO: Use mask or something to avoid scaling something more times... 
@@ -68,6 +72,15 @@ int update_ldp(const int mask, DAQPWorkspace *work){
         }
     }
 #endif
+
+    // Make sure activate constraints are activated
+    if(do_activate){
+        reset_daqp_workspace(work);
+        error_flag = activate_constraints(work);
+        if(error_flag<0)
+            return error_flag;
+    }
+
     return 0;
 }
 
