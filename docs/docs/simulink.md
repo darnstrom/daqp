@@ -11,7 +11,7 @@ math: mathjax3
 
 ## Setting up the problem
 
-In Simulink, an s-function block can be used to solve a quadratic program. The s-function needs to link to the compiled c-code called "DAQP_sfunc". To compile the c-code, the following matlab-script can be used in the terminal:
+In Simulink, an s-function block can be used to solve a quadratic program. The s-function needs to link to the compiled c-code called "daqp_sfunc". To compile the c-code, the following matlab-script can be used in the terminal:
 
 ```matlab
 make_sfunc()
@@ -19,9 +19,9 @@ make_sfunc()
 
 _Note_: Please make sure to have a C-compiler installed on your system and linked in matlab. This can be checked by running ``mex -setup`` in the terminal:
 
-After the c-code has been compiled, a new file called ``DAQP_sfunc.mexw64`` (windows) or ``DAQP_sfunc.mexa64`` (linux, mac) should be found.
+After the c-code has been compiled, a new file called ``daqp_sfunc.mexw64`` (windows) or ``daqp_sfunc.mexa64`` (linux, mac) should be found.
 
-The s-function block has the following inputs:
+The corresponding S-function block has the following inputs:
 | Inputs | Description | Size | 
 | --- | --- | --- |
 | $H$ | The Hessian matrix of the quadratic objective function | [$n$ x $n$] |
@@ -48,16 +48,3 @@ The block has the following outputs:
 | $f_{val}$ | The optimal value of the objective function | 1 |
 | exitflag | The exit flag of the solver | 1 |
 | iter | The number of iterations used by the solver | 1 |
-
-## Example
-
-An example can be found in the simulink file ``simulink_example.slx``. The example solves the following quadratic program:
-
-$$\begin{aligned}
-&\underset{x}{\text{minimize}}&& \frac{1}{2} \left(x_1^2 + x_2^2\right)\\
-&\text{subject to} && 0.5 \leq \:x_1 \:\leq inf, \\
-& && 2 \leq \:x_2 \:\leq inf, \\
-& && 2.6 \leq \:x_1 + x_2 \: \leq inf, \\
-\end{aligned}$$
-
-The solution of the problem is $x = [0.6, 2]^T$ and $f_{val} = 2.18 = \frac12 \left(0.6^2 + 2^2\right)$.

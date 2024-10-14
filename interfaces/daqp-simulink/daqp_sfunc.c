@@ -28,7 +28,7 @@
  * 5. iteration: Number of iterations [1 x 1]
  */
 
-#define S_FUNCTION_NAME  DAQP_sfunc
+#define S_FUNCTION_NAME  daqp_sfunc
 #define S_FUNCTION_LEVEL 2
 
 // #define __DEBUG__ // uncomment for debugging
