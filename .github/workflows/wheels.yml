@@ -62,5 +62,6 @@ jobs:
     - name: Upload artifacts to github
       uses: actions/upload-artifact@v4
       with:
-        name: wheels
+        pattern: cibw-* 
         path: interfaces/daqp-python/wheelhouse
+        merge-multiple: true
