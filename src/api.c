@@ -95,12 +95,6 @@ int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time){
         free_daqp_workspace(work);
         return errorflag;
     }
-    errorflag = activate_constraints(work);
-    if(errorflag < 0){
-        if(own_settings==0) work->settings = NULL;
-        free_daqp_workspace(work);
-        return errorflag;
-    }
 #ifdef PROFILING
     if(setup_time != NULL){
         toc(&timer);
