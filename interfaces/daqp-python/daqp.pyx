@@ -93,6 +93,8 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
     if sense is None:
         sense = np.zeros(m, dtype=int)
 
+    H_ptr = NULL if H is None else &H[0,0]
+    f_ptr = NULL if f is None else &f[0]
     A_ptr = NULL if mA == 0 else &A[0,0]
 
     if m == 0:
@@ -101,7 +103,7 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
         bu_ptr, bl_ptr, sense_ptr  = &bupper[0], &blower[0], &sense[0]
 
 
-    cdef DAQPProblem problem = [n,m,m-mA, &H[0,0], &f[0], A_ptr, bu_ptr, bl_ptr, sense_ptr]
+    cdef DAQPProblem problem = [n,m,m-mA, H_ptr, f_ptr, A_ptr, bu_ptr, bl_ptr, sense_ptr]
 
     # Setup settings
     cdef DAQPSettings settings = [primal_tol, dual_tol, zero_tol, pivot_tol,
