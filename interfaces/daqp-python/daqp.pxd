@@ -48,6 +48,8 @@ cdef extern from "api.h":
     cdef extern nogil:
         int daqp_quadprog(DAQPResult *res, DAQPProblem *prob, DAQPSettings *settings)
     cdef extern nogil:
+        int daqp_minrep(int *is_redundant, double *A, double*b, int n, int m, int ms)
+    cdef extern nogil:
         int daqp_default_settings(DAQPSettings *settings)
 
 cdef extern from "constants.h":

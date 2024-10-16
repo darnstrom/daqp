@@ -126,3 +126,20 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
             'nodes': res.nodes,
             'lam': np.asarray(lam)}
     return np.asarray(x), res.fval, res.exitflag, info
+def minrep(double[:,:] A, double[:] b):
+    # Setup problem
+    cdef int n,m,ms
+    A = np.ascontiguousarray(A)
+    mA, n = np.shape(A)
+    m = np.size(b)
+    ms = m-mA
+
+    &A[0,0]
+
+    # Setup output
+    cdef int[::1] is_redundant = np.zeros(m, dtype=np.intc)
+
+    # Solve 
+    with nogil:
+        daqp_minrep(&is_redundant[0], &A[0,0], &b[0],n,m,ms)
+    return np.asarray(is_redundant)
