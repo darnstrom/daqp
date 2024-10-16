@@ -38,6 +38,7 @@ void free_daqp_bnb(DAQPWorkspace* work);
 
 void daqp_extract_result(DAQPResult* res, DAQPWorkspace* work);
 void daqp_default_settings(DAQPSettings *settings);
+void daqp_minrep(int* is_redundant, c_float* A, c_float* b, int n, int m, int ms);
 
 # ifdef __cplusplus
 }
