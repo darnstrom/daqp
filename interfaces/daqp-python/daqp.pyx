@@ -89,9 +89,9 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
 
     # By default, set lower bounds to -inf and interpret constraints as inequalities 
     if blower is None:
-        blower = np.fill(m, -DAQP_INF)
+        blower = np.full(m, -DAQP_INF)
     if sense is None:
-        sense = np.zeros(m, dtype=int)
+        sense = np.zeros(m, dtype=np.intc)
 
     H_ptr = NULL if H is None else &H[0,0]
     f_ptr = NULL if f is None else &f[0]
