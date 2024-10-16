@@ -5,6 +5,7 @@ set(
     "${CMAKE_CURRENT_SOURCE_DIR}/bnb.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/daqp.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/daqp_prox.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/daqp_lp.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/factorization.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/utils.c"
 )
