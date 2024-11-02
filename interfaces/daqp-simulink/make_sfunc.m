@@ -31,11 +31,11 @@ source_files = {'daqp.c', ...
                 'bnb.c'};
 
 
-sfunc = 'daqp_sfunc.c';
+sfunc = 'DAQP_sfunc.c';
     
 % Construct compile command
 if do_debug
-    cmd = [ 'mex -g ', sfunc ];
+    cmd = [ 'mex -D__DEBUG__ -g ', sfunc ];
 else
     cmd = [ 'mex ', sfunc ];
 end
