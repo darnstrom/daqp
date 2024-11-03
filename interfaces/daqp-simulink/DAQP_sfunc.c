@@ -72,7 +72,6 @@ static void removeNaN(real_T *x, int_T n)
         }
     }
 }
-
 static void transposeMatrix(InputRealPtrsType x_in, c_float *x, int_T n, int_T m)
 {
     // Convert Matrix column-first-order to row-first-order
@@ -89,7 +88,7 @@ static void transposeMatrix(InputRealPtrsType x_in, c_float *x, int_T n, int_T m
 
     for (i = 0; i < n; ++i)
         for (j = 0; j < m; ++j)
-            x[j * n + i] = (c_float)(*x_in)[i * m + j];
+            x[i * m + j] = (c_float)(*x_in)[j * n + i];
 }
 
 /* Function: mdlInitializeSizes ===============================================
@@ -115,11 +114,6 @@ static void mdlInitializeSizes(SimStruct *S)
 
     // --------------------------- PARAMETERS -----------------------------
     ssSetNumSFcnParams(S, 2); /* Number of expected parameters */
-    // if (ssGetNumSFcnParams(S) != ssGetSFcnParamsCount(S)) {
-    //     /* Return if number of expected != number of actual parameters */
-    //     mexErrMsgTxt( "ERROR (DAQP): Number of parameters must be 2. 1:maxIter (int), 2:WARM_START(int, 0: cold, 1: constraints, 2: constraints+H+A]" );
-    //     return;
-    // }
 
     // ----------------------------- INPUTS -----------------------------
     if (!ssSetNumInputPorts(S, 6))
@@ -143,7 +137,7 @@ static void mdlInitializeSizes(SimStruct *S)
     ssSetInputPortDirectFeedThrough(S, 5, 1);
 
     // ----------------------------- WORK -------------------------------
-    ssSetNumPWork(S, 1); // work
+    ssSetNumPWork(S, 2); // work, result
 
     // ----------------------------- OUTPUTS -----------------------------
     if (!ssSetNumOutputPorts(S, 5))
@@ -354,7 +348,6 @@ DAQPWorkspace *daqp_sfun_Start_wrapper(Dimensions dim)
     work->qp->f = malloc(n * sizeof(c_float));
     work->qp->bupper = malloc(m * sizeof(c_float));
     work->qp->blower = malloc(m * sizeof(c_float));
-    // work->qp->sense = NULL;
 
     // Setup daqp workspace
     work->Rinv = malloc(((n + 1) * n / 2) * sizeof(c_float));
@@ -371,14 +364,6 @@ DAQPWorkspace *daqp_sfun_Start_wrapper(Dimensions dim)
 }
 static void mdlStart(SimStruct *S)
 {
-    const mxArray *in_maxIter = ssGetSFcnParam(S, 0);
-    int_T maxIter = (int_T)((mxGetPr(in_maxIter))[0]); // Maximum number of iterations
-
-    if (maxIter <= 0)
-    {
-        mexErrMsgTxt("ERROR (DAQP): Maximum number of iterations must be greater than zero.");
-    }
-
 // ----------------------------- WORK -----------------------------
 // Dimensions as work
 #ifdef __DEBUG__
@@ -388,7 +373,12 @@ static void mdlStart(SimStruct *S)
     Dimensions dim = checkDimensions(S);
     DAQPWorkspace *work = daqp_sfun_Start_wrapper(dim);
 
+    DAQPResult *result = (DAQPResult *)calloc(1, sizeof(DAQPResult));
+    result->lam = (c_float *)calloc(dim.m, sizeof(c_float));
+    result->x = (c_float *)calloc(dim.n, sizeof(c_float));
+
     ssSetPWorkValue(S, 0, work);
+    ssSetPWorkValue(S, 1, result);
 
 #ifdef __DEBUG__
     mexPrintf("DAQP: Dimensions:\n");
@@ -401,7 +391,6 @@ static void mdlStart(SimStruct *S)
     mexPrintf(" - lb:     [%d x 1], %c\n", dim.m, ssGetInputPortConnected(S, 3) ? 'Y' : 'N');
     mexPrintf(" - ub:     [%d x 1], %c\n", dim.m, ssGetInputPortConnected(S, 4) ? 'Y' : 'N');
     mexPrintf(" - sense:  [%d x 1], %c\n", dim.m, ssGetInputPortConnected(S, 5) ? 'Y' : 'N');
-    mexPrintf(" - Maximum number of iterations: %d\n", maxIter);
 #endif
 }
 
@@ -469,7 +458,13 @@ static void mdlOutputs(SimStruct *S, int_T tid)
         {
             mexErrMsgTxt("ERROR (DAQP): maxIter must be a scalar.");
         }
+
         maxIter = (int_T)((mxGetPr(in_maxIter))[0]); // Maximum number of iterations
+
+        if (maxIter <= 0)
+        {
+            mexErrMsgTxt("ERROR (DAQP): Maximum number of iterations must be greater than zero.");
+        }
     }
 
     // ----------------------------- INPUTS -----------------------------
@@ -483,6 +478,7 @@ static void mdlOutputs(SimStruct *S, int_T tid)
 
     // ----------------------------- Get Work -----------------------------
     DAQPWorkspace *work = (DAQPWorkspace *)ssGetPWorkValue(S, 0);
+    work->settings->iter_limit = maxIter;
 
     // ----------------------------- OUTPUTS -----------------------------
     real_T *out_x_opt = ssGetOutputPortRealSignal(S, 0);
@@ -496,60 +492,62 @@ static void mdlOutputs(SimStruct *S, int_T tid)
     int n = work->n;
     int m = work->m;
     int mg = m - work->ms;
-
     int update_mask = 0;
 
     // Update H and A
     if (WARM_START < 2 || work->iterations == 0)
     {
-        transposeMatrix(in_H, work->qp->H, n, n);
+        // Convert input to row-first-order
+        transposeMatrix(in_H, work->qp->H, work->n, work->n);
+        transposeMatrix(in_A, work->qp->A, mg, work->n);
 
-        transposeMatrix(in_A, work->qp->A, mg, n);
         // Check if A is connected
         if (!(ssGetInputPortConnected(S, 2)))
         {
-            for (ii = mg; ii < m; ii++)
+            for (ii = mg; ii < work->m * work->n; ii++)
             {
-                for (jj = 0; jj < n; jj++)
-                {
-                    work->qp->A[ii * n + jj] = 0.0;
-                }
+                work->qp->A[ii] = 0.0;
             }
         }
         update_mask += UPDATE_Rinv + UPDATE_M;
     }
 
-    // Update f & bupper/blower
+    // Update f
     update_mask += UPDATE_v + UPDATE_d;
-    for (ii = 0; ii < n; ii++)
+    for (ii = 0; ii < work->n; ii++)
         work->qp->f[ii] = (c_float)(*in_f)[ii];
-    for (ii = 0; ii < m; ii++)
+
+    // Update blower, bupper and sense
+    boolean_T Port3Connected = ssGetInputPortConnected(S, 3);
+    boolean_T Port4Connected = ssGetInputPortConnected(S, 4);
+    boolean_T Port5Connected = ssGetInputPortConnected(S, 5);
+    for (ii = 0; ii < work->m; ii++)
     {
-        if (!ssGetInputPortConnected(S, 3))
-        {
-            work->qp->blower[ii] = -INFTY; // input not connected
-        }
-        else
+        if (Port3Connected)
         {
             work->qp->blower[ii] = (c_float)(*in_lb)[ii];
         }
-
-        if (!ssGetInputPortConnected(S, 4))
-        {
-            work->qp->bupper[ii] = INFTY; // input not connected
-        }
         else
+        {
+            work->qp->blower[ii] = -INFTY; // input not connected
+        }
+
+        if (Port4Connected)
         {
             work->qp->bupper[ii] = (c_float)(*in_ub)[ii];
         }
-
-        if (!ssGetInputPortConnected(S, 5))
+        else
         {
-            work->qp->sense[ii] = 0; // input not connected
+            work->qp->bupper[ii] = INFTY; // input not connected
+        }
+
+        if (Port5Connected)
+        {
+            work->qp->sense[ii] = (int_T)(*in_sense)[ii];
         }
         else
         {
-            work->qp->sense[ii] = (int_T)(*in_sense)[ii];
+            work->qp->sense[ii] = 0; // input not connected
         }
     }
     // Cleanup sense
@@ -567,6 +565,9 @@ static void mdlOutputs(SimStruct *S, int_T tid)
     // Solve problem
     out_flag[0] = daqp_ldp(work);
     ldp2qp_solution(work);
+
+    DAQPResult *result = (DAQPResult *)ssGetPWorkValue(S, 1);
+    daqp_extract_result(result, work);
 
 // DEBUG
 #ifdef __DEBUG__
@@ -616,14 +617,20 @@ static void mdlOutputs(SimStruct *S, int_T tid)
 #endif
 
     // ------------------------- WRITE OUTPUTS -------------------------
+    if (work->x == NULL || work->lam == NULL)
+    {
+        mexErrMsgTxt("ERROR (DAQP): Memory allocation failed.");
+    }
+
     for (ii = 0; ii < work->n; ++ii)
-        out_x_opt[ii] = (real_T)(work->x[ii]);
+        out_x_opt[ii] = (real_T)(result->x[ii]);
 
-    for (ii = 0; ii < work->m; ++ii)
-        out_lambda[ii] = (real_T)(work->lam[ii]);
+    if (work->lam != NULL)
+        for (ii = 0; ii < work->m; ++ii)
+            out_lambda[ii] = (real_T)(result->lam[ii]);
 
-    out_fval[0] = (real_T)(work->fval);
-    out_iteration[0] = (real_T)(work->iterations);
+    out_fval[0] = (real_T)(result->fval);
+    out_iteration[0] = (real_T)(result->iter);
 
     // -------------------------- REMOVE NaN -------------------------
     removeNaN(out_x_opt, work->n);
@@ -654,6 +661,12 @@ static void mdlTerminate(SimStruct *S)
     free(work->qp);
 
     free(work);
+
+    // Free Result
+    DAQPResult *result = (DAQPResult *)ssGetPWorkValue(S, 1);
+    free(result->lam);
+    free(result->x);
+    free(result);
 
 #ifdef __DEBUG__
     mexPrintf("mdlTerminate finished.\n");
@@ -686,6 +699,52 @@ static void mdlSetOutputPortDimensionInfo(SimStruct *S, int_T port, const DimsIn
  * Abstract:
  *    Needed for missing inputs
  */
+static void setOutputPortDimensions(SimStruct *S, int_T port, int_T dim1, int_T dim2)
+{
+    DimsInfo_T dimsInfo;
+    dimsInfo.dims = (int *)calloc(2, sizeof(int));
+    if (dim2 == 1)
+    {
+        dimsInfo.numDims = 1;
+        dimsInfo.dims[0] = dim1;
+        dimsInfo.dims[1] = dim2;
+        dimsInfo.width = dim1 * dim2;
+    }
+    else
+    {
+        dimsInfo.numDims = 2;
+        dimsInfo.dims[0] = dim1;
+        dimsInfo.dims[1] = dim2;
+        dimsInfo.width = dim1 * dim2;
+    }
+    mdlSetOutputPortDimensionInfo(S, port, &dimsInfo);
+
+    // Free memory
+    free(dimsInfo.dims);
+}
+static void setInputPortDimensions(SimStruct *S, int_T port, int_T dim1, int_T dim2)
+{
+    DimsInfo_T dimsInfo;
+    dimsInfo.dims = (int *)calloc(2, sizeof(int));
+    if (dim2 == 1)
+    {
+        dimsInfo.numDims = 1;
+        dimsInfo.dims[0] = dim1;
+        dimsInfo.dims[1] = dim2;
+        dimsInfo.width = dim1 * dim2;
+    }
+    else
+    {
+        dimsInfo.numDims = 2;
+        dimsInfo.dims[0] = dim1;
+        dimsInfo.dims[1] = dim2;
+        dimsInfo.width = dim1 * dim2;
+    }
+    mdlSetInputPortDimensionInfo(S, port, &dimsInfo);
+
+    // Free memory
+    free(dimsInfo.dims);
+}
 static void mdlSetDefaultPortDimensionInfo(SimStruct *S)
 {
 #ifdef __DEBUG__
@@ -695,52 +754,17 @@ static void mdlSetDefaultPortDimensionInfo(SimStruct *S)
     // Get Dimensions
     Dimensions dim = checkDimensions(S);
 
-    // Set Dimensions of Port 0
-    DimsInfo_T dimsInfo;
-    dimsInfo.numDims = 2;
-    dimsInfo.dims = (int *)calloc(2, sizeof(int));
-    dimsInfo.dims[0] = dim.n;
-    dimsInfo.dims[1] = dim.n;
-    dimsInfo.width = dim.n * dim.n;
-    mdlSetInputPortDimensionInfo(S, 0, &dimsInfo);
+    // Set Outputs
+    setOutputPortDimensions(S, 0, dim.n, 1);
+    setOutputPortDimensions(S, 1, dim.m, 1);
 
-    // Set Dimensions of Port 2
-    dimsInfo.numDims = 2;
-    dimsInfo.dims[0] = dim.mg;
-    dimsInfo.dims[1] = dim.n;
-    dimsInfo.width = dim.mg * dim.n;
-    mdlSetInputPortDimensionInfo(S, 2, &dimsInfo);
-
-    free(dimsInfo.dims);
-
-    // Set Dimensions of Port 1
-    dimsInfo.numDims = 1;
-    dimsInfo.dims = (int *)calloc(1, sizeof(int));
-    dimsInfo.dims[0] = dim.n;
-    dimsInfo.width = dim.n;
-    mdlSetInputPortDimensionInfo(S, 1, &dimsInfo);
-
-    // Set Dimensions of Port 3,4,5
-    dimsInfo.numDims = 1;
-    dimsInfo.dims[0] = dim.m;
-    dimsInfo.width = dim.m;
-    mdlSetInputPortDimensionInfo(S, 3, &dimsInfo);
-    mdlSetInputPortDimensionInfo(S, 4, &dimsInfo);
-    mdlSetInputPortDimensionInfo(S, 5, &dimsInfo);
-
-    // Set Dimensions of Output Port 0
-    dimsInfo.numDims = 1;
-    dimsInfo.dims[0] = dim.n;
-    dimsInfo.width = dim.n;
-    mdlSetOutputPortDimensionInfo(S, 0, &dimsInfo);
-
-    // Set Dimensions of Output Port 1
-    dimsInfo.numDims = 1;
-    dimsInfo.dims[0] = dim.m;
-    dimsInfo.width = dim.m;
-    mdlSetOutputPortDimensionInfo(S, 1, &dimsInfo);
-
-    free(dimsInfo.dims);
+    // Set Inputs
+    setInputPortDimensions(S, 0, dim.n, dim.n);
+    setInputPortDimensions(S, 1, dim.n, 1);
+    setInputPortDimensions(S, 2, dim.mg, dim.n);
+    setInputPortDimensions(S, 3, dim.m, 1);
+    setInputPortDimensions(S, 4, dim.m, 1);
+    setInputPortDimensions(S, 5, dim.m, 1);
 
 #ifdef __DEBUG__
     mexPrintf("mdlSetDefaultPortDimensionInfo finished.\n");

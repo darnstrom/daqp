@@ -4,9 +4,9 @@ classdef core_test < matlab.unittest.TestCase
         function random_feasible_QPs(testCase)
             % Test on randomly generated feasible QPs
             rng('default');
-            nQPs = 20;
-            n = 5; m = 10; ms = 5;
-            nAct = 3;
+            nQPs = 100;
+            n = 500; m = 100; ms = 50;
+            nAct = 30;
             kappa = 1e2;
             tol = 1e-5;
             
