@@ -18,7 +18,16 @@ if(SOFT_WEIGHTS)
 endif()
 
 add_library(daqpstat STATIC ${daqp_src} ${daqp_headers} ${daqp_codegen_src} ${daqp_codegen_headers})
+target_include_directories(daqpstat PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>
+)
+
 add_library(daqp SHARED ${daqp_src} ${daqp_headers} ${daqp_codegen_src} ${daqp_codegen_headers})
+target_include_directories(daqp PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>
+)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_C_STANDARD_LIBRARIES "${CMAKE_C_STANDARD_LIBRARIES}") # math for C api
@@ -38,7 +47,7 @@ install(TARGETS daqp EXPORT  ${PROJECT_NAME}
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 install(FILES ${daqp_headers} ${daqp_codegen_headers} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/daqp")
 
-install(EXPORT ${PROJECT_NAME} DESTINATION cmake)
+install(EXPORT ${PROJECT_NAME}Cmake DESTINATION cmake)
 
 if(MATLAB)
   find_package(Matlab)
