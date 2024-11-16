@@ -25,12 +25,12 @@ The corresponding S-function block has the following inputs:
 
 | Inputs | Description | Size | 
 | --- | --- | --- |
-| $$H$$ | The Hessian matrix of the quadratic objective function | [$$n$$ x $$n$$ |
-| $$f$$ | The linear part of the objective function | [ $$n$$ x 1 ]
-| $$A$$ | The matrix of linear constraints | [ $$m_g$$ x $$n$$ ]
-| $$b_l$$ | The lower bound of the linear constraints | [ $$m$$ x 1 ]
-| $$b_u$$ | The upper bound of the linear constraints | [ $$m$$ x 1 ]
-| sense | The type of the constraints | [ $$m$$ x 1 ]
+| $$H$$ | The Hessian matrix of the quadratic objective function | [ $$n$$ x $$n$$ ] |
+| $$f$$ | The linear part of the objective function | [ $$n$$ x 1 ] |
+| $$A$$ | The matrix of linear constraints | [ $$m_g$$ x $$n$$ ] |
+| $$b_l$$ | The lower bound of the linear constraints | [ $$m$$ x 1 ] |
+| $$b_u$$ | The upper bound of the linear constraints | [ $$m$$ x 1 ] |
+| sense | The type of the constraints | [ $$m$$ x 1 ] |
 
 _Note_: When $$b_u$$ and $$b_l$$ have more elements than the number of rows in $$A$$ the first elements in $$b_u$$ and $$b_l$$ are interpreted as simple bounds. 
 
