@@ -111,12 +111,10 @@ void update_LDL_remove(DAQPWorkspace *work, const int rm_ind){
     c_float p,beta,dbar,alpha=work->D[rm_ind];
     // i - Element/row to update|j - Column which is looped over|r - Row to loop over
     old_disp=ARSUM(rm_ind)+rm_ind;
-    for(j = 0, i=rm_ind+1;;j++,i++){
+    for(j = 0, i=rm_ind+1;j<n_update;j++,i++){
         p=w[j];
         dbar = work->D[i]+alpha*p*p;
         work->D[i-1] = dbar;
-
-        if(j == n_update) break;
 
         beta = p*alpha/dbar;
         alpha =work->D[i]*alpha/dbar;
