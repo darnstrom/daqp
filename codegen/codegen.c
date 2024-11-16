@@ -155,8 +155,9 @@ void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work){
     fprintf(f, "DAQPWorkspace daqp_work= {\n");
     fprintf(f, "NULL,\n"); // DAQPProblem
     fprintf(f, "%d, %d, %d,\n",n,m,ms); // dimensions 
-    fprintf(f, "M, dupper, dlower, Rinv, NULL, NULL, sense,\n"); //LDP 
+    fprintf(f, "M, dupper, dlower, Rinv, NULL, sense,\n"); //LDP
     fprintf(f, "scaling,\n"); // scaling
+    fprintf(f, "NULL,\n"); // RinvD
     fprintf(f, "x, xold,\n");
     fprintf(f, "lam, lam_star, u, %d,\n",-1); // fval
     fprintf(f, "L, D, xldl,zldl,%d,\n",0); // reuse_ind
