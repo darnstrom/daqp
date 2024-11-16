@@ -94,9 +94,9 @@ void write_daqp_workspace_h(FILE *f, DAQPWorkspace* work){
     fprintf(f, "extern c_float dupper[%d];\n", m);
     fprintf(f, "extern c_float dlower[%d];\n", m);
     fprintf(f, "extern c_float Rinv[%d];\n", n*(n+1)/2);
-    fprintf(f, "extern c_float v[%d];\n", n);
+    //fprintf(f, "extern c_float v[%d];\n", n);
     fprintf(f, "extern int sense[%d];\n\n", m);
-    fprintf(f, "extern c_float scaling[%d];\n\n", m);
+    //fprintf(f, "extern c_float scaling[%d];\n\n", m);
 
     fprintf(f, "extern c_float x[%d];\n", n+1);
     fprintf(f, "extern c_float xold[%d];\n\n", n+1);
@@ -134,7 +134,7 @@ void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work){
     write_float_array(f,work->Rinv,n*(n+1)/2,"Rinv");
     //write_float_array(f,work->v,n, "v");
     write_int_array(f,work->sense, m,"sense");
-    write_float_array(f,work->scaling, m,"scaling");
+    //write_float_array(f,work->scaling, m,"scaling");
 
     // Iteratates
     fprintf(f, "c_float x[%d];\n", n+1);
@@ -155,8 +155,9 @@ void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work){
     fprintf(f, "DAQPWorkspace daqp_work= {\n");
     fprintf(f, "NULL,\n"); // DAQPProblem
     fprintf(f, "%d, %d, %d,\n",n,m,ms); // dimensions 
-    fprintf(f, "M, dupper, dlower, Rinv, NULL, NULL, sense,\n"); //LDP 
-    fprintf(f, "scaling,\n"); // scaling
+    fprintf(f, "M, dupper, dlower, Rinv, NULL, sense,\n"); //LDP
+    fprintf(f, "NULL,\n"); // scaling
+    fprintf(f, "NULL,\n"); // RinvD
     fprintf(f, "x, xold,\n");
     fprintf(f, "lam, lam_star, u, %d,\n",-1); // fval
     fprintf(f, "L, D, xldl,zldl,%d,\n",0); // reuse_ind

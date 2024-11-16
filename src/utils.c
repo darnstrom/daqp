@@ -6,13 +6,16 @@
 int update_ldp(const int mask, DAQPWorkspace *work){
     // TODO: copy dimensions from work->qp? 
     int error_flag, i;
+    int do_activate = 0;
 
     /** Update constraint sense **/
     if(mask&UPDATE_sense){
         if(work->qp->sense == NULL) // Assume all constraints are "normal" inequality constraints
             for(i=0;i<N_CONSTR;i++) work->sense[i] = 0;
-        else
+        else{
             for(i=0;i<N_CONSTR;i++) work->sense[i] = work->qp->sense[i];
+            do_activate = 1;
+        }
     }
 
     /** Update Rinv **/
@@ -49,13 +52,14 @@ int update_ldp(const int mask, DAQPWorkspace *work){
                 return EXIT_INFEASIBLE;
             }
             // Check for unmarked equality constraint (blower == bupper)
-            else if ( diff < work->settings->zero_tol )
+            else if ( diff < work->settings->zero_tol ){
                 work->sense[i] |= ACTIVE + IMMUTABLE;
+                do_activate = 1;
+            }
         }
 #endif
         update_d(work);
     }
-
 
 #ifdef SOFT_WEIGHTS
     // TODO: Use mask or something to avoid scaling something more times... 
@@ -68,6 +72,15 @@ int update_ldp(const int mask, DAQPWorkspace *work){
         }
     }
 #endif
+
+    // Make sure activate constraints are activated
+    if(do_activate){
+        reset_daqp_workspace(work);
+        error_flag = activate_constraints(work);
+        if(error_flag<0)
+            return error_flag;
+    }
+
     return 0;
 }
 
@@ -297,6 +310,36 @@ void normalize_M(DAQPWorkspace* work){
         work->scaling[i]=scaling_i;
         for(j=0, disp-=NX;j<NX;j++,disp++)
             work->M[disp]*=scaling_i;
+    }
+}
+
+/* Remove Minrep */
+void daqp_minrep_work(int* is_redundant, DAQPWorkspace* work){
+    int i,j,exitflag;
+
+    for(i=0; i < work->m; i++)
+        is_redundant[i] = -1;
+
+    for(i=0; i < work->m; i++){
+        if(is_redundant[i] != -1 || (work->sense[i]&IMMUTABLE) !=  0) continue;
+        reset_daqp_workspace(work);
+        work->sense[i] = 5;
+        add_constraint(work,i,1.0);
+        //work->dupper[i] += tol_weak; TODO support weaky infeasible constraints
+        exitflag = daqp_ldp(work);
+        if(exitflag== EXIT_INFEASIBLE){
+            is_redundant[i] = 1;
+            work->sense[i] &=~ACTIVE; // deactive (remains immutable, so will be ignored)
+        }
+        else{
+            is_redundant[i] = 0;
+            work->sense[i] &=~IMMUTABLE;
+            if(exitflag==EXIT_OPTIMAL)
+                for(j=0; j < work->n_active; j++) // all active constraint must also be nonredundant
+                    is_redundant[work->WS[j]] = 0;
+        }
+        // work->dupper[i] -= tol_weak; // TODO support weakly infeasible constraints
+        deactivate_constraints(work);
     }
 }
 

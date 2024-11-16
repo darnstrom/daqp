@@ -4,6 +4,7 @@ int daqp_ldp(DAQPWorkspace *work){
     int exitflag=EXIT_ITERLIMIT,iter;
     int tried_repair=0, cycle_counter=0;
     c_float best_fval = -1;
+    c_float fval_bound = 2*work->settings->fval_bound; // Internal objective is twice the nomninal
 
     for(iter=1; iter < work->settings->iter_limit; ++iter){
         if(work->sing_ind==EMPTY_IND){ 
@@ -12,7 +13,7 @@ int daqp_ldp(DAQPWorkspace *work){
             if(!remove_blocking(work)){ //lam_star >= 0 (i.e., dual feasible)
                 compute_primal_and_fval(work);
                 // fval termination criterion
-                if(work->fval > work->settings->fval_bound){
+                if(work->fval > fval_bound){
                     exitflag = EXIT_INFEASIBLE;
                     break;
                 }

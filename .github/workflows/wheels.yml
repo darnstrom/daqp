@@ -60,7 +60,7 @@ jobs:
         python -m pip install --upgrade twine
         twine upload wheelhouse/*
     - name: Upload artifacts to github
-      uses: actions/upload-artifact@v1
+      uses: actions/upload-artifact@v4
       with:
-        name: wheels
-        path: interfaces/daqp-python/wheelhouse
+        name: wheels-${{ matrix.os }}-${{ strategy.job-index }}
+        path: interfaces/daqp-python/wheelhouse/*.whl
