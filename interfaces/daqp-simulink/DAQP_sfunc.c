@@ -44,6 +44,7 @@
 #include "types.h"
 #include "daqp.h"
 #include "api.h"
+#include "utils.h"
 
 #include <stdlib.h> // For malloc und free
 #include <math.h>   // For isnan, sqrt
