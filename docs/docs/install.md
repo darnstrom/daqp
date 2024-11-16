@@ -58,7 +58,7 @@ pip install daqp
 ```
 
 ## Installing the Simulink interface
-The Simulink interface can be installed directly by running the following commands in MATLAB in the directory where you want to store interface:
+The Simulink interface can be installed directly by running the following commands in MATLAB in the directory where you want to store the interface:
 ```shell
 websave('daqp.tar.gz','https://github.com/darnstrom/daqp/archive/refs/heads/master.tar.gz')
 untar('daqp.tar.gz')
