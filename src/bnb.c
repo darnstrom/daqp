@@ -100,31 +100,37 @@ int process_node(DAQPNode* node, DAQPWorkspace* work){
 int get_branch_id(DAQPWorkspace* work){
     int i,disp;
     int branch_id = EMPTY_IND;
+    c_float diff, Mu, bin_tol;
     for(i=0; i < work->bnb->nb; i++){
         // Branch on first inactive constraint 
         if(IS_ACTIVE(work->bnb->bin_ids[i])) continue;
+
+        // Check if weakly active
         branch_id = work->bnb->bin_ids[i];
-        break;
-    }
-
-    if(branch_id == EMPTY_IND) return EMPTY_IND; // Nothing to branch over (=>integer feasible)
-
-    // Determine if upper or lower child should be processed first 
-    // by computing whether the upper or lower bound is closer to be activated
-    c_float diff = 0.5*(work->dupper[branch_id]+work->dlower[branch_id]);
-    if(IS_SIMPLE(branch_id)){//Simple bound
-        if(work->Rinv==NULL) diff-=work->u[branch_id]; //Hessian is identify 
-        else{
-            for(i=branch_id,disp=branch_id+R_OFFSET(branch_id,NX);i<NX;i++) // 
-                diff-=work->Rinv[disp++]*work->u[i];
+        Mu = 0;
+        if(IS_SIMPLE(branch_id)){//Simple bound
+            if(work->Rinv==NULL) Mu+=work->u[branch_id]; //Hessian is identity
+            else{
+                for(i=branch_id,disp=branch_id+R_OFFSET(branch_id,NX);i<NX;i++)
+                    Mu+=work->Rinv[disp++]*work->u[i];
+            }
         }
+        else{//General bound
+            for(i=0,disp=NX*(branch_id-N_SIMPLE);i<NX;i++)
+                Mu+=work->M[disp++]*work->u[i];
+        }
+        bin_tol = work->scaling != NULL ? work->scaling[branch_id]*work->settings->primal_tol : work->settings->primal_tol;
+        if(work->dupper[branch_id]-Mu < bin_tol) continue; // Weakly active at upper
+        if(work->dlower[branch_id]-Mu > -bin_tol) continue;  // Weakly active at lower
+
+        // branch_id is inactive
+        // determine if upper or lower child should be processed first
+        // by computing whether the upper or lower bound is closer to be activated
+        diff = 0.5*(work->dupper[branch_id]+work->dlower[branch_id])-Mu;
+        return diff <0 ? branch_id : ADD_LOWER_FLAG(branch_id);
     }
-    else{//General bound
-        for(i=0,disp=NX*(branch_id-N_SIMPLE);i<NX;i++) 
-            diff-=work->M[disp++]*work->u[i];
-    }
-    branch_id = diff<0 ? branch_id : ADD_LOWER_FLAG(branch_id);
-    return branch_id;
+
+    return EMPTY_IND; // Nothing to branch over (=>integer feasible)
 }
 
 void spawn_children(DAQPNode* node, const int branch_id, DAQPWorkspace* work){
