@@ -29,6 +29,9 @@ typedef struct{
     // sense define the state of the constraints 
     // (active, immutable, upper/lower, soft, binary).
 
+    // if is_factored != 0, field H contains the Cholesky factor R, where H=R'R
+    // H has dimension n*n if !is_factored, n*(n+1)/2 if is_factored
+
     int n;
     int m;
     int ms;
@@ -41,6 +44,8 @@ typedef struct{
     c_float* blower;
 
     int* sense; 
+
+    int is_factored;
 
 }DAQPProblem;
 
