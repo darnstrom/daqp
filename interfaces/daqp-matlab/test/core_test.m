@@ -176,6 +176,38 @@ classdef core_test < matlab.unittest.TestCase
             soft_info
         end
 
+        function soft_QP(testCase)
+            n=10;
+            m=30;
+            H = eye(n);
+            f = zeros(n,1);
+            A = randn(m,n);
+            tol = 1e-5;
+            rho = 1e-3;
+            bupper = randn(m,1);
+            blower = -1e30*ones(m,1)
+            sense= int32(8*ones(m,1));
+            d = daqp();
+            d.setup(H,f,A,bupper,blower,sense);
+            d.settings('rho_soft',rho);
+            [xi,fval,exitflag, soft_info] = d.solve();
+            wi = soft_info.lambda*rho
+
+            % Explicit solve the problem with slacks 
+            He = blkdiag(H,(1/rho)*eye(m));
+            fe = [f;zeros(m,1)];
+            Ae = [A -eye(m)];
+            sense= int32(zeros(m,1));
+            
+            [xw,fval,exitflag,info] = daqp.quadprog(He,fe,Ae,bupper,blower,sense);
+            xe = xw(1:n);
+            we = xw(n+1:end)
+            testCase.verifyLessThan(norm(xi-xe),tol);
+            testCase.verifyLessThan(norm(wi-we),tol);
+
+
+        end
+
         function trivial_infeasible_QP(testCase)
             H = eye(2);
             f = zeros(2,1);
