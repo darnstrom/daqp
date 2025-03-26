@@ -193,6 +193,7 @@ void setup_daqp_hiqp(DAQPWorkspace* work, int* break_points, int nh){
             update_d(work);
         }
     }
+}
 
 int setup_daqp_bnb(DAQPWorkspace* work, int nb, int ns){
     int i, nadded;

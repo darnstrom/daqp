@@ -309,6 +309,7 @@ classdef core_test < matlab.unittest.TestCase
                 fprintf('fval_daqp:%f fval_grb:%f, rel_error:%f',fval,gurobi_result.objval,rel_error);
                 testCase.verifyLessThan((fval-gurobi_result.objval)/fval,0.1);
             end
+        end
 
         function hierarchical_qp(testCase)
             %  Larger example 
