@@ -1,15 +1,23 @@
 #ifndef DAQP_TYPES_H
 # define DAQP_TYPES_H
 
+# ifdef __cplusplus
+extern "C" {
+# endif // ifdef __cplusplus
+
+#ifdef DAQP_SINGLE_PRECISION
+typedef float c_float;
+#else
 typedef double c_float;
+#endif
 
 typedef struct{
 
     // Data for the QP problem
     //
     // min  0.5 x'*H*x + f'x
-    // s.t  lbA <= A*x <= ubA
-    //      lb  <=  x  <= ub
+    // s.t   lb  <=  x  <= ub
+    //       lbA <= A*x <= ubA
     //
     // n  - dimension of x
     // m  - total number of constraints
@@ -19,7 +27,7 @@ typedef struct{
     // (The number of rows in A is hence m-ms)
 
     // sense define the state of the constraints 
-    // (active, immutable, upper/lower, soft). 
+    // (active, immutable, upper/lower, soft, binary).
 
     int n;
     int m;
@@ -33,10 +41,6 @@ typedef struct{
     c_float* blower;
 
     int* sense; 
-
-    // BnB
-    int* bin_ids;
-    int nb;
 
     // Hierarchical QP
     int* break_points;
@@ -58,6 +62,9 @@ typedef struct{
     c_float eta_prox;
 
     c_float rho_soft;
+
+    c_float rel_subopt;
+    c_float abs_subopt;
 }DAQPSettings;
 
 
@@ -79,6 +86,7 @@ typedef struct{
     int* tree_WS;
     int nWS;
     int n_clean;
+    int* fixed_ids;
 
     int nodecount;
     int itercount;
@@ -102,6 +110,7 @@ typedef struct{
     c_float *v; // v = R'\f (used to transform QP to LDP 
     int *sense; // State of constraints  
     c_float *scaling; // normalizations 
+    c_float *RinvD; // in case Rinv is diagonal
 
 
     // Iterates
@@ -154,5 +163,9 @@ typedef struct{
     // Hierarchical QP 
     DAQPHierarchy* hier;
 }DAQPWorkspace;
+
+# ifdef __cplusplus
+}
+# endif // ifdef __cplusplus
 
 #endif //ifndef DAQP_TYPES_H

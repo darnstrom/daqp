@@ -15,7 +15,7 @@ In MATLAB we define the problem as
 % Define the problem
 H = eye(2);
 f = [1;1]; 
-A = [1 1; 1 -1];
+A = [1 2; 1 -1];
 bupper = [1; 2; 3; 4];
 blower = [-1; -2; -3; -4];
 sense = zeros(4,1,'int32');
@@ -53,7 +53,7 @@ DAQP can also be interfaced to [YALMIP](https://yalmip.github.io/). The followin
 x = sdpvar(2,1);
 cons = [-1 <= x(1) <=1,...
         -2 <= x(2) <=2,...
-        -3 <= x(1)+x(2) <= 3,...
+        -3 <= x(1)+2*x(2) <= 3,...
         -4 <= x(1)-x(2) <= 4];
 obj = 0.5*x'*x+x(1)+x(2);
 options = sdpsettings('solver','daqp');

@@ -1,0 +1,3 @@
+recursive-include csrc/include *
+include daqp.pyx
+include daqp.pxd 

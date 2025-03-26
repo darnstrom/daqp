@@ -1,6 +1,10 @@
 #ifndef DAQP_CONSTANTS_H
 #define DAQP_CONSTANTS_H
 
+# ifdef __cplusplus
+extern "C" {
+# endif // ifdef __cplusplus
+
 #include <stddef.h>
 
 #define EMPTY_IND -1 
@@ -12,13 +16,15 @@
 // DEFAULT SETTINGS 
 #define DEFAULT_PRIM_TOL 1e-6
 #define DEFAULT_DUAL_TOL 1e-12 
-#define DEFAULT_ZERO_TOL 1e-14
+#define DEFAULT_ZERO_TOL 1e-11
 #define DEFAULT_PROG_TOL 1e-14 
-#define DEFAULT_PIVOT_TOL 1e-4
+#define DEFAULT_PIVOT_TOL 1e-6
 #define DEFAULT_CYCLE_TOL 10
 #define DEFAULT_ETA 1e-6
 #define DEFAULT_ITER_LIMIT 1000 
-#define DEFAULT_RHO_SOFT 1e-3 
+#define DEFAULT_RHO_SOFT 1e-3
+#define DEFAULT_REL_SUBOPT 0
+#define DEFAULT_ABS_SUBOPT 0
 
 // MACROS
 #define SQUARE(x) ((x)*(x))
@@ -79,5 +85,8 @@
 
 #define IS_SIMPLE(x) (x < work->ms)
 
+# ifdef __cplusplus
+}
+# endif // ifdef __cplusplus
 
 #endif //ifndef DAQP_CONSTANTS_H

@@ -1,0 +1,66 @@
+name: Python Wheels
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - master
+  push:
+    tags:
+    - 'v*'
+
+jobs:
+  build_wheels:
+    name: Build wheel on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-2019]
+
+    steps:
+    - uses: actions/checkout@master
+
+    - uses: actions/setup-python@v4
+      name: Install Python
+      with:
+        python-version: '3.9'
+
+    - name: Build wheels
+      run: |
+        mkdir interfaces/daqp-python/csrc
+        cp -r src interfaces/daqp-python/csrc/src
+        cp -r include interfaces/daqp-python/csrc/include
+        cp -r codegen interfaces/daqp-python/csrc/codegen
+        cp CMakeLists.txt interfaces/daqp-python/csrc/CMakeLists.txt
+        cp LICENSE interfaces/daqp-python/LICENSE
+
+        cd interfaces/daqp-python
+        python -m pip install --upgrade pip
+        python -m pip install --upgrade build
+        python -m pip install cibuildwheel
+        python -m cibuildwheel --output-dir wheelhouse
+      env:
+        CIBW_SKIP: "pp* *-manylinux_i686 *-musllinux*" # Skip 32 bit linux
+        CIBW_TEST_REQUIRES: "pytest numpy"
+        CIBW_TEST_COMMAND: "pytest -s {project}/test"
+
+    - name: Build source
+      if: startsWith(matrix.os, 'ubuntu')
+      run: |
+        cd interfaces/daqp-python
+        python -m build . --sdist --outdir wheelhouse
+
+    - name: Release to pypi
+      if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags'))
+      env:
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN}}
+      run: |
+        cd interfaces/daqp-python
+        python -m pip install --upgrade twine
+        twine upload wheelhouse/*
+    - name: Upload artifacts to github
+      uses: actions/upload-artifact@v4
+      with:
+        name: wheels-${{ matrix.os }}-${{ strategy.job-index }}
+        path: interfaces/daqp-python/wheelhouse/*.whl

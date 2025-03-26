@@ -1,5 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
 #include "daqp_prox.h"
 #include "utils.h"
 
@@ -7,11 +5,14 @@ static int gradient_step(DAQPWorkspace* work);
 
 int daqp_prox(DAQPWorkspace *work){
     int i,total_iter=0;
-    const int nx=work->n;
+    const int nx=NX;
     int exitflag;
     c_float *swp_ptr;
     c_float diff,eps=work->settings->eps_prox;
-    for(i=0;i < work->n;i++) work->x[i] = 0; // TODO add option for user to set x0
+    c_float tol_stat, eta=work->settings->eta_prox;
+    int cycle_counter = 0;
+    c_float best_fval = DAQP_INF;
+    for(i=0;i < NX;i++) work->x[i] = 0; // TODO add option for user to set x0
 
     while(total_iter  <  work->settings->iter_limit){
         // xold <-- x
@@ -31,42 +32,59 @@ int daqp_prox(DAQPWorkspace *work){
 
         // ** Check convergence **
         if(work->iterations==1){ // No changes to the working set 
+            tol_stat = (work->Rinv == NULL && work->RinvD == NULL) ? eta*eps : eta/eps;
             for(i=0, diff= 0;i<nx;i++){ // ||x_old - x|| > eta  ?
                 diff= work->x[i] - work->xold[i];
-                if((diff> work->settings->eta_prox) || (diff< -work->settings->eta_prox)) break;
+                if((diff> tol_stat) || (diff< -tol_stat)) break;
             }
             if(i==nx){
                 exitflag = EXIT_OPTIMAL; // Fix point reached
                 break;
             }
             // Take gradient step if LP (and the iterate is not constrained to a vertex)
-            if((work->Rinv == NULL)&&(work->n_active != work->n)){
+            if((work->Rinv == NULL && work->RinvD ==NULL )&&(work->n_active != NX)){
                 if(gradient_step(work)==EMPTY_IND){
                     exitflag= EXIT_UNBOUNDED;
                     break;
                 }
             }
         }
+        // For LPs, compute objective function value to detect progress
+        // TODO: add paramters to settings
+        if(work->Rinv == NULL && work->RinvD == NULL){
+            for(i=0, diff=best_fval;i<nx;i++)
+                diff-=work->qp->f[i]*work->x[i];
+            if(diff<1e-10){
+                if(cycle_counter++ > 10) return EXIT_OPTIMAL; // assume fix point
+            }
+            else{ // Progress -> update objective function value
+                best_fval -=diff ;
+                cycle_counter=0;
+            }
+        }
 
         // ** Perturb problem **
         // Compute v = R'\(f-eps*x) (FWS Skipped if LP since R = I) 
-        if(work->Rinv== NULL){ 
+        if(work->Rinv== NULL && work->RinvD == NULL){ 
             eps*= (work->iterations==1) ? 10 : 0.9; // Adapt epsilon TODO: add to settings 
+            eps = (eps > 1e3) ? 1e3 : eps; // TODO: add saturation option to settings
             for(i = 0; i<nx;i++) 
                 work->v[i] = work->qp->f[i]*eps-work->x[i];
         }
         else{
             for(i = 0; i<nx;i++) 
                 work->v[i] = work->qp->f[i]-eps*work->x[i];
-            update_v(work->v,work); // 
+            update_v(work->v,work,0);
         }
         // Perturb RHS of constraints 
         update_d(work);
     }
     // Finalize results
     if(total_iter >= work->settings->iter_limit) exitflag = EXIT_ITERLIMIT; 
-    if(work->Rinv == NULL)
-        for(i = 0; i<work->n_active;i++) work->lam_star[i]/=eps;// Rescale dual variables
+    if(work->Rinv == NULL && work->RinvD == NULL){
+        for(i = 0; i<work->n_active;i++) 
+            work->lam_star[i]/=eps;// Rescale dual variables
+    }
     work->iterations = total_iter;
     return exitflag;
 }
@@ -74,9 +92,9 @@ int daqp_prox(DAQPWorkspace *work){
 // TODO: could probably reuse code from daqp
 static int gradient_step(DAQPWorkspace* work){
     int j,k,disp,add_ind=EMPTY_IND;
-    const int nx=work->n;
-    const int m=work->m;
-    const int ms=work->ms;
+    const int nx=NX;
+    const int m=N_CONSTR;
+    const int ms=N_SIMPLE;
     c_float Ax,delta_s, min_alpha=DAQP_INF;
     // Find constraint j to add: j =  argmin_j s_j
     // Simple bounds
@@ -109,6 +127,10 @@ static int gradient_step(DAQPWorkspace* work){
         }
         delta_s +=Ax;
 
+        if(work->scaling != NULL){
+            Ax /= work->scaling[j];
+            delta_s /= work->scaling[j];
+        }
         if(delta_s>0 && // Feasible descent direction
                 work->qp->bupper[j]<DAQP_INF && // Not single-sided
                 work->qp->bupper[j]-Ax < delta_s*min_alpha){
