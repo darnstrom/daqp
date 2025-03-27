@@ -10,6 +10,7 @@ int daqp_hiqp(DAQPWorkspace *work){
     int exitflag=0;
     c_float w;
     start=0;
+    int nfree = work->n;
     work->settings->rho_soft = DAQP_HIQP_SOFT;
     for(i =0; i < work->hier->nh; i++){
         // initialize current level
@@ -27,12 +28,14 @@ int daqp_hiqp(DAQPWorkspace *work){
             if(IS_SOFT(id)){ 
                 w = work->lam_star[j]*work->settings->rho_soft*1.025;
                 if(-1e-4 < w &&  w < 1e-4) continue; // Too small
+                nfree--;
                 if(IS_LOWER(id))
                     work->dlower[id]+=w;
                 else
                     work->dupper[id]+=w;
             }
         }
+        if(nfree <= 0 ) break;  // No degrees of freedom left 
 
         // Make constraints in current level hard
         for(j=start; j<end;j++) SET_HARD(j);
