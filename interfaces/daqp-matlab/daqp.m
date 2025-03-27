@@ -36,6 +36,38 @@ classdef daqp< handle
             [x,fval,exitflag,info] = d.solve();
             info.setup_time = setup_time;
         end
+
+        function [x,es,exitflag,info] = hidaqp(As,bus,bls)
+            nh = length(As);
+            A = [];
+            bu = [];
+            bl = [];
+            break_points=[];
+            m = 0;
+            for i = 1:nh
+                m = m+size(As{i},1);
+                A =  [A;As{i}];
+                bu = [bu;bus{i}];
+                bl = [bl;bls{i}];
+                break_points = [break_points;m];
+            end
+            sense= int32(8*ones(m,1));
+            d = daqp();
+            d.setup([],[],A,bu,bl,sense,break_points);
+            [x,fval,exitflag, info] = d.solve(); 
+            es = {};
+            for i = 1:nh
+                etot = zeros(size(As{i},1),1);
+                Ax = As{i}*x;
+                eu = Ax-bus{i};
+                el = Ax-bls{i};
+                soft_upper = eu>0;
+                soft_lower = el<0;
+                etot(soft_upper) = eu(soft_upper);
+                etot(soft_lower) = el(soft_lower);
+                es{end+1} = etot;
+            end
+        end
     end
 
     methods
