@@ -95,6 +95,9 @@ int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time){
     else
         own_settings = 0;
     allocate_daqp_workspace(work,qp->n,ns);
+
+    setup_daqp_hiqp(work,qp->break_points,qp->nh);
+
     errorflag = setup_daqp_ldp(work,qp);
     if(errorflag < 0){
         if(own_settings==0) work->settings = NULL;
@@ -108,7 +111,6 @@ int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time){
         free_daqp_workspace(work);
         return errorflag;
     }
-    setup_daqp_hiqp(work,qp->break_points,qp->nh); // TODO Maybe need to activate?
 
 #ifdef PROFILING
     if(setup_time != NULL){
