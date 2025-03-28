@@ -51,7 +51,7 @@ classdef daqp< handle
                 bl = [bl;bls{i}];
                 break_points = [break_points;m];
             end
-            sense= int32(8*ones(m,1));
+            sense = zeros(m,1,'int32');
             d = daqp();
             d.setup([],[],A,bu,bl,sense,break_points);
             [x,fval,exitflag, info] = d.solve(); 

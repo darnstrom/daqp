@@ -18,8 +18,9 @@ int daqp_hiqp(DAQPWorkspace *work){
         // initialize current level
         end=work->hier->break_points[i];
         work->m = end;
-        // Activate equality constraints
+        // Soften constraints and activate 
         for(j =start;j<end;j++){
+            SET_SOFT(j);
             if(IS_ACTIVE(j)){
                 if(IS_LOWER(j))
                     add_constraint(work,j, -1.0);
