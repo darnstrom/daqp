@@ -75,9 +75,11 @@ int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time){
     // (to account for it in allocation)
     int ns = 0, nb = 0;
     int i;
-    for(i = 0; i < qp->m ; i++){
-        if(qp->sense[i] & SOFT) ns++;
-        if(qp->sense[i] & BINARY) nb++;
+    if(qp->sense != NULL){
+        for(i = 0; i < qp->m ; i++){
+            if(qp->sense[i] & SOFT) ns++;
+            if(qp->sense[i] & BINARY) nb++;
+        }
     }
     // Correct number of soft constraints if several hierarchies
     if(qp->nh > 1){
