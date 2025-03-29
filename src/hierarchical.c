@@ -2,14 +2,14 @@
 #include "types.h"
 
 #define DAQP_HIQP_SOFT ((c_float)1e-8)
-#define DAQP_HIQP_TOL ((c_float)1e-4)
+#define DAQP_HIQP_TOL ((c_float)1e-6)
 
 int daqp_hiqp(DAQPWorkspace *work){
     int i,j,id;
     int start,end;
     int iterations = 0;
     int exitflag=0;
-    c_float w;
+    c_float w,wtol;
     start=0;
     int nfree = work->n;
     work->settings->rho_soft = DAQP_HIQP_SOFT;
@@ -40,13 +40,16 @@ int daqp_hiqp(DAQPWorkspace *work){
         for(j=0; j<work->n_active;j++){
             id=work->WS[j];
             if(IS_SOFT(id)){ 
-                w = work->lam_star[j]*work->settings->rho_soft*1.025;
-                if(-DAQP_HIQP_TOL < w &&  w < DAQP_HIQP_TOL) continue; // Too small
+                w = work->lam_star[j]*work->settings->rho_soft;
+                wtol = DAQP_HIQP_TOL*work->scaling[id];
+                //if(-wtol < w &&  w < wtol) continue; // Too small
+                //w = IS_IMMUTABLE(id) ? w : w*1.01; // Perturb if inequality
                 if(IS_LOWER(id))
                     work->dlower[id]+=w;
                 else
                     work->dupper[id]+=w;
-                if(IS_IMMUTABLE(id)) continue;
+                if(IS_IMMUTABLE(id)) continue; // Already an equality
+                //SET_IMMUTABLE(id);  // Make equality constraint
                 nfree--;
             }
         }

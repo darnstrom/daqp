@@ -191,17 +191,18 @@ classdef core_test < matlab.unittest.TestCase
             d.setup(H,f,A,bupper,blower,sense);
             d.settings('rho_soft',rho);
             [xi,fval,exitflag, soft_info] = d.solve();
-            wi = soft_info.lambda*rho
+            wi = soft_info.lambda*rho.*(vecnorm(A,2,2).^2)
+            bupper-A*xi
 
             % Explicit solve the problem with slacks 
             He = blkdiag(H,(1/rho)*eye(m));
             fe = [f;zeros(m,1)];
-            Ae = [A -eye(m)];
+            Ae = [A -diag(vecnorm(A,2,2))];
             sense= int32(zeros(m,1));
             
             [xw,fval,exitflag,info] = daqp.quadprog(He,fe,Ae,bupper,blower,sense);
             xe = xw(1:n);
-            we = xw(n+1:end)
+            we = xw(n+1:end).*vecnorm(A,2,2);
             testCase.verifyLessThan(norm(xi-xe),tol);
             testCase.verifyLessThan(norm(wi-we),tol);
 
@@ -372,7 +373,7 @@ classdef core_test < matlab.unittest.TestCase
             f = zeros(n,1);
             sense= int32(8*ones(m,1));
             d.setup(H,f,A,bu_cpy,bl_cpy,sense);
-            d.settings('rho_soft',1e-8);
+            d.settings('rho_soft',1e-6);
             [x_ref,fval,exitflag, hier_ref_info] = d.solve(); 
             hier_ref_info
             % Compute slacks
@@ -392,7 +393,7 @@ classdef core_test < matlab.unittest.TestCase
                     min(-(blower(inds)-A(inds,:)*x_ref)));
                 start = break_points(i)+1;
             end
-            [slacks_hier,ref_slacks_hier];
+            [slacks_hier,ref_slacks_hier]
 
             testCase.verifyLessThan(ref_slacks_hier(1),slacks_hier(1));
             testCase.verifyLessThan(norm(ref_slacks_hier,2),norm(slacks_hier,2));
