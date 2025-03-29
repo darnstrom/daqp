@@ -419,3 +419,14 @@ void daqp_minrep(int* is_redundant, c_float* A, c_float* b, int n, int m, int ms
     free(work.dlower);
     free(work.sense);
 }
+
+void daqp_solve_tasks(DAQPResult* res, DAQPTask* tasks, int nt, int n){
+    DAQPProblem qp = daqp_setup_hqp(tasks, nt, n);
+    daqp_quadprog(res,&qp,NULL);
+
+    // Free memory allocated inside daqp_setup_hqp
+    free(qp.A);
+    free(qp.bupper);
+    free(qp.blower);
+    free(qp.break_points);
+}

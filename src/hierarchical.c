@@ -1,5 +1,6 @@
 #include "hierarchical.h"
 #include "types.h"
+#include <stdlib.h>
 
 #define DAQP_HIQP_SOFT ((c_float)1e-8)
 #define DAQP_HIQP_TOL ((c_float)1e-6)
@@ -84,4 +85,50 @@ int daqp_hiqp(DAQPWorkspace *work){
     }
     work->iterations = iterations; // Append total number of iterations
     return exitflag;
+}
+
+// Sort tasks using insertion sort based on prioritization
+void daqp_sort_tasks(DAQPTask* tasks, int nt) {
+    int i,j;
+    DAQPTask task;
+    for (i = 1; i < nt; i++) {
+        j = i - 1;
+        task  = tasks[i];
+        while (j-- >= 0 && tasks[j].index > task.index) {
+            tasks[j + 1] = tasks[j];
+        }
+        tasks[j + 1] = task;
+    }
+}
+
+DAQPProblem daqp_setup_hqp(DAQPTask* tasks, int nt, int n){
+    int i,j,k,disp1,disp2;
+    // Sort the tasks
+    //daqp_sort_tasks(tasks,nt);
+
+    // Setup QP
+    int mtot = 0;
+    for(k = 0; k < nt; k++){
+            mtot += tasks[k].m;
+    }
+
+    c_float* A = malloc(n*mtot*sizeof(c_float));
+    c_float* bu = malloc(mtot*sizeof(c_float));
+    c_float* bl = malloc(mtot*sizeof(c_float));
+
+    int* break_points = malloc(mtot*sizeof(int));
+    int bp = 0;
+
+    for(k = 0, disp1=0; k < nt; k++){
+        for(i=0, disp2=0;i< tasks[k].m;i++){
+            for(j=0;j<n;j++){
+                A[disp1++] = tasks[k].A[disp2++];
+            }
+            bu[bp] = tasks[k].bu[i];
+            bl[bp++] = tasks[k].bl[i];
+        }
+        break_points[k] = bp;
+    }
+    DAQPProblem qp = {n,mtot,0,NULL,NULL,A,bu,bl,NULL, break_points,nt};
+    return qp;
 }
