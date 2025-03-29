@@ -8,15 +8,15 @@
 int daqp_hiqp(DAQPWorkspace *work);
 
 typedef struct{
-    int index;
+    int level;
     c_float* A;
     c_float* bu;
     c_float* bl;
     int m;
 }DAQPTask;
 
-void daqp_sort_tasks(DAQPTask* tasks, int nt);
-DAQPProblem daqp_setup_hqp(DAQPTask* tasks, int nt, int n);
+void daqp_sort_tasks(DAQPTask* tasks, int n_tasks);
+DAQPProblem daqp_setup_hqp(DAQPTask* tasks, int n_tasks, int n);
 
 
 #endif //ifndef DAQP_HIERARCHICAL_H

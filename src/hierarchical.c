@@ -88,27 +88,28 @@ int daqp_hiqp(DAQPWorkspace *work){
 }
 
 // Sort tasks using insertion sort based on prioritization
-void daqp_sort_tasks(DAQPTask* tasks, int nt) {
+void daqp_sort_tasks(DAQPTask* tasks, int n_tasks) {
     int i,j;
     DAQPTask task;
-    for (i = 1; i < nt; i++) {
-        j = i - 1;
+    for (i = 1; i < n_tasks; i++) {
         task  = tasks[i];
-        while (j-- >= 0 && tasks[j].index > task.index) {
-            tasks[j + 1] = tasks[j];
+        j = i-1;
+        while (j >= 0 && tasks[j].level > task.level) {
+            tasks[j+1] = tasks[j];
+            j--;
         }
-        tasks[j + 1] = task;
+        tasks[j+1] = task;
     }
 }
 
-DAQPProblem daqp_setup_hqp(DAQPTask* tasks, int nt, int n){
+DAQPProblem daqp_setup_hqp(DAQPTask* tasks, int n_tasks, int n){
     int i,j,k,disp1,disp2;
     // Sort the tasks
-    //daqp_sort_tasks(tasks,nt);
+    daqp_sort_tasks(tasks,n_tasks);
 
     // Setup QP
     int mtot = 0;
-    for(k = 0; k < nt; k++){
+    for(k = 0; k < n_tasks; k++){
             mtot += tasks[k].m;
     }
 
@@ -119,7 +120,7 @@ DAQPProblem daqp_setup_hqp(DAQPTask* tasks, int nt, int n){
     int* break_points = malloc(mtot*sizeof(int));
     int bp = 0;
 
-    for(k = 0, disp1=0; k < nt; k++){
+    for(k = 0, disp1=0; k < n_tasks; k++){
         for(i=0, disp2=0;i< tasks[k].m;i++){
             for(j=0;j<n;j++){
                 A[disp1++] = tasks[k].A[disp2++];
@@ -129,6 +130,6 @@ DAQPProblem daqp_setup_hqp(DAQPTask* tasks, int nt, int n){
         }
         break_points[k] = bp;
     }
-    DAQPProblem qp = {n,mtot,0,NULL,NULL,A,bu,bl,NULL, break_points,nt};
+    DAQPProblem qp = {n,mtot,0,NULL,NULL,A,bu,bl,NULL, break_points,n_tasks};
     return qp;
 }
