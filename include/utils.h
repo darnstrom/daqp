@@ -8,10 +8,10 @@ extern "C" {
 #include "daqp.h"
 // Utils for transforming QP to LDP
 int update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem *qp);
-int update_Rinv(DAQPWorkspace *work, DAQPProblem *qp);
-void update_M(DAQPWorkspace *work, DAQPProblem *qp, const int mask);
+int update_Rinv(DAQPWorkspace *work, c_float *H);
+void update_M(DAQPWorkspace *work, c_float *A, const int mask);
 void update_v(c_float *f, DAQPWorkspace *work, const int mask);
-void update_d(DAQPWorkspace *work, DAQPProblem* qp);
+void update_d(DAQPWorkspace *work, c_float *bupper, c_float *blower);
 void normalize_Rinv(DAQPWorkspace *work);
 void normalize_M(DAQPWorkspace *work);
 //
