@@ -33,6 +33,7 @@ void setup_daqp_hiqp(DAQPWorkspace *work, int* break_points, int nh);
 int setup_daqp_bnb(DAQPWorkspace* work, int nb, int ns);
 void allocate_daqp_settings(DAQPWorkspace *work);
 void allocate_daqp_workspace(DAQPWorkspace *work, int n, int ns);
+void allocate_daqp_ldp(DAQPWorkspace *work, int n, int m, int ms, int alloc_R, int alloc_v);
 
 void free_daqp_ldp(DAQPWorkspace *work);
 void free_daqp_workspace(DAQPWorkspace *work);
