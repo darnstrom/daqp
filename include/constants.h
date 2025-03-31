@@ -47,6 +47,7 @@ extern "C" {
 #define UPDATE_v 4
 #define UPDATE_d 8
 #define UPDATE_sense 16 
+#define UPDATE_hierarchy 32
 
 // CONSTRAINT MASKS 
 #define ACTIVE 1

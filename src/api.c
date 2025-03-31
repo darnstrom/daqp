@@ -98,8 +98,6 @@ int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time){
         own_settings = 0;
     allocate_daqp_workspace(work,qp->n,ns);
 
-    setup_daqp_hiqp(work,qp->break_points,qp->nh);
-
     errorflag = setup_daqp_ldp(work,qp);
     if(errorflag < 0){
         if(own_settings==0) work->settings = NULL;
@@ -150,6 +148,10 @@ int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp){
 
     // Allocate memory for LDP
     allocate_daqp_ldp(work, qp->n, qp->m, qp->ms, alloc_R, alloc_v);
+
+
+    // Update hierarchy if hqp
+    if(qp->nh > 1) update_mask += UPDATE_hierarchy;
 
     // Form LDP
     error_flag = update_ldp(update_mask, work);

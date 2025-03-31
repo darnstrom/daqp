@@ -56,6 +56,7 @@ int update_ldp(const int mask, DAQPWorkspace *work){
                 work->sense[i] |= ACTIVE + IMMUTABLE;
                 do_activate = 1;
             }
+            // TODO: Make innactive here
         }
 #endif
         update_d(work);
@@ -72,6 +73,12 @@ int update_ldp(const int mask, DAQPWorkspace *work){
         }
     }
 #endif
+
+    /** Update hierarchy **/
+    if(mask&UPDATE_hierarchy){
+        work->nh = work->qp->nh;
+        work->break_points = work->qp->break_points;
+    }
 
     // Make sure activate constraints are activated
     if(do_activate == 1 && work->nh < 2){
