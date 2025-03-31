@@ -8,6 +8,14 @@ int update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
     int error_flag, i;
     int do_activate = 0;
 
+    // Add original qp to workspace
+    work->qp = qp;
+
+    // Update dimensions of problem
+    work->n = qp->n;
+    work->m = qp->m;
+    work->ms = qp->ms;
+
     /** Update constraint sense **/
     if(mask&UPDATE_sense){
         if(work->qp->sense == NULL) // Assume all constraints are "normal" inequality constraints

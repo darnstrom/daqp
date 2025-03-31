@@ -127,14 +127,6 @@ int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp){
     int error_flag;
     int alloc_R=0, alloc_v=0;
 
-    // Setup dimensions of the LDP
-    work->n = qp->n;
-    work->m = qp->m;
-    work->ms = qp->ms;
-
-    // Add original qp to workspace
-    work->qp = qp;
-
     // Only allocate Rinv if H is not NULL
     if(qp->H!=NULL){
         alloc_R = 1;
@@ -286,7 +278,7 @@ void allocate_daqp_ldp(DAQPWorkspace *work, int n, int m, int ms, int alloc_R, i
     int i;
     // Always allocate scaling, M ,dupper, dlower,sense
     work->scaling= malloc(m*sizeof(c_float));
-    for(i =0; i < work->qp->ms; i++) work->scaling[i] =1;
+    for(i =0; i < ms; i++) work->scaling[i] =1;
     work->M = malloc(n*(m-ms)*sizeof(c_float));
     work->dupper = malloc(m*sizeof(c_float));
     work->dlower = malloc(m*sizeof(c_float));
