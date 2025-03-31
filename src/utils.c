@@ -41,24 +41,9 @@ int update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
 
     /** Update d **/
     if(mask&UPDATE_Rinv||mask&UPDATE_M||mask&UPDATE_v||mask&UPDATE_d){
-#ifndef DAQP_ASSUME_VALID
-        c_float diff;
-        for(i =0;i<N_CONSTR;i++){
-            if(IS_IMMUTABLE(i)) continue;
-            diff = qp->bupper[i] - qp->blower[i];
-            // Check for trivial infeasibility
-            if ( diff < -work->settings->primal_tol ){
-                return EXIT_INFEASIBLE;
-            }
-            // Check for unmarked equality constraint (blower == bupper)
-            else if ( diff < work->settings->zero_tol ){
-                work->sense[i] |= ACTIVE + IMMUTABLE;
-                do_activate = 1;
-            }
-            // TODO: Make innactive here
-        }
-#endif
-        update_d(work,qp->bupper,qp->blower);
+        error_flag = update_d(work,qp->bupper,qp->blower);
+        if(error_flag<0) return error_flag;
+        if(error_flag==1) do_activate = 1;
     }
 
 #ifdef SOFT_WEIGHTS
@@ -239,10 +224,30 @@ void update_v(c_float *f, DAQPWorkspace *work, const int mask){
     }
 }
 
-void update_d(DAQPWorkspace *work, c_float *bupper, c_float *blower){
+int update_d(DAQPWorkspace *work, c_float *bupper, c_float *blower){
     /* Compute d  = b+M*v */
     int i,j,disp;
+    int do_activate = 0;
     c_float sum;
+
+#ifndef DAQP_ASSUME_VALID
+    c_float diff;
+    for(i =0;i<N_CONSTR;i++){
+        if(IS_IMMUTABLE(i)) continue;
+        diff = bupper[i] - blower[i];
+        // Check for trivial infeasibility
+        if ( diff < -work->settings->primal_tol ){
+            return EXIT_INFEASIBLE;
+        }
+        // Check for unmarked equality constraint (blower == bupper)
+        else if ( diff < work->settings->zero_tol ){
+            work->sense[i] |= ACTIVE + IMMUTABLE;
+            do_activate = 1;
+        }
+        // TODO: Make innactive here
+    }
+#endif
+
     const int n = NX;
     work->reuse_ind = 0; // RHS of KKT system changed => cannot reuse intermediate results
     // Take into scaling of constraints
@@ -259,7 +264,7 @@ void update_d(DAQPWorkspace *work, c_float *bupper, c_float *blower){
         }
     }
 
-    if(work->v == NULL) return;
+    if(work->v == NULL) return do_activate;
     // Simple bounds 
     if(work->Rinv !=NULL){
         for(i = 0,disp=0;i<N_SIMPLE;i++){
@@ -281,7 +286,7 @@ void update_d(DAQPWorkspace *work, c_float *bupper, c_float *blower){
         work->dupper[i]+=sum;
         work->dlower[i]+=sum;
     }
-
+    return do_activate;
 }
 
 void normalize_Rinv(DAQPWorkspace* work){
