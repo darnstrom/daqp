@@ -27,7 +27,6 @@ int update_ldp(const int mask, DAQPWorkspace *work){
     /** Update M **/
     if(mask&UPDATE_Rinv||mask&UPDATE_M){
         update_M(work,mask);
-        normalize_M(work);
     }
 
     /** Update v **/
@@ -213,6 +212,7 @@ void update_M(DAQPWorkspace *work, const int mask){
     }
 
     reset_daqp_workspace(work); // Internal factorizations need to be redone!
+    normalize_M(work);
 }
 
 void update_v(c_float *f, DAQPWorkspace *work, const int mask){
