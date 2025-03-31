@@ -77,7 +77,7 @@ int daqp_prox(DAQPWorkspace *work){
             update_v(work->v,work,0);
         }
         // Perturb RHS of constraints 
-        update_d(work);
+        update_d(work, work->qp);
     }
     // Finalize results
     if(total_iter >= work->settings->iter_limit) exitflag = EXIT_ITERLIMIT; 

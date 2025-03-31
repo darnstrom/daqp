@@ -197,7 +197,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  work->qp->sense= (int *)mxGetPr(prhs[7]);
 	  // Update LDP with new QP data
 	  const int update_mask = (int)mxGetScalar(prhs[8]);
-	  update_ldp(update_mask,work);
+	  update_ldp(update_mask,work,work->qp);
 	}
     else if (!strcmp("codegen", cmd)) {
         char fname[64];
