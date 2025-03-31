@@ -15,9 +15,9 @@ int daqp_hiqp(DAQPWorkspace *work){
     int nfree = work->n;
     work->settings->rho_soft = DAQP_HIQP_SOFT;
 
-    for(i =0; i < work->hier->nh; i++){
+    for(i =0; i < work->nh; i++){
         // initialize current level
-        end=work->hier->break_points[i];
+        end=work->break_points[i];
         work->m = end;
         // Soften constraints and activate 
         for(j =start;j<end;j++){

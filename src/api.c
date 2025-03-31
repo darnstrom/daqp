@@ -14,7 +14,7 @@ void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
     if(work->settings->eps_prox==0){
         if(work->bnb != NULL)
             res->exitflag = daqp_bnb(work);
-        else if(work->hier !=NULL)
+        else if(work->nh > 1)
             res->exitflag = daqp_hiqp(work);
         else
             res->exitflag = daqp_ldp(work);
@@ -162,11 +162,9 @@ int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp){
 
 
 void setup_daqp_hiqp(DAQPWorkspace* work, int* break_points, int nh){
-    if((work->hier == NULL) && (nh > 1)){
-        work->hier= malloc(sizeof(DAQPHierarchy));
-
-        work->hier->nh = nh;
-        work->hier->break_points= break_points;
+    if(nh > 1){
+        work->nh = nh;
+        work->break_points= break_points;
     }
 }
 
@@ -277,7 +275,8 @@ void allocate_daqp_workspace(DAQPWorkspace *work, int n, int ns){
 #endif
 
     work->bnb = NULL;
-    work->hier = NULL;
+    work->nh = 0;
+    work->break_points = NULL;
     reset_daqp_workspace(work);
 }
 
@@ -340,10 +339,6 @@ void free_daqp_workspace(DAQPWorkspace *work){
 
     free_daqp_bnb(work);
 
-    if(work->hier != NULL){
-        free(work->hier);
-        work->hier = NULL;
-    }
 }
 
 // Extract solution information from workspace 
