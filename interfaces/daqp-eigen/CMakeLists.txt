@@ -1,22 +1,22 @@
-if(EIGEN)
-    project(daqp_eigen)
+project(daqp_eigen)
 
-    find_package(Eigen3 3.4.0 REQUIRED NO_MODULE)
-    find_package(daqp)
+find_package(Eigen3 3.4.0 REQUIRED NO_MODULE)
+find_package(daqp)
 
-    include(CTest)
+add_executable(00_basic_qp tests/00_basic_qp.cpp)
+add_executable(01_static_func tests/01_static_func.cpp)
+add_executable(02_class tests/02_class.cpp)
 
-    add_executable(01_static_func tests/01_static_func.cpp)
+set(TARGETS 00_basic_qp 01_static_func 02_class)
 
-    set(TARGETS 01_static_func)
-
-    foreach(TARGET ${TARGETS})
-        target_link_libraries(${TARGET} Eigen3::Eigen daqp)
-        target_include_directories(${TARGET}
-            PRIVATE
+foreach(TARGET ${TARGETS})
+    target_link_libraries(${TARGET} PUBLIC Eigen3::Eigen daqp)
+    target_include_directories(${TARGET}
+        PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}
-        )
+    )
 
-        add_test(NAME test_${TARGET} COMMAND ${TARGET})
-    endforeach()
-endif()
+    add_test(NAME test_${TARGET} COMMAND ${TARGET})
+endforeach()
+
+install(FILES daqp.hpp DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/daqp")
