@@ -31,6 +31,8 @@ int main()
     Eigen::MatrixXd A = (Eigen::MatrixXd(6, 3) << A0, A1, A2, A3).finished();
     Eigen::VectorXd bu = (Eigen::VectorXd(6) << bu0, bu1, bu2, bu3).finished();
     Eigen::VectorXd bl = (Eigen::VectorXd(6) << bl0, bl1, bl2, bl3).finished();
+
+
     Eigen::VectorXi break_points = (Eigen::VectorXi(4) << m0, m0 + m1, m0 + m1 + m2, m0 + m1 + m2 + m3).finished();
 
     // Solve

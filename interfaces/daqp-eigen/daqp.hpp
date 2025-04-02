@@ -1,23 +1,25 @@
 #include <Eigen/Dense>
-#include "api.h"
+#include "daqp/api.h"
 
 class EigenDAQPResult : public DAQPResult {
   private:
-    int m_;
-    int n_;
+      Eigen::VectorXd x_;
+      Eigen::VectorXd lam_;
 
   public:
     EigenDAQPResult(int m, int n)
-      : m_(m)
-      , n_(n) {
+      : x_(Eigen::VectorXd(n))
+      , lam_(Eigen::VectorXd(m)) {
+          x = x_.data();
+          lam = lam_.data();
     }
 
-    Eigen::Map<Eigen::VectorXd> get_x() {
-        return Eigen::Map<Eigen::VectorXd>(x, n_);
+    Eigen::VectorXd get_x() {
+        return x_;
     }
 
-    Eigen::Map<Eigen::VectorXd> get_lam() {
-        return Eigen::Map<Eigen::VectorXd>(lam, m_);
+    Eigen::VectorXd get_lam() {
+        return lam_;
     }
 };
 
@@ -25,6 +27,7 @@ EigenDAQPResult daqp_solve(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
                            Eigen::VectorXd &bu,
                            Eigen::VectorXd &bl,
                            Eigen::VectorXi &break_points) {
+
     int cols    = A.cols();
     int rows    = A.rows();
     int n_tasks = break_points.size();
@@ -34,8 +37,6 @@ EigenDAQPResult daqp_solve(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
     assert(break_points(Eigen::last) == rows);
 
     EigenDAQPResult result(rows, cols);
-    result.x   = new double[cols];
-    result.lam = NULL;
 
     DAQPProblem qp = {cols, rows, 0, NULL, NULL, A.data(), bu.data(), bl.data(), NULL, break_points.data(), n_tasks};
     daqp_quadprog(&result, &qp, NULL);
