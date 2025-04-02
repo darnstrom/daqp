@@ -1,12 +1,17 @@
 cmake_minimum_required(VERSION 3.10)
 project(daqp VERSION 0.6.0)
 
+include(CTest)
+
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/codegen)
 add_subdirectory(src)
 add_subdirectory(include)
 add_subdirectory(codegen)
-add_subdirectory(interfaces/daqp-eigen)
+
+if(EIGEN)
+  add_subdirectory(interfaces/daqp-eigen)
+endif()
 
 option (PROFILING "Enable profiling" ON)
 if(PROFILING)
