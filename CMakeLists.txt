@@ -6,6 +6,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/codegen)
 add_subdirectory(src)
 add_subdirectory(include)
 add_subdirectory(codegen)
+add_subdirectory(interfaces/daqp-eigen)
 
 option (PROFILING "Enable profiling" ON)
 if(PROFILING)
