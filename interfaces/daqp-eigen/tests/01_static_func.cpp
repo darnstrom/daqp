@@ -11,7 +11,7 @@ int main()
 
     // === BASIC QP ===
     H = Eigen::MatrixXd::Identity(2, 2);
-    f = Eigen::VectorXd::Ones(4);
+    f = Eigen::VectorXd::Ones(2);
     A = (Eigen::MatrixXd(2, 2) << 1, 2, 1, -1).finished();
     bu = (Eigen::VectorXd(4) << 1,2,3,4).finished();
     bl = (Eigen::VectorXd(4) << -1,-2,-3,-4).finished();
