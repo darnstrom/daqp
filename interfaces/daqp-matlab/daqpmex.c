@@ -5,12 +5,12 @@
 #include <string.h>
 
 const char* INFO_FIELDS[] = {
-  "lambda",
-  "setup_time",           
-  "solve_time",           
-  "iter",           
-  "nodes",
-  "soft_slack"}; 
+    "lambda",
+    "setup_time",
+    "solve_time",
+    "iter",
+    "nodes",
+    "soft_slack"};
 
 const char* SETTINGS_FIELDS[] = {
   "primal_tol",           
@@ -30,10 +30,8 @@ const char* SETTINGS_FIELDS[] = {
 
 /* The gateway function */
 void mexFunction( int nlhs, mxArray *plhs[],
-				  int nrhs, const mxArray *prhs[])
+        int nrhs, const mxArray *prhs[])
 {
-
-  // RHS 
 
   // Extract command
   char cmd[64];
@@ -77,6 +75,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  int n = mxGetM(prhs[4]);
 	  int m = mxGetM(prhs[5]);
 	  int ms = m-mxGetN(prhs[4]);
+    int nh = mxGetM(prhs[8]);
 	  
 	  // Setup QP struct
 	  qp->n = n;
@@ -88,6 +87,9 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  qp->bupper= (c_float *)mxGetPr(prhs[5]);
 	  qp->blower= (c_float *)mxGetPr(prhs[6]);
 	  qp->sense= (int *)mxGetPr(prhs[7]);
+    qp->break_points= (nh > 1) ?  (int *)mxGetPr(prhs[8]) : NULL;
+    qp->nh=nh;
+
 	  
 	  c_float solve_time;
 	  error_flag = setup_daqp(qp,work,&solve_time);
@@ -195,7 +197,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  work->qp->sense= (int *)mxGetPr(prhs[7]);
 	  // Update LDP with new QP data
 	  const int update_mask = (int)mxGetScalar(prhs[8]);
-	  update_ldp(update_mask,work);
+	  update_ldp(update_mask,work,work->qp);
 	}
     else if (!strcmp("codegen", cmd)) {
         char fname[64];
@@ -214,6 +216,4 @@ void mexFunction( int nlhs, mxArray *plhs[],
         isdouble_ptr[0] = 1;
 #endif
     }
-
-  // RHS
 }

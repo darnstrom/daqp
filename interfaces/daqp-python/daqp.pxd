@@ -13,6 +13,9 @@ cdef extern from "types.h":
     
         int* sense
     
+        int* break_points
+        int nh
+
     ctypedef struct DAQPSettings:
         double primal_tol;
         double dual_tol;

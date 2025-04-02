@@ -103,7 +103,7 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
         bu_ptr, bl_ptr, sense_ptr  = &bupper[0], &blower[0], &sense[0]
 
 
-    cdef DAQPProblem problem = [n,m,m-mA, H_ptr, f_ptr, A_ptr, bu_ptr, bl_ptr, sense_ptr]
+    cdef DAQPProblem problem = [n,m,m-mA, H_ptr, f_ptr, A_ptr, bu_ptr, bl_ptr, sense_ptr, NULL, 0]
 
     # Setup settings
     cdef DAQPSettings settings = [primal_tol, dual_tol, zero_tol, pivot_tol,

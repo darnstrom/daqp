@@ -42,6 +42,9 @@ typedef struct{
 
     int* sense; 
 
+    // Hierarchical QP
+    int* break_points;
+    int nh;
 }DAQPProblem;
 
 typedef struct{
@@ -152,6 +155,9 @@ typedef struct{
 
     // BnB
     DAQPBnB* bnb;
+    // Hierarchical QP 
+    int nh;
+    int* break_points;
 }DAQPWorkspace;
 
 # ifdef __cplusplus

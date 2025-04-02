@@ -1,6 +1,6 @@
 ---
 layout: page
-title: C  
+title: C/C++
 permalink: /start/c
 nav: 3 
 parent: Interfaces 
@@ -50,3 +50,18 @@ settings.iter_limit = 2000;
 ```
 
 A full list of available settings is provided [here](/daqp/parameters/#settings).
+## Using DAQP with Eigen
+DAQP also has an interface to matrices/vectors defined with [Eigen](https://eigen.tuxfamily.org/). The following code sets up and solves the problem considered above
+
+```cpp
+// Setup problem
+Eigen::MatrixXd H = Eigen::MatrixXd::Identity(2, 2);
+Eigen::VectorXd f = Eigen::VectorXd::Ones(2);
+Eigen::MatrixXd A = (Eigen::MatrixXd(2, 2) << 1, 2, 1, -1).finished();
+Eigen::VectorXd bu = (Eigen::VectorXd(4) << 1,2,3,4).finished();
+Eigen::VectorXd bl = (Eigen::VectorXd(4) << -1,-2,-3,-4).finished();
+
+// Solve problem
+EigenDAQPResult result = daqp_solve(H,f,A,bu,bl);
+```
+The primal solution can obtain with `result.get_primal()`, and the dual solution can be obtain with `result.get_primal()`.
