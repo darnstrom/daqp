@@ -87,9 +87,10 @@ int update_ldp(const int mask, DAQPWorkspace *work){
 int update_Rinv(DAQPWorkspace *work){
     int i,j,k,disp,disp2,disp3;
     const int n = NX; 
+    int is_factored = work->qp->is_factored;
         // Check if diagonal
     int is_diagonal = 1;
-    for (i=0,disp=1; i<n; i++, disp+=i+1){
+    for (i=0,disp=1; i<n; i++, disp+=(is_factored?1:(i+1))){
         for (j=1; j<n-i; j++,disp++) {
             if(work->qp->H[disp] > 1e-12 || work->qp->H[disp] < -1e-12){
                 is_diagonal=0;
@@ -107,20 +108,40 @@ int update_Rinv(DAQPWorkspace *work){
         }
         c_float Hi;
         i=0; disp=0;
-        if(work->scaling != NULL){
-            for(;i<N_SIMPLE;i++,disp+=n){ // Combine with settings scaling
-                Hi = work->qp->H[disp++]+work->settings->eps_prox;
+        if (is_factored) {
+            if(work->scaling != NULL){
+                for(;i<N_SIMPLE;disp+=n-(i++)){ // Combine with settings scaling
+                    Hi = work->qp->H[disp];
+                    if (work->settings->eps_prox != 0.) {
+                        Hi = sqrt(Hi*Hi+work->settings->eps_prox);
+                    }
+                    work->RinvD[i] = 1/Hi;
+                    work->scaling[i] = Hi;
+                }
+            }
+            for(;i<n;disp+=n-(i++)){
+                Hi = work->qp->H[disp];
+                if (work->settings->eps_prox != 0.) {
+                    Hi = sqrt(Hi*Hi+work->settings->eps_prox);
+                }
+                work->RinvD[i] = 1/Hi;
+            }
+        } else {
+            if(work->scaling != NULL){
+                for(;i<N_SIMPLE;i++,disp+=n){ // Combine with settings scaling
+                    Hi = work->qp->H[disp++]+work->settings->eps_prox;
+                    if (Hi <= 0) return EXIT_NONCONVEX;
+                    Hi = sqrt(Hi);
+                    work->RinvD[i] = 1/Hi;
+                    work->scaling[i] = Hi;
+                }
+            }
+            for(;i<n;i++,disp+=n){
+                Hi = work->qp->H[disp++] + work->settings->eps_prox;
                 if (Hi <= 0) return EXIT_NONCONVEX;
                 Hi = sqrt(Hi);
                 work->RinvD[i] = 1/Hi;
-                work->scaling[i] = Hi;
             }
-        }
-        for(;i<n;i++,disp+=n){
-            Hi = work->qp->H[disp++] + work->settings->eps_prox;
-            if (Hi <= 0) return EXIT_NONCONVEX;
-            Hi = sqrt(Hi);
-            work->RinvD[i] = 1/Hi;
         }
         return 1;
     }
@@ -131,27 +152,40 @@ int update_Rinv(DAQPWorkspace *work){
         work->RinvD = NULL;
     }
 
-
-    // Cholesky
-    for (i=0,disp=0,disp3=0; i<n; disp+=n-i,i++,disp3+=i) {
-        // Diagonal element
-        work->Rinv[disp] = work->qp->H[disp3++]+work->settings->eps_prox;// Add regularization
-        for (k=0,disp2=i; k<i; k++,disp2+=n-k) 
-            work->Rinv[disp] -= work->Rinv[disp2]*work->Rinv[disp2];
-        if (work->Rinv[disp] <= 0) return EXIT_NONCONVEX; // Not positive definite 
-
-        work->Rinv[disp] = sqrt(work->Rinv[disp]);
-
-        // Off-diagonal elements
-        for (j=1; j<n-i; j++) {
-            work->Rinv[disp+j]=work->qp->H[disp3++];
-            for (k=0,disp2=i; k<i; k++,disp2+=n-k)
-                work->Rinv[disp+j] -= work->Rinv[disp2]*work->Rinv[disp2+j];
-            work->Rinv[disp+j] /= work->Rinv[disp];
+    if (is_factored) {
+        for(i=0,disp=0;i<n;i++){
+            // Diagonal element
+            // Store 1/r_ii instead of r_ii
+            // to get multiplication instead division when forward/backward substituting
+            work->Rinv[disp] = 1/work->qp->H[disp];
+            disp++;
+            // Off-diagonal elements
+            for (j=i+1; j<n; j++,disp++) {
+                work->Rinv[disp] = work->qp->H[disp];
+            }
         }
-        // Store 1/r_ii instead of r_ii 
-        // to get multiplication instead division when forward/backward substituting
-        work->Rinv[disp] = 1/work->Rinv[disp]; 
+    } else {
+        // Cholesky
+        for (i=0,disp=0,disp3=0; i<n; disp+=n-i,i++,disp3+=i) {
+            // Diagonal element
+            work->Rinv[disp] = work->qp->H[disp3++]+work->settings->eps_prox;// Add regularization
+            for (k=0,disp2=i; k<i; k++,disp2+=n-k)
+                work->Rinv[disp] -= work->Rinv[disp2]*work->Rinv[disp2];
+            if (work->Rinv[disp] <= 0) return EXIT_NONCONVEX; // Not positive definite
+
+            work->Rinv[disp] = sqrt(work->Rinv[disp]);
+
+            // Off-diagonal elements
+            for (j=1; j<n-i; j++) {
+                work->Rinv[disp+j]=work->qp->H[disp3++];
+                for (k=0,disp2=i; k<i; k++,disp2+=n-k)
+                    work->Rinv[disp+j] -= work->Rinv[disp2]*work->Rinv[disp2+j];
+                work->Rinv[disp+j] /= work->Rinv[disp];
+            }
+            // Store 1/r_ii instead of r_ii
+            // to get multiplication instead division when forward/backward substituting
+            work->Rinv[disp] = 1/work->Rinv[disp];
+        }
     }
 
     // Compute Rinv (store in R) by Rinv = R\I 
