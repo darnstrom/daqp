@@ -1,6 +1,6 @@
 #include <iostream>
 #include <Eigen/Dense>
-#include "daqp.hpp"
+#include <daqp.hpp>
 
 int main() {
     Eigen::MatrixXd H = Eigen::MatrixXd::Identity(2, 2);

@@ -1,6 +1,6 @@
 #include <iostream>
 #include <Eigen/Dense>
-#include "daqp.hpp"
+#include <daqp.hpp>
 
 int main() {
     // Task 1: -1 <= x <= 1
