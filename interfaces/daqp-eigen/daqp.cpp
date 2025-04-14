@@ -97,6 +97,26 @@ DAQP::DAQP(int max_variables, int max_constraints, int max_constraints_in_level)
     work_.settings = &settings_;
 }
 
+int DAQP::resize_result(const int n, const int m, const int ns){
+    // Ensure that the new dimensions is not too large
+    if (n > max_variables_) return 1;
+    if (m > max_constraints_) return 2;
+    if (ns > max_constraints_in_level_) return 3;
+
+    // Resize primal and dual variables
+    if (result_.x == nullptr) {
+        result_.resize_primal(n);
+        result_.resize_dual(m);
+    }
+    if (n != work_.n) {
+        result_.resize_primal(n);
+    }
+    if (m != work_.m) {
+        result_.resize_dual(m);
+    }
+    return 0;
+}
+
 const EigenDAQPResult& DAQP::solve(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> A,
                                    Eigen::VectorXd& bu,
                                    Eigen::VectorXd& bl,
@@ -107,16 +127,18 @@ const EigenDAQPResult& DAQP::solve(Eigen::Matrix<double, Eigen::Dynamic, Eigen::
     assert(bu.size() == rows);
     assert(bl.size() == rows);
     assert(break_points(Eigen::last) == rows);
-    if (result_.x == nullptr) {
-        result_.resize_primal(cols);
-        result_.resize_dual(rows);
+
+    // Get maximum rows in a single level
+    int max_rows_in_level = 0;
+    for(int i = 0, bp=0; i < n_tasks; i++){
+        max_rows_in_level = (max_rows_in_level  > break_points(i)-bp) ? max_rows_in_level : break_points(i)-bp;
+        bp = break_points(i)-bp;
     }
-    if (cols != work_.n) {
-        result_.resize_primal(cols);
-    }
-    if (rows != work_.m) {
-        result_.resize_dual(rows);
-    }
+
+    //  Resize if dimension changes since previous solve
+    int resize_status = resize_result(cols,rows,max_rows_in_level);
+    assert(resize_status == 0);
+
     DAQPProblem qp = {
       cols, rows, 0, nullptr, nullptr, A.data(), bu.data(), bl.data(), nullptr, break_points.data(), n_tasks};
     update_ldp(update_mask_, &work_, &qp);

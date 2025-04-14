@@ -53,6 +53,7 @@ class DAQP {
     DAQPWorkspace work_;
     DAQPSettings settings_;
     EigenDAQPResult result_;
+    int resize_result(int n, int m, int ns);
 
   public:
     DAQP(int max_variables, int max_constraints, int max_constraints_in_level);
