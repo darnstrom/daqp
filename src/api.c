@@ -87,7 +87,7 @@ int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time){
         int start = 0;
         for(int i = 0; i < qp->nh; i++){
             ns = (ns  > qp->break_points[i]-start) ? ns : qp->break_points[i]-start;
-            start = qp->break_points[i]-start;
+            start = qp->break_points[i];
         }
      }
    
