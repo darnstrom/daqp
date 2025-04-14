@@ -46,17 +46,25 @@ EigenDAQPResult daqp_solve(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
 
 class DAQP {
   private:
-    int update_mask_ = UPDATE_M + UPDATE_d + UPDATE_sense + UPDATE_hierarchy;
     int max_variables_;
     int max_constraints_;
     int max_constraints_in_level_;
     DAQPWorkspace work_;
     DAQPSettings settings_;
     EigenDAQPResult result_;
-    int resize_result(int n, int m, int ns);
+    int resize_result(int n, int m, Eigen::VectorXi& break_points);
 
   public:
     DAQP(int max_variables, int max_constraints, int max_constraints_in_level);
+    int update(Eigen::MatrixXd& H,
+               Eigen::VectorXd& f,
+               Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> A,
+               Eigen::VectorXd& bu,
+               Eigen::VectorXd& bl,
+               Eigen::VectorXi& sense,
+               Eigen::VectorXi& break_points,
+               int update_mask = -1);
+    const EigenDAQPResult& solve();
     const EigenDAQPResult& solve(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> A,
                                  Eigen::VectorXd& bu,
                                  Eigen::VectorXd& bl,

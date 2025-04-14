@@ -74,8 +74,6 @@ EigenDAQPResult daqp_solve(Eigen::MatrixXd& H,
     return daqp_solve(H, f, A, bu, bl, sense, break_points);
 }
 
-// Solve min_x ||x||
-//        s.t  bl <= A*x <= bu
 EigenDAQPResult daqp_solve(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> A,
                            Eigen::VectorXd& bu,
                            Eigen::VectorXd& bl,
@@ -97,10 +95,17 @@ DAQP::DAQP(int max_variables, int max_constraints, int max_constraints_in_level)
     work_.settings = &settings_;
 }
 
-int DAQP::resize_result(const int n, const int m, const int ns){
+int DAQP::resize_result(const int n, const int m, Eigen::VectorXi& break_points){
     // Ensure that the new dimensions is not too large
     if (n > max_variables_) return 1;
     if (m > max_constraints_) return 2;
+
+    // Check if maximum soft constraints exceeds limit
+    int ns = 0;
+    for(int i = 0, prev =0; i < break_points.size(); i++){
+        ns = (ns  > break_points(i)- prev) ? ns : break_points(i)-prev;
+        prev = break_points(i);
+    }
     if (ns > max_constraints_in_level_) return 3;
 
     // Resize primal and dual variables
@@ -117,32 +122,61 @@ int DAQP::resize_result(const int n, const int m, const int ns){
     return 0;
 }
 
+// Update the workspace with a new problem
+int DAQP::update(Eigen::MatrixXd& H,
+                 Eigen::VectorXd& f,
+                 Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> A,
+                 Eigen::VectorXd& bu,
+                 Eigen::VectorXd& bl,
+                 Eigen::VectorXi& sense,
+                 Eigen::VectorXi& break_points,
+                 int update_mask) {
+
+    int n       = A.cols();
+    int m       = bu.size();
+    int ms      = m - A.rows();
+    int n_tasks = break_points.size();
+
+    assert(bu.size() == bl.size());
+    assert(ms <= n);
+    assert(n_tasks == 0 || break_points(Eigen::last) == m);
+
+    // Get correct pointers
+    double *H_ptr  = H.size() == 0 ? nullptr : H.data();
+    double *f_ptr  = f.size() == 0 ? nullptr : f.data();
+    double *A_ptr  = A.size() == 0 ? nullptr : A.data();
+    int *sense_ptr = A.size() == 0 ? nullptr : sense.data();
+    int *bp_ptr    = break_points.size() == 0 ? nullptr : break_points.data();
+
+    //
+    int resize_status = resize_result(n,m,break_points);
+    assert(resize_status == 0);
+
+    DAQPProblem qp = {n, m, ms, H_ptr, f_ptr, A_ptr, bu.data(), bl.data(), sense_ptr, bp_ptr, n_tasks};
+
+    if(update_mask < 0){
+        // Assume that everythig should be updated
+        update_mask = UPDATE_Rinv + UPDATE_M + UPDATE_v + UPDATE_d + UPDATE_sense + UPDATE_hierarchy;
+    }
+
+    return update_ldp(update_mask, &work_, &qp);
+}
+
+// Solve the LDP that is in the workspace
+const EigenDAQPResult& DAQP::solve(){
+    daqp_solve(&result_,&work_);
+    return result_;
+}
+
+// Solve min_x ||x||
+//        s.t  bl <= A*x <= bu
 const EigenDAQPResult& DAQP::solve(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> A,
                                    Eigen::VectorXd& bu,
                                    Eigen::VectorXd& bl,
                                    Eigen::VectorXi& break_points) {
-    int cols    = A.cols();
-    int rows    = A.rows();
-    int n_tasks = break_points.size();
-    assert(bu.size() == rows);
-    assert(bl.size() == rows);
-    assert(break_points(Eigen::last) == rows);
-
-    // Get maximum rows in a single level
-    int max_rows_in_level = 0;
-    for(int i = 0, bp=0; i < n_tasks; i++){
-        max_rows_in_level = (max_rows_in_level  > break_points(i)-bp) ? max_rows_in_level : break_points(i)-bp;
-        bp = break_points(i)-bp;
-    }
-
-    //  Resize if dimension changes since previous solve
-    int resize_status = resize_result(cols,rows,max_rows_in_level);
-    assert(resize_status == 0);
-
-    DAQPProblem qp = {
-      cols, rows, 0, nullptr, nullptr, A.data(), bu.data(), bl.data(), nullptr, break_points.data(), n_tasks};
-    update_ldp(update_mask_, &work_, &qp);
-    int exitflag = daqp_hiqp(&work_);
-    daqp_extract_result(&result_, &work_);
-    return result_;
+    Eigen::MatrixXd H(0, 0);
+    Eigen::VectorXd f(0);
+    Eigen::VectorXi sense(0);
+    update(H,f,A,bu,bl,sense,break_points,UPDATE_M + UPDATE_d + UPDATE_sense + UPDATE_hierarchy);
+    return solve();
 }
