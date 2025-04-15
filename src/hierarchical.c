@@ -36,6 +36,10 @@ int daqp_hiqp(DAQPWorkspace *work){
         exitflag = daqp_ldp(work);
         iterations+=work->iterations;
         if(exitflag < 0) break;
+        if(iterations >= work->settings->iter_limit){
+            exitflag = EXIT_ITERLIMIT;
+            break;
+        }
 
         // Perturb rhs with slacks in level 
         for(j=0; j<work->n_active;j++){
