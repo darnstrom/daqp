@@ -83,6 +83,13 @@ class DAQP {
     void set_rho_soft(double val);
     void set_rel_subopt(double val);
     void set_abs_subopt(double val);
+
+    // Getters for result
+    Eigen::VectorXd get_primal();
+    Eigen::VectorXd get_dual();
+    int get_status();
+    int get_iterations();
+    double get_solve_time();
 };
 
 #endif // DAQP_HPP

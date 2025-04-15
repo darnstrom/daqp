@@ -194,3 +194,13 @@ void DAQP::set_eta_prox(double val)    { settings_.eta_prox = val;}
 void DAQP::set_rho_soft(double val)    { settings_.rho_soft = val;}
 void DAQP::set_rel_subopt(double val)  { settings_.rel_subopt = val;}
 void DAQP::set_abs_subopt(double val)  { settings_.abs_subopt = val;}
+
+Eigen::VectorXd DAQP::get_primal() {return result_.get_primal();}
+Eigen::VectorXd DAQP::get_dual()   {return result_.get_dual();}
+int             DAQP::get_status() {return result_.exitflag;}
+int             DAQP::get_iterations() {return result_.iter;}
+double          DAQP::get_solve_time() {return result_.solve_time;}
+
+
+
+
