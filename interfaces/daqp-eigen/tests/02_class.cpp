@@ -32,11 +32,11 @@ int main() {
     
     // Solve
     DAQP solver(3, 50, 5);
-    EigenDAQPResult result = solver.solve(A, bu, bl, break_points);
+    solver.solve(A, bu, bl, break_points);
     
     std::cout << "Solution: \n";
-    std::cout << result.get_primal().transpose() << std::endl;
-    std::cout << "Solve time: " << result.solve_time << " seconds" << std::endl;
+    std::cout << solver.get_primal().transpose() << std::endl;
+    std::cout << "Solve time: " << solver.get_solve_time() << " seconds" << std::endl;
 
-    return result.get_primal().isApprox((Eigen::VectorXd(3) << 1, 0.5, -1).finished()) ? 0 : 1;
+    return solver.get_primal().isApprox((Eigen::VectorXd(3) << 1, 0.5, -1).finished()) ? 0 : 1;
 }

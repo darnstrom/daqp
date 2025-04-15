@@ -7,7 +7,6 @@ int main() {
     Eigen::MatrixXd A;
     Eigen::VectorXd bu, bl;
     Eigen::VectorXi break_points;
-    EigenDAQPResult result;
 
     // Setup solver
     DAQP solver(3, 50, 5);
@@ -37,60 +36,60 @@ int main() {
     bu = (Eigen::VectorXd(6) << bu0, bu1, bu2, bu3).finished();
     bl = (Eigen::VectorXd(6) << bl0, bl1, bl2, bl3).finished();
     break_points = (Eigen::VectorXi(4) << 3, 4, 5, 6).finished();
-    result = solver.solve(A, bu, bl, break_points);
+    solver.solve(A, bu, bl, break_points);
 
-    if (!result.get_primal().isApprox((Eigen::VectorXd(3) << 1, 0.5, -1).finished())) {
+    if (!solver.get_primal().isApprox((Eigen::VectorXd(3) << 1, 0.5, -1).finished())) {
         return 1;
     }
     std::cout << "Solution 1: \n";
-    std::cout << result.get_primal().transpose() << std::endl;
-    std::cout << "Solve time: " << result.solve_time << " seconds" << std::endl;
+    std::cout << solver.get_primal().transpose() << std::endl;
+    std::cout << "Solve time: " << solver.get_solve_time() << " seconds" << std::endl;
 
     // ==== Second setup: remove some tasks ====
     A = (Eigen::MatrixXd(4, 3) << A0, A3).finished();
     bu = (Eigen::VectorXd(4) << bu0, bu3).finished();
     bl = (Eigen::VectorXd(4) << bl0, bl3).finished();
     break_points = (Eigen::VectorXi(2) << 3, 4).finished();
-    result = solver.solve(A, bu, bl, break_points);
+    solver.solve(A, bu, bl, break_points);
 
-    if (!result.get_primal().isApprox((Eigen::VectorXd(3) << 1, 1, -1).finished())) {
+    if (!solver.get_primal().isApprox((Eigen::VectorXd(3) << 1, 1, -1).finished())) {
         return 1;
     }
     std::cout << "Solution 2: \n";
-    std::cout << result.get_primal().transpose() << std::endl;
-    std::cout << "Solve time: " << result.solve_time << " seconds" << std::endl;
+    std::cout << solver.get_primal().transpose() << std::endl;
+    std::cout << "Solve time: " << solver.get_solve_time() << " seconds" << std::endl;
 
     // ==== Third setup: remove the third dimension ====
     A = (Eigen::MatrixXd(5, 2) << 1,0,0,1, 1,1,1,-1,3,1).finished();
     bu = (Eigen::VectorXd(5) << 1,1, bu1, bu2, bu3).finished();
     bl = (Eigen::VectorXd(5) << -1,-1, bl1, bl2, bl3).finished();
     break_points = (Eigen::VectorXi(4) << 2, 3, 4, 5).finished();
-    result = solver.solve(A, bu, bl, break_points);
+    solver.solve(A, bu, bl, break_points);
 
     double precision = 1e-7;
     std::cerr << "Precision had to be lowered from: "
               << Eigen::NumTraits<double>::dummy_precision() << " to: " << precision << std::endl;
-    if (!result.get_primal().isApprox((Eigen::VectorXd(2) << 0.75, 0.25).finished(),precision)) {
+    if (!solver.get_primal().isApprox((Eigen::VectorXd(2) << 0.75, 0.25).finished(),precision)) {
         return 1;
     }
     std::cout << "Solution 3: \n";
-    std::cout << result.get_primal().transpose() << std::endl;
-    std::cout << "Solve time: " << result.solve_time << " seconds" << std::endl;
-    result = solver.solve(A, bu, bl, break_points);
+    std::cout << solver.get_primal().transpose() << std::endl;
+    std::cout << "Solve time: " << solver.get_solve_time() << " seconds" << std::endl;
+    solver.solve(A, bu, bl, break_points);
 
     // ==== Fourth setup: reorder some tasks ====
     A = (Eigen::MatrixXd(6, 3) << A1, A3, A0, A2).finished();
     bu = (Eigen::VectorXd(6) << bu1, bu3, bu0, bu2).finished();
     bl = (Eigen::VectorXd(6) << bl1, bl3, bl0, bl2).finished();
     break_points = (Eigen::VectorXi(4) << 1, 2, 5, 6).finished();
-    result = solver.solve(A, bu, bl, break_points);
+    solver.solve(A, bu, bl, break_points);
 
-    if (!result.get_primal().isApprox((Eigen::VectorXd(3) << 2.25, 1, -2.25).finished(), precision)) {
+    if (!solver.get_primal().isApprox((Eigen::VectorXd(3) << 2.25, 1, -2.25).finished(), precision)) {
         return 1;
     }
     std::cout << "Solution 4: \n";
-    std::cout << result.get_primal().transpose() << std::endl;
-    std::cout << "Solve time: " << result.solve_time << " seconds" << std::endl;
+    std::cout << solver.get_primal().transpose() << std::endl;
+    std::cout << "Solve time: " << solver.get_solve_time() << " seconds" << std::endl;
 
     return 0;
 }
