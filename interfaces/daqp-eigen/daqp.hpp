@@ -69,6 +69,20 @@ class DAQP {
                                  Eigen::VectorXd& bu,
                                  Eigen::VectorXd& bl,
                                  Eigen::VectorXi& break_points);
+    // Setters for settings
+    void set_primal_tol(double val);
+    void set_dual_tol(double val);
+    void set_zero_tol(double val);
+    void set_pivot_tol(double val);
+    void set_progress_tol(double val);
+    void set_cycle_tol(int val);
+    void set_iter_limit(int val);
+    void set_fval_bound(double val);
+    void set_eps_prox(double val);
+    void set_eta_prox(double val);
+    void set_rho_soft(double val);
+    void set_rel_subopt(double val);
+    void set_abs_subopt(double val);
 };
 
 #endif // DAQP_HPP

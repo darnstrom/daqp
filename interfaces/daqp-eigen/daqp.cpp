@@ -180,3 +180,17 @@ const EigenDAQPResult& DAQP::solve(Eigen::Matrix<double, Eigen::Dynamic, Eigen::
     update(H,f,A,bu,bl,sense,break_points,UPDATE_M + UPDATE_d + UPDATE_sense + UPDATE_hierarchy);
     return solve();
 }
+
+void DAQP::set_primal_tol(double val)  { settings_.primal_tol = val;}
+void DAQP::set_dual_tol(double val)    { settings_.dual_tol = val;}
+void DAQP::set_zero_tol(double val)    { settings_.zero_tol = val;}
+void DAQP::set_pivot_tol(double val)   { settings_.pivot_tol = val;}
+void DAQP::set_progress_tol(double val){ settings_.progress_tol = val;}
+void DAQP::set_cycle_tol(int val)      { settings_.cycle_tol = val;}
+void DAQP::set_iter_limit(int val)     { settings_.iter_limit = val;}
+void DAQP::set_fval_bound(double val)  { settings_.fval_bound = val;}
+void DAQP::set_eps_prox(double val)    { settings_.eps_prox = val;}
+void DAQP::set_eta_prox(double val)    { settings_.eta_prox = val;}
+void DAQP::set_rho_soft(double val)    { settings_.rho_soft = val;}
+void DAQP::set_rel_subopt(double val)  { settings_.rel_subopt = val;}
+void DAQP::set_abs_subopt(double val)  { settings_.abs_subopt = val;}
