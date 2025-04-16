@@ -2,7 +2,7 @@
 #include "types.h"
 #include <stdlib.h>
 
-#define DAQP_HIQP_SOFT ((c_float)1e-8)
+#define DAQP_HIQP_SOFT ((c_float)1e-6)
 #define DAQP_HIQP_TOL ((c_float)1e-6)
 
 int daqp_hiqp(DAQPWorkspace *work){
@@ -10,7 +10,7 @@ int daqp_hiqp(DAQPWorkspace *work){
     int start,end;
     int iterations = 0;
     int exitflag=0;
-    c_float w,wtol;
+    c_float w;
     start=0;
     int nfree = work->n;
     work->settings->rho_soft = DAQP_HIQP_SOFT;
@@ -28,14 +28,18 @@ int daqp_hiqp(DAQPWorkspace *work){
                 else
                     add_constraint(work,j, 1.0);
                 nfree--;
+                if(work->sing_ind != EMPTY_IND) return EXIT_OVERDETERMINED_INITIAL;
                 }
-            if(work->sing_ind != EMPTY_IND) return EXIT_OVERDETERMINED_INITIAL;
         }
 
+
+        // Solve best solution in case daqp_ldp fails
+        for(j = 0; j<work->n;j++) work->xold[j] = work->x[j];
         // Solve LDP
         exitflag = daqp_ldp(work);
         iterations+=work->iterations;
         if(exitflag < 0) break;
+
         if(iterations >= work->settings->iter_limit){
             exitflag = EXIT_ITERLIMIT;
             break;
@@ -47,14 +51,11 @@ int daqp_hiqp(DAQPWorkspace *work){
             if(IS_SOFT(id)){ 
                 w = work->lam_star[j]*work->settings->rho_soft;
                 wtol = DAQP_HIQP_TOL*work->scaling[id];
-                //if(-wtol < w &&  w < wtol) continue; // Too small
-                //w = IS_IMMUTABLE(id) ? w : w*1.01; // Perturb if inequality
                 if(IS_LOWER(id))
                     work->dlower[id]+=w;
                 else
                     work->dupper[id]+=w;
                 if(IS_IMMUTABLE(id)) continue; // Already an equality
-                //SET_IMMUTABLE(id);  // Make equality constraint
                 nfree--;
             }
         }
@@ -75,17 +76,17 @@ int daqp_hiqp(DAQPWorkspace *work){
         work->sing_ind = EMPTY_IND;
         for(; j<n_active_old ;j++){
             add_constraint(work,work->WS[j],work->lam_star[j]);
-            // Abort reactivation if WS becomes overdtermined
-            if(work->sing_ind != EMPTY_IND){
-                remove_constraint(work,j);
-                work->sing_ind = EMPTY_IND;
-                for(; j<n_active_old ;j++) SET_INACTIVE(work->WS[j]);
-                break;
-            }
+            // Abort if WS becomes overdtermined
+            if(work->sing_ind != EMPTY_IND) return EXIT_OVERDETERMINED_INITIAL;
         }
 
         // Move up hierarchy
         start = end;
+    }
+    // Finalize
+    if(exitflag < -1){ // Restore a point that was good before it failed
+        for(j = 0; j<work->n;j++) work->x[j] = work->xold[j];
+        exitflag = 3; // signify no degrees of freedoom left
     }
     work->iterations = iterations; // Append total number of iterations
     return exitflag;
