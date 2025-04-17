@@ -7,11 +7,15 @@ int daqp_hiqp(DAQPWorkspace *work){
     int start,end;
     int iterations = 0;
     int exitflag=0;
+
+    // If only one hiearchy -> just solve normal LDP
+    if( work->nh < 2) return daqp_ldp(work);
+
+    // Start moving down the hierarchy
     c_float w;
     start=0;
     int nfree = work->n;
-
-    for(i =0; i < work->nh; i++){
+    for(i =1; i < work->nh; i++){
         // initialize current level
         end=work->break_points[i];
         work->m = end;
