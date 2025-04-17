@@ -2,9 +2,6 @@
 #include "types.h"
 #include <stdlib.h>
 
-#define DAQP_HIQP_SOFT ((c_float)1e-6)
-#define DAQP_HIQP_TOL ((c_float)1e-6)
-
 int daqp_hiqp(DAQPWorkspace *work){
     int i,j,id;
     int start,end;
@@ -13,7 +10,6 @@ int daqp_hiqp(DAQPWorkspace *work){
     c_float w;
     start=0;
     int nfree = work->n;
-    work->settings->rho_soft = DAQP_HIQP_SOFT;
 
     for(i =0; i < work->nh; i++){
         // initialize current level
@@ -32,7 +28,6 @@ int daqp_hiqp(DAQPWorkspace *work){
                 }
         }
 
-
         // Solve best solution in case daqp_ldp fails
         for(j = 0; j<work->n;j++) work->xold[j] = work->x[j];
         // Solve LDP
@@ -50,7 +45,6 @@ int daqp_hiqp(DAQPWorkspace *work){
             id=work->WS[j];
             if(IS_SOFT(id)){ 
                 w = work->lam_star[j]*work->settings->rho_soft;
-                wtol = DAQP_HIQP_TOL*work->scaling[id];
                 if(IS_LOWER(id))
                     work->dlower[id]+=w;
                 else
