@@ -82,7 +82,7 @@ int daqp_hiqp(DAQPWorkspace *work){
         start = end;
     }
     // Finalize
-    if(exitflag < -1){ // Restore a point that was good before it failed
+    if(exitflag < 0){ // Restore a point that was good before it failed
         for(j = 0; j<work->n;j++) work->x[j] = work->xold[j];
         exitflag = 3; // signify no degrees of freedoom left
     }
