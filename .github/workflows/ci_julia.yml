@@ -1,9 +1,10 @@
 name: CMake test
 on:
-workflow_dispatch:
+  workflow_dispatch:
   pull_request:
     branches:
       - master
+
 jobs:
   test:
     name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }} - ${{ github.event_name }}
