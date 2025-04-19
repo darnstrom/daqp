@@ -25,11 +25,11 @@ jobs:
         run: cmake -S . -B build -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DJULIA=ON
       - name: "Build Project" 
         run: cmake --build build --target all --config Release -- -j4 
-      - name: "Build and test Julia interface"
         run: cd build/interfaces/daqp-julia 
       - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
-      - uses: julia-actions/julia-buildpkg@v1
-      - uses: julia-actions/julia-runtest@v1
+      - name: "Test Julia interface"
+        run: julia --color=yes --project=build/interfaces/daqp-julia -e "using Pkg; Pkg.test()"
+
