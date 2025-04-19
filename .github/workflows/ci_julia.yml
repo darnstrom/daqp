@@ -26,7 +26,8 @@ jobs:
       - name: "Build Project" 
         run: cmake --build build --target all --config Release -- -j4 
       - name: "Build and test Julia interface"
-        run: cd interfaces/daqp-julia 
+        run: cd build/interfaces/daqp-julia 
+        run: pwd 
       - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.version }}
