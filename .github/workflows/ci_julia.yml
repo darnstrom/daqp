@@ -24,9 +24,8 @@ jobs:
         run: cmake -S . -B build -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DJULIA=ON
       - name: "Build Project" 
         run: cmake --build build --target all --config Release -- -j4 
-      - name: "Get to julia interface"
-        run: cd interfaces/daqp-julia 
       - name: "Build and test Julia interface"
+        run: cd interfaces/daqp-julia 
       - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.version }}
