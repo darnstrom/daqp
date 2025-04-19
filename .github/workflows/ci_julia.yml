@@ -1,0 +1,35 @@
+name: CMake test
+on:
+workflow_dispatch:
+  pull_request:
+    branches:
+      - master
+jobs:
+  test:
+    name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }} - ${{ github.event_name }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        version:
+          - '1'
+        os:
+          - ubuntu-latest
+          - macOS-latest
+          - windows-latest
+        arch:
+          - x64
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Create build directory and run CMake"
+        run: cmake -S . -B build -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DJULIA=ON
+      - name: "Build Project" 
+        run: cmake --build build --target all --config Release -- -j4 
+      - name: "Get to julia interface"
+        run: cd interfaces/daqp-julia 
+      - name: "Build and test Julia interface"
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: ${{ matrix.version }}
+          arch: ${{ matrix.arch }}
+      - uses: julia-actions/julia-buildpkg@v1
+      - uses: julia-actions/julia-runtest@v1
