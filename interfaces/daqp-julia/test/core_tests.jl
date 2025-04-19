@@ -1,13 +1,14 @@
 using LinearAlgebra
 using Random
 using DAQPBase
+using DAQP_jll
 include(joinpath(dirname(@__FILE__), "utils.jl"))
 
 # Use local libdaqp if available
 _libdaqp = joinpath(pkgdir(DAQPBase),"libdaqp."*Libc.Libdl.dlext)
 if isfile(_libdaqp)
     @info "Using local libdaqp"
-    global DAQPBase.libdaqp = _libdaqp
+    DAQP_jll.libdaqp = _libdaqp
 end
 
 # API Tests
