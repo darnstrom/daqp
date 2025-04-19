@@ -7,7 +7,7 @@ include(joinpath(dirname(@__FILE__), "utils.jl"))
 _libdaqp = joinpath(pkgdir(DAQPBase),"libdaqp."*Libc.Libdl.dlext)
 if isfile(_libdaqp)
     @info "Using local libdaqp"
-    DAQPBase.libdaqp = _libdaqp
+    global DAQPBase.libdaqp = _libdaqp
 end
 
 # API Tests
