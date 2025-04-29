@@ -8,13 +8,16 @@ struct QPj
     bupper::Vector{Cdouble}
     blower::Vector{Cdouble}
     sense::Vector{Cint}
+
+    break_points::Vector{Cint}
+    nh::Cint
 end
 function QPj() 
-    return QPj(0,0,0,Matrix{Cdouble}(undef,0,0),Vector{Cdouble}(undef,0),Matrix{Cdouble}(undef,0,0), Vector{Cdouble}(undef,0), Vector{Cdouble}(undef,0), Vector{Cint}(undef,0))
+    return QPj(0,0,0,Matrix{Cdouble}(undef,0,0),Vector{Cdouble}(undef,0),Matrix{Cdouble}(undef,0,0), Vector{Cdouble}(undef,0), Vector{Cdouble}(undef,0), Vector{Cint}(undef,0),Vector{Cint}(undef,0),0)
 end
 function QPj(H::Matrix{Float64},f::Vector{Float64},
         A::Matrix{Float64},bupper::Vector{Float64}, blower::Vector{Float64},
-        sense::Vector{Cint};A_rowmaj=false)
+        sense::Vector{Cint};A_rowmaj=false,break_points=Cint[])
     # TODO: check consistency of dimensions
     if(A_rowmaj)
         (n,mA) = size(A);
@@ -28,7 +31,7 @@ function QPj(H::Matrix{Float64},f::Vector{Float64},
     if(!A_rowmaj)
         A = A' # Transpose A for col => row major
     end
-    return QPj(n,m,ms,H,f,A,bupper,blower,sense)
+    return QPj(n,m,ms,H,f,A,bupper,blower,sense,break_points,length(break_points))
 end
 
 struct QPc 
@@ -41,13 +44,17 @@ struct QPc
     bupper::Ptr{Cdouble}
     blower::Ptr{Cdouble}
     sense::Ptr{Cint}
+
+    break_points::Ptr{Cint}
+    nh::Cint
 end
 function QPc(qpj::QPj)
     H_ptr = isempty(qpj.H) ? C_NULL : pointer(qpj.H)
     f_ptr = isempty(qpj.f) ? C_NULL : pointer(qpj.f)
     return QPc(qpj.n,qpj.m,qpj.ms,
                H_ptr,f_ptr,
-               pointer(qpj.A),pointer(qpj.bupper),pointer(qpj.blower),pointer(qpj.sense))
+               pointer(qpj.A),pointer(qpj.bupper),pointer(qpj.blower),pointer(qpj.sense),
+               pointer(qpj.break_points),qpj.nh)
 end
 
 struct DAQPSettings
@@ -132,4 +139,7 @@ struct Workspace
     settings::Ptr{DAQPSettings}
 
     bnb::Ptr{Cvoid}
+
+    nh::Cint
+    break_points::Ptr{Cint}
 end

@@ -191,8 +191,8 @@ end
 
 function setup(daqp::DAQPBase.Model, H::Matrix{Cdouble},f::Vector{Cdouble},
         A::Matrix{Cdouble},bupper::Vector{Cdouble},blower::Vector{Cdouble}=Cdouble[],
-        sense::Vector{Cint}=Cint[];A_rowmaj=false)
-    return setup(daqp,QPj(H,f,A,bupper,blower,sense;A_rowmaj))
+        sense::Vector{Cint}=Cint[];A_rowmaj=false,break_points = Cint[])
+    return setup(daqp,QPj(H,f,A,bupper,blower,sense;A_rowmaj,break_points))
 end
 
 function solve(daqp::DAQPBase.Model)
@@ -238,7 +238,7 @@ function settings(daqp::DAQPBase.Model,changes::Dict{Symbol,<:Any})
     return new_settings;
 end
 
-function update(daqp::DAQPBase.Model, H,f,A,bupper,blower,sense) 
+function update(daqp::DAQPBase.Model, H,f,A,bupper,blower,sense=nothing,break_points=nothing) 
     update_mask = Cint(0);
     work = unsafe_load(daqp.work);
     if(!isnothing(H) && work.n == size(H,1) && work.n == size(H,2))
@@ -266,10 +266,15 @@ function update(daqp::DAQPBase.Model, H,f,A,bupper,blower,sense)
         daqp.qpj.sense[:] .= sense[:]
         update_mask+=16
     end
-    daqp.qpc = QPc(daqp.qpj);
-    unsafe_store!(work.qp,daqp.qpc);
 
-    exitflag = ccall((:update_ldp,DAQPBase.libdaqp),Cint,(Cint,Ptr{DAQPBase.Workspace},), update_mask, daqp.work);
+    if(!isnothing(break_points) && length(break_points)== work.nh)
+        daqp.qpj.break_points[:] .= break_points[:]
+        update_mask+=32
+    end
+    daqp.qpc = QPc(daqp.qpj);
+
+    exitflag = ccall((:update_ldp,DAQPBase.libdaqp),Cint,(Cint,Ptr{DAQPBase.Workspace},Ptr{DAQPBase.QPc}), 
+                     update_mask, daqp.work,Ref(daqp.qpc));
 end
 
 using Downloads
