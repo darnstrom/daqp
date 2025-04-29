@@ -71,10 +71,7 @@ void compute_primal_and_fval(DAQPWorkspace *work){
             else
                 fval+=SQUARE(work->lam_star[i])*work->rho_us[work->WS[i]];
 #else
-            if(work->scaling != NULL)
-                fval+= SQUARE(work->lam_star[i]*work->scaling[work->WS[i]]);
-            else
-                fval+= SQUARE(work->lam_star[i]);
+            fval+= SQUARE(work->lam_star[i]);
 #endif
         }
     }

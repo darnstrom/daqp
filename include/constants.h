@@ -22,7 +22,7 @@ extern "C" {
 #define DEFAULT_CYCLE_TOL 10
 #define DEFAULT_ETA 1e-6
 #define DEFAULT_ITER_LIMIT 1000 
-#define DEFAULT_RHO_SOFT 1e-3
+#define DEFAULT_RHO_SOFT 1e-6
 #define DEFAULT_REL_SUBOPT 0
 #define DEFAULT_ABS_SUBOPT 0
 
@@ -47,6 +47,7 @@ extern "C" {
 #define UPDATE_v 4
 #define UPDATE_d 8
 #define UPDATE_sense 16 
+#define UPDATE_hierarchy 32
 
 // CONSTRAINT MASKS 
 #define ACTIVE 1

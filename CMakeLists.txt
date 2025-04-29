@@ -8,6 +8,10 @@ add_subdirectory(src)
 add_subdirectory(include)
 add_subdirectory(codegen)
 
+if(EIGEN)
+  add_subdirectory(interfaces/daqp-eigen)
+endif()
+
 option (PROFILING "Enable profiling" ON)
 if(PROFILING)
   add_compile_definitions(PROFILING)
