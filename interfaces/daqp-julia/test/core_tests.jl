@@ -147,6 +147,13 @@ end
     sense[1] = DAQPBase.BINARY
     d = DAQPBase.Model()
     DAQPBase.setup(d,H,f,A,bupper,blower,sense)
-    DAQPBase.codegen(d,dir="codegen",src=true)
-    rm("codegen",recursive=true)
+    srcdir = tempname();
+    DAQPBase.codegen(d,dir=srcdir,src=true)
+    src = [f for f in readdir(srcdir) if last(f,1) == "c"]
+    if(!isnothing(Sys.which("gcc")))
+        testlib = "daqptestlib."* Base.Libc.Libdl.dlext
+        run(Cmd(`gcc -lm -fPIC -O3 -msse3 -xc -shared -o $testlib $src`; dir=srcdir))
+        @test isfile(joinpath(srcdir,testlib))
+    end
+    rm(srcdir,recursive=true)
 end
