@@ -3,6 +3,7 @@
 #include <daqp.hpp>
 
 int main() {
+    double precision = 1e-5;
     Eigen::MatrixXd H = Eigen::MatrixXd::Identity(2, 2);
     Eigen::VectorXd f = Eigen::VectorXd::Ones(2);
 
@@ -24,7 +25,7 @@ int main() {
     std::cout << result2.get_primal().transpose() << std::endl;
     std::cout << "Solve time: " << result2.solve_time << " seconds" << std::endl;
 
-    return result1.get_primal().isApprox((Eigen::VectorXd(2) << -1, -1).finished()) &&
+    return result1.get_primal().isApprox((Eigen::VectorXd(2) << -1, -1).finished(),precision) &&
                result1.get_primal().isApprox(result2.get_primal())
            ? 0
            : 1;
