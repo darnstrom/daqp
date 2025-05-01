@@ -8,8 +8,10 @@ add_subdirectory(src)
 add_subdirectory(include)
 add_subdirectory(codegen)
 
-if(EIGEN)
-  add_subdirectory(interfaces/daqp-eigen)
+
+if(TEST)
+  include(CTest)
+  enable_testing()
 endif()
 
 option (PROFILING "Enable profiling" ON)
@@ -54,9 +56,10 @@ install(FILES ${daqp_headers} ${daqp_codegen_headers} DESTINATION "${CMAKE_INSTA
 
 install(EXPORT ${PROJECT_NAME}Config DESTINATION cmake)
 
-if(TEST)
-  enable_testing()
+if(EIGEN)
+  add_subdirectory(interfaces/daqp-eigen)
 endif()
+
 
 if(MATLAB)
   find_package(Matlab REQUIRED MAIN_PROGRAM)
