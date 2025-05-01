@@ -13,7 +13,7 @@ int daqp_hiqp(DAQPWorkspace *work){
 
     // Start moving down the hierarchy
     c_float w;
-    start=0;
+    start=work->break_points[0];
     int nfree = work->n;
     for(i =1; i < work->nh; i++){
         // initialize current level
