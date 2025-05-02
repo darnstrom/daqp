@@ -3,7 +3,6 @@
 #include <daqp.hpp>
 
 int main() {
-    double precision = 1e-5;
     // Task 1: -1 <= x <= 1
     Eigen::MatrixXd A0  = Eigen::MatrixXd::Identity(3, 3);
     Eigen::VectorXd bu0 = Eigen::VectorXd::Ones(3);
@@ -33,11 +32,12 @@ int main() {
     
     // Solve
     DAQP solver(3, 50, 5);
+    solver.set_rho_soft(1e-8);
     solver.solve(A, bu, bl, break_points);
     
     std::cout << "Solution: \n";
     std::cout << solver.get_primal().transpose() << std::endl;
     std::cout << "Solve time: " << solver.get_solve_time() << " seconds" << std::endl;
 
-    return solver.get_primal().isApprox((Eigen::VectorXd(3) << 1, 0.5, -1).finished(),precision) ? 0 : 1;
+    return solver.get_primal().isApprox((Eigen::VectorXd(3) << 1, 0.5, -1).finished()) ? 0 : 1;
 }

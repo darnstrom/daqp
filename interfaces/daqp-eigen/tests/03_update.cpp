@@ -11,6 +11,7 @@ int main() {
 
     // Setup solver
     DAQP solver(3, 50, 5);
+    solver.set_rho_soft(1e-8);
 
     // Task 1: -1 <= x <= 1
     Eigen::MatrixXd A0 = Eigen::MatrixXd::Identity(3, 3);
@@ -42,7 +43,7 @@ int main() {
     std::cout << "Solution 1: \n";
     std::cout << solver.get_primal().transpose() << std::endl;
     std::cout << "Solve time: " << solver.get_solve_time() << " seconds" << std::endl;
-    if (!solver.get_primal().isApprox((Eigen::VectorXd(3) << 1, 0.5, -1).finished(),precision)) {
+    if (!solver.get_primal().isApprox((Eigen::VectorXd(3) << 1, 0.5, -1).finished())) {
         return 1;
     }
 
@@ -56,7 +57,7 @@ int main() {
     std::cout << "Solution 2: \n";
     std::cout << solver.get_primal().transpose() << std::endl;
     std::cout << "Solve time: " << solver.get_solve_time() << " seconds" << std::endl;
-    if (!solver.get_primal().isApprox((Eigen::VectorXd(3) << 1, 1, -1).finished(),precision)) {
+    if (!solver.get_primal().isApprox((Eigen::VectorXd(3) << 1, 1, -1).finished())) {
         return 1;
     }
 
@@ -71,7 +72,7 @@ int main() {
     std::cout << solver.get_primal().transpose() << std::endl;
     std::cout << "Solve time: " << solver.get_solve_time() << " seconds" << std::endl;
     solver.solve(A, bu, bl, break_points);
-    if (!solver.get_primal().isApprox((Eigen::VectorXd(2) << 0.75, 0.25).finished(),precision)) {
+    if (!solver.get_primal().isApprox((Eigen::VectorXd(2) << 0.75, 0.25).finished(), precision)) {
         return 1;
     }
 
