@@ -157,3 +157,16 @@ end
     end
     rm(srcdir,recursive=true)
 end
+
+@testset "Hierarchical QP" begin
+    A = [1.0 1 1; 1 -1 0; 3 1 -1]
+    bu = [ones(3);1;0.5;20]
+    bl = [-ones(3);-1e30;0.5;10]
+    sense = zeros(Cint,6)
+    xref = [1; 0.5; -1]
+    d = DAQPBase.Model()
+    DAQPBase.setup(d,zeros(0,0),zeros(0),A,bu,bl,sense;break_points = [3;4;5;6])
+    x,fval,exitflag,info = solve(d)
+    print
+    @test norm(xref-x) < tol
+end
