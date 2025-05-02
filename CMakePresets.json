@@ -1,0 +1,66 @@
+{
+    "version": 3,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 22
+    },
+    "configurePresets": [
+        {
+            "name": "default",
+            "hidden": true,
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build",
+            "cacheVariables": {
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "YES",
+                "TEST": "ON",
+                "EIGEN": "ON"
+            }
+        },
+        {
+            "name": "release",
+            "inherits": "default",
+            "description": "Release build with optimizations",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            }
+        },
+        {
+            "name": "debug",
+            "inherits": "default",
+            "description": "Debug build with debug symbols",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "default",
+            "hidden": true,
+            "configurePreset": "release"
+        },
+        {
+            "name": "debug",
+            "configurePreset": "debug"
+        },
+        {
+            "name": "release",
+            "configurePreset": "release"
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "default",
+            "hidden": true,
+            "configurePreset": "release"
+        },
+        {
+            "name": "test-release",
+            "configurePreset": "release"
+        },
+        {
+            "name": "test-debug",
+            "configurePreset": "debug"
+        }
+    ]
+}
