@@ -1,0 +1,31 @@
+name: Eigen CI
+
+on:
+  push:
+    branches: ["master"]
+  pull_request:
+    branches: ["master"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        build_type: [debug, release]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y cmake ninja-build libeigen3-dev
+
+      - name: Configure CMake
+        run: cmake --preset ${{ matrix.build_type }}
+
+      - name: Build
+        run: cmake --build ${{github.workspace}}/build --preset ${{ matrix.build_type }}
+
+      - name: Test
+        run: ctest --preset ${{ matrix.build_type }}
