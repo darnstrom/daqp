@@ -14,6 +14,8 @@ void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
     if(work->settings->eps_prox==0){
         if(work->bnb != NULL)
             res->exitflag = daqp_bnb(work);
+        else if(work->nh > 1)
+            res->exitflag = daqp_hiqp(work);
         else
             res->exitflag = daqp_ldp(work);
 
@@ -73,28 +75,43 @@ int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time){
     // (to account for it in allocation)
     int ns = 0, nb = 0;
     int i;
-    for(i = 0; i < qp->m ; i++){
-        if(qp->sense[i] & SOFT) ns++;
-        if(qp->sense[i] & BINARY) nb++;
+    if(qp->sense != NULL){
+        for(i = 0; i < qp->m ; i++){
+            if(qp->sense[i] & SOFT) ns++;
+            if(qp->sense[i] & BINARY) nb++;
+        }
     }
+    // Correct number of soft constraints if several hierarchies
+    if(qp->nh > 1){
+        ns = 0; // Reset
+        int start = 0;
+        for(int i = 0; i < qp->nh; i++){
+            ns = (ns  > qp->break_points[i]-start) ? ns : qp->break_points[i]-start;
+            start = qp->break_points[i];
+        }
+     }
+   
     // Setup workspace
     if(work->settings == NULL)
         allocate_daqp_settings(work);
     else
         own_settings = 0;
     allocate_daqp_workspace(work,qp->n,ns);
+
     errorflag = setup_daqp_ldp(work,qp);
     if(errorflag < 0){
         if(own_settings==0) work->settings = NULL;
         free_daqp_workspace(work);
         return errorflag;
     }
-    errorflag = setup_daqp_bnb(work, nb, ns);
+
+    errorflag = setup_daqp_bnb(work, nb, ns);  
     if(errorflag < 0){
         if(own_settings==0) work->settings = NULL;
         free_daqp_workspace(work);
         return errorflag;
     }
+
 #ifdef PROFILING
     if(setup_time != NULL){
         toc(&timer);
@@ -106,60 +123,43 @@ int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time){
 
 //  Setup LDP from QP  
 int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp){
-    int error_flag,update_mask=0;
-    int i;
-    work->n = qp->n;
-    work->m = qp->m;
-    work->ms = qp->ms;
-    work->qp = qp;
+    int update_mask = UPDATE_M+UPDATE_d+UPDATE_sense; // Always update M, d and sense
+    int error_flag;
+    int alloc_R=0, alloc_v=0;
 
-    // Always allocate scaling, M ,dupper, dlower,sense
-    work->scaling= malloc(qp->m*sizeof(c_float));
-    for(i =0; i < work->qp->ms; i++) work->scaling[i] =1;
-    work->M = malloc(qp->n*(qp->m-qp->ms)*sizeof(c_float));
-    work->dupper = malloc(qp->m*sizeof(c_float));
-    work->dlower = malloc(qp->m*sizeof(c_float));
-    work->sense = malloc(qp->m*sizeof(int));
-    update_mask += UPDATE_M+UPDATE_d+UPDATE_sense;
-
-    // Allocate memory for Rinv
-    work->RinvD = NULL;
-    if(qp->H!=NULL){ 
-        work->Rinv = malloc(((qp->n+1)*qp->n/2)*sizeof(c_float));
-        update_mask += UPDATE_Rinv;
+    // Only allocate Rinv if H is not NULL
+    if(qp->H!=NULL){
+        alloc_R = 1;
+        update_mask+=UPDATE_Rinv;
     }
-    else// H = I =>  no need to transform H->Rinv
-        work->Rinv = NULL;
-
-    // Allocate memory for d and v 
+    // Only allocate v if f is not NULL, or if proximal
     if(qp->f!=NULL || work->settings->eps_prox != 0){
-        work->v = malloc(qp->n*sizeof(c_float));
+        alloc_v = 1;
         update_mask+=UPDATE_v;
     }
-    else // f = 0 => no need to transform f->v
-        work->v= NULL;
 
-#ifdef SOFT_WEIGHTS
-    // Allocate memory for soft weights
-    work->d_ls = malloc(qp->m*sizeof(c_float));
-    work->d_us = malloc(qp->m*sizeof(c_float));
-    work->rho_ls= malloc(qp->m*sizeof(c_float));
-    work->rho_us= malloc(qp->m*sizeof(c_float));
-    for(i = 0; i< qp->m; i++){
-        work->d_ls[i] = 0;
-        work->d_us[i] = 0;
-        work->rho_ls[i] = DEFAULT_RHO_SOFT;
-        work->rho_us[i] = DEFAULT_RHO_SOFT;
-    }
-#endif
+    // Allocate memory for LDP
+    allocate_daqp_ldp(work, qp->n, qp->m, qp->ms, alloc_R, alloc_v);
+
+
+    // Update hierarchy if hqp
+    if(qp->nh > 1) update_mask += UPDATE_hierarchy;
 
     // Form LDP
-    error_flag = update_ldp(update_mask, work);
+    error_flag = update_ldp(update_mask, work, qp);
     if(error_flag<0){
         free_daqp_ldp(work);
         return error_flag;
     }
     return 1;
+}
+
+
+void setup_daqp_hiqp(DAQPWorkspace* work, int* break_points, int nh){
+    if(nh > 1){
+        work->nh = nh;
+        work->break_points= break_points;
+    }
 }
 
 int setup_daqp_bnb(DAQPWorkspace* work, int nb, int ns){
@@ -240,6 +240,7 @@ void allocate_daqp_workspace(DAQPWorkspace *work, int n, int ns){
     work->n = n;
     n = n + ns; //To account for soft_constraints
     work->Rinv = NULL;
+    work->RinvD = NULL;
     work->v = NULL;
     work->scaling = NULL;
 
@@ -268,7 +269,39 @@ void allocate_daqp_workspace(DAQPWorkspace *work, int n, int ns){
 #endif
 
     work->bnb = NULL;
+    work->nh = 0;
+    work->break_points = NULL;
     reset_daqp_workspace(work);
+}
+
+void allocate_daqp_ldp(DAQPWorkspace *work, int n, int m, int ms, int alloc_R, int alloc_v){
+    int i;
+    // Always allocate scaling, M ,dupper, dlower,sense
+    work->scaling= malloc(m*sizeof(c_float));
+    for(i =0; i < ms; i++) work->scaling[i] =1;
+    work->M = malloc(n*(m-ms)*sizeof(c_float));
+    work->dupper = malloc(m*sizeof(c_float));
+    work->dlower = malloc(m*sizeof(c_float));
+    work->sense = malloc(m*sizeof(int));
+
+    // Allocate memory for Rinv
+    work->Rinv = (alloc_R == 1) ? malloc(((n+1)*n/2)*sizeof(c_float)) : NULL;
+    // Allocate memory for v
+    work->v = (alloc_v == 1) ? malloc(n*sizeof(c_float)) :  NULL;
+
+#ifdef SOFT_WEIGHTS
+    // Allocate memory for soft weights
+    work->d_ls = malloc(m*sizeof(c_float));
+    work->d_us = malloc(m*sizeof(c_float));
+    work->rho_ls= malloc(m*sizeof(c_float));
+    work->rho_us= malloc(m*sizeof(c_float));
+    for(i = 0; i< m; i++){
+        work->d_ls[i] = 0;
+        work->d_us[i] = 0;
+        work->rho_ls[i] = DEFAULT_RHO_SOFT;
+        work->rho_us[i] = DEFAULT_RHO_SOFT;
+    }
+#endif
 }
 
 
@@ -299,6 +332,7 @@ void free_daqp_workspace(DAQPWorkspace *work){
     }
 
     free_daqp_bnb(work);
+
 }
 
 // Extract solution information from workspace 

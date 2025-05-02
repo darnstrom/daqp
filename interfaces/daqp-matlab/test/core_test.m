@@ -43,13 +43,13 @@ classdef core_test < matlab.unittest.TestCase
             tol = 1e-5;
             solve_times = zeros(nQPs,1);
             solve_errors = zeros(nQPs,1);
+
             for i = 1:nQPs
                 [xref,H,f,A,bupper,blower,sense]=generate_test_QP(n,m,ms,nAct,kappa);
                 d = daqp();
                 d.settings('eps_prox',1e-2);
                 d.setup(H,f,A,bupper,blower,sense);
                 [x,fval,exitflag, info] = d.solve();
-
                 testCase.verifyEqual(exitflag,int32(1));
                 testCase.verifyLessThan(norm(x-xref),tol);
                 testCase.verifyLessThan(norm(H*x+f+[eye(ms,n);A]'*info.lambda),tol);
@@ -176,6 +176,39 @@ classdef core_test < matlab.unittest.TestCase
             soft_info
         end
 
+        function soft_QP(testCase)
+            n=10;
+            m=30;
+            H = eye(n);
+            f = zeros(n,1);
+            A = randn(m,n);
+            tol = 1e-5;
+            rho = 1e-3;
+            bupper = randn(m,1);
+            blower = -1e30*ones(m,1)
+            sense= int32(8*ones(m,1));
+            d = daqp();
+            d.setup(H,f,A,bupper,blower,sense);
+            d.settings('rho_soft',rho);
+            [xi,fval,exitflag, soft_info] = d.solve();
+            wi = soft_info.lambda*rho.*(vecnorm(A,2,2).^2)
+            bupper-A*xi
+
+            % Explicit solve the problem with slacks 
+            He = blkdiag(H,(1/rho)*eye(m));
+            fe = [f;zeros(m,1)];
+            Ae = [A -diag(vecnorm(A,2,2))];
+            sense= int32(zeros(m,1));
+            
+            [xw,fval,exitflag,info] = daqp.quadprog(He,fe,Ae,bupper,blower,sense);
+            xe = xw(1:n);
+            we = xw(n+1:end).*vecnorm(A,2,2);
+            testCase.verifyLessThan(norm(xi-xe),tol);
+            testCase.verifyLessThan(norm(wi-we),tol);
+
+
+        end
+
         function trivial_infeasible_QP(testCase)
             H = eye(2);
             f = zeros(2,1);
@@ -232,7 +265,6 @@ classdef core_test < matlab.unittest.TestCase
             testCase.verifyEqual(exitflag,int32(-3));
             unb_lp_info
         end
-
         function random_bnb(testCase)
             % generate and solve with daqp
             rng('default');
@@ -310,6 +342,61 @@ classdef core_test < matlab.unittest.TestCase
                 fprintf('fval_daqp:%f fval_grb:%f, rel_error:%f',fval,gurobi_result.objval,rel_error);
                 testCase.verifyLessThan((fval-gurobi_result.objval)/fval,0.1);
             end
+        end
+
+        function hierarchical_qp(testCase)
+            %  Larger example 
+            rng(1);
+            break_points = [5;13;20;25;30;40;43;50];
+            n = 25; 
+            m = break_points(end);
+            bu_cpy = zeros(m,1); bl_cpy = zeros(m,1);
+            H = []; 
+            f = []; 
+            A = randn(m,n); 
+            scale = 10;
+            bupper = scale*randn(m,1);
+            blower = bupper-scale*rand(m,1);
+            sense= int32(8*ones(m,1));
+            d = daqp();
+            bu_cpy(:) = bupper; bl_cpy(:) = blower;
+            d.setup(H,f,A,bu_cpy,bl_cpy,sense,break_points);
+            [x_hi,fval,exitflag, hier_info] = d.solve(); 
+            hier_info
+
+
+            % Solve without hierarchy
+            d = daqp();
+            bu_cpy(:) = bupper;
+            bl_cpy(:) = blower;
+            H = eye(n);
+            f = zeros(n,1);
+            sense= int32(8*ones(m,1));
+            d.setup(H,f,A,bu_cpy,bl_cpy,sense);
+            d.settings('rho_soft',1e-6);
+            [x_ref,fval,exitflag, hier_ref_info] = d.solve(); 
+            hier_ref_info
+            % Compute slacks
+            start = 1;
+            slacks_hier = zeros(length(break_points),1);
+            for i = 1:length(break_points)
+                inds = start:break_points(i);
+                slacks_hier(i) = min(min(bupper(inds)-A(inds,:)*x_hi),... 
+                    min(-(blower(inds)-A(inds,:)*x_hi)));
+                start = break_points(i)+1;
+            end
+            start = 1;
+            ref_slacks_hier = zeros(length(break_points),1);
+            for i = 1:length(break_points)
+                inds = start:break_points(i);
+                ref_slacks_hier(i) = min(min(bupper(inds)-A(inds,:)*x_ref),... 
+                    min(-(blower(inds)-A(inds,:)*x_ref)));
+                start = break_points(i)+1;
+            end
+            [slacks_hier,ref_slacks_hier]
+
+            testCase.verifyLessThan(ref_slacks_hier(1),slacks_hier(1));
+            testCase.verifyLessThan(norm(ref_slacks_hier,2),norm(slacks_hier,2));
 
         end
     end

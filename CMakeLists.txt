@@ -1,11 +1,18 @@
 cmake_minimum_required(VERSION 3.10)
-project(daqp VERSION 0.6.0)
+project(daqp VERSION 0.7.0)
+
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/codegen)
 add_subdirectory(src)
 add_subdirectory(include)
 add_subdirectory(codegen)
+
+
+if(TEST)
+  include(CTest)
+  enable_testing()
+endif()
 
 option (PROFILING "Enable profiling" ON)
 if(PROFILING)
@@ -49,15 +56,22 @@ install(FILES ${daqp_headers} ${daqp_codegen_headers} DESTINATION "${CMAKE_INSTA
 
 install(EXPORT ${PROJECT_NAME}Config DESTINATION cmake)
 
+if(EIGEN)
+  add_subdirectory(interfaces/daqp-eigen)
+endif()
+
+
 if(MATLAB)
-  find_package(Matlab)
+  find_package(Matlab REQUIRED MAIN_PROGRAM)
   set(MATLAB_INTERFACE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/interfaces/daqp-matlab")
   matlab_add_mex(NAME daqpmex SRC ${MATLAB_INTERFACE_DIR}/daqpmex.c LINK_TO daqpstat)
   set_target_properties(daqpmex PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${MATLAB_INTERFACE_DIR})
+  matlab_add_unit_test(NAME MATLAB UNITTEST_FILE ${MATLAB_INTERFACE_DIR}/test/core_test.m ADDITIONAL_PATH ${MATLAB_INTERFACE_DIR} ${MATLAB_INTERFACE_DIR}/utils)
 endif()
 
-if(MATLABTEST)
-  find_package(Matlab REQUIRED MAIN_PROGRAM)
-  enable_testing()
-  matlab_add_unit_test(NAME core_test UNITTEST_FILE ${MATLAB_INTERFACE_DIR}/test/core_test.m ADDITIONAL_PATH ${MATLAB_INTERFACE_DIR} ${MATLAB_INTERFACE_DIR}/utils)
+if(JULIA)
+  set(JULIA_INTERFACE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/interfaces/daqp-julia")
+  file(COPY "${JULIA_INTERFACE_DIR}" DESTINATION "interfaces")
+  add_custom_command(TARGET daqp POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:daqp> "interfaces/daqp-julia")
+  add_test(NAME Julia COMMAND sh -c "julia --color=yes --project=interfaces/daqp-julia -e \"using Pkg; Pkg.test()\"")
 endif()
