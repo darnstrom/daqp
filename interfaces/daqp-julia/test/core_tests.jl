@@ -167,6 +167,17 @@ end
     d = DAQPBase.Model()
     DAQPBase.setup(d,zeros(0,0),zeros(0),A,bu,bl,sense;break_points = [3;4;5;6])
     x,fval,exitflag,info = solve(d)
-    print
     @test norm(xref-x) < tol
+    # Degenerate
+    H = [10.5 4.0 2.0; 4.0 5.5 0.5; 2.0 0.5 2.0]
+    f = [-53.0; -30; -11.5]
+    A = [1.0 0 0; 1 1 0; 0 0 0; 1 0 0];
+    bu = [3*ones(3);7.5;7.5;5.0;10.0]
+    bl = [-3*ones(3);4.5;4.5;2;7]
+    sense = zeros(Cint,7)
+    sense[6] = 4
+    d = DAQPBase.Model()
+    DAQPBase.setup(d,zeros(0,0),zeros(0),A,bu,bl,sense;break_points = Cint.([3;5;7]))
+    x,fval,exitflag,info = solve(d)
+    @test exitflag > 0
 end
