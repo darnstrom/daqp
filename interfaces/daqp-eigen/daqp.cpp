@@ -47,7 +47,7 @@ EigenDAQPResult daqp_solve(Eigen::MatrixXd& H,
     double *H_ptr  = H.size() == 0 ? nullptr : H.data();
     double *f_ptr  = f.size() == 0 ? nullptr : f.data();
     double *A_ptr  = A.size() == 0 ? nullptr : A.data();
-    int *sense_ptr = A.size() == 0 ? nullptr : sense.data();
+    int *sense_ptr = sense.size() == 0 ? nullptr : sense.data();
     int *bp_ptr    = break_points.size() == 0 ? nullptr : break_points.data();
 
     assert(bu.size() == bl.size());
@@ -145,7 +145,7 @@ int DAQP::update(Eigen::MatrixXd& H,
     double *H_ptr  = H.size() == 0 ? nullptr : H.data();
     double *f_ptr  = f.size() == 0 ? nullptr : f.data();
     double *A_ptr  = A.size() == 0 ? nullptr : A.data();
-    int *sense_ptr = A.size() == 0 ? nullptr : sense.data();
+    int *sense_ptr = sense.size() == 0 ? nullptr : sense.data();
     int *bp_ptr    = break_points.size() == 0 ? nullptr : break_points.data();
 
     //
