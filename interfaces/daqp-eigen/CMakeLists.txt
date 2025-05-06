@@ -1,14 +1,13 @@
 project(daqp_eigen)
 
 find_package(Eigen3 3.4.0 REQUIRED NO_MODULE)
-find_package(daqp)
 
 add_library(${PROJECT_NAME} SHARED daqp.cpp)
 target_include_directories(${PROJECT_NAME} PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>
 )
-target_link_libraries(${PROJECT_NAME} PUBLIC Eigen3::Eigen daqp)
+target_link_libraries(${PROJECT_NAME} PUBLIC Eigen3::Eigen daqpstat)
 
 add_executable(00_basic_qp tests/00_basic_qp.cpp)
 add_executable(01_static_func tests/01_static_func.cpp)
