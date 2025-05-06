@@ -2,6 +2,8 @@ project(daqp_eigen)
 
 find_package(Eigen3 3.4.0 REQUIRED NO_MODULE)
 
+include(GNUInstallDirs)
+
 add_library(${PROJECT_NAME} SHARED daqp.cpp)
 target_include_directories(${PROJECT_NAME} PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
@@ -31,7 +33,6 @@ foreach(TARGET ${TARGETS})
     add_test(NAME test_${TARGET} COMMAND ${TARGET})
 endforeach()
 
-include(GNUInstallDirs)
 install(TARGETS ${PROJECT_NAME} EXPORT  ${PROJECT_NAME}Config
   ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
