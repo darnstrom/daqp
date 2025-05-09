@@ -25,7 +25,7 @@ extern "C" {
 #define DEFAULT_RHO_SOFT 1e-6
 #define DEFAULT_REL_SUBOPT 0
 #define DEFAULT_ABS_SUBOPT 0
-#define DEFAULT_SING_TOL (3.7*1e-11)
+#define DEFAULT_SING_TOL (3.7e-11)
 
 // MACROS
 #define SQUARE(x) ((x)*(x))
