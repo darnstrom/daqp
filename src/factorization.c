@@ -82,7 +82,7 @@ void update_LDL_add(DAQPWorkspace *work, const int add_ind){
     work->D[work->n_active]=sum;
 
     // Check for singularity
-    if(work->D[work->n_active] < work->settings->zero_tol ||
+    if(work->D[work->n_active] < work->settings->sing_tol ||
             (work->n_active >= work->n + ns_active)){
         work->sing_ind=work->n_active;
         work->D[work->n_active]=0;

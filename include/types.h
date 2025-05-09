@@ -65,6 +65,8 @@ typedef struct{
 
     c_float rel_subopt;
     c_float abs_subopt;
+
+    c_float sing_tol;
 }DAQPSettings;
 
 

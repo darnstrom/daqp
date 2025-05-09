@@ -25,7 +25,9 @@ const char* SETTINGS_FIELDS[] = {
   "eta_prox",
   "rho_soft",
   "abs_subopt",
-  "rel_subopt"};
+  "rel_subopt",
+  "sing_tol"
+};
 
 
 /* The gateway function */
