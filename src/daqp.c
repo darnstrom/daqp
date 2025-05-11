@@ -26,7 +26,8 @@ int daqp_ldp(DAQPWorkspace *work){
                             work->D[work->n_active-1] < work->settings->refactor_tol){
                         tried_repair = 1;
                         reset_daqp_workspace(work);
-                        if (activate_constraints(work) < 0) continue; // singular -> continue
+                        activate_constraints(work);
+                        continue; // Try again with new LDL factorization
                     }
 
                     if(work->soft_slack > work->settings->primal_tol)
