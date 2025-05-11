@@ -16,7 +16,7 @@ void remove_constraint(DAQPWorkspace* work, const int rm_ind){
         work->reuse_ind = rm_ind;
 
     // Check if the removal lead to singularity (can happen due to numerics)
-    if(work->n_active > 0 && work->D[work->n_active-1] < work->settings->zero_tol){
+    if(work->n_active > 0 && work->D[work->n_active-1] < work->settings->sing_tol){
         work->sing_ind = work->n_active-1;
         work->D[work->n_active-1] = 0;
     }

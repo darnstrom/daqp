@@ -77,6 +77,7 @@ struct DAQPSettings
     abs_subopt::Cdouble
 
     sing_tol::Cdouble
+    refactor_tol::Cdouble
 end
 function DAQPSettings()
     settings = Ref{DAQPBase.DAQPSettings}()

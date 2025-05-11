@@ -83,6 +83,8 @@ class DAQP {
     void set_rho_soft(double val);
     void set_rel_subopt(double val);
     void set_abs_subopt(double val);
+    void set_sing_tol(double val);
+    void set_refactor_tol(double val);
 
     // Getters for result
     Eigen::VectorXd get_primal();

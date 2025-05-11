@@ -23,7 +23,7 @@ int daqp_ldp(DAQPWorkspace *work){
 
                     // If ill-conditioned basis, refactor
                     if(work->n_active > 2 && tried_repair != 1 &&
-                            work->D[work->n_active-1] < work->settings->sing_tol*10){
+                            work->D[work->n_active-1] < work->settings->refactor_tol){
                         tried_repair = 1;
                         reset_daqp_workspace(work);
                         if (activate_constraints(work) < 0) continue; // singular -> continue

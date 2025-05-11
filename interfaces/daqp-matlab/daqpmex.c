@@ -26,7 +26,8 @@ const char* SETTINGS_FIELDS[] = {
   "rho_soft",
   "abs_subopt",
   "rel_subopt",
-  "sing_tol"
+  "sing_tol",
+  "refactor_tol"
 };
 
 

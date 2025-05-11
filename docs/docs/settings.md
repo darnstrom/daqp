@@ -32,6 +32,7 @@ Table of contents
 | `rel_subopt` | Allowed relative suboptimality in branch and bound | 0 |
 | `abs_subopt` | Allowed absolute suboptimality in branch and bound | 0 |
 | `sing_tol` | Tolerance for checking if the LDL' factorization is singular| 3.7e-11 |
+| `refactor_tol` | Tolerance for refactoring the LDL' factorization before terminating | 1e-7 |
 
 
 ## Exit flags 

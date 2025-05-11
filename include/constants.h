@@ -26,6 +26,7 @@ extern "C" {
 #define DEFAULT_REL_SUBOPT 0
 #define DEFAULT_ABS_SUBOPT 0
 #define DEFAULT_SING_TOL (3.7e-11)
+#define DEFAULT_REFACTOR_TOL 1e-7
 
 // MACROS
 #define SQUARE(x) ((x)*(x))
