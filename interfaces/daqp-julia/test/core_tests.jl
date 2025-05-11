@@ -148,7 +148,17 @@ end
     d = DAQPBase.Model()
     DAQPBase.setup(d,H,f,A,bupper,blower,sense)
     srcdir = tempname();
-    DAQPBase.codegen(d,dir=srcdir,src=true)
+    DAQPBase.codegen(d,dir=srcdir,src=false)
+    # Get source
+    daqp_dir = joinpath(dirname(@__FILE__), "..","..","..","..")
+    cfiles = ["daqp.c","auxiliary.c","factorization.c", "bnb.c", "hierarchical.c"]
+    hfiles = ["daqp.h","auxiliary.h","factorization.h", "bnb.h", "hierarchical.h","constants.h", "types.h"]
+    for cf in cfiles
+        cp(joinpath(daqp_dir,"src",cf), joinpath(srcdir,cf))
+    end
+    for hf in hfiles
+        cp(joinpath(daqp_dir,"include",hf), joinpath(srcdir,hf))
+    end
     src = [f for f in readdir(srcdir) if last(f,1) == "c"]
     if(!isnothing(Sys.which("gcc")))
         testlib = "daqptestlib."* Base.Libc.Libdl.dlext
