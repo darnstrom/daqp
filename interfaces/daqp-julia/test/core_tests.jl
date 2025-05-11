@@ -149,7 +149,7 @@ end
     DAQPBase.setup(d,H,f,A,bupper,blower,sense)
     srcdir = tempname();
     DAQPBase.codegen(d,dir=srcdir,src=false)
-    # Get source
+    # Get local source
     daqp_dir = joinpath(dirname(@__FILE__), "..","..","..","..")
     cfiles = ["daqp.c","auxiliary.c","factorization.c", "bnb.c", "hierarchical.c"]
     hfiles = ["daqp.h","auxiliary.h","factorization.h", "bnb.h", "hierarchical.h","constants.h", "types.h"]
@@ -165,6 +165,11 @@ end
         run(Cmd(`gcc -lm -fPIC -O3 -msse3 -xc -shared -o $testlib $src`; dir=srcdir))
         @test isfile(joinpath(srcdir,testlib))
     end
+    rm(srcdir,recursive=true)
+
+    # Try to also get global source...
+    DAQPBase.codegen(d,dir=srcdir,src=true)
+    @test isfile(joinpath(srcdir,"daqp.c"))
     rm(srcdir,recursive=true)
 end
 
