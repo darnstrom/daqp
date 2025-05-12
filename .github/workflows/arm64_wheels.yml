@@ -41,6 +41,7 @@ jobs:
         python -m cibuildwheel --output-dir wheelhouse
       env:
         CIBW_ARCHS_MACOS: "arm64"
+        CIBW_SKIP: "pp*"
 
     - name: Release to pypi
       if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags'))
