@@ -159,13 +159,14 @@ int DAQP::update(Eigen::MatrixXd& H,
     assert(resize_status == 0);
 
     DAQPProblem qp = {n, m, ms, H_ptr, f_ptr, A_ptr, bu.data(), bl.data(), sense_ptr, bp_ptr, n_tasks};
+    qp_ = qp; // To remember the qp
 
     if(update_mask < 0){
         // Assume that everythig should be updated
         update_mask = UPDATE_Rinv + UPDATE_M + UPDATE_v + UPDATE_d + UPDATE_sense + UPDATE_hierarchy;
     }
 
-    return update_ldp(update_mask, &work_, &qp);
+    return update_ldp(update_mask, &work_, &qp_);
 }
 
 // Solve the LDP that is in the workspace
