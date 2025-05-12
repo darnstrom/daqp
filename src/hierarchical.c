@@ -75,7 +75,12 @@ int daqp_hiqp(DAQPWorkspace *work){
         for(; j<n_active_old ;j++){
             add_constraint(work,work->WS[j],work->lam_star[j]);
             // Abort if WS becomes overdtermined
-            if(work->sing_ind != EMPTY_IND) return EXIT_OVERDETERMINED_INITIAL;
+            if(work->sing_ind != EMPTY_IND){
+                remove_constraint(work,j);
+                work->sing_ind = EMPTY_IND;
+                for(; j<n_active_old ;j++) SET_INACTIVE(work->WS[j]);
+                break;
+            }
         }
 
         // Move up hierarchy

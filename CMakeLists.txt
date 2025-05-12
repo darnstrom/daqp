@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.10)
-project(daqp VERSION 0.7.0)
+project(daqp VERSION 0.7.1)
 
 
+include(GNUInstallDirs)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/codegen)
 add_subdirectory(src)
@@ -43,7 +44,6 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -Wall -Wextra")
 target_link_libraries(daqpstat daqp)
 
 # Install
-include(GNUInstallDirs)
 install(TARGETS daqpstat EXPORT  ${PROJECT_NAME}Config
   ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"

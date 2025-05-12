@@ -20,6 +20,16 @@ int daqp_ldp(DAQPWorkspace *work){
                 // Try to add infeasible constraint 
                 if(!add_infeasible(work)){ //mu >= (i.e., primal feasible)
                                            // All KKT-conditions satisfied -> optimum found 
+
+                    // If ill-conditioned basis, refactor
+                    if(work->n_active > 2 && tried_repair != 1 &&
+                            work->D[work->n_active-1] < work->settings->refactor_tol){
+                        tried_repair = 1;
+                        reset_daqp_workspace(work);
+                        activate_constraints(work);
+                        continue; // Try again with new LDL factorization
+                    }
+
                     if(work->soft_slack > work->settings->primal_tol)
                         exitflag = EXIT_SOFT_OPTIMAL; 
                     else

@@ -52,6 +52,7 @@ class DAQP {
     DAQPWorkspace work_;
     DAQPSettings settings_;
     EigenDAQPResult result_;
+    DAQPProblem qp_;
     int resize_result(int n, int m, Eigen::VectorXi& break_points);
 
   public:
@@ -64,6 +65,7 @@ class DAQP {
                Eigen::VectorXi& sense,
                Eigen::VectorXi& break_points,
                int update_mask = -1);
+    ~DAQP();
     const EigenDAQPResult& solve();
     const EigenDAQPResult& solve(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> A,
                                  Eigen::VectorXd& bu,
@@ -83,6 +85,8 @@ class DAQP {
     void set_rho_soft(double val);
     void set_rel_subopt(double val);
     void set_abs_subopt(double val);
+    void set_sing_tol(double val);
+    void set_refactor_tol(double val);
 
     // Getters for result
     Eigen::VectorXd get_primal();

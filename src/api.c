@@ -388,6 +388,9 @@ void daqp_default_settings(DAQPSettings* settings){
 
     settings->rel_subopt = DEFAULT_REL_SUBOPT;
     settings->abs_subopt = DEFAULT_ABS_SUBOPT;
+
+    settings->sing_tol = DEFAULT_SING_TOL;
+    settings->refactor_tol = DEFAULT_REFACTOR_TOL;
 }
 
 /* Remove redundant constraints*/

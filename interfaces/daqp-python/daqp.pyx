@@ -4,10 +4,11 @@ cimport daqp
 def solve(double[:, :] H, double[:] f, double[:, :] A,
         double[:] bupper, double[:] blower=None, int[:] sense =None,
         primal_tol = DEFAULT_PRIM_TOL, dual_tol = DEFAULT_DUAL_TOL, zero_tol = DEFAULT_ZERO_TOL,
-        pivot_tol = DEFAULT_PIVOT_TOL, progress_tol = DEFAULT_PROG_TOL, 
+        pivot_tol = DEFAULT_PIVOT_TOL, progress_tol = DEFAULT_PROG_TOL,
         cycle_tol = DEFAULT_CYCLE_TOL, iter_limit =  DEFAULT_ITER_LIMIT, fval_bound = DAQP_INF,
         eps_prox= 0, eta_prox = DEFAULT_ETA, rho_soft = DEFAULT_RHO_SOFT,
-        rel_subopt = DEFAULT_REL_SUBOPT, abs_subopt = DEFAULT_ABS_SUBOPT):
+        rel_subopt = DEFAULT_REL_SUBOPT, abs_subopt = DEFAULT_ABS_SUBOPT,
+        sing_tol = DEFAULT_SING_TOL, refactor_tol = DEFAULT_REFACTOR_TOL):
     """
     Solve the quadratic program      minimize       0.5 x'*H*x + f' x
                                     subject to   blower <= A x <= bupper
@@ -108,7 +109,7 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
     # Setup settings
     cdef DAQPSettings settings = [primal_tol, dual_tol, zero_tol, pivot_tol,
             progress_tol, cycle_tol, iter_limit, fval_bound,
-            eps_prox, eta_prox, rho_soft, rel_subopt, abs_subopt]
+            eps_prox, eta_prox, rho_soft, rel_subopt, abs_subopt, sing_tol, refactor_tol]
         
     # Setup output
     cdef double[::1] x = np.zeros(n)

@@ -13,6 +13,7 @@ const SOFT= 8
 const BINARY= 16 
 
 # Exit Flags
+const  CONSTRAINED_POINT   = 3
 const  SOFT_OPTIMAL   =  2
 const  OPTIMAL        =  1
 const  INFEASIBLE     = -1
@@ -22,7 +23,8 @@ const  ITERLIMIT      = -4
 const  NONCONVEX      = -5
 const  OVERDETERMINED = -6
 
-const flag2status= Dict{Int,Symbol}(2 => :Soft_Optimal,
+const flag2status= Dict{Int,Symbol}(3 => :Constrained_Point,
+                                    2 => :Soft_Optimal,
                                     1 => :Optimal,
                                    -1 => :Primal_Infeasible,
                                    -2 => :Cycling,

@@ -295,6 +295,10 @@ function codegen(d::DAQPBase.Model; fname="daqp_workspace", dir="codegen", src=f
             push!(cfiles,"bnb.c")
             push!(hfiles,"bnb.h")
         end
+        if d.qpj.nh>1
+            push!(cfiles,"hierarchical.c")
+            push!(hfiles,"hierarchical.h")
+        end
 
         # Copy source files from GitHub
         for f in cfiles

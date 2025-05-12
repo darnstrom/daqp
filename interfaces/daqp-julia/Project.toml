@@ -1,7 +1,7 @@
 name = "DAQPBase"
 uuid = "833476c3-a8c0-4073-9b64-6473509843fe"
 authors = ["Daniel Arnström <daniel.arnstrom@gmail.com>"]
-version = "0.2.0"
+version = "0.3.0"
 
 [deps]
 DAQP_jll = "5c51c916-43bf-57fe-9d62-13064ebbf40d"

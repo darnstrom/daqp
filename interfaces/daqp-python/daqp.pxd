@@ -35,6 +35,9 @@ cdef extern from "types.h":
         double rel_subopt;
         double abs_subopt;
 
+        double sing_tol;
+        double refactor_tol;
+
 cdef extern from "api.h":
     ctypedef struct DAQPResult:
         double *x;
@@ -68,3 +71,5 @@ cdef extern from "constants.h":
     cdef double DEFAULT_RHO_SOFT
     cdef double  DEFAULT_REL_SUBOPT
     cdef double  DEFAULT_ABS_SUBOPT
+    cdef double  DEFAULT_SING_TOL
+    cdef double  DEFAULT_REFACTOR_TOL
