@@ -52,6 +52,7 @@ class DAQP {
     DAQPWorkspace work_;
     DAQPSettings settings_;
     EigenDAQPResult result_;
+    DAQPProblem qp_;
     int resize_result(int n, int m, Eigen::VectorXi& break_points);
 
   public:
