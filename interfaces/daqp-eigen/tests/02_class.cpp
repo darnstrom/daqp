@@ -5,6 +5,8 @@
 int main() {
     double precision = 1e-5;
     // Task 1: -1 <= x <= 1
+
+    std::cout << "Setting up problem matrices\n";
     Eigen::MatrixXd A0  = Eigen::MatrixXd::Identity(3, 3);
     Eigen::VectorXd bu0 = Eigen::VectorXd::Ones(3);
     Eigen::VectorXd bl0 = -Eigen::VectorXd::Ones(3);
@@ -32,7 +34,9 @@ int main() {
     Eigen::VectorXi break_points = (Eigen::VectorXi(4) << 3, 4, 5, 6).finished();
     
     // Solve
+    std::cout << "Setting up DAQP solver\n";
     DAQP solver(3, 50, 5);
+    std::cout << "Calling solve: \n";
     solver.solve(A, bu, bl, break_points);
     
     std::cout << "Solution: \n";
