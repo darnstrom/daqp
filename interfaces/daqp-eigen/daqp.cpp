@@ -95,6 +95,12 @@ DAQP::DAQP(int max_variables, int max_constraints, int max_constraints_in_level)
     work_.settings = &settings_;
 }
 
+DAQP::~DAQP(){
+    work_.settings = nullptr;
+    free_daqp_workspace(&work_);
+    free_daqp_ldp(&work_);
+}
+
 int DAQP::resize_result(const int n, const int m, Eigen::VectorXi& break_points){
     // Ensure that the new dimensions is not too large
     if (n > max_variables_) return 1;
