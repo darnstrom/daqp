@@ -16,6 +16,24 @@ add_executable(01_static_func tests/01_static_func.cpp)
 add_executable(02_class tests/02_class.cpp)
 add_executable(03_update tests/03_update.cpp)
 
+option(ENABLE_SANITIZERS "Enable ASan, UBSan, and LeakSanitizer" ON)
+if(ENABLE_SANITIZERS)
+set(SANITIZER_COMPILE_FLAGS
+-fsanitize=address
+-fsanitize=undefined
+-fsanitize=leak
+-fno-omit-frame-pointer
+-O1
+)
+set(SANITIZER_LINK_FLAGS
+-fsanitize=address
+-fsanitize=undefined
+-fsanitize=leak
+)
+add_compile_options(${SANITIZER_COMPILE_FLAGS})
+add_link_options(${SANITIZER_LINK_FLAGS})
+endif()
+
 set(TARGETS
     00_basic_qp
     01_static_func
