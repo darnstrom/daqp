@@ -64,6 +64,7 @@ class DAQP {
                Eigen::VectorXi& sense,
                Eigen::VectorXi& break_points,
                int update_mask = -1);
+    ~DAQP();
     const EigenDAQPResult& solve();
     const EigenDAQPResult& solve(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> A,
                                  Eigen::VectorXd& bu,
