@@ -7,8 +7,11 @@ include(joinpath(dirname(@__FILE__), "utils.jl"))
 # Use local libdaqp if available
 _libdaqp = joinpath(pkgdir(DAQPBase),"libdaqp."*Libc.Libdl.dlext)
 if isfile(_libdaqp)
+    local_lib = true
     @info "Using local libdaqp"
     DAQP_jll.libdaqp = _libdaqp
+else
+    local_lib = false
 end
 
 # API Tests
@@ -134,8 +137,15 @@ end
     A = A'[:,:] # since row major...
     DAQPBase.init_c_workspace_ldp(p,A,bupper,blower,sense;max_radius=1e30) 
     @test isfeasible(p,m,ms)
+    buold = bupper[1]
     bupper[1] = -1e30 #Make trivially infeasible
     @test !isfeasible(p,m,ms;validate=true)
+    bupper[1] = buold;
+    settings(p,Dict(:iter_limit => 1))
+    @test !isfeasible(p,m,ms;validate=false)
+    settings(p,Dict(:iter_limit => 1e4))
+    @test isfeasible(p,m,ms;validate=false)
+
     work = unsafe_load(Ptr{DAQPBase.Workspace}(p));
     @test work.n == n
     DAQPBase.free_c_workspace(p)
@@ -148,16 +158,18 @@ end
     d = DAQPBase.Model()
     DAQPBase.setup(d,H,f,A,bupper,blower,sense)
     srcdir = tempname();
-    DAQPBase.codegen(d,dir=srcdir,src=false)
-    # Get local source
-    daqp_dir = joinpath(dirname(@__FILE__), "..","..","..","..")
-    cfiles = ["daqp.c","auxiliary.c","factorization.c", "bnb.c", "hierarchical.c"]
-    hfiles = ["daqp.h","auxiliary.h","factorization.h", "bnb.h", "hierarchical.h","constants.h", "types.h"]
-    for cf in cfiles
-        cp(joinpath(daqp_dir,"src",cf), joinpath(srcdir,cf))
-    end
-    for hf in hfiles
-        cp(joinpath(daqp_dir,"include",hf), joinpath(srcdir,hf))
+    DAQPBase.codegen(d,dir=srcdir,src=!local_lib)
+    if(local_lib)
+        # Get local source
+        daqp_dir = joinpath(dirname(@__FILE__), "..","..","..","..")
+        cfiles = ["daqp.c","auxiliary.c","factorization.c", "bnb.c", "hierarchical.c"]
+        hfiles = ["daqp.h","auxiliary.h","factorization.h", "bnb.h", "hierarchical.h","constants.h", "types.h"]
+        for cf in cfiles
+            cp(joinpath(daqp_dir,"src",cf), joinpath(srcdir,cf))
+        end
+        for hf in hfiles
+            cp(joinpath(daqp_dir,"include",hf), joinpath(srcdir,hf))
+        end
     end
     src = [f for f in readdir(srcdir) if last(f,1) == "c"]
     if(!isnothing(Sys.which("gcc")))
