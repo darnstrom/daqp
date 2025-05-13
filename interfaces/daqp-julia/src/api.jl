@@ -214,21 +214,31 @@ function solve(daqp::DAQPBase.Model)
     return xstar,result[].fval,result[].exitflag,info
 end
 
-function settings(daqp::DAQPBase.Model)
-    workspace = unsafe_load(daqp.work);
+
+function settings(p::Ptr{DAQPBase.Workspace})
+    workspace = unsafe_load(p);
     if(workspace.settings != C_NULL)
         return unsafe_load(workspace.settings)
     end
 end
-function settings(daqp::DAQPBase.Model, new_settings::DAQPBase.DAQPSettings)
-    workspace = unsafe_load(daqp.work);
+
+settings(daqp::DAQPBase.Model) = settings(daqp.work)
+
+function settings(p::Ptr{DAQPBase.Workspace}, new_settings::DAQPBase.DAQPSettings)
+    workspace = unsafe_load(p);
     if(workspace.settings != C_NULL)
         unsafe_store!(workspace.settings,new_settings)
     end
     return new_settings
 end
+
+settings(daqp::DAQPBase.Model, new_settings::DAQPBase.DAQPSettings) = settings(daqp.work,new_settings)
+
 function settings(daqp::DAQPBase.Model,changes::Dict{Symbol,<:Any})
-    workspace = unsafe_load(daqp.work);
+    return settings(daqp.work,changes)
+end
+function settings(p::Ptr{DAQPBase.Workspace},changes::Dict{Symbol,<:Any})
+    workspace = unsafe_load(p);
     if(workspace.settings == C_NULL) return end
     settings = unsafe_load(workspace.settings)
     new = [haskey(changes,f) ? changes[f] : getfield(settings,f)
@@ -310,19 +320,19 @@ function codegen(d::DAQPBase.Model; fname="daqp_workspace", dir="codegen", src=f
     end
 end
 
-function setup_c_workspace(n)::Ptr{Cvoid}
+function setup_c_workspace(n)::Ptr{DAQPBase.Workspace}
     p = Libc.calloc(1,sizeof(DAQPBase.Workspace));
     ccall((:allocate_daqp_workspace,libdaqp), Cvoid, (Ptr{Cvoid},Cint,Cint),p, n, 0);
     ccall((:allocate_daqp_settings,libdaqp), Cvoid, (Ptr{Cvoid},),p);
     return p
 end
 
-function free_c_workspace(p::Ptr{Cvoid})
+function free_c_workspace(p::Ptr{DAQPBase.Workspace})
     ccall((:free_daqp_workspace,libdaqp), Cvoid, (Ptr{Cvoid},),p)
     Libc.free(p)
 end
 
-function init_c_workspace_ldp(p::Ptr{Cvoid},A::Matrix{Cdouble},bupper::Vector{Cdouble},blower::Vector{Cdouble},sense::Vector{Cint}; max_radius=nothing) 
+function init_c_workspace_ldp(p::Ptr{DAQPBase.Workspace},A::Matrix{Cdouble},bupper::Vector{Cdouble},blower::Vector{Cdouble},sense::Vector{Cint}; max_radius=nothing) 
     # Set fval_bound to maximal radius for early termination
     if(!isnothing(max_radius))
         d_work = unsafe_load(Ptr{DAQPBase.Workspace}(p));
@@ -336,7 +346,7 @@ function init_c_workspace_ldp(p::Ptr{Cvoid},A::Matrix{Cdouble},bupper::Vector{Cd
     unsafe_store!(Ptr{Ptr{Cint}}(p+fieldoffset(DAQPBase.Workspace,10)),pointer(sense))
 end
 
-function isfeasible(p::Ptr{Cvoid}, m=nothing, ms=nothing ;validate=false)::Bool
+function isfeasible(p::Ptr{DAQPBase.Workspace}, m=nothing, ms=nothing ;validate=false)::Bool
     # Update A and bupper/blower dimensions 
     !isnothing(m)  && unsafe_store!(Ptr{Cint}(p+fieldoffset(DAQPBase.Workspace,3)),m)
     !isnothing(ms) && unsafe_store!(Ptr{Cint}(p+fieldoffset(DAQPBase.Workspace,4)),ms)
