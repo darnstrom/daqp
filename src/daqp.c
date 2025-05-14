@@ -1,7 +1,7 @@
 #include "daqp.h" 
 
 int daqp_ldp(DAQPWorkspace *work){
-    int exitflag=EXIT_ITERLIMIT,iter;
+    int exitflag=EXIT_ITERLIMIT,iter,i;
     int tried_repair=0, cycle_counter=0;
     c_float best_fval = -1;
     c_float fval_bound = 2*work->settings->fval_bound; // Internal objective is twice the nomninal
@@ -46,6 +46,15 @@ int daqp_ldp(DAQPWorkspace *work){
                         }
                         else{// Cycling -> Try to reorder and refactorize LDL
                             tried_repair =1;
+
+                            // Correct LOWER/UPPER (important for equality constraints)
+                            for(i = 0; i < work->n_active; i++){
+                                if (work->lam[i] >= 0)
+                                    SET_UPPER(work->WS[i]);
+                                else
+                                    SET_LOWER(work->WS[i]);
+                            }
+
                             reset_daqp_workspace(work);
                             activate_constraints(work);
                             cycle_counter=0;
