@@ -25,6 +25,13 @@ int daqp_ldp(DAQPWorkspace *work){
                     if(work->n_active > 2 && tried_repair != 1 &&
                             work->D[work->n_active-1] < work->settings->refactor_tol){
                         tried_repair = 1;
+                        // Correct LOWER/UPPER (important for equality constraints)
+                        for(i = 0; i < work->n_active; i++){
+                            if (work->lam[i] >= 0)
+                                SET_UPPER(work->WS[i]);
+                            else
+                                SET_LOWER(work->WS[i]);
+                        }
                         reset_daqp_workspace(work);
                         activate_constraints(work);
                         continue; // Try again with new LDL factorization
@@ -46,15 +53,6 @@ int daqp_ldp(DAQPWorkspace *work){
                         }
                         else{// Cycling -> Try to reorder and refactorize LDL
                             tried_repair =1;
-
-                            // Correct LOWER/UPPER (important for equality constraints)
-                            for(i = 0; i < work->n_active; i++){
-                                if (work->lam[i] >= 0)
-                                    SET_UPPER(work->WS[i]);
-                                else
-                                    SET_LOWER(work->WS[i]);
-                            }
-
                             reset_daqp_workspace(work);
                             activate_constraints(work);
                             cycle_counter=0;
