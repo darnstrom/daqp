@@ -557,7 +557,7 @@ static void mdlOutputs(SimStruct *S, int_T tid)
         deactivate_constraints(work);
     }
     // Update internal problem
-    update_ldp(update_mask, work);
+    update_ldp(update_mask, work, work->qp);
 
     // Reuse previous working set
     if (WARM_START == 1)
