@@ -42,7 +42,7 @@ classdef daqp< handle
             A = [];
             bu = [];
             bl = [];
-            break_points=[];
+            break_points=[0];
             m = 0;
             for i = 1:nh
                 m = m+size(As{i},1);
