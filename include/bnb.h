@@ -18,6 +18,7 @@ void node_cleanup_workspace(int n_clean, DAQPWorkspace* work);
 void warmstart_node(DAQPNode* node, DAQPWorkspace* work); 
 void save_warmstart(DAQPNode* node, DAQPWorkspace* work);
 int add_upper_lower(const int add_id, DAQPWorkspace* work); 
+void setup_cold_bnb(DAQPNode* node, DAQPWorkspace* work);
 
 #define LOWER_BIT 16
 #define EXTRACT_LOWER_FLAG(x) (x>>(LOWER_BIT-1))
