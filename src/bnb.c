@@ -23,6 +23,7 @@ int daqp_bnb(DAQPWorkspace* work){
 
     // Start tree exploration
     while( work->bnb->n_nodes > 0 ){
+
         node = work->bnb->tree+(--work->bnb->n_nodes);
         exitflag = process_node(node,work); // Solve relaxation
         // Cut conditions
@@ -55,7 +56,7 @@ int daqp_bnb(DAQPWorkspace* work){
 }
 
 int process_node(DAQPNode* node, DAQPWorkspace* work){
-    int exitflag, i;
+    int exitflag;
     work->bnb->nodecount+=1;
     if(node->depth >=0){
         // Fix a binary constraints
@@ -73,6 +74,9 @@ int process_node(DAQPNode* node, DAQPWorkspace* work){
             //warmstart_node(node,work);
             add_upper_lower(node->bin_id,work);
             work->sense[REMOVE_LOWER_FLAG(node->bin_id)] |= IMMUTABLE; // Make equality
+            if(work->sing_ind != EMPTY_IND) // Need to cold start to not miss integer feasible
+                setup_cold_bnb(node,work);
+
         }
         // Add binary constraint 
     }
@@ -81,15 +85,7 @@ int process_node(DAQPNode* node, DAQPWorkspace* work){
     work->bnb->itercount += work->iterations;
     
     if(exitflag == EXIT_CYCLE){// Try to repair (cold start)
-        node_cleanup_workspace(work->bnb->n_clean,work);
-        work->sing_ind=EMPTY_IND;
-        work->n_active=work->bnb->n_clean;
-        work->reuse_ind=work->bnb->n_clean;
-        for(i=work->bnb->n_clean - work->bnb->neq; i< node->depth+1;i++){
-            add_upper_lower(work->bnb->fixed_ids[i],work);
-            SET_IMMUTABLE(REMOVE_LOWER_FLAG(work->bnb->fixed_ids[i]));
-        }
-        work->bnb->n_clean = work->bnb->neq+node->depth;
+        setup_cold_bnb(node,work);
         exitflag = daqp_ldp(work);
         work->bnb->itercount += work->iterations;
     }
@@ -202,4 +198,17 @@ int add_upper_lower(const int add_id, DAQPWorkspace* work){
         add_constraint(work,true_add_id,1.0);
     }
     return 1;
+}
+
+void setup_cold_bnb(DAQPNode* node,DAQPWorkspace *work){
+    int i;
+    node_cleanup_workspace(work->bnb->n_clean,work);
+    work->sing_ind=EMPTY_IND;
+    work->n_active=work->bnb->n_clean;
+    work->reuse_ind=work->bnb->n_clean;
+    for(i=work->bnb->n_clean - work->bnb->neq; i< node->depth+1;i++){
+        add_upper_lower(work->bnb->fixed_ids[i],work);
+        SET_IMMUTABLE(REMOVE_LOWER_FLAG(work->bnb->fixed_ids[i]));
+    }
+    work->bnb->n_clean = work->bnb->neq+node->depth;
 }

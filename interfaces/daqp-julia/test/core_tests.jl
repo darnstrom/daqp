@@ -103,6 +103,16 @@ end
         @test exitflag == 1 # was able to solve problem
         @test all((abs.(x[1:nb].-1.0).<ϵb) .| (abs.(x[1:nb]).<ϵb)) # is binary feasible
     end
+
+    H = [1 0.5 0; 0.5 1 0.5; 0 0.5 1]
+    f = [1.0;0;0]
+    A = [1.0 2 3;  1 1 0]
+    bu = [1.0;1;1;1e30;1e30]
+    bl = [0.0;0;0;4;1]
+    sense = Cint.([DAQPBase.BINARY;DAQPBase.BINARY;DAQPBase.BINARY;0;0])
+    x,_,_,info = DAQPBase.quadprog(H,f,A,bu,bl,sense)
+    @test norm(x-[0;1;1]) < tol 
+
 end
 
 @testset "Model interface" begin
