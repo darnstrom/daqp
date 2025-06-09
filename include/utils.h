@@ -9,11 +9,11 @@ extern "C" {
 // Utils for transforming QP to LDP
 int update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem *qp);
 int update_Rinv(DAQPWorkspace *work, c_float *H);
-void update_M(DAQPWorkspace *work, c_float *A, const int mask);
+int update_M(DAQPWorkspace *work, c_float *A, const int mask);
 void update_v(c_float *f, DAQPWorkspace *work, const int mask);
 int update_d(DAQPWorkspace *work, c_float *bupper, c_float *blower);
 void normalize_Rinv(DAQPWorkspace *work);
-void normalize_M(DAQPWorkspace *work);
+int normalize_M(DAQPWorkspace *work);
 //
 void daqp_minrep_work(int* is_redundant,DAQPWorkspace* work);
 // Utils for profiling

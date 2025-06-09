@@ -34,7 +34,9 @@ int update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
     }
     /** Update M **/
     if(mask&UPDATE_Rinv||mask&UPDATE_M){
-        update_M(work,qp->A,mask);
+        error_flag = update_M(work,qp->A,mask);
+        if(error_flag<0)
+            return error_flag;
     }
 
     /** Update v **/
@@ -169,7 +171,7 @@ int update_Rinv(DAQPWorkspace *work, c_float *H){
     return 1;
 }
 
-void update_M(DAQPWorkspace *work, c_float *A, const int mask){
+int update_M(DAQPWorkspace *work, c_float *A, const int mask){
     int i,j,k,disp,disp2;
     const int n = NX;
     const int mA = N_CONSTR-N_SIMPLE;
@@ -205,7 +207,7 @@ void update_M(DAQPWorkspace *work, c_float *A, const int mask){
     }
 
     reset_daqp_workspace(work); // Internal factorizations need to be redone!
-    normalize_M(work);
+    return normalize_M(work);
 }
 
 void update_v(c_float *f, DAQPWorkspace *work, const int mask){
@@ -314,15 +316,21 @@ void normalize_Rinv(DAQPWorkspace* work){
         }
     }
 }
-void normalize_M(DAQPWorkspace* work){
+int normalize_M(DAQPWorkspace* work){
     int i,j,disp;
     c_float scaling_i;
+    c_float zero_tol = work->settings->zero_tol;
     // Normalize general constraints 
     for(i=N_SIMPLE, disp=0;i<N_CONSTR;i++){
         scaling_i = 0;
         for(j=0;j<NX;disp++,j++)
             scaling_i+=work->M[disp]*work->M[disp];
-        if(scaling_i < work->settings->zero_tol){
+        if(scaling_i < zero_tol){
+#ifndef DAQP_ASSUME_VALID
+            if(work->qp->bupper[i] < -zero_tol || work->qp->blower[i] > zero_tol)
+                if(work->sense[i] != IMMUTABLE)
+                    return EXIT_INFEASIBLE;
+#endif
             work->sense[i] = IMMUTABLE; // ignore zero-row constraint
             continue; // TODO: mark infeasibility if dupper & dlower are nonzero
         }
@@ -331,6 +339,7 @@ void normalize_M(DAQPWorkspace* work){
         for(j=0, disp-=NX;j<NX;j++,disp++)
             work->M[disp]*=scaling_i;
     }
+    return 0;
 }
 
 /* Remove Minrep */
