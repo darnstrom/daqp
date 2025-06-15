@@ -8,7 +8,9 @@ extern "C" {
 #include "types.h"
 #include "constants.h"
 
+#define remove_constraint daqp_aux_remove_constraint
 void remove_constraint(DAQPWorkspace* work, const int rm_ind);
+#define add_constraint daqp_aux_add_constraint
 void add_constraint(DAQPWorkspace *work, const int add_ind, c_float lam);
 void compute_primal_and_fval(DAQPWorkspace *work);
 int add_infeasible(DAQPWorkspace *work);
