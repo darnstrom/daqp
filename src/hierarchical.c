@@ -27,7 +27,6 @@ int daqp_hiqp(DAQPWorkspace *work){
                     add_constraint(work,j, -1.0);
                 else
                     add_constraint(work,j, 1.0);
-                nfree--;
                 if(work->sing_ind != EMPTY_IND) return EXIT_OVERDETERMINED_INITIAL;
                 }
         }
@@ -53,11 +52,8 @@ int daqp_hiqp(DAQPWorkspace *work){
                     work->dlower[id]+=w;
                 else
                     work->dupper[id]+=w;
-                if(IS_IMMUTABLE(id)) continue; // Already an equality
-                nfree--;
             }
         }
-        if(nfree <= 0 ) break;  // No degrees of freedom left 
 
         // Make constraints in current level hard
         for(j=start; j<end;j++) SET_HARD(j);
@@ -74,15 +70,17 @@ int daqp_hiqp(DAQPWorkspace *work){
         work->sing_ind = EMPTY_IND;
         for(; j<n_active_old ;j++){
             add_constraint(work,work->WS[j],work->lam_star[j]);
-            // Abort if WS becomes overdtermined
+            // Skip if WS becomes overdtermined
             if(work->sing_ind != EMPTY_IND){
                 remove_constraint(work,j);
                 work->sing_ind = EMPTY_IND;
-                for(; j<n_active_old ;j++) SET_INACTIVE(work->WS[j]);
-                break;
+            }
+            else{
+                if(IS_IMMUTABLE(work->WS[j])) nfree--;
             }
         }
 
+        if(nfree <= 0 ) break;  // No degrees of freedom left
         // Move up hierarchy
         start = end;
     }
