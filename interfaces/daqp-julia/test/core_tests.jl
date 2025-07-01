@@ -207,4 +207,15 @@ end
     DAQPBase.setup(d,zeros(0,0),zeros(0),A,bu,bl,sense;break_points = Cint.([3;5;7]))
     x,fval,exitflag,info = solve(d)
     @test exitflag > 0
+
+    # Degenerate #2
+    A = [1.0 0; 1 0; 0 1]
+    bu = [4.0;8;1]
+    bl = [4.0;8;1]
+    sense = zeros(Cint,3)
+    d = DAQPBase.Model()
+    DAQPBase.setup(d,zeros(0,0),zeros(0),A,bu,bl,sense;break_points = [0,2,3])
+    x,fval,exitflag,info = solve(d)
+    @test norm([6.0;1]-x) < tol
+
 end
