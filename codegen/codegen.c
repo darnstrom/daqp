@@ -84,8 +84,19 @@ void write_daqp_workspace_h(FILE *f, DAQPWorkspace* work){
     const int m = work->m;
     const int ms = work->ms;
     int ntot = n;
-    for(i = 0; i < m ; i++) 
-        if(work->sense[i] & SOFT) ntot++;
+    // Account for soft constraints
+    if(work->nh > 1){
+        int ns = 0, start=0;
+        for(i = 0; i < work->nh; i++){
+            ns = (ns  > work->break_points[i]-start) ? ns : work->break_points[i]-start;
+            start = work->break_points[i];
+        }
+        ntot+=ns;
+    }
+    else{// Simply count soft constraints if not hierarchical
+        for(i = 0; i < m ; i++)
+            if(work->sense[i] & SOFT) ntot++;
+    }
 
     // Refdefine NX, N_CONSTR and N_SIMPLE to static
     fprintf(f, "#undef NX\n");
