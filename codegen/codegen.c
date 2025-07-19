@@ -249,7 +249,8 @@ void write_daqp_bnb_src(FILE*  f, DAQPBnB* bnb, const int n){
 
 void write_float_array(FILE *f, c_float* a, const int N, const char *name){
     if(a == NULL)
-        fprintf(f, "c_float %s[%d];\n", name, N);
+        fprintf(f, "c_float* const %s = NULL;\n",name);
+        //fprintf(f, "c_float %s[%d];\n", name, N);
     else{
         int i;
         fprintf(f, "c_float %s[%d] = {\n", name, N);
@@ -261,7 +262,8 @@ void write_float_array(FILE *f, c_float* a, const int N, const char *name){
 
 void write_int_array(FILE *f, int* a, const int N, const char *name){
     if(a == NULL)
-        fprintf(f, "int %s[%d];\n", name, N);
+        fprintf(f, "int* const %s = NULL;\n",name);
+        //fprintf(f, "int %s[%d];\n", name, N);
     else{
         int i;
         fprintf(f, "int %s[%d] = {\n", name, N);
