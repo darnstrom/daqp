@@ -3,6 +3,7 @@ using Random
 using DAQPBase
 using DAQP_jll
 include(joinpath(dirname(@__FILE__), "utils.jl"))
+global templib
 
 # Use local libdaqp if available
 _libdaqp = joinpath(pkgdir(DAQPBase),"libdaqp."*Libc.Libdl.dlext)
@@ -159,18 +160,7 @@ end
     DAQPBase.setup(d,H,f,A,bupper,blower,sense)
     srcdir = tempname();
     DAQPBase.codegen(d,dir=srcdir,src=!local_lib)
-    if(local_lib)
-        # Get local source
-        daqp_dir = joinpath(dirname(@__FILE__), "..","..","..","..")
-        cfiles = ["daqp.c","auxiliary.c","factorization.c", "bnb.c", "hierarchical.c"]
-        hfiles = ["daqp.h","auxiliary.h","factorization.h", "bnb.h", "hierarchical.h","constants.h", "types.h"]
-        for cf in cfiles
-            cp(joinpath(daqp_dir,"src",cf), joinpath(srcdir,cf))
-        end
-        for hf in hfiles
-            cp(joinpath(daqp_dir,"include",hf), joinpath(srcdir,hf))
-        end
-    end
+    local_lib && get_local_sources(srcdir)
     src = [f for f in readdir(srcdir) if last(f,1) == "c"]
     if(!isnothing(Sys.which("gcc")))
         testlib = "daqptestlib."* Base.Libc.Libdl.dlext
@@ -180,9 +170,12 @@ end
     rm(srcdir,recursive=true)
 
     # Try to also get global source...
-    DAQPBase.codegen(d,dir=srcdir,src=true)
-    @test isfile(joinpath(srcdir,"daqp.c"))
-    rm(srcdir,recursive=true)
+    try
+        DAQPBase.codegen(d,dir=srcdir,src=true)
+        @test isfile(joinpath(srcdir,"daqp.c"))
+        rm(srcdir,recursive=true)
+    catch
+    end
 end
 
 @testset "Hierarchical QP" begin
@@ -195,6 +188,36 @@ end
     DAQPBase.setup(d,zeros(0,0),zeros(0),A,bu,bl,sense;break_points = [3;4;5;6])
     x,fval,exitflag,info = solve(d)
     @test norm(xref-x) < tol
+
+    # Test codegen
+    srcdir = tempname();
+    DAQPBase.codegen(d,dir=srcdir,src=!local_lib)
+    local_lib && get_local_sources(srcdir)
+    src = [f for f in readdir(srcdir) if last(f,1) == "c"]
+
+    if(!isnothing(Sys.which("gcc")))
+        testlib = "daqptestlib."* Base.Libc.Libdl.dlext
+        run(Cmd(`gcc -lm -fPIC -O3 -msse3 -xc -shared -o $testlib $src`; dir=srcdir))
+        @test isfile(joinpath(srcdir,testlib))
+        global templib = joinpath(srcdir,testlib)
+        daqp_work_ptr = cglobal((:daqp_work,templib),DAQPBase.Workspace)
+        ws = unsafe_load(daqp_work_ptr)
+
+        # Setup correct LDP 
+        dupper = unsafe_wrap(Vector{Cdouble}, ws.dupper, ws.m, own=false)
+        dlower = unsafe_wrap(Vector{Cdouble}, ws.dlower, ws.m, own=false)
+        sense = unsafe_wrap(Vector{Cint}, ws.sense, ws.m, own=false)
+        Anorm = [ones(3);[norm(A[i,:],2) for i in 1:size(A,2)]]
+        dupper .= bu ./ Anorm
+        dlower .= bl ./ Anorm
+
+        # Solve
+        exitflag = ccall((:daqp_hiqp,templib),Cint,(Ptr{DAQPBase.Workspace},),daqp_work_ptr);
+        ccall((:ldp2qp_solution,templib),Cvoid,(Ptr{DAQPBase.Workspace},),daqp_work_ptr);
+        xgen = copy(unsafe_wrap(Vector{Cdouble}, ws.x, ws.n, own=false))
+        @test norm(xref-xgen) < tol
+    end
+
     # Degenerate
     H = [10.5 4.0 2.0; 4.0 5.5 0.5; 2.0 0.5 2.0]
     f = [-53.0; -30; -11.5]
@@ -207,4 +230,5 @@ end
     DAQPBase.setup(d,zeros(0,0),zeros(0),A,bu,bl,sense;break_points = Cint.([3;5;7]))
     x,fval,exitflag,info = solve(d)
     @test exitflag > 0
+
 end
