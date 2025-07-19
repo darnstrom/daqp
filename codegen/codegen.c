@@ -53,6 +53,13 @@ void render_daqp_workspace(DAQPWorkspace* work, const char *fname, const char *d
         write_daqp_bnb_src(fsrc,work->bnb,work->n);
     }
 
+    // Write Hierarchical
+    if(work->nh > 1 ){
+        fprintf(fh, "#define DAQP_HIERARCHICAL\n");
+        fprintf(fh, "extern int daqp_break_points[%d];\n", work->nh);
+        write_int_array(fsrc,work->break_points, work->nh,"daqp_break_points");
+    }
+
     // TODO Check soft constraints 
 
     //Write workspace
@@ -165,13 +172,16 @@ void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work){
     fprintf(f, "%d,%d,\n",0,-1); //iterations + sing_id
     fprintf(f, "%f,\n",0.0); // Soft slack
     fprintf(f, "&settings, \n");
-    //if(!has_binary)
+    // BnB
     if(work->bnb == NULL)
-        fprintf(f, "NULL};\n\n");
+        fprintf(f, "NULL,\n");
     else
-        fprintf(f, "&daqp_bnb_work};\n\n");
-
-
+        fprintf(f, "&daqp_bnb_work,\n");
+    // Hierarhical
+    if(work->nh > 1)
+        fprintf(f, "%d,daqp_break_points};\n\n",work->nh);
+    else
+        fprintf(f, "0, NULL};\n\n");
 }
 
 void write_daqp_settings_src(FILE*  f, DAQPSettings* settings){
