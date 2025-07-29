@@ -38,7 +38,7 @@ jobs:
             platform: linux 
           - os: macos-latest
             platform: mac
-          - os: windows-2019
+          - os: windows-2022
             platform: windows 
 
     runs-on: ${{ matrix.os }}
