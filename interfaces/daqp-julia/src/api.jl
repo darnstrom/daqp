@@ -294,6 +294,10 @@ function codegen(d::DAQPBase.Model; fname="daqp_workspace", dir="codegen", src=f
     dir[end] != '/' && (dir*="/") ## Make sure it is correct directory path
     isdir(dir) || mkdir(dir)
 
+    # Make sure workspace is cleared
+    ccall((:deactivate_constraints,libdaqp),Cvoid,(Ptr{DAQPBase.Workspace},),d.work);
+    ccall((:reset_daqp_workspace,libdaqp),Cvoid,(Ptr{DAQPBase.Workspace},),d.work);
+
     exitflag = ccall((:render_daqp_workspace, libdaqp),Cvoid,
                      (Ptr{DAQPBase.Workspace},Cstring,Cstring,), d.work,fname,dir);
     if src
