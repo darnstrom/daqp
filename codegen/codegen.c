@@ -53,6 +53,13 @@ void render_daqp_workspace(DAQPWorkspace* work, const char *fname, const char *d
         write_daqp_bnb_src(fsrc,work->bnb,work->n);
     }
 
+    // Write Hierarchical
+    if(work->nh > 1 ){
+        fprintf(fh, "#define DAQP_HIERARCHICAL\n");
+        fprintf(fh, "extern int daqp_break_points[%d];\n", work->nh);
+        write_int_array(fsrc,work->break_points, work->nh,"daqp_break_points");
+    }
+
     // TODO Check soft constraints 
 
     //Write workspace
@@ -77,8 +84,19 @@ void write_daqp_workspace_h(FILE *f, DAQPWorkspace* work){
     const int m = work->m;
     const int ms = work->ms;
     int ntot = n;
-    for(i = 0; i < m ; i++) 
-        if(work->sense[i] & SOFT) ntot++;
+    // Account for soft constraints
+    if(work->nh > 1){
+        int ns = 0, start=0;
+        for(i = 0; i < work->nh; i++){
+            ns = (ns  > work->break_points[i]-start) ? ns : work->break_points[i]-start;
+            start = work->break_points[i];
+        }
+        ntot+=ns;
+    }
+    else{// Simply count soft constraints if not hierarchical
+        for(i = 0; i < m ; i++)
+            if(work->sense[i] & SOFT) ntot++;
+    }
 
     // Refdefine NX, N_CONSTR and N_SIMPLE to static
     fprintf(f, "#undef NX\n");
@@ -165,13 +183,16 @@ void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work){
     fprintf(f, "%d,%d,\n",0,-1); //iterations + sing_id
     fprintf(f, "%f,\n",0.0); // Soft slack
     fprintf(f, "&settings, \n");
-    //if(!has_binary)
+    // BnB
     if(work->bnb == NULL)
-        fprintf(f, "NULL};\n\n");
+        fprintf(f, "NULL,\n");
     else
-        fprintf(f, "&daqp_bnb_work};\n\n");
-
-
+        fprintf(f, "&daqp_bnb_work,\n");
+    // Hierarhical
+    if(work->nh > 1)
+        fprintf(f, "%d,daqp_break_points};\n\n",work->nh);
+    else
+        fprintf(f, "0, NULL};\n\n");
 }
 
 void write_daqp_settings_src(FILE*  f, DAQPSettings* settings){
@@ -239,7 +260,8 @@ void write_daqp_bnb_src(FILE*  f, DAQPBnB* bnb, const int n){
 
 void write_float_array(FILE *f, c_float* a, const int N, const char *name){
     if(a == NULL)
-        fprintf(f, "c_float %s[%d];\n", name, N);
+        fprintf(f, "c_float* const %s = NULL;\n",name);
+        //fprintf(f, "c_float %s[%d];\n", name, N);
     else{
         int i;
         fprintf(f, "c_float %s[%d] = {\n", name, N);
@@ -251,7 +273,8 @@ void write_float_array(FILE *f, c_float* a, const int N, const char *name){
 
 void write_int_array(FILE *f, int* a, const int N, const char *name){
     if(a == NULL)
-        fprintf(f, "int %s[%d];\n", name, N);
+        fprintf(f, "int* const %s = NULL;\n",name);
+        //fprintf(f, "int %s[%d];\n", name, N);
     else{
         int i;
         fprintf(f, "int %s[%d] = {\n", name, N);
