@@ -104,6 +104,16 @@ end
         @test exitflag == 1 # was able to solve problem
         @test all((abs.(x[1:nb].-1.0).<ϵb) .| (abs.(x[1:nb]).<ϵb)) # is binary feasible
     end
+
+    H = [1 0.5 0; 0.5 1 0.5; 0 0.5 1]
+    f = [1.0;0;0]
+    A = [1.0 2 3;  1 1 0]
+    bu = [1.0;1;1;1e30;1e30]
+    bl = [0.0;0;0;4;1]
+    sense = Cint.([DAQPBase.BINARY;DAQPBase.BINARY;DAQPBase.BINARY;0;0])
+    x,_,_,info = DAQPBase.quadprog(H,f,A,bu,bl,sense)
+    @test norm(x-[0;1;1]) < tol 
+
 end
 
 @testset "Model interface" begin
@@ -231,4 +241,47 @@ end
     x,fval,exitflag,info = solve(d)
     @test exitflag > 0
 
+    # Degenerate #2
+    A = [1.0 0; 1 0; 0 1]
+    bu = [4.0;8;1]
+    bl = [4.0;8;1]
+    sense = zeros(Cint,3)
+    d = DAQPBase.Model()
+    DAQPBase.setup(d,zeros(0,0),zeros(0),A,bu,bl,sense;break_points = [0,2,3])
+    x,fval,exitflag,info = solve(d)
+    @test norm([6.0;1]-x) < tol
+
+end
+
+@testset "Trivial infeasible" begin
+    H = [6.837677669279314 1.3993262799977795 1.9781574256330445 0.7988389688453156;
+         1.3993262799977795 4.91607513347457 0.8347008717503388 0.964319980996552;
+         1.9781574256330445 0.8347008717503388 5.6186371819867755 0.23421356059787485;
+         0.7988389688453156 0.964319980996552 0.23421356059787485 5.512564828518534]
+    f = [-0.9018168388545096, 1.3888380439021342, -3.2050167583822065, 6.2604158413126205]
+
+    A = [0.0 0.0 0.0 0.0;
+         1.0 0.0 1.0 0.0;
+         0.0 0.0 0.0 0.0;
+         -1.0 0.0 -1.0 0.0;
+         1.0 0.0 1.0 0.0;
+         0.5 1.0 0.5 1.0;
+         -1.0 0.0 -1.0 0.0;
+         -0.5 -1.0 -0.5 -1.0;
+         1.0 0.0 0.0 0.0;
+         -1.0 0.0 0.0 0.0;
+         0.0 1.0 0.0 0.0;
+         0.0 -1.0 0.0 0.0;
+         0.0 0.0 1.0 0.0;
+         0.0 0.0 -1.0 0.0;
+         0.0 0.0 0.0 1.0;
+         0.0 0.0 0.0 -1.0]
+    b = [2.2693082025353517, 1.3445735938597536, -0.2693082025353519, 0.6554264061402464, 2.2330893356345, 1.172286796929877, -0.23308933563449985, 0.8277132030701232, 1.0, 0.5, 1.0, 0.5, 0.5, 2.0, 0.5, 2.0]
+
+    d = DAQPBase.Model()
+
+    exitflag,_ = DAQPBase.setup(d,H,f,A,b,Float64[],zeros(Cint, length(b)))
+    @test exitflag == -1
+    _, _, exitflag, _ = DAQPBase.solve(d)
+    @test exitflag < 0
 end
