@@ -51,7 +51,7 @@ jobs:
       run: |
         cd interfaces/daqp-python
         python -m pip install --upgrade twine
-        twine upload wheelhouse/*
+        twine upload wheelhouse/* --skip-existing
     - name: Upload artifacts to github
       uses: actions/upload-artifact@v4
       with:
