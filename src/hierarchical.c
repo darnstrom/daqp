@@ -11,10 +11,29 @@ int daqp_hiqp(DAQPWorkspace *work){
     // If only one hiearchy -> just solve normal LDP
     if( work->nh < 2) return daqp_ldp(work);
 
+    // Free variables
+    int nfree = work->n;
+
+    // Activate constraints in first level 
+    for(j =0;j<work->break_points[0];j++){
+        if(IS_ACTIVE(j)){
+            if(IS_LOWER(j))
+                add_constraint(work,j, -1.0);
+            else
+                add_constraint(work,j, 1.0);
+            if(work->sing_ind != EMPTY_IND){
+                // XXX overdetermined constraints are ignored
+                // (might not detect trivially feasible instances)
+                work->n_active--;
+                work->sing_ind = EMPTY_IND;
+            }
+            else if(IS_IMMUTABLE(j)) nfree--;
+        }
+    }
+
     // Start moving down the hierarchy
     c_float w;
     start=work->break_points[0];
-    int nfree = work->n;
     for(i =1; i < work->nh; i++){
         // initialize current level
         end=work->break_points[i];
@@ -27,7 +46,6 @@ int daqp_hiqp(DAQPWorkspace *work){
                     add_constraint(work,j, -1.0);
                 else
                     add_constraint(work,j, 1.0);
-                if(work->sing_ind != EMPTY_IND) return EXIT_OVERDETERMINED_INITIAL;
                 }
         }
 
