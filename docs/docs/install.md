@@ -38,6 +38,15 @@ cmake --build . --target install
 The commands mentioned above can be executed on Windows by, for example, using [Git BASH](https://gitforwindows.org/) after installing [CMake](https://cmake.org/) and [TDM-GCC](https://jmeubank.github.io/tdm-gcc/download/). Make sure that CMake is added to PATH during installation.) 
 
 
+## Installing the Eigen interface
+In the path where you cloned the source code, run the following commands
+
+```shell
+cd build
+cmake .. -D EIGEN=ON
+cmake --build . --target install
+```
+
 ## Installing the MATLAB interface
 The MATLAB interface can be installed directly in MATLAB by running the following commands in the directory where you want to store the m-files:
 ```shell
