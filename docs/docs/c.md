@@ -64,4 +64,4 @@ Eigen::VectorXd bl = (Eigen::VectorXd(4) << -1,-2,-3,-4).finished();
 // Solve problem
 EigenDAQPResult result = daqp_solve(H,f,A,bu,bl);
 ```
-The primal solution can obtain with `result.get_primal()`, and the dual solution can be obtain with `result.get_primal()`.
+The primal solution can obtain with `result.get_primal()`, and the dual solution can be obtain with `result.get_dual()`.
