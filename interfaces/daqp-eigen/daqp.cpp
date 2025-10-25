@@ -4,16 +4,13 @@
 
 EigenDAQPResult::EigenDAQPResult()
   : DAQPResult() {
-    active_set = nullptr;
 }
 
 EigenDAQPResult::EigenDAQPResult(int n, int m)
   : x_{Eigen::VectorXd(n)}
-  , lam_{Eigen::VectorXd(m)}
-  , active_set_{Eigen::VectorXi(m)} {
-    x = x_.data();
+  , lam_{Eigen::VectorXd(m)} {
+    x   = x_.data();
     lam = lam_.data();
-    active_set = active_set_.data();
 }
 
 void EigenDAQPResult::resize_primal(int n) {
@@ -26,11 +23,6 @@ void EigenDAQPResult::resize_dual(int m) {
     lam = lam_.data();
 }
 
-void EigenDAQPResult::resize_active_set(int m) {
-    active_set_.resize(m);
-    active_set = active_set_.data();
-}
-
 Eigen::VectorXd EigenDAQPResult::get_primal() const {
     return x_;
 }
@@ -40,12 +32,16 @@ Eigen::VectorXd EigenDAQPResult::get_dual() const {
 }
 
 Eigen::VectorXi EigenDAQPResult::get_active_set() const {
-    if (n_active > 0 && active_set != nullptr) {
-        active_set_.conservativeResize(n_active);
-    } else {
-        active_set_.resize(0);
+    Eigen::Array<bool, Eigen::Dynamic, 1> mask = (lam_.array().abs() > 0);
+
+    int n_active = mask.cast<int>().sum();
+    Eigen::VectorXi active_set(n_active);
+    for (int idx = 0, k = 0; k < lam_.size(); ++k) {
+        if (mask(k)) {
+            active_set(idx++) = k;
+        }
     }
-    return active_set_;
+    return active_set;
 }
 
 
@@ -135,14 +131,12 @@ int DAQP::resize_result(const int n, const int m, Eigen::VectorXi& break_points)
     if (result_.x == nullptr) {
         result_.resize_primal(n);
         result_.resize_dual(m);
-        result_.resize_active_set(m);
     }
     if (n != work_.n) {
         result_.resize_primal(n);
     }
     if (m != work_.m) {
         result_.resize_dual(m);
-        result_.resize_active_set(m);
     }
     return 0;
 }
@@ -229,7 +223,3 @@ Eigen::VectorXi DAQP::get_active_set() {return result_.get_active_set();}
 int             DAQP::get_status() {return result_.exitflag;}
 int             DAQP::get_iterations() {return result_.iter;}
 double          DAQP::get_solve_time() {return result_.solve_time;}
-
-
-
-
