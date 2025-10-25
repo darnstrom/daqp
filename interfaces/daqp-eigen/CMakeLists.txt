@@ -15,12 +15,14 @@ add_executable(00_basic_qp tests/00_basic_qp.cpp)
 add_executable(01_static_func tests/01_static_func.cpp)
 add_executable(02_class tests/02_class.cpp)
 add_executable(03_update tests/03_update.cpp)
+add_executable(04_slack_sign tests/04_slack_sign.cpp)
 
 set(TARGETS
     00_basic_qp
     01_static_func
     02_class
     03_update
+    04_slack_sign
 )
 
 foreach(TARGET ${TARGETS})
