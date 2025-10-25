@@ -22,6 +22,8 @@ typedef struct{
     c_float solve_time;
     c_float setup_time;
 
+    int *active_set;
+    int n_active;
 }DAQPResult;
 
 void daqp_solve(DAQPResult* res, DAQPWorkspace *work);
