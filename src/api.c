@@ -349,13 +349,6 @@ void daqp_extract_result(DAQPResult* res, DAQPWorkspace* work){
             res->lam[work->WS[i]] = work->lam_star[i];
     }
 
-    // Extract active set indices
-    res->n_active = work->n_active;
-    if(res->active_set != NULL && work->n_active > 0){
-        for(i=0;i<work->n_active;i++)
-            res->active_set[i] = work->WS[i];
-    }
-
     // Shift back function value
     if(work->v != NULL && (work->settings->eps_prox == 0
                 || work->Rinv != NULL || work->RinvD != NULL)){ // Normal QP

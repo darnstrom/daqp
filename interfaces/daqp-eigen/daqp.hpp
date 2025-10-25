@@ -9,14 +9,12 @@ class EigenDAQPResult : public DAQPResult {
   private:
     Eigen::VectorXd x_;
     Eigen::VectorXd lam_;
-    mutable Eigen::VectorXi active_set_;
 
   public:
     EigenDAQPResult();
     EigenDAQPResult(int n, int m);
     void resize_primal(int n);
     void resize_dual(int m);
-    void resize_active_set(int m);
     Eigen::VectorXd get_primal() const;
     Eigen::VectorXd get_dual() const;
     Eigen::VectorXi get_active_set() const;
