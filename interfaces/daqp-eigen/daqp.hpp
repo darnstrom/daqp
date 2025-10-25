@@ -9,14 +9,17 @@ class EigenDAQPResult : public DAQPResult {
   private:
     Eigen::VectorXd x_;
     Eigen::VectorXd lam_;
+    mutable Eigen::VectorXi active_set_;
 
   public:
     EigenDAQPResult();
     EigenDAQPResult(int n, int m);
     void resize_primal(int n);
     void resize_dual(int m);
-    Eigen::VectorXd get_primal();
-    Eigen::VectorXd get_dual();
+    void resize_active_set(int m);
+    Eigen::VectorXd get_primal() const;
+    Eigen::VectorXd get_dual() const;
+    Eigen::VectorXi get_active_set() const;
 };
 
 
@@ -91,6 +94,7 @@ class DAQP {
     // Getters for result
     Eigen::VectorXd get_primal();
     Eigen::VectorXd get_dual();
+    Eigen::VectorXi get_active_set();
     int get_status();
     int get_iterations();
     double get_solve_time();

@@ -4,13 +4,16 @@
 
 EigenDAQPResult::EigenDAQPResult()
   : DAQPResult() {
+    active_set = nullptr;
 }
 
 EigenDAQPResult::EigenDAQPResult(int n, int m)
   : x_{Eigen::VectorXd(n)}
-  , lam_{Eigen::VectorXd(m)} {
-    x   = x_.data();
+  , lam_{Eigen::VectorXd(m)}
+  , active_set_{Eigen::VectorXi(m)} {
+    x = x_.data();
     lam = lam_.data();
+    active_set = active_set_.data();
 }
 
 void EigenDAQPResult::resize_primal(int n) {
@@ -23,12 +26,26 @@ void EigenDAQPResult::resize_dual(int m) {
     lam = lam_.data();
 }
 
-Eigen::VectorXd EigenDAQPResult::get_primal() {
+void EigenDAQPResult::resize_active_set(int m) {
+    active_set_.resize(m);
+    active_set = active_set_.data();
+}
+
+Eigen::VectorXd EigenDAQPResult::get_primal() const {
     return x_;
 }
 
-Eigen::VectorXd EigenDAQPResult::get_dual() {
+Eigen::VectorXd EigenDAQPResult::get_dual() const {
     return lam_;
+}
+
+Eigen::VectorXi EigenDAQPResult::get_active_set() const {
+    if (n_active > 0 && active_set != nullptr) {
+        active_set_.conservativeResize(n_active);
+    } else {
+        active_set_.resize(0);
+    }
+    return active_set_;
 }
 
 
@@ -118,12 +135,14 @@ int DAQP::resize_result(const int n, const int m, Eigen::VectorXi& break_points)
     if (result_.x == nullptr) {
         result_.resize_primal(n);
         result_.resize_dual(m);
+        result_.resize_active_set(m);
     }
     if (n != work_.n) {
         result_.resize_primal(n);
     }
     if (m != work_.m) {
         result_.resize_dual(m);
+        result_.resize_active_set(m);
     }
     return 0;
 }
@@ -206,6 +225,7 @@ void DAQP::set_refactor_tol(double val)  { settings_.refactor_tol = val;}
 
 Eigen::VectorXd DAQP::get_primal() {return result_.get_primal();}
 Eigen::VectorXd DAQP::get_dual()   {return result_.get_dual();}
+Eigen::VectorXi DAQP::get_active_set() {return result_.get_active_set();}
 int             DAQP::get_status() {return result_.exitflag;}
 int             DAQP::get_iterations() {return result_.iter;}
 double          DAQP::get_solve_time() {return result_.solve_time;}
