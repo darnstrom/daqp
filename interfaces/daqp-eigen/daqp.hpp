@@ -56,6 +56,8 @@ EigenDAQPResult daqp_solve(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
 
 class DAQP {
   private:
+    bool is_solved_;
+    bool is_slack_computed_;
     int max_variables_;
     int max_constraints_;
     int max_constraints_in_level_;
