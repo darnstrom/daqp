@@ -252,57 +252,94 @@ EigenDAQPResult const& DAQP::solve(Eigen::Matrix<double, Eigen::Dynamic, Eigen::
 
 void DAQP::set_primal_tol(double val) {
     settings_.primal_tol = val;
+    is_solved_ = false;
 }
+
 void DAQP::set_dual_tol(double val) {
     settings_.dual_tol = val;
+    is_solved_ = false;
 }
+
 void DAQP::set_zero_tol(double val) {
     settings_.zero_tol = val;
+    is_solved_ = false;
 }
+
 void DAQP::set_pivot_tol(double val) {
     settings_.pivot_tol = val;
+    is_solved_ = false;
 }
+
 void DAQP::set_progress_tol(double val) {
     settings_.progress_tol = val;
+    is_solved_ = false;
 }
+
 void DAQP::set_cycle_tol(int val) {
     settings_.cycle_tol = val;
+    is_solved_ = false;
 }
+
 void DAQP::set_iter_limit(int val) {
     settings_.iter_limit = val;
+    is_solved_ = false;
 }
+
 void DAQP::set_fval_bound(double val) {
     settings_.fval_bound = val;
+    is_solved_ = false;
 }
+
 void DAQP::set_eps_prox(double val) {
     settings_.eps_prox = val;
+    is_solved_ = false;
 }
+
 void DAQP::set_eta_prox(double val) {
     settings_.eta_prox = val;
+    is_solved_ = false;
 }
+
 void DAQP::set_rho_soft(double val) {
     settings_.rho_soft = val;
+    is_solved_ = false;
 }
+
 void DAQP::set_rel_subopt(double val) {
     settings_.rel_subopt = val;
+    is_solved_ = false;
 }
+
 void DAQP::set_abs_subopt(double val) {
     settings_.abs_subopt = val;
+    is_solved_ = false;
 }
+
 void DAQP::set_sing_tol(double val) {
     settings_.sing_tol = val;
+    is_solved_ = false;
 }
+
 void DAQP::set_refactor_tol(double val) {
     settings_.refactor_tol = val;
+    is_solved_ = false;
 }
 
 
 Eigen::VectorXd DAQP::get_primal() {
+    if (!is_solved_) {
+        solve();
+    }
     return result_.get_primal();
 }
+
 Eigen::VectorXd DAQP::get_dual() {
+    if (!is_solved_) {
+        solve();
+    }
     return result_.get_dual();
 }
+
 Eigen::VectorXd DAQP::get_slack() {
     if (!is_solved_) {
         solve();
@@ -320,15 +357,31 @@ Eigen::VectorXd DAQP::get_slack() {
 
     return result_.get_slack();
 }
+
 Eigen::VectorXi DAQP::get_active_set() {
+    if (!is_solved_) {
+        solve();
+    }
     return result_.get_active_set();
 }
+
 int DAQP::get_status() {
+    if (!is_solved_) {
+        solve();
+    }
     return result_.exitflag;
 }
+
 int DAQP::get_iterations() {
+    if (!is_solved_) {
+        solve();
+    }
     return result_.iter;
 }
+
 double DAQP::get_solve_time() {
+    if (!is_solved_) {
+        solve();
+    }
     return result_.solve_time;
 }
