@@ -9,6 +9,7 @@ class EigenDAQPResult : public DAQPResult {
   private:
     Eigen::VectorXd x_;
     Eigen::VectorXd lam_;
+    Eigen::VectorXd slack_;
 
   public:
     EigenDAQPResult();
@@ -17,8 +18,16 @@ class EigenDAQPResult : public DAQPResult {
     void resize_dual(int m);
     Eigen::VectorXd get_primal() const;
     Eigen::VectorXd get_dual() const;
+    Eigen::VectorXd get_slack() const;
     Eigen::VectorXi get_active_set() const;
+    void set_slack(Eigen::VectorXd const& slack);
 };
+
+
+Eigen::VectorXd compute_slacks(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> const& matrix,
+                               Eigen::VectorXd const& upper,
+                               Eigen::VectorXd const& lower,
+                               Eigen::VectorXd const& primal);
 
 
 EigenDAQPResult daqp_solve(Eigen::MatrixXd& H,
@@ -47,6 +56,8 @@ EigenDAQPResult daqp_solve(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
 
 class DAQP {
   private:
+    bool is_solved_;
+    bool is_slack_computed_;
     int max_variables_;
     int max_constraints_;
     int max_constraints_in_level_;
@@ -54,24 +65,24 @@ class DAQP {
     DAQPSettings settings_;
     EigenDAQPResult result_;
     DAQPProblem qp_;
-    int resize_result(int n, int m, Eigen::VectorXi& break_points);
+    int resize_result(int n, int m, Eigen::VectorXi const& break_points);
 
   public:
     DAQP(int max_variables, int max_constraints, int max_constraints_in_level);
-    int update(Eigen::MatrixXd& H,
-               Eigen::VectorXd& f,
-               Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> A,
-               Eigen::VectorXd& bu,
-               Eigen::VectorXd& bl,
-               Eigen::VectorXi& sense,
-               Eigen::VectorXi& break_points,
+    int update(Eigen::MatrixXd const& H,
+               Eigen::VectorXd const& f,
+               Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> const& A,
+               Eigen::VectorXd const& bu,
+               Eigen::VectorXd const& bl,
+               Eigen::VectorXi const& sense,
+               Eigen::VectorXi const& break_points,
                int update_mask = -1);
     ~DAQP();
-    const EigenDAQPResult& solve();
-    const EigenDAQPResult& solve(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> A,
-                                 Eigen::VectorXd& bu,
-                                 Eigen::VectorXd& bl,
-                                 Eigen::VectorXi& break_points);
+    EigenDAQPResult const& solve();
+    EigenDAQPResult const& solve(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> const& A,
+                                 Eigen::VectorXd const& bu,
+                                 Eigen::VectorXd const& bl,
+                                 Eigen::VectorXi const& break_points);
     // Setters for settings
     void set_primal_tol(double val);
     void set_dual_tol(double val);
@@ -92,6 +103,7 @@ class DAQP {
     // Getters for result
     Eigen::VectorXd get_primal();
     Eigen::VectorXd get_dual();
+    Eigen::VectorXd get_slack();
     Eigen::VectorXi get_active_set();
     int get_status();
     int get_iterations();
