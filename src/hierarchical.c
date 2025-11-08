@@ -56,7 +56,11 @@ int daqp_hiqp(DAQPWorkspace *work, c_float *lambda){
                     work->dlower[id]+=w;
                 else
                     work->dupper[id]+=w;
-               if(lambda != NULL) lambda[id] = w;
+                if(lambda != NULL){
+                    w += IS_LOWER(id) ? -1e-14 : 1e-14; // For weakly active
+                    lambda[id] = w;
+                }
+
             }
         }
 
