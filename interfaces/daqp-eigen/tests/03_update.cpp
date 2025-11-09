@@ -41,10 +41,18 @@ int main() {
 
     std::cout << "Solution 1: \n";
     std::cout << solver.get_primal().transpose() << std::endl;
-    std::cout << "Solve time: " << solver.get_solve_time() << " seconds" << std::endl;
+    std::cout << "Solve time: " << solver.get_solve_time() << " seconds";
+    std::cout << " | Iterations: " << solver.get_iterations() << std::endl;
     if (!solver.get_primal().isApprox((Eigen::VectorXd(3) << 1, 0.5, -1).finished(),precision)) {
         return 1;
     }
+    solver.set_warm_start();
+    solver.solve(A, bu, bl, break_points);
+    std::cout << "Solution 1 (warm start): \n";
+    std::cout << solver.get_primal().transpose() << std::endl;
+    std::cout << "Solve time: " << solver.get_solve_time() << " seconds";
+    std::cout << " | Iterations: " << solver.get_iterations() << std::endl;
+    solver.set_cold_start();
 
     // ==== Second setup: remove some tasks ====
     A = (Eigen::MatrixXd(4, 3) << A0, A3).finished();
