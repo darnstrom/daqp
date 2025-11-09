@@ -2,7 +2,7 @@
 #include "types.h"
 #include <stdlib.h>
 
-int daqp_hiqp(DAQPWorkspace *work){
+int daqp_hiqp(DAQPWorkspace *work, c_float *lambda){
     int i,j,id;
     int start,end;
     int iterations = 0;
@@ -10,6 +10,10 @@ int daqp_hiqp(DAQPWorkspace *work){
 
     // If only one hiearchy -> just solve normal LDP
     if( work->nh < 2) return daqp_ldp(work);
+
+
+    // Reset lambda for output 
+    if(lambda != NULL) for(i=0;i<work->m;i++) lambda[i]=0;
 
     // Start moving down the hierarchy
     c_float w;
@@ -52,6 +56,11 @@ int daqp_hiqp(DAQPWorkspace *work){
                     work->dlower[id]+=w;
                 else
                     work->dupper[id]+=w;
+                if(lambda != NULL){
+                    w += IS_LOWER(id) ? -1e-14 : 1e-14; // For weakly active
+                    lambda[id] = w;
+                }
+
             }
         }
 

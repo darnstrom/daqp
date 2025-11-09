@@ -222,7 +222,8 @@ end
         dlower .= bl ./ Anorm
 
         # Solve
-        exitflag = ccall((:daqp_hiqp,templib),Cint,(Ptr{DAQPBase.Workspace},),daqp_work_ptr);
+        lambda = zeros(ws.m) 
+        exitflag = ccall((:daqp_hiqp,templib),Cint,(Ptr{DAQPBase.Workspace},Ptr{Cdouble}),daqp_work_ptr,lambda);
         ccall((:ldp2qp_solution,templib),Cvoid,(Ptr{DAQPBase.Workspace},),daqp_work_ptr);
         xgen = copy(unsafe_wrap(Vector{Cdouble}, ws.x, ws.n, own=false))
         @test norm(xref-xgen) < tol

@@ -15,7 +15,7 @@ void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
         if(work->bnb != NULL)
             res->exitflag = daqp_bnb(work);
         else if(work->nh > 1)
-            res->exitflag = daqp_hiqp(work);
+            res->exitflag = daqp_hiqp(work,res->lam);
         else
             res->exitflag = daqp_ldp(work);
 
@@ -342,7 +342,7 @@ void daqp_extract_result(DAQPResult* res, DAQPWorkspace* work){
     for(i=0;i<work->n;i++) res->x[i] = work->x[i];
 
     // Extract dual solution
-    if(res->lam != NULL){
+    if(res->lam != NULL && work->nh < 2){
         for(i=0;i<work->m;i++) 
             res->lam[i] = 0; 
         for(i=0;i<work->n_active;i++)

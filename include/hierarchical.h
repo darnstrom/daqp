@@ -9,7 +9,7 @@ extern "C" {
 #include "constants.h"
 #include "daqp.h"
 
-int daqp_hiqp(DAQPWorkspace *work);
+int daqp_hiqp(DAQPWorkspace *work, c_float *lambda);
 
 # ifdef __cplusplus
 }
