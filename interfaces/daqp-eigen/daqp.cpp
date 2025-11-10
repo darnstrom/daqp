@@ -8,19 +8,19 @@ EigenDAQPResult::EigenDAQPResult()
 
 EigenDAQPResult::EigenDAQPResult(int n, int m)
   : x_{Eigen::VectorXd(n)}
-  , lam_{Eigen::VectorXd::Zero(m)}
+  , lam_{Eigen::VectorXd(m)}
   , slack_{Eigen::VectorXd(m)} {
     x   = x_.data();
     lam = lam_.data();
 }
 
 void EigenDAQPResult::resize_primal(int n) {
-    x_.resize(n);
+    x_.conservativeResizeLike(Eigen::VectorXd::Zero(n));
     x = x_.data();
 }
 
 void EigenDAQPResult::resize_dual(int m) {
-    lam_.resize(m);
+    lam_.conservativeResizeLike(Eigen::VectorXd::Zero(m));
     lam = lam_.data();
     slack_.resize(m);
 }
@@ -232,7 +232,19 @@ int DAQP::update(Eigen::MatrixXd const& H,
             else
                 sense_ptr[i] = 0;
         }
-        update_mask &= ~UPDATE_sense; // Ensure sense is update
+        update_mask |= UPDATE_sense; // Ensure sense is update
+
+        // Adjust break points based on feasibility of previous solution
+        if(A_ptr != nullptr && n_tasks > 1){
+            int first_violating = daqp_first_violating(result_.x,A_ptr,bu_ptr,bl_ptr,n,m,ms,settings_.primal_tol);
+            for(int i = 0; i < n_tasks; i++){
+                if(bp_ptr[i] >= first_violating){
+                    n_tasks = n_tasks - i;
+                    bp_ptr += i;
+                    break;
+                } 
+            }
+        }
     }
 
     qp_ = {n, m, ms, H_ptr, f_ptr, A_ptr, bu_ptr, bl_ptr, sense_ptr, bp_ptr, n_tasks};
@@ -245,9 +257,6 @@ int DAQP::update(Eigen::MatrixXd const& H,
 // Solve the LDP that is in the workspace
 EigenDAQPResult const& DAQP::solve() {
     if (!is_solved_) {
-        if(true){
-
-        }
         daqp_solve(&result_, &work_);
         is_solved_ = true;
     }
