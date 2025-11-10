@@ -52,9 +52,9 @@ int daqp_hiqp(DAQPWorkspace *work, c_float *lambda){
             id=work->WS[j];
             if(IS_SOFT(id)){ 
                 w = work->lam_star[j]*work->settings->rho_soft;
-                if(IS_LOWER(id))
+                if(w < -work->settings->primal_tol)
                     work->dlower[id]+=w;
-                else
+                else if(w > work->settings->primal_tol)
                     work->dupper[id]+=w;
                 if(lambda != NULL){
                     w += IS_LOWER(id) ? -1e-14 : 1e-14; // For weakly active
