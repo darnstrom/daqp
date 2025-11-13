@@ -15,12 +15,12 @@ EigenDAQPResult::EigenDAQPResult(int n, int m)
 }
 
 void EigenDAQPResult::resize_primal(int n) {
-    x_.resize(n);
+    x_.conservativeResizeLike(Eigen::VectorXd::Zero(n));
     x = x_.data();
 }
 
 void EigenDAQPResult::resize_dual(int m) {
-    lam_.resize(m);
+    lam_.conservativeResizeLike(Eigen::VectorXd::Zero(m));
     lam = lam_.data();
     slack_.resize(m);
 }
@@ -136,6 +136,7 @@ EigenDAQPResult daqp_solve(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
 DAQP::DAQP(int max_variables, int max_constraints, int max_constraints_in_level)
   : is_solved_{false}
   , is_slack_computed_{false}
+  , warm_start_{false}
   , max_variables_{max_variables}
   , max_constraints_{max_constraints}
   , max_constraints_in_level_{max_constraints_in_level} {
@@ -215,12 +216,38 @@ int DAQP::update(Eigen::MatrixXd const& H,
     int resize_status = resize_result(n, m, break_points);
     assert(resize_status == 0);
 
-    qp_ = {n, m, ms, H_ptr, f_ptr, A_ptr, bu_ptr, bl_ptr, sense_ptr, bp_ptr, n_tasks};
-
     if (update_mask < 0) {
         // Assume that everythig should be updated
         update_mask = UPDATE_Rinv + UPDATE_M + UPDATE_v + UPDATE_d + UPDATE_sense + UPDATE_hierarchy;
     }
+
+    if (warm_start_){
+        if(sense_ptr == nullptr)
+            sense_ptr = work_.sense; // Directly work with sense of workspace
+        for(int i = 0; i < m; i++){
+            if(result_.lam[i] > 0)
+                sense_ptr[i] |= 1; // Active + Upper
+            else if(result_.lam[i] < 0)
+                sense_ptr[i] |= 3; // Active + Lower
+            else
+                sense_ptr[i] = 0;
+        }
+        update_mask |= UPDATE_sense; // Ensure sense is update
+
+        // Adjust break points based on feasibility of previous solution
+        if(A_ptr != nullptr && n_tasks > 1){
+            int first_violating = daqp_first_violating(result_.x,A_ptr,bu_ptr,bl_ptr,n,m,ms,settings_.primal_tol);
+            for(int i = 0; i < n_tasks; i++){
+                if(bp_ptr[i] >= first_violating){
+                    n_tasks = n_tasks - i;
+                    bp_ptr += i;
+                    break;
+                } 
+            }
+        }
+    }
+
+    qp_ = {n, m, ms, H_ptr, f_ptr, A_ptr, bu_ptr, bl_ptr, sense_ptr, bp_ptr, n_tasks};
 
     int status = update_ldp(update_mask, &work_, &qp_);
     is_solved_ = is_slack_computed_ = false;
@@ -249,6 +276,14 @@ EigenDAQPResult const& DAQP::solve(Eigen::Matrix<double, Eigen::Dynamic, Eigen::
     return solve();
 }
 
+
+void DAQP::set_warm_start() {
+    warm_start_ = true;
+}
+
+void DAQP::set_cold_start() {
+    warm_start_ = false;
+}
 
 void DAQP::set_primal_tol(double val) {
     settings_.primal_tol = val;

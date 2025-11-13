@@ -366,7 +366,8 @@ void pivot_last(DAQPWorkspace *work){
 int activate_constraints(DAQPWorkspace *work){
     //TODO prioritize inequalities?
     int i;
-    for(i =0;i<N_CONSTR;i++){
+    const int end = work->nh == 0 ? N_CONSTR : work->break_points[0];
+    for(i =0;i<end ;i++){
         if(IS_ACTIVE(i)){
 #ifdef SOFT_WEIGHTS
             if(IS_LOWER(i)){

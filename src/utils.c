@@ -75,7 +75,7 @@ int update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
     }
 
     // Make sure activate constraints are activated
-    if(do_activate == 1 && work->nh < 2){
+    if(do_activate == 1){
         reset_daqp_workspace(work);
         error_flag = activate_constraints(work);
         if(error_flag<0)
