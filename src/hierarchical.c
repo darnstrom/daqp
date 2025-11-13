@@ -52,9 +52,9 @@ int daqp_hiqp(DAQPWorkspace *work, c_float *lambda){
             id=work->WS[j];
             if(IS_SOFT(id)){ 
                 w = work->lam_star[j]*work->settings->rho_soft;
-                if(IS_LOWER(id))
+                if(w < -work->settings->primal_tol)
                     work->dlower[id]+=w;
-                else
+                else if(w > work->settings->primal_tol)
                     work->dupper[id]+=w;
                 if(lambda != NULL){
                     w += IS_LOWER(id) ? -1e-14 : 1e-14; // For weakly active
@@ -73,7 +73,9 @@ int daqp_hiqp(DAQPWorkspace *work, c_float *lambda){
         // reactive constraint in level current (to addresss soft->hard)
         // TODO: can factorization be directly reused?
         int n_active_old = (work->n_active < work->n) ? work->n_active : work->n;
-        for(int jj=n_active_old; jj < work->n_active ;jj++) SET_INACTIVE(work->WS[jj]);
+        for(int jj=n_active_old; jj < work->n_active ;jj++) {
+            work->sense[work->WS[jj]]&=~(ACTIVE+IMMUTABLE); // ensure inactive + mutable
+        }
         work->n_active =j;
         work->reuse_ind=j;
         work->sing_ind = EMPTY_IND;
@@ -83,6 +85,7 @@ int daqp_hiqp(DAQPWorkspace *work, c_float *lambda){
             if(work->sing_ind != EMPTY_IND){
                 remove_constraint(work,j);
                 work->sing_ind = EMPTY_IND;
+                SET_MUTABLE(work->WS[j]);
             }
             else{
                 if(IS_IMMUTABLE(work->WS[j])) nfree--;
