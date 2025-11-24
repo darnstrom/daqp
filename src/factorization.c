@@ -1,9 +1,8 @@
 #include "factorization.h"
 
-c_float daqp_dot(c_float* v1, c_float* v2, const int n){
-    int i;
+c_float daqp_dot(const c_float* v1, const c_float* v2, const int n) {
     c_float sum = 0.0;
-    for(i=0;i<n;i++) sum += v1[i]*v2[i];
+    for (int i = 0; i < n; i++) sum += v1[i] * v2[i];
     return sum;
 }
 

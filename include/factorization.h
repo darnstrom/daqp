@@ -8,7 +8,7 @@ extern "C" {
 #include "types.h"
 #include "constants.h"
 
-c_float daqp_dot(c_float* v1, c_float* v2, const int n);
+c_float daqp_dot(const c_float* v1, const c_float* v2, const int n);
 void update_LDL_add(DAQPWorkspace *work, const int add_ind);
 void update_LDL_remove(DAQPWorkspace *work, const int rm_ind);
 
