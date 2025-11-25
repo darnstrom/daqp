@@ -85,7 +85,7 @@ void compute_primal_and_fval(DAQPWorkspace *work){
     work->fval = fval;
 }
 int add_infeasible(DAQPWorkspace *work){
-    int j,k,disp;
+    int j,disp;
     c_float ep = -work->settings->primal_tol;
     c_float min_val = ep;
     c_float Mu,min_cand;
@@ -99,12 +99,11 @@ int add_infeasible(DAQPWorkspace *work){
         }
         if(work->Rinv==NULL){// Hessian is identify
             Mu=work->u[j]; 
-            disp+=NX-j;
         }
         else{
-            for(k=j,Mu=0;k<NX;k++) // 
-                Mu+=work->Rinv[disp++]*work->u[k];
+            Mu = daqp_dot(work->Rinv+disp,work->u+j,NX-j);
         }
+        disp+=NX-j;
         min_cand = work->dupper[j]-Mu;
         if(min_cand < min_val && (work->scaling == NULL || min_cand < ep*work->scaling[j])){
             add_ind = j; isupper = 1;
@@ -125,8 +124,8 @@ int add_infeasible(DAQPWorkspace *work){
             disp+=NX;// Skip ahead in M
             continue;
         }
-        for(k=0,Mu=0;k<NX;k++) 
-            Mu+=work->M[disp++]*work->u[k];
+        Mu = daqp_dot(work->M+disp,work->u,NX);
+        disp+=NX;
 
         min_cand = work->dupper[j]-Mu;
         if(min_cand < min_val && (work->scaling == NULL || min_cand < ep*work->scaling[j])){
