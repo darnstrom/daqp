@@ -9,7 +9,7 @@ from Cython.Build import cythonize
 
 # Copy C source
 try:
-    src_path = pathlib.Path(__file__).resolve().parent.parent.parent
+    src_path = pathlib.Path(os.environ["PWD"], "../../../daqp")
 except:
     src_path = []
 csrc_dir = pathlib.Path('./csrc')
