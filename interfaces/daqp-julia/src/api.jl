@@ -252,33 +252,33 @@ function update(daqp::DAQPBase.Model, H,f,A,bupper,blower,sense=nothing,break_po
     update_mask = Cint(0);
     work = unsafe_load(daqp.work);
     if(!isnothing(H) && work.n == size(H,1) && work.n == size(H,2))
-        daqp.qpj.H[:].=H[:]
+        daqp.qpj.H.=H
         update_mask +=1
     end
     if(!isnothing(A) && size(A,1)==(work.m-work.ms) && size(A,2)==work.n)
-        daqp.qpj.A[:].=A'[:]
+        daqp.qpj.A.=A'
         update_mask+=2
     end
 
     if(!isnothing(f) && length(f)==work.n)
-        daqp.qpj.f[:].=f[:]
+        daqp.qpj.f.=f
         update_mask+=4
     end
 
     if(!isnothing(bupper) && !isnothing(blower) &&
        length(bupper)==work.m && length(blower)==work.m)
-        daqp.qpj.bupper[:].=bupper[:]
-        daqp.qpj.blower[:].=blower[:]
+        daqp.qpj.bupper.=bupper
+        daqp.qpj.blower.=blower
         update_mask+=8
     end
 
     if(!isnothing(sense) && length(sense)== work.m)
-        daqp.qpj.sense[:] .= sense[:]
+        daqp.qpj.sense .= sense
         update_mask+=16
     end
 
     if(!isnothing(break_points) && length(break_points)== work.nh)
-        daqp.qpj.break_points[:] .= break_points[:]
+        daqp.qpj.break_points .= break_points
         update_mask+=32
     end
     daqp.qpc = QPc(daqp.qpj);
