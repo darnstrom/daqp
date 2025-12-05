@@ -75,9 +75,16 @@ int update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
     }
 
     // Make sure activate constraints are activated
-    if(do_activate == 1 && work->nh < 2){
+    if(do_activate == 1){
         reset_daqp_workspace(work);
-        error_flag = activate_constraints(work);
+        if(work->nh < 2)
+            error_flag = activate_constraints(work);
+        else{// Activate the first level (since those constraints are hard)
+            int m_tmp = work->m;
+            work->m = work->break_points[0];
+            error_flag = activate_constraints(work);
+            work->m = m_tmp;
+        }
         if(error_flag<0)
             return error_flag;
     }
