@@ -58,6 +58,7 @@ class DAQP {
   private:
     bool is_solved_;
     bool is_slack_computed_;
+    bool warm_start_;
     int max_variables_;
     int max_constraints_;
     int max_constraints_in_level_;
@@ -83,7 +84,10 @@ class DAQP {
                                  Eigen::VectorXd const& bu,
                                  Eigen::VectorXd const& bl,
                                  Eigen::VectorXi const& break_points);
+
     // Setters for settings
+    void set_warm_start();
+    void set_cold_start();
     void set_primal_tol(double val);
     void set_dual_tol(double val);
     void set_zero_tol(double val);
