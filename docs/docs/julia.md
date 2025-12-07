@@ -40,7 +40,7 @@ This allows us to reuse internal matrix factorization if we want to solve a pert
 ## Changing settings
 If we, for example, want to change the maximum number of iterations to 2000 we can do so by
 ```julia
-DAQP.settings(d; Dict(:iter_limit =>2000))
+DAQP.settings(d, Dict(:iter_limit =>2000))
 ```
 
 A full list of available settings is provided [here](/daqp/parameters/#settings)

@@ -2,13 +2,15 @@ import numpy as np
 cimport daqp
 
 def solve(double[:, :] H, double[:] f, double[:, :] A,
-        double[:] bupper, double[:] blower=None, int[:] sense =None,
-        primal_tol = DEFAULT_PRIM_TOL, dual_tol = DEFAULT_DUAL_TOL, zero_tol = DEFAULT_ZERO_TOL,
-        pivot_tol = DEFAULT_PIVOT_TOL, progress_tol = DEFAULT_PROG_TOL,
-        cycle_tol = DEFAULT_CYCLE_TOL, iter_limit =  DEFAULT_ITER_LIMIT, fval_bound = DAQP_INF,
-        eps_prox= 0, eta_prox = DEFAULT_ETA, rho_soft = DEFAULT_RHO_SOFT,
-        rel_subopt = DEFAULT_REL_SUBOPT, abs_subopt = DEFAULT_ABS_SUBOPT,
-        sing_tol = DEFAULT_SING_TOL, refactor_tol = DEFAULT_REFACTOR_TOL):
+          double[:] bupper, double[:] blower=None,
+          int[:] sense =None, int[:] break_points=np.zeros(0,dtype=np.intc),
+          primal_tol = DEFAULT_PRIM_TOL, dual_tol = DEFAULT_DUAL_TOL,
+          zero_tol = DEFAULT_ZERO_TOL, pivot_tol = DEFAULT_PIVOT_TOL,
+          progress_tol = DEFAULT_PROG_TOL, cycle_tol = DEFAULT_CYCLE_TOL,
+          iter_limit =  DEFAULT_ITER_LIMIT, fval_bound = DAQP_INF,
+          eps_prox= 0, eta_prox = DEFAULT_ETA, rho_soft = DEFAULT_RHO_SOFT,
+          rel_subopt = DEFAULT_REL_SUBOPT, abs_subopt = DEFAULT_ABS_SUBOPT,
+          sing_tol = DEFAULT_SING_TOL, refactor_tol = DEFAULT_REFACTOR_TOL):
     """
     Solve the quadratic program      minimize       0.5 x'*H*x + f' x
                                     subject to   blower <= A x <= bupper
@@ -87,6 +89,7 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
     A = np.ascontiguousarray(A)
     mA, n = np.shape(A)
     m = np.size(bupper)
+    nh = np.size(break_points)
 
     # By default, set lower bounds to -inf and interpret constraints as inequalities 
     if blower is None:
@@ -94,9 +97,11 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
     if sense is None:
         sense = np.zeros(m, dtype=np.intc)
 
+    
     H_ptr = NULL if H is None else &H[0,0]
     f_ptr = NULL if f is None else &f[0]
     A_ptr = NULL if mA == 0 else &A[0,0]
+    bp_ptr = NULL if nh == 0 else &break_points[0]
 
     if m == 0:
         bu_ptr, bl_ptr, sense_ptr = NULL, NULL, NULL
@@ -104,7 +109,7 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
         bu_ptr, bl_ptr, sense_ptr  = &bupper[0], &blower[0], &sense[0]
 
 
-    cdef DAQPProblem problem = [n,m,m-mA, H_ptr, f_ptr, A_ptr, bu_ptr, bl_ptr, sense_ptr, NULL, 0]
+    cdef DAQPProblem problem = [n,m,m-mA, H_ptr, f_ptr, A_ptr, bu_ptr, bl_ptr, sense_ptr, bp_ptr, nh]
 
     # Setup settings
     cdef DAQPSettings settings = [primal_tol, dual_tol, zero_tol, pivot_tol,

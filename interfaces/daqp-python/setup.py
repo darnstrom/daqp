@@ -36,7 +36,8 @@ cython_ext = Extension('daqp',
             'csrc/src/utils.c', 
             ],
         library_dirs=['.'],
-        extra_compile_args=["-O3", "-DPROFILING"],
+        extra_compile_args=["-O3", "-DPROFILING", "-fassociative-math",
+                            "-fno-signed-zeros", "-fno-trapping-math"],
         include_dirs=['csrc/include'])
 
 setup(name='daqp',

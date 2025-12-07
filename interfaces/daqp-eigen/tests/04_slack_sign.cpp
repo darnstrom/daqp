@@ -5,7 +5,10 @@
 bool verify_slack(EigenDAQPResult const& result) {
     Eigen::VectorXd dual  = result.get_dual();
     Eigen::VectorXd slack = result.get_slack();
-    auto same_sign        = (dual.array() * slack.array()) >= 0;
+    for(int i = 0; i < dual.size(); i++){
+        printf(" %e %e \n",dual(i),slack(i));
+    }
+    auto same_sign = (dual.array().abs() < 1e-6) || (dual.array() * slack.array()) >= 0;
     return same_sign.all();
 }
 

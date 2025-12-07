@@ -1,5 +1,12 @@
 #include "factorization.h"
 
+c_float daqp_dot(const c_float* v1, const c_float* v2, const int n) {
+    c_float sum = 0.0;
+    for (int i = 0; i < n; i++) sum += v1[i] * v2[i];
+    return sum;
+}
+
+
 void update_LDL_add(DAQPWorkspace *work, const int add_ind){
     work->sing_ind = EMPTY_IND;
     int i,j,disp,id;
@@ -56,8 +63,7 @@ void update_LDL_add(DAQPWorkspace *work, const int add_ind){
         else if(Mi == NULL)
             sum = Mk[j];
         else
-            for(sum = 0;j<NX;j++)
-                sum+=Mk[j]*Mi[j];
+            sum = daqp_dot(Mk+j,Mi+j,NX-j);
 
         work->L[new_L_start+i] = sum;
     }

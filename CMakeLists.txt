@@ -25,6 +25,12 @@ if(SOFT_WEIGHTS)
   add_compile_definitions(SOFT_WEIGHTS)
 endif()
 
+option (FASTER_MATH "Enable some faster math" ON)
+if(FASTER_MATH)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fassociative-math -fno-signed-zeros -fno-trapping-math")
+endif()
+
+
 add_library(daqpstat STATIC ${daqp_src} ${daqp_headers} ${daqp_codegen_src} ${daqp_codegen_headers})
 target_include_directories(daqpstat PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
