@@ -423,3 +423,19 @@ void daqp_minrep(int* is_redundant, c_float* A, c_float* b, int n, int m, int ms
     free(work.dlower);
     free(work.sense);
 }
+
+
+// Find which constraints the point x first violates
+int daqp_first_violating(c_float* x, c_float* A, c_float* bu, c_float* bl, int n, int m, int ms, c_float tol){
+    int i,j,disp;
+    c_float Ax;
+    for(i=0; i < ms; i++)
+        if(x[i] > bu[i]+tol || x[i] < bl[i]-tol) return i;
+
+    for(disp=0; i < m; i++){
+        Ax = 0;
+        for(j=0;j<n;j++) Ax += A[disp++]*x[j];
+        if(Ax > bu[i]+tol || Ax < bl[i]-tol) return i;
+    }
+    return m; // No constraint is violating
+}
