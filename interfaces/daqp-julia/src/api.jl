@@ -130,6 +130,8 @@ mutable struct Model
     qpc::QPc
     qpc_ptr::Ptr{DAQPBase.QPc}
     has_model::Bool
+    x::Vector{Float64}
+    λ::Vector{Float64}
     function Model()
         # Setup initial model
         work = Libc.calloc(1,sizeof(DAQPBase.Workspace))
@@ -176,14 +178,8 @@ function setup(daqp::DAQPBase.Model, qp::DAQPBase.QPj)
         settings(daqp,old_settings)
     else
         daqp.has_model = true
-        # Quick fix to initialize x for proximal
-        # will be fixed in DAQP_jll 0.3.2
-        if((isempty(qp.H)&&!isempty(qp.f)) || old_settings.eps_prox != 0)
-            workspace = unsafe_load(daqp.work);
-            xinit = zeros(workspace.n)
-            unsafe_copyto!(workspace.x,pointer(xinit),workspace.n);
-        end
-        # should be unsafe_copy_to
+        daqp.x = Vector{Float64}(undef, qp.n)
+        daqp.λ = Vector{Float64}(undef, qp.m)
     end
 
     return exitflag, setup_time
@@ -197,21 +193,19 @@ end
 
 function solve(daqp::DAQPBase.Model)
     if(!daqp.has_model) return  zeros(0), NaN, -10, [] end
-    xstar = zeros(Float64,daqp.qpc.n); 
-    lam = zeros(Float64,daqp.qpc.m); 
-    result= Ref(DAQPResult(xstar,lam));
+    result= Ref(DAQPResult(daqp.x,daqp.λ));
 
     exitflag=ccall((:daqp_solve, DAQPBase.libdaqp), Cint,
                    (Ref{DAQPBase.DAQPResult},Ref{DAQPBase.Workspace}), 
                    result,daqp.work)
 
-    info = (x = xstar, λ=lam, fval=result[].fval,
+    info = (x = daqp.x, λ=daqp.λ, fval=result[].fval,
             exitflag=result[].exitflag,
             status = DAQPBase.flag2status[result[].exitflag],
             solve_time = result[].solve_time,
             setup_time = result[].setup_time,
             iterations= result[].iter, nodes = result[].nodes)
-    return xstar,result[].fval,result[].exitflag,info
+    return copy(daqp.x),result[].fval,result[].exitflag,info
 end
 
 
@@ -287,6 +281,15 @@ function update(daqp::DAQPBase.Model, H,f,A,bupper,blower,sense=nothing,break_po
                      update_mask, daqp.work,Ref(daqp.qpc));
 end
 
+function reset(p::Ptr{DAQPBase.Workspace})
+    ccall((:deactivate_constraints,libdaqp),Cvoid,(Ptr{DAQPBase.Workspace},),p);
+    ccall((:reset_daqp_workspace,libdaqp),Cvoid,(Ptr{DAQPBase.Workspace},),p);
+end
+
+function reset(d::DAQPBase.Model)
+    reset(d.work)
+end
+
 using Downloads
 function codegen(d::DAQPBase.Model; fname="daqp_workspace", dir="codegen", src=false)
     @assert(d.has_model, "setup the model before code generation")
@@ -294,9 +297,7 @@ function codegen(d::DAQPBase.Model; fname="daqp_workspace", dir="codegen", src=f
     dir[end] != '/' && (dir*="/") ## Make sure it is correct directory path
     isdir(dir) || mkdir(dir)
 
-    # Make sure workspace is cleared
-    ccall((:deactivate_constraints,libdaqp),Cvoid,(Ptr{DAQPBase.Workspace},),d.work);
-    ccall((:reset_daqp_workspace,libdaqp),Cvoid,(Ptr{DAQPBase.Workspace},),d.work);
+    reset(d) # Make sure workspace is cleared
 
     exitflag = ccall((:render_daqp_workspace, libdaqp),Cvoid,
                      (Ptr{DAQPBase.Workspace},Cstring,Cstring,), d.work,fname,dir);
@@ -370,13 +371,8 @@ function isfeasible(p::Ptr{DAQPBase.Workspace}, m=nothing, ms=nothing ;validate=
             @warn "Couldn't validate infeas. with Frakas (err:$(err), fval=$(daqp_ws.fval))"
         end
     end
-
-    # Reset the workspace 
-    ccall((:deactivate_constraints,DAQPBase.libdaqp),Cvoid,(Ptr{Cvoid},),p);
-    ccall((:reset_daqp_workspace,DAQPBase.libdaqp),Cvoid,(Ptr{Cvoid},),p);
-    #if(exitflag != 1 && exitflag != -1)
-    #    @warn "exitflag: $exitflag"
-    #end
+    # Make sure workspace is clean for next solve
+    reset(p)
     return exitflag == 1
 end
 
