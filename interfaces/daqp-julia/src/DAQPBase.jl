@@ -19,4 +19,6 @@ export isfeasible
 
 include("daqp_julia.jl")
 
+include("avi.jl")
+
 end

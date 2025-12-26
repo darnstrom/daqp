@@ -87,7 +87,30 @@ function generate_test_LP(n,m,ms)
     sense = zeros(Int32,m)
     return x,f,A,bupper,blower,sense
 end
+## AVI
+function generate_test_avi(n,m)
+    A = randn(m,n);
+    shuffle_inds= randperm(m);
+    nAS= rand(1:n+1) - 1;
+    AS = shuffle_inds[1:nAS];
 
+    λ = zeros(m);λ[AS]=rand(nAS);
+    x = randn(n)
+
+    # Generate H that is PD but not symmetric
+    M,N = rand(n,n),randn(n,n)
+    H = M'*M + (N-N')
+
+    # f to satisfy stationarity
+    f = -H*x-A[AS,:]'*λ[AS]
+
+    # b to make AS active and IS inactive 
+    Ax = A*x
+    b = Ax + rand(m) 
+    b[AS] = Ax[AS]
+
+    return x,H,f,A,b
+end
 ## Source files
 function get_local_sources(srcdir)
     # Get local source

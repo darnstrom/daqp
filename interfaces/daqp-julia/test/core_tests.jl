@@ -286,3 +286,13 @@ end
     _, _, exitflag, _ = DAQPBase.solve(d)
     @test exitflag < 0
 end
+
+@testset "Affine variational inequality" begin
+    for _ in 1:10
+        n = 100; m = 500
+        xref,H,f,A,b = generate_test_avi(n,m);
+        x,λ,info = DAQPBase.solve_avi(H,f,A,b);
+        #println("$(info.status) | $(norm(xref-x)) | $(info.iterations)")
+        @test norm(xref-x) < n*tol;
+    end
+end
