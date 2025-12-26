@@ -130,6 +130,8 @@ mutable struct Model
     qpc::QPc
     qpc_ptr::Ptr{DAQPBase.QPc}
     has_model::Bool
+    x::Vector{Float64}
+    λ::Vector{Float64}
     function Model()
         # Setup initial model
         work = Libc.calloc(1,sizeof(DAQPBase.Workspace))
@@ -176,14 +178,8 @@ function setup(daqp::DAQPBase.Model, qp::DAQPBase.QPj)
         settings(daqp,old_settings)
     else
         daqp.has_model = true
-        # Quick fix to initialize x for proximal
-        # will be fixed in DAQP_jll 0.3.2
-        if((isempty(qp.H)&&!isempty(qp.f)) || old_settings.eps_prox != 0)
-            workspace = unsafe_load(daqp.work);
-            xinit = zeros(workspace.n)
-            unsafe_copyto!(workspace.x,pointer(xinit),workspace.n);
-        end
-        # should be unsafe_copy_to
+        daqp.x = Vector{Float64}(undef, qp.n)
+        daqp.λ = Vector{Float64}(undef, qp.m)
     end
 
     return exitflag, setup_time
@@ -197,21 +193,19 @@ end
 
 function solve(daqp::DAQPBase.Model)
     if(!daqp.has_model) return  zeros(0), NaN, -10, [] end
-    xstar = zeros(Float64,daqp.qpc.n); 
-    lam = zeros(Float64,daqp.qpc.m); 
-    result= Ref(DAQPResult(xstar,lam));
+    result= Ref(DAQPResult(daqp.x,daqp.λ));
 
     exitflag=ccall((:daqp_solve, DAQPBase.libdaqp), Cint,
                    (Ref{DAQPBase.DAQPResult},Ref{DAQPBase.Workspace}), 
                    result,daqp.work)
 
-    info = (x = xstar, λ=lam, fval=result[].fval,
+    info = (x = daqp.x, λ=daqp.λ, fval=result[].fval,
             exitflag=result[].exitflag,
             status = DAQPBase.flag2status[result[].exitflag],
             solve_time = result[].solve_time,
             setup_time = result[].setup_time,
             iterations= result[].iter, nodes = result[].nodes)
-    return xstar,result[].fval,result[].exitflag,info
+    return copy(daqp.x),result[].fval,result[].exitflag,info
 end
 
 
