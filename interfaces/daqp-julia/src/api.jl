@@ -281,6 +281,15 @@ function update(daqp::DAQPBase.Model, H,f,A,bupper,blower,sense=nothing,break_po
                      update_mask, daqp.work,Ref(daqp.qpc));
 end
 
+function reset(p::Ptr{DAQPBase.Workspace})
+    ccall((:deactivate_constraints,libdaqp),Cvoid,(Ptr{DAQPBase.Workspace},),p);
+    ccall((:reset_daqp_workspace,libdaqp),Cvoid,(Ptr{DAQPBase.Workspace},),p);
+end
+
+function reset(d::DAQPBase.Model)
+    reset(d.work)
+end
+
 using Downloads
 function codegen(d::DAQPBase.Model; fname="daqp_workspace", dir="codegen", src=false)
     @assert(d.has_model, "setup the model before code generation")
@@ -288,9 +297,7 @@ function codegen(d::DAQPBase.Model; fname="daqp_workspace", dir="codegen", src=f
     dir[end] != '/' && (dir*="/") ## Make sure it is correct directory path
     isdir(dir) || mkdir(dir)
 
-    # Make sure workspace is cleared
-    ccall((:deactivate_constraints,libdaqp),Cvoid,(Ptr{DAQPBase.Workspace},),d.work);
-    ccall((:reset_daqp_workspace,libdaqp),Cvoid,(Ptr{DAQPBase.Workspace},),d.work);
+    reset(d) # Make sure workspace is cleared
 
     exitflag = ccall((:render_daqp_workspace, libdaqp),Cvoid,
                      (Ptr{DAQPBase.Workspace},Cstring,Cstring,), d.work,fname,dir);
@@ -364,13 +371,8 @@ function isfeasible(p::Ptr{DAQPBase.Workspace}, m=nothing, ms=nothing ;validate=
             @warn "Couldn't validate infeas. with Frakas (err:$(err), fval=$(daqp_ws.fval))"
         end
     end
-
-    # Reset the workspace 
-    ccall((:deactivate_constraints,DAQPBase.libdaqp),Cvoid,(Ptr{Cvoid},),p);
-    ccall((:reset_daqp_workspace,DAQPBase.libdaqp),Cvoid,(Ptr{Cvoid},),p);
-    #if(exitflag != 1 && exitflag != -1)
-    #    @warn "exitflag: $exitflag"
-    #end
+    # Make sure workspace is clean for next solve
+    reset(p)
     return exitflag == 1
 end
 
