@@ -15,7 +15,7 @@ function _solve_kkt(H,f,A,bu,bl,ASu,ASl,kkt_buffer)
     n = length(f)
     nkkt = n+length(AS)
     resize!(kkt_buffer,nkkt^2)
-    K = reshape(kkt_buffer,nkkt,nkkt)
+    K = reshape(view(kkt_buffer,1:nkkt^2),(nkkt,nkkt))
     @views K[1:n,1:n] = H
     @views K[n+1:end,1:n] = A[AS,:] 
     @views K[1:n,n+1:end] = A[AS,:]'
