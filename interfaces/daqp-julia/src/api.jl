@@ -193,21 +193,20 @@ end
 
 function solve(daqp::DAQPBase.Model)
     if(!daqp.has_model) return  zeros(0), NaN, -10, [] end
-    result= Ref(DAQPResult(daqp.x,daqp.λ));
+    result_ptr= Ref(DAQPResult(daqp.x,daqp.λ));
 
-    GC.@preserve result begin
-        ccall((:daqp_solve, DAQPBase.libdaqp), Nothing,
-              (Ref{DAQPBase.DAQPResult},Ref{DAQPBase.Workspace}), 
-              result,daqp.work)
+    ccall((:daqp_solve, DAQPBase.libdaqp), Nothing,
+          (Ref{DAQPBase.DAQPResult},Ref{DAQPBase.Workspace}),
+          result_ptr,daqp.work)
 
-        info = (x = daqp.x, λ=daqp.λ, fval=result[].fval,
-                exitflag=result[].exitflag,
-                status = DAQPBase.flag2status[result[].exitflag],
-                solve_time = result[].solve_time,
-                setup_time = result[].setup_time,
-                iterations= result[].iter, nodes = result[].nodes)
-        return copy(daqp.x),result[].fval,result[].exitflag,info
-    end
+    result = unsafe_load(Base.unsafe_convert(Ptr{DAQPResult}, result_ptr))
+    info = (x = daqp.x, λ=daqp.λ, fval=result.fval,
+            exitflag=result.exitflag,
+            status = DAQPBase.flag2status[result.exitflag],
+            solve_time = result.solve_time,
+            setup_time = result.setup_time,
+            iterations= result.iter, nodes = result.nodes)
+    return copy(daqp.x),result.fval,result.exitflag,info
 end
 
 
