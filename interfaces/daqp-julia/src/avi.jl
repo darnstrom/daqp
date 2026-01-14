@@ -48,6 +48,10 @@ function setup_avi(H,f,A,bu,bl;x0 = zeros(0), daqp_workspace=nothing, settings=A
                                            :dual_tol => settings.dual_tol))
     exitflag,tsetup = DAQPBase.setup(daqp_workspace, H1pI, H2xpf, A, bu, bl)
 
+    if m > size(A,1)
+        A = [I(n)[1:m-size(A,1),:];A] # To handle simple bounds
+    end
+
     return exitflag, AVIWorkspace(H,f,A,bu,bl,
                                   H1pI,H2mI,H2pI,H2,H2xpf,
                                   x,y,daqp_workspace,kkt_buffer,
