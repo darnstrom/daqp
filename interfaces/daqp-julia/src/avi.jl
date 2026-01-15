@@ -45,10 +45,10 @@ function setup_avi(H,f,A,bu,bl,sense;x0 = zeros(0), daqp_workspace=nothing, sett
     H2 = H1+(H-H') / 2
     H1pI,H2mI,H2pI = H1+I, H2-I, lu!(H2+I)
 
-    H_factor = lu(H)
-    x_unc = -(H_factor\f)
+    #H_factor = lu(H)
+    H_factor = lu(zeros(0,0))
 
-    x = isempty(x0) ? copy(x_unc) : copy(x0)
+    x = isempty(x0) ? fill(NaN,n) : copy(x0)
     y,H2xpf = zeros(n),zeros(n)
 
     kkt_buffer = Float64[]
@@ -65,7 +65,7 @@ function setup_avi(H,f,A,bu,bl,sense;x0 = zeros(0), daqp_workspace=nothing, sett
     end
 
     return exitflag, AVIWorkspace(H,f,A,bu,bl,
-                                  H_factor,x_unc,
+                                  H_factor,zeros(n),
                                   H1pI,H2mI,H2pI,H2,H2xpf,
                                   x,y,daqp_workspace,kkt_buffer,
                                   settings)
@@ -78,6 +78,7 @@ function solve(ws::AVIWorkspace)
     ϵp, ϵd = ws.settings.primal_tol, ws.settings.dual_tol
     α,β = ws.settings.alpha, ws.settings.beta
     tot_iter,outer_iter,nkkt = 0,0,0
+    isnan(ws.x[1]) && (ws.x .= -ws.H\ws.f) # Use unconstrained optimum as x0
     @inbounds for k in 1:ws.settings.iter_limit
         ws.H2xpf .= ws.f
         mul!(ws.H2xpf, ws.H2mI, ws.x, 1.0, 1.0)
@@ -90,7 +91,8 @@ function solve(ws::AVIWorkspace)
         if info.iterations == 1
             nkkt += 1
             ASu,ASl = _get_AS(info.λ,ϵd) 
-            xt,λ,AS = _solve_kkt_schur(ws,ASu,ASl)
+            #xt,λ,AS = _solve_kkt_schur(ws,ASu,ASl)
+            xt,λ,AS = _solve_kkt(ws,ASu,ASl)
             nu = length(ASu)
             if all(λ[i] > -ϵd for i in 1:nu) && all(λ[i] < ϵd for i in nu+1:length(λ))
                 Ax = ws.A*xt
@@ -125,40 +127,57 @@ function _get_AS(λ,dual_tol)
     return ASu,ASl
 end
 
-function _solve_kkt_schur(ws::AVIWorkspace,ASu,ASl)
-    # Prepare some helpers
+# TODO kkt_schur is faster in isolation, but leads to slower total execution 
+#function _solve_kkt_schur(ws::AVIWorkspace,ASu,ASl)
+#    # Prepare some helpers
+#    AS = [ASu;ASl]
+#    n,nAS = length(ws.f),length(AS)
+#
+#    # Juggle some buffers
+#    resize!(ws.kkt_buffer,nAS*(nAS+n+1)+n) # Is this necessary?
+#    invH_At = reshape(view(ws.kkt_buffer,1:nAS*n),(n,nAS))
+#    offset = nAS*n 
+#    S = reshape(view(ws.kkt_buffer,offset+1:offset+nAS^2),(nAS,nAS))
+#    offset +=nAS^2
+#    λ = view(ws.kkt_buffer,offset+1:offset+nAS)
+#    offset +=nAS
+#    x = view(ws.kkt_buffer,offset+1:offset+n)
+#
+#    AAS = ws.A[AS,:]
+#
+#    # Schur complement 
+#    @inbounds for (i,id) in enumerate(AS)
+#        @views invH_At[:,i] .= ws.A[id,:]
+#    end
+#    ldiv!(ws.H_factor,invH_At)
+#    mul!(S, AAS, invH_At)
+#    S_fact = lu!(S) 
+#
+#    # Solve for λ
+#    @views λ .= AAS * ws.x_unc
+#    @views λ[1:length(ASu)] .-= ws.bu[ASu]
+#    @views λ[length(ASu)+1:end] .-= ws.bl[ASl]
+#    ldiv!(S_fact,λ)
+#
+#    # Solve for x
+#    x .= ws.x_unc .- invH_At * λ
+#
+#    return x,λ,AS 
+#end
+function _solve_kkt(ws,ASu,ASl)
     AS = [ASu;ASl]
-    n,nAS = length(ws.f),length(AS)
-
-    # Juggle some buffers
-    resize!(ws.kkt_buffer,nAS*(nAS+n+1)) # Is this necessary?
-    invH_At = reshape(view(ws.kkt_buffer,1:nAS*n),(n,nAS))
-    offset = nAS*n 
-    S = reshape(view(ws.kkt_buffer,offset+1:offset+nAS^2),(nAS,nAS))
-    offset +=nAS^2
-    λ = view(ws.kkt_buffer,offset+1:offset+nAS)
-
-    AAS = ws.A[AS,:]
-
-    # Schur complement 
-    @inbounds for (i,id) in enumerate(AS)
-        @views invH_At[:,i] .= ws.A[id,:]
-    end
-    #transpose!(invH_At, AAS)
-    ldiv!(ws.H_factor,invH_At)
-    mul!(S, AAS, invH_At)
-    S_fact = lu!(S) 
-
-    # Solve for λ
-    @views λ .= AAS * ws.x_unc
-    @views λ[1:length(ASu)] .-= ws.bu[ASu]
-    @views λ[length(ASu)+1:end] .-= ws.bl[ASl]
-    ldiv!(S_fact,λ)
-
-    # Solve for x
-    x = ws.x_unc - invH_At * λ
-
-    return x,λ,AS 
+    n = length(ws.f)
+    nkkt = n+length(AS)
+    resize!(ws.kkt_buffer,nkkt^2)
+    K = reshape(view(ws.kkt_buffer,1:nkkt^2),(nkkt,nkkt))
+    @views K[1:n,1:n] = ws.H
+    @views K[n+1:end,1:n] = ws.A[AS,:] 
+    @views K[1:n,n+1:end] = ws.A[AS,:]'
+    K[n+1:end,n+1:end] .= 0
+    z = K\[-ws.f;ws.bu[ASu];ws.bl[ASl]]
+    x = @view z[1:n]
+    λ = @view z[n+1:end]
+    return x,λ,AS
 end
 
 """
