@@ -14,6 +14,9 @@ struct AVIWorkspace
     bu::Vector{Float64}
     bl::Vector{Float64}
 
+    H_factor::LU{Float64}
+    x_unc::Vector{Float64}
+
     H1pI::Matrix{Float64}
     H2mI::Matrix{Float64}
     H2pI::LU{Float64} # LU
@@ -27,16 +30,25 @@ struct AVIWorkspace
     settings::AVISettings
 end
 
+AVIWorkspace() = AVIWorkspace(zeros(0,0),zeros(0),zeros(0,0),zeros(0),zeros(0), 
+                              lu(zeros(0,0)),zeros(0),
+                              zeros(0,0),zeros(0,0),lu(zeros(0,0)),zeros(0,0), zeros(0),
+                              zeros(0),zeros(0), Model(), zeros(0), AVISettings())
 
-function setup_avi(H,f,A,bu,bl;x0 = zeros(0), daqp_workspace=nothing, settings=AVISettings())
+
+function setup_avi(H,f,A,bu,bl,sense;x0 = zeros(0), daqp_workspace=nothing, settings=AVISettings())
     n,m = length(f),length(bu)
     bl = isempty(bl) ? fill(-1e30,m) : bl
+    sense = isempty(sense) ? zeros(Cint,m) : sense
 
     H1 = (H+H') / 4
     H2 = H1+(H-H') / 2
     H1pI,H2mI,H2pI = H1+I, H2-I, lu!(H2+I)
 
-    x = isempty(x0) ? zeros(n) : copy(x0)
+    H_factor = lu(H)
+    x_unc = -(H_factor\f)
+
+    x = isempty(x0) ? copy(x_unc) : copy(x0)
     y,H2xpf = zeros(n),zeros(n)
 
     kkt_buffer = Float64[]
@@ -46,25 +58,26 @@ function setup_avi(H,f,A,bu,bl;x0 = zeros(0), daqp_workspace=nothing, settings=A
     DAQPBase.settings(daqp_workspace, Dict(:iter_limit => settings.inner_iter_limit, 
                                            :primal_tol => settings.primal_tol, 
                                            :dual_tol => settings.dual_tol))
-    exitflag,tsetup = DAQPBase.setup(daqp_workspace, H1pI, H2xpf, A, bu, bl)
+    exitflag,tsetup = DAQPBase.setup(daqp_workspace, H1pI, H2xpf, A, bu, bl, sense)
 
     if m > size(A,1)
         A = [I(n)[1:m-size(A,1),:];A] # To handle simple bounds
     end
 
     return exitflag, AVIWorkspace(H,f,A,bu,bl,
+                                  H_factor,x_unc,
                                   H1pI,H2mI,H2pI,H2,H2xpf,
                                   x,y,daqp_workspace,kkt_buffer,
                                   settings)
 end
 
 function solve(ws::AVIWorkspace)
-    exitflag = -4
+    exitflag = 0
     λstar, ASstar = zeros(0), Int[]
     n = length(ws.f)
     ϵp, ϵd = ws.settings.primal_tol, ws.settings.dual_tol
     α,β = ws.settings.alpha, ws.settings.beta
-    tot_iter,outer_iter = 0,0
+    tot_iter,outer_iter,nkkt = 0,0,0
     @inbounds for k in 1:ws.settings.iter_limit
         ws.H2xpf .= ws.f
         mul!(ws.H2xpf, ws.H2mI, ws.x, 1.0, 1.0)
@@ -75,10 +88,9 @@ function solve(ws::AVIWorkspace)
 
         # Same AS -> Check if KKT conditions are satisfied
         if info.iterations == 1
+            nkkt += 1
             ASu,ASl = _get_AS(info.λ,ϵd) 
-            z,AS = _solve_kkt(ws.H,ws.f,ws.A,ws.bu,ws.bl,ASu,ASl,ws.kkt_buffer)
-            xt = @view z[1:n]
-            λ = @view z[n+1:end]
+            xt,λ,AS = _solve_kkt_schur(ws,ASu,ASl)
             nu = length(ASu)
             if all(λ[i] > -ϵd for i in 1:nu) && all(λ[i] < ϵd for i in nu+1:length(λ))
                 Ax = ws.A*xt
@@ -95,8 +107,9 @@ function solve(ws::AVIWorkspace)
             mul!(ws.y, ws.H2, ws.x, 1.0, 1.0)
             ldiv!(ws.x, ws.H2pI, ws.y)
         end
+        k == ws.settings.iter_limit && (exitflag = -4)
     end
-    info = (status=flag2status[exitflag], AS=ASstar, outer_iterations=outer_iter, iterations=tot_iter)
+    info = (status=flag2status[exitflag], AS=ASstar, outer_iterations=outer_iter, iterations=tot_iter, nkkt=nkkt)
     return ws.x,λstar,exitflag,info
 end
 
@@ -112,17 +125,40 @@ function _get_AS(λ,dual_tol)
     return ASu,ASl
 end
 
-function _solve_kkt(H,f,A,bu,bl,ASu,ASl,kkt_buffer)
+function _solve_kkt_schur(ws::AVIWorkspace,ASu,ASl)
+    # Prepare some helpers
     AS = [ASu;ASl]
-    n = length(f)
-    nkkt = n+length(AS)
-    resize!(kkt_buffer,nkkt^2)
-    K = reshape(view(kkt_buffer,1:nkkt^2),(nkkt,nkkt))
-    @views K[1:n,1:n] = H
-    @views K[n+1:end,1:n] = A[AS,:] 
-    @views K[1:n,n+1:end] = A[AS,:]'
-    K[n+1:end,n+1:end] .= 0
-    return K\[-f;bu[ASu];bl[ASl]], AS
+    n,nAS = length(ws.f),length(AS)
+
+    # Juggle some buffers
+    resize!(ws.kkt_buffer,nAS*(nAS+n+1)) # Is this necessary?
+    invH_At = reshape(view(ws.kkt_buffer,1:nAS*n),(n,nAS))
+    offset = nAS*n 
+    S = reshape(view(ws.kkt_buffer,offset+1:offset+nAS^2),(nAS,nAS))
+    offset +=nAS^2
+    λ = view(ws.kkt_buffer,offset+1:offset+nAS)
+
+    AAS = ws.A[AS,:]
+
+    # Schur complement 
+    @inbounds for (i,id) in enumerate(AS)
+        @views invH_At[:,i] .= ws.A[id,:]
+    end
+    #transpose!(invH_At, AAS)
+    ldiv!(ws.H_factor,invH_At)
+    mul!(S, AAS, invH_At)
+    S_fact = lu!(S) 
+
+    # Solve for λ
+    @views λ .= AAS * ws.x_unc
+    @views λ[1:length(ASu)] .-= ws.bu[ASu]
+    @views λ[length(ASu)+1:end] .-= ws.bl[ASl]
+    ldiv!(S_fact,λ)
+
+    # Solve for x
+    x = ws.x_unc - invH_At * λ
+
+    return x,λ,AS 
 end
 
 """
@@ -149,7 +185,7 @@ x ∈ {x: blower ≤ Ax ≤ bupper} such that:
 * `info` 		- tuple containing extra information from the solver such as status, active set and number of iterations.
 
 """
-function solve_avi(H::AbstractMatrix,f::AbstractVector,A::AbstractMatrix,bupper::AbstractVector,blower::AbstractVector=Float64[]; x0 = zeros(0), settings=AVISettings())
-    exitflag, ws = setup_avi(H,f,A,bupper,blower;x0=zeros(0),settings)
+function solve_avi(H::AbstractMatrix,f::AbstractVector,A::AbstractMatrix,bupper::AbstractVector,blower::AbstractVector=Float64[], sense=Cint[]; x0 = zeros(0), settings=AVISettings())
+    exitflag, ws = setup_avi(H,f,A,bupper,blower,sense;x0,settings)
     return solve(ws)
 end
