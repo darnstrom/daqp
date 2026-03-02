@@ -8,7 +8,7 @@ extern "C" {
 #include "types.h"
 
 typedef struct{
-    DAQPWorkspace work;
+    DAQPWorkspace* work;
     DAQPProblem problem;
 
     c_float* Hsym;

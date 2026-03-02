@@ -4,7 +4,7 @@
 
 // Solve AVI
 int _daqp_avi(DAQPAVI *avi) {
-    DAQPWorkspace* work = &(avi->work);
+    DAQPWorkspace* work = avi->work;
     int n = work->n;
     int i,j,k,disp;
     c_float val,sum,sum2;
@@ -137,14 +137,14 @@ void daqp_lu_solve(c_float* LU, int* P, c_float* b, c_float* x, int n) {
 void daqp_solve_avi_kkt(DAQPAVI* avi) {
     // TODO handle simple bounds...
     int i, j, k, disp;
-    int nAS = avi->work.n_active;
-    int n = avi->work.n;
-    c_float* lambda = avi->work.lam_star;
+    int nAS = avi->work->n_active;
+    int n = avi->work->n;
+    c_float* lambda = avi->work->lam_star;
     c_float* x = avi->x;
     c_float* S = avi->kkt_buffer;
     c_float* rhs_S = avi->kkt_buffer+nAS*nAS;
     c_float* temp = avi->xtemp; // TODO make sure this does not collide with other
-    int* WS = avi->work.WS;
+    int* WS = avi->work->WS;
 
     // Compute S = A_WS * H^-1 * A_WS^T
     for (i = 0; i < nAS; i++) {
@@ -171,7 +171,7 @@ void daqp_solve_avi_kkt(DAQPAVI* avi) {
         for (j = 0; j < n; j++) {
             sum -= avi->problem.A[disp++] * temp[j];
         }
-        sum -= avi->work.sense[row_idx]&2 ? avi->problem.blower[row_idx] : avi->problem.bupper[row_idx];
+        sum -= avi->work->sense[row_idx]&2 ? avi->problem.blower[row_idx] : avi->problem.bupper[row_idx];
         rhs_S[i] = sum;
     }
 
@@ -193,7 +193,7 @@ void daqp_solve_avi_kkt(DAQPAVI* avi) {
 
 
 int daqp_check_optimal_avi(DAQPAVI* avi){
-    DAQPWorkspace* work = &(avi->work);
+    DAQPWorkspace* work = avi->work;
     int i,j,disp;
     c_float dual_tol = work->settings->dual_tol;
     c_float primal_tol = work->settings->primal_tol;

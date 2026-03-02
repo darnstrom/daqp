@@ -60,8 +60,9 @@ void daqp_avi(DAQPResult *res, DAQPProblem* problem, DAQPSettings *settings){
     int i,errorflag;
     // Setup AVI
     DAQPAVI avi;
-    avi.work.settings = settings;
-    errorflag = setup_daqp_avi(&avi, problem, &(res->setup_time));
+    DAQPWorkspace work;
+    work.settings = settings;
+    errorflag = setup_daqp_avi(&avi, problem, &work, &(res->setup_time));
     if(errorflag < 0){
         res->exitflag = errorflag;
         return;
@@ -80,11 +81,11 @@ void daqp_avi(DAQPResult *res, DAQPProblem* problem, DAQPSettings *settings){
     // Extract dual variables
     for(i=0;i < problem->m;i++) 
         res->lam[i] = 0;
-    for(i=0;i < avi.work.n_active; i++) 
-        res->lam[avi.work.WS[i]] = avi.work.lam_star[i];
+    for(i=0;i < work.n_active; i++) 
+        res->lam[work.WS[i]] = work.lam_star[i];
     
     // Extract profiling info
-    res->iter = avi.work.iterations;
+    res->iter = work.iterations;
 #ifdef PROFILING
     res->solve_time = get_time(&timer);
 #else
@@ -92,7 +93,7 @@ void daqp_avi(DAQPResult *res, DAQPProblem* problem, DAQPSettings *settings){
 #endif
 
     // Free allocated memory 
-    if(settings != NULL) avi.work.settings = NULL;
+    if(settings != NULL) work.settings = NULL;
     free_daqp_avi(&avi);
 }
 
@@ -226,7 +227,8 @@ int setup_daqp_bnb(DAQPWorkspace* work, int nb, int ns){
     return 1;
 }
 
-int setup_daqp_avi(DAQPAVI* avi, DAQPProblem* p, c_float* setup_time){
+int setup_daqp_avi(DAQPAVI* avi, DAQPProblem* p, DAQPWorkspace* work, c_float* setup_time){
+    avi->work = work;
 #ifdef PROFILING
     DAQPtimer timer;
     if(setup_time != NULL){
@@ -289,8 +291,8 @@ int setup_daqp_avi(DAQPAVI* avi, DAQPProblem* p, c_float* setup_time){
     avi->problem.sense = p->sense; 
     avi->problem.nh = 0;
 
-    avi->work.settings = NULL;
-    int setup_flag = setup_daqp(&(avi->problem),&(avi->work),NULL);
+    avi->work->settings = NULL;
+    int setup_flag = setup_daqp(&(avi->problem),avi->work,NULL);
     if(setup_flag < 0){
         free_daqp_avi(avi);
         return setup_flag;
@@ -472,8 +474,8 @@ void free_daqp_avi(DAQPAVI* avi){
     free(avi->y);
     free(avi->xtemp);
 
-    free_daqp_workspace(&(avi->work));
-    free_daqp_ldp(&(avi->work));
+    free_daqp_workspace(avi->work);
+    free_daqp_ldp(avi->work);
 }
         
 
