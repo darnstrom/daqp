@@ -60,6 +60,7 @@ void daqp_avi(DAQPResult *res, DAQPProblem* problem, DAQPSettings *settings){
     int i,errorflag;
     // Setup AVI
     DAQPAVI avi;
+    avi.work.settings = settings;
     errorflag = setup_daqp_avi(&avi, problem, &(res->setup_time));
     if(errorflag < 0){
         res->exitflag = errorflag;
@@ -91,6 +92,7 @@ void daqp_avi(DAQPResult *res, DAQPProblem* problem, DAQPSettings *settings){
 #endif
 
     // Free allocated memory 
+    if(settings != NULL) avi.work.settings = NULL;
     free_daqp_avi(&avi);
 }
 

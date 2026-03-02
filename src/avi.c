@@ -11,13 +11,14 @@ int _daqp_avi(DAQPAVI *avi) {
     int tot_iter = 0;
     int counter = 0;
     int terminate_limit = 1;
-    int exitflag = -10;
+    int exitflag = -4;
 
     // Set starting iterate
     for(i=0;i<n;i++) avi->x[i] = 0;
 
     // Start the iterations
-    for (k = 0; k < 100; k++) {
+    // TODO iter_limit should be the for tot_iter...
+    for (k = 0; k < work->settings->iter_limit; k++) {
         // Compute xtemp = H*x + f - (Hsym + I)x
         for(i=0, disp=0; i < work->n; i++){
             sum = sum2 = 0.0;
@@ -58,7 +59,7 @@ int _daqp_avi(DAQPAVI *avi) {
         }
 
         for (i = 0; i < work->n; i++){
-            avi->xtemp[i] = 0.5*avi->y[i]+avi->Hx[i]; // TODO: replace 0.5 with regularization
+            avi->xtemp[i] = 0.5*avi->y[i]+avi->Hx[i];
             avi->y[i] -= avi->x[i];
         }
         for (i = 0; i < n; i++) {
