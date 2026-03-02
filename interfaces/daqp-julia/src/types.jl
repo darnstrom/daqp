@@ -146,3 +146,24 @@ struct Workspace
     nh::Cint
     break_points::Ptr{Cint}
 end
+
+struct AVIWorkspace
+    work::DAQPBase.Workspace
+    problem::DAQPBase.QPc
+
+    Hsym::Ptr{Cdouble}
+    H1pI::Ptr{Cdouble}
+    H2pI::Ptr{Cdouble}
+    P_H2::Ptr{Cint}
+
+    LU_H::Ptr{Cdouble}
+    P_H::Ptr{Cint}
+
+    kkt_buffer::Ptr{Cdouble}
+    P_S::Ptr{Cint}
+
+    xtemp::Ptr{Cdouble}
+    Hx::Ptr{Cdouble}
+    x::Ptr{Cdouble}
+    y::Ptr{Cdouble}
+end
