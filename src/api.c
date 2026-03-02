@@ -56,6 +56,44 @@ void daqp_quadprog(DAQPResult *res, DAQPProblem* qp, DAQPSettings *settings){
     }
 }
 
+void daqp_avi(DAQPResult *res, DAQPProblem* problem, DAQPSettings *settings){
+    int i,errorflag;
+    // Setup AVI
+    DAQPAVI avi;
+    errorflag = setup_daqp_avi(&avi, problem, &(res->setup_time));
+    if(errorflag < 0){
+        res->exitflag = errorflag;
+        return;
+    }
+    // Solve the actual AVI
+#ifdef PROFILING
+    DAQPtimer timer;
+    tic(&timer);
+#endif
+    res->exitflag = _daqp_avi(&avi);
+#ifdef PROFILING
+    toc(&timer);
+#endif
+    // Extract primal solution
+    for(i=0;i < problem->n; i++) res->x[i] = avi.x[i];
+    // Extract dual variables
+    for(i=0;i < problem->m;i++) 
+        res->lam[i] = 0;
+    for(i=0;i < avi.work.n_active; i++) 
+        res->lam[avi.work.WS[i]] = avi.work.lam_star[i];
+    
+    // Extract profiling info
+    res->iter = avi.work.iterations;
+#ifdef PROFILING
+    res->solve_time = get_time(&timer);
+#else
+    res->solve_time = 0; 
+#endif
+
+    // Free allocated memory 
+    free_daqp_avi(&avi);
+}
+
 // Setup workspace and transform QP to LDP
 int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time){
     int errorflag;
@@ -183,6 +221,86 @@ int setup_daqp_bnb(DAQPWorkspace* work, int nb, int ns){
         work->bnb->nWS= 0; 
         work->bnb->fixed_ids= malloc((nb+1)*sizeof(int));
     }
+    return 1;
+}
+
+int setup_daqp_avi(DAQPAVI* avi, DAQPProblem* p, c_float* setup_time){
+#ifdef PROFILING
+    DAQPtimer timer;
+    if(setup_time != NULL){
+        *setup_time = 0; // in case setup fails 
+        tic(&timer);
+    }
+#endif
+    double rho = 0.5;
+    int n = p->n;
+    int m = p->m;
+    int ms = p->ms;
+
+    // Allocate matrices
+    avi->Hsym = malloc(n*n*sizeof(c_float));
+    avi->H1pI = malloc(n*n*sizeof(c_float));
+    avi->H2pI = malloc(n*n*sizeof(c_float));
+    avi->P_H2= malloc(n*sizeof(int));
+
+    avi->LU_H = malloc(n*n*sizeof(c_float));
+    avi->P_H = malloc(n*sizeof(int));
+
+    avi->kkt_buffer = malloc((n*n+2*n)*sizeof(c_float));
+    avi->P_S = malloc(n*sizeof(int));
+
+    // Allocate iterate (maybe reuse from normal workspace...)
+    avi->Hx = malloc(n*sizeof(c_float));
+    avi->x = malloc(n*sizeof(c_float));
+    avi->y = malloc(n*sizeof(c_float));
+    avi->xtemp = malloc(n*sizeof(c_float));
+    //
+    // Setup matrices Hsym, H1pI, and H2pI, LU_H
+    int i,j,disp;
+    c_float val;
+    for (i = 0, disp=0; i < n; i++) {
+        for (j = 0; j < n; j++, disp++) {
+            val = (p->H[disp] + p->H[j * n + i]) * 0.5;
+            avi->Hsym[disp] = val;
+            avi->H1pI[disp] = val;
+            avi->H2pI[disp] = p->H[disp];
+            avi->LU_H[disp] = p->H[disp];
+            if(i==j){ 
+                avi->H1pI[disp] += rho;
+                avi->H2pI[disp] += rho;
+            }
+        }
+    }
+    // Factorize H and H2pI 
+    daqp_lu(avi->LU_H, avi->P_H, n);
+    daqp_lu(avi->H2pI, avi->P_H2, n);
+
+    // Setup QP
+    avi->problem.n = n; 
+    avi->problem.m = m; 
+    avi->problem.ms = ms; 
+    avi->problem.H = avi->H1pI;
+    avi->problem.f = p->f;
+    avi->problem.A = p->A;
+    avi->problem.bupper = p->bupper; 
+    avi->problem.blower = p->blower; 
+    avi->problem.sense = p->sense; 
+    avi->problem.nh = 0;
+
+    avi->work.settings = NULL;
+    int setup_flag = setup_daqp(&(avi->problem),&(avi->work),NULL);
+    if(setup_flag < 0){
+        free_daqp_avi(avi);
+        return setup_flag;
+    }
+
+    avi->problem.H = p->H; // Switch back to nominal H
+#ifdef PROFILING
+    if(setup_time != NULL){
+        toc(&timer);
+        *setup_time = get_time(&timer);
+    }
+#endif
     return 1;
 }
 
@@ -334,6 +452,28 @@ void free_daqp_workspace(DAQPWorkspace *work){
     free_daqp_bnb(work);
 
 }
+
+void free_daqp_avi(DAQPAVI* avi){
+    free(avi->Hsym);
+    free(avi->H1pI);
+    free(avi->H2pI);
+    free(avi->P_H2);
+
+    free(avi->LU_H);
+    free(avi->P_H);
+
+    free(avi->kkt_buffer);
+    free(avi->P_S);
+
+    free(avi->Hx);
+    free(avi->x);
+    free(avi->y);
+    free(avi->xtemp);
+
+    free_daqp_workspace(&(avi->work));
+    free_daqp_ldp(&(avi->work));
+}
+        
 
 // Extract solution information from workspace 
 void daqp_extract_result(DAQPResult* res, DAQPWorkspace* work){

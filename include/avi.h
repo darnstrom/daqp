@@ -28,12 +28,12 @@ typedef struct{
     c_float* y;
 }DAQPAVI;
 
+int _daqp_avi(DAQPAVI* avi);
+
 int daqp_lu(c_float* A, int* P, int n);
 void daqp_lu_solve(c_float* LU, int* P, c_float* b, c_float* x, int n);
 
-DAQPAVI setup_daqp_avi(DAQPProblem* p);
 void daqp_solve_avi_kkt(DAQPAVI* avi);
-int daqp_avi(DAQPAVI *avi, c_float* x0);
 int daqp_check_optimal_avi(DAQPAVI* avi);
 
 

@@ -1,83 +1,93 @@
-#include <stdlib.h>
-#include <math.h>
 #include "avi.h"
-#include "api.h"
+#include "daqp.h"
 #include "utils.h"
 
-DAQPAVI setup_daqp_avi(DAQPProblem* p){
-    double rho = 0.5;
-    int n = p->n;
-    int m = p->m;
-    int ms = p->ms;
+// Solve AVI
+int _daqp_avi(DAQPAVI *avi) {
+    DAQPWorkspace* work = &(avi->work);
+    int n = work->n;
+    int i,j,k,disp;
+    c_float val,sum,sum2;
+    int tot_iter = 0;
+    int counter = 0;
+    int terminate_limit = 1;
+    int exitflag = -10;
 
-    DAQPAVI avi;
-    // Allocate matrices
-    avi.Hsym = malloc(n*n*sizeof(c_float));
-    avi.H1pI = malloc(n*n*sizeof(c_float));
-    avi.H2pI = malloc(n*n*sizeof(c_float));
-    avi.P_H2= malloc(n*sizeof(int));
+    // Set starting iterate
+    for(i=0;i<n;i++) avi->x[i] = 0;
 
-    avi.LU_H = malloc(n*n*sizeof(c_float));
-    avi.P_H = malloc(n*sizeof(int));
+    // Start the iterations
+    for (k = 0; k < 100; k++) {
+        // Compute xtemp = H*x + f - (Hsym + I)x
+        for(i=0, disp=0; i < work->n; i++){
+            sum = sum2 = 0.0;
+            for(j=0; j < work->n; j++) {
+                sum += avi->problem.H[disp]*avi->x[j];
+                sum2 += avi->H1pI[disp++]*avi->x[j];
+            }
+            avi->Hx[i] = sum;
+            avi->xtemp[i] = sum + avi->problem.f[i] - sum2;
+        } 
 
-    avi.kkt_buffer = malloc((n*n+2*n)*sizeof(c_float));
-    avi.P_S = malloc(n*sizeof(int));
+        // Update linear term 
+        update_v(avi->xtemp,work,0);
+        update_d(work, avi->problem.bupper,avi->problem.blower);
 
-    // Allocate iterate (maybe reuse from normal workspace...)
-    avi.Hx = malloc(n*sizeof(c_float));
-    avi.x = malloc(n*sizeof(c_float));
-    avi.y = malloc(n*sizeof(c_float));
-    avi.xtemp = malloc(n*sizeof(c_float));
-    //
-    // Setup matrices Hsym, H1pI, and H2pI, LU_H
-    int i,j,disp;
-    c_float val;
-    for (i = 0, disp=0; i < n; i++) {
-        for (j = 0; j < n; j++, disp++) {
-            val = (p->H[disp] + p->H[j * n + i]) * 0.5;
-            avi.Hsym[disp] = val;
-            avi.H1pI[disp] = val;
-            avi.H2pI[disp] = p->H[disp];
-            avi.LU_H[disp] = p->H[disp];
-            if(i==j){ 
-                avi.H1pI[disp] += rho;
-                avi.H2pI[disp] += rho;
+        exitflag = daqp_ldp(work);
+
+        if (exitflag < 0) break;
+        ldp2qp_solution(work);
+        tot_iter += work->iterations;
+        for(i=0; i < n; i++) avi->y[i]=work->x[i];
+
+        // AS has not changed -> Check KKT conditions
+        if (work->iterations == 1) {
+            if (++counter == terminate_limit) {
+                daqp_solve_avi_kkt(avi);
+                if (daqp_check_optimal_avi(avi)) {
+                    exitflag = 1;
+                    break;
+                } 
+                terminate_limit *= 2;
+                if(terminate_limit > 10) terminate_limit = 10;
+                continue;
             }
         }
+        else {
+            counter = 0;
+        }
+
+        for (i = 0; i < work->n; i++){
+            avi->xtemp[i] = 0.5*avi->y[i]+avi->Hx[i]; // TODO: replace 0.5 with regularization
+            avi->y[i] -= avi->x[i];
+        }
+        for (i = 0; i < n; i++) {
+            avi->xtemp[i] += 0.5*avi->Hsym[i * n + i] * avi->y[i]; // diagonal
+            for (j = i + 1; j < n; j++) {
+                val = 0.5*avi->Hsym[i * n + j];
+                avi->xtemp[i] += val * avi->y[j];
+                avi->xtemp[j] += val * avi->y[i];
+            }
+        }
+        daqp_lu_solve(avi->H2pI, avi->P_H2, avi->xtemp, avi->x, n);
     }
-    // Factorize H and H2pI 
-    daqp_lu(avi.LU_H, avi.P_H, n);
-    daqp_lu(avi.H2pI, avi.P_H2, n);
-
-    // Setup QP
-    avi.problem.n = n; 
-    avi.problem.m = m; 
-    avi.problem.ms = ms; 
-    avi.problem.H = avi.H1pI;
-    avi.problem.f = p->f;
-    avi.problem.A = p->A;
-    avi.problem.bupper = p->bupper; 
-    avi.problem.blower = p->blower; 
-    avi.problem.sense = p->sense; 
-    avi.problem.nh = 0;
-
-    avi.work.settings = NULL;
-    int setup_flag = setup_daqp(&(avi.problem),&(avi.work),NULL);
-
-    avi.problem.H = p->H; // Switch back to nominal H
-    return avi;
+    work->iterations = tot_iter;
+    return exitflag;
 }
-        
+
 
 int daqp_lu(c_float* A, int* P, int n) {
+    c_float max_val,pA;
     for (int i = 0; i < n; i++) P[i] = i; // Initialize permutation vector
     for (int i = 0; i < n; i++) {
         // Pivot
-        c_float max_val = 0.0;
+        max_val = 0.0;
         int pivot = i;
         for (int j = i; j < n; j++) {
-            if (fabs(A[j * n + i]) > max_val) {
-                max_val = fabs(A[j * n + i]);
+            pA = A[j*n+i];
+            pA = (pA < 0) ? -pA : pA; // |pA| 
+                if (pA > max_val) {
+                max_val = pA;
                 pivot = j;
             }
         }
@@ -180,83 +190,6 @@ void daqp_solve_avi_kkt(DAQPAVI* avi) {
     daqp_lu_solve(avi->LU_H, avi->P_H, temp, x, n);
 }
 
-
-// Main Solver Loop
-int daqp_avi(DAQPAVI *avi, c_float* x0) {
-    DAQPWorkspace* work = &(avi->work);
-    int n = work->n;
-    int i,j,k,disp;
-    c_float val,sum,sum2;
-    int tot_iter = 0;
-    int counter = 0;
-    int terminate_limit = 1;
-    int exitflag = -10;
-
-    // Set starting iterate
-    if(x0 == NULL)
-        for(i=0;i<n;i++) avi->x[i] = 0;
-    else
-        for(i=0;i<n;i++) avi->x[i] = x0[i];
-
-    // Start the iterations
-    for (k = 0; k < 100; k++) {
-        printf("==== Iteration %d ===== \n",k);
-        // Compute xtemp = H*x + f - (Hsym + I)x
-        for(i=0, disp=0; i < work->n; i++){
-            sum = sum2 = 0.0;
-            for(j=0; j < work->n; j++) {
-                sum += avi->problem.H[disp]*avi->x[j];
-                sum2 += avi->H1pI[disp++]*avi->x[j];
-            }
-            avi->Hx[i] = sum;
-            avi->xtemp[i] = sum + avi->problem.f[i] - sum2;
-        } 
-
-        // Update linear term 
-        update_v(avi->xtemp,work,0);
-        update_d(work, avi->problem.bupper,avi->problem.blower);
-
-        exitflag = daqp_ldp(work);
-
-        if (exitflag < 0) break;
-        ldp2qp_solution(work);
-        tot_iter += work->iterations;
-        for(i=0; i < n; i++) avi->y[i]=work->x[i];
-
-        // AS has not changed -> Check KKT conditions
-        if (work->iterations == 1) {
-            if (++counter == terminate_limit) {
-                daqp_solve_avi_kkt(avi);
-                if (daqp_check_optimal_avi(avi)) {
-                    printf("OPTIMAL\n");
-                    exitflag = 1;
-                    break;
-                } 
-                terminate_limit *= 2;
-                if(terminate_limit > 10) terminate_limit = 10;
-                continue;
-            }
-        }
-        else {
-            counter = 0;
-        }
-
-        for (i = 0; i < work->n; i++){
-            avi->xtemp[i] = 0.5*avi->y[i]+avi->Hx[i]; // TODO: replace 0.5 with regularization
-            avi->y[i] -= avi->x[i];
-        }
-        for (i = 0; i < n; i++) {
-            avi->xtemp[i] += 0.5*avi->Hsym[i * n + i] * avi->y[i]; // diagonal
-            for (j = i + 1; j < n; j++) {
-                val = 0.5*avi->Hsym[i * n + j];
-                avi->xtemp[i] += val * avi->y[j];
-                avi->xtemp[j] += val * avi->y[i];
-            }
-        }
-        daqp_lu_solve(avi->H2pI, avi->P_H2, avi->xtemp, avi->x, n);
-    }
-    return exitflag;
-}
 
 int daqp_check_optimal_avi(DAQPAVI* avi){
     DAQPWorkspace* work = &(avi->work);
