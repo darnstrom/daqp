@@ -147,9 +147,9 @@ struct Workspace
     break_points::Ptr{Cint}
 end
 
-struct AVIWorkspace
-    work::DAQPBase.Workspace
-    problem::DAQPBase.QPc
+struct AVIWorkspaceC
+    work::Ptr{DAQPBase.Workspace}
+    problem::Ptr{DAQPBase.QPc}
 
     Hsym::Ptr{Cdouble}
     H1pI::Ptr{Cdouble}

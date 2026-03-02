@@ -37,6 +37,32 @@ void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
     res->solve_time = 0; 
 #endif
 }
+void daqp_solve_avi(DAQPResult *res, DAQPAVI* avi){
+    int i;
+#ifdef PROFILING
+    DAQPtimer timer;
+    tic(&timer);
+#endif
+    res->exitflag = _daqp_avi(avi);
+#ifdef PROFILING
+    toc(&timer);
+#endif
+    // Extract primal solution
+    for(i=0;i < avi->problem->n; i++) res->x[i] = avi->x[i];
+    // Extract dual variables
+    for(i=0;i < avi->problem->m;i++) 
+        res->lam[i] = 0;
+    for(i=0;i < avi->work->n_active; i++) 
+        res->lam[avi->work->WS[i]] = avi->work->lam_star[i];
+    
+    // Extract profiling info
+    res->iter = avi->work->iterations;
+#ifdef PROFILING
+    res->solve_time = get_time(&timer);
+#else
+    res->solve_time = 0; 
+#endif
+}
 
 // Setup and solve problem
 void daqp_quadprog(DAQPResult *res, DAQPProblem* qp, DAQPSettings *settings){
@@ -57,41 +83,16 @@ void daqp_quadprog(DAQPResult *res, DAQPProblem* qp, DAQPSettings *settings){
 }
 
 void daqp_avi(DAQPResult *res, DAQPProblem* problem, DAQPSettings *settings){
-    int i,errorflag;
     // Setup AVI
     DAQPAVI avi;
     DAQPWorkspace work;
     work.settings = settings;
-    errorflag = setup_daqp_avi(&avi, problem, &work, &(res->setup_time));
+    int errorflag = setup_daqp_avi(&avi, problem, &work, &(res->setup_time));
     if(errorflag < 0){
         res->exitflag = errorflag;
         return;
     }
-    // Solve the actual AVI
-#ifdef PROFILING
-    DAQPtimer timer;
-    tic(&timer);
-#endif
-    res->exitflag = _daqp_avi(&avi);
-#ifdef PROFILING
-    toc(&timer);
-#endif
-    // Extract primal solution
-    for(i=0;i < problem->n; i++) res->x[i] = avi.x[i];
-    // Extract dual variables
-    for(i=0;i < problem->m;i++) 
-        res->lam[i] = 0;
-    for(i=0;i < work.n_active; i++) 
-        res->lam[work.WS[i]] = work.lam_star[i];
-    
-    // Extract profiling info
-    res->iter = work.iterations;
-#ifdef PROFILING
-    res->solve_time = get_time(&timer);
-#else
-    res->solve_time = 0; 
-#endif
-
+    daqp_solve_avi(res, &avi);
     // Free allocated memory 
     if(settings != NULL) work.settings = NULL;
     free_daqp_avi(&avi);
@@ -229,6 +230,7 @@ int setup_daqp_bnb(DAQPWorkspace* work, int nb, int ns){
 
 int setup_daqp_avi(DAQPAVI* avi, DAQPProblem* p, DAQPWorkspace* work, c_float* setup_time){
     avi->work = work;
+    avi->problem = malloc(sizeof(DAQPProblem));
 #ifdef PROFILING
     DAQPtimer timer;
     if(setup_time != NULL){
@@ -275,30 +277,32 @@ int setup_daqp_avi(DAQPAVI* avi, DAQPProblem* p, DAQPWorkspace* work, c_float* s
             }
         }
     }
+    // Set x0 to zero 
+    for(i=0;i<n;i++) avi->x[i] = 0;
     // Factorize H and H2pI 
     daqp_lu(avi->LU_H, avi->P_H, n);
     daqp_lu(avi->H2pI, avi->P_H2, n);
 
     // Setup QP
-    avi->problem.n = n; 
-    avi->problem.m = m; 
-    avi->problem.ms = ms; 
-    avi->problem.H = avi->H1pI;
-    avi->problem.f = p->f;
-    avi->problem.A = p->A;
-    avi->problem.bupper = p->bupper; 
-    avi->problem.blower = p->blower; 
-    avi->problem.sense = p->sense; 
-    avi->problem.nh = 0;
+    avi->problem->n = n; 
+    avi->problem->m = m; 
+    avi->problem->ms = ms; 
+    avi->problem->H = avi->H1pI;
+    avi->problem->f = p->f;
+    avi->problem->A = p->A;
+    avi->problem->bupper = p->bupper; 
+    avi->problem->blower = p->blower; 
+    avi->problem->sense = p->sense; 
+    avi->problem->nh = 0;
 
     avi->work->settings = NULL;
-    int setup_flag = setup_daqp(&(avi->problem),avi->work,NULL);
+    int setup_flag = setup_daqp(avi->problem,avi->work,NULL);
     if(setup_flag < 0){
         free_daqp_avi(avi);
         return setup_flag;
     }
 
-    avi->problem.H = p->H; // Switch back to nominal H
+    avi->problem->H = p->H; // Switch back to nominal H
 #ifdef PROFILING
     if(setup_time != NULL){
         toc(&timer);
@@ -473,6 +477,8 @@ void free_daqp_avi(DAQPAVI* avi){
     free(avi->x);
     free(avi->y);
     free(avi->xtemp);
+
+    free(avi->problem);
 
     free_daqp_workspace(avi->work);
     free_daqp_ldp(avi->work);

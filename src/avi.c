@@ -13,9 +13,6 @@ int _daqp_avi(DAQPAVI *avi) {
     int terminate_limit = 1;
     int exitflag = -4;
 
-    // Set starting iterate
-    for(i=0;i<n;i++) avi->x[i] = 0;
-
     // Start the iterations
     // TODO iter_limit should be the for tot_iter...
     for (k = 0; k < work->settings->iter_limit; k++) {
@@ -23,16 +20,16 @@ int _daqp_avi(DAQPAVI *avi) {
         for(i=0, disp=0; i < work->n; i++){
             sum = sum2 = 0.0;
             for(j=0; j < work->n; j++) {
-                sum += avi->problem.H[disp]*avi->x[j];
+                sum += avi->problem->H[disp]*avi->x[j];
                 sum2 += avi->H1pI[disp++]*avi->x[j];
             }
             avi->Hx[i] = sum;
-            avi->xtemp[i] = sum + avi->problem.f[i] - sum2;
+            avi->xtemp[i] = sum + avi->problem->f[i] - sum2;
         } 
 
         // Update linear term 
         update_v(avi->xtemp,work,0);
-        update_d(work, avi->problem.bupper,avi->problem.blower);
+        update_d(work, avi->problem->bupper,avi->problem->blower);
 
         exitflag = daqp_ldp(work);
 
@@ -149,29 +146,29 @@ void daqp_solve_avi_kkt(DAQPAVI* avi) {
     // Compute S = A_WS * H^-1 * A_WS^T
     for (i = 0; i < nAS; i++) {
         // temp = H^-1 * A_row_WS[i]^T
-        daqp_lu_solve(avi->LU_H, avi->P_H, avi->problem.A + WS[i] * n, temp, n);
+        daqp_lu_solve(avi->LU_H, avi->P_H, avi->problem->A + WS[i] * n, temp, n);
 
         for (j = 0; j < nAS; j++) {
             double sum = 0;
             disp = WS[j] * n;
             for (k = 0; k < n; k++) {
-                sum += avi->problem.A[disp + k] * temp[k];
+                sum += avi->problem->A[disp + k] * temp[k];
             }
             S[j * nAS + i] = sum;
         }
     }
 
     // Form rhs for Schur system: rhs_S = -A_WS * H^-1 * f - b_WS
-    daqp_lu_solve(avi->LU_H, avi->P_H, avi->problem.f, temp, n);
+    daqp_lu_solve(avi->LU_H, avi->P_H, avi->problem->f, temp, n);
 
     for (i = 0; i < nAS; i++) {
         int row_idx = WS[i];
         double sum = 0;
         disp = row_idx * n;
         for (j = 0; j < n; j++) {
-            sum -= avi->problem.A[disp++] * temp[j];
+            sum -= avi->problem->A[disp++] * temp[j];
         }
-        sum -= avi->work->sense[row_idx]&2 ? avi->problem.blower[row_idx] : avi->problem.bupper[row_idx];
+        sum -= avi->work->sense[row_idx]&2 ? avi->problem->blower[row_idx] : avi->problem->bupper[row_idx];
         rhs_S[i] = sum;
     }
 
@@ -180,11 +177,11 @@ void daqp_solve_avi_kkt(DAQPAVI* avi) {
     daqp_lu_solve(S, avi->P_S, rhs_S, lambda, nAS);
 
     // Get x by solving for: H * x = -f - A_WS^T * lambda
-    for (i = 0; i < n; i++) temp[i] = -avi->problem.f[i];
+    for (i = 0; i < n; i++) temp[i] = -avi->problem->f[i];
     for (j = 0; j < nAS; j++) {
         c_float lj = lambda[j];
         disp = WS[j] * n;
-        for (i = 0; i < n; i++) temp[i] -= avi->problem.A[disp++] * lj;
+        for (i = 0; i < n; i++) temp[i] -= avi->problem->A[disp++] * lj;
     }
 
     // Final back-substitution to get x
@@ -209,8 +206,8 @@ int daqp_check_optimal_avi(DAQPAVI* avi){
     // Simple constraints
     for(i=0; i < work->ms; i++){
         if(IS_ACTIVE(i)) continue;
-        if(avi->x[i] > avi->problem.bupper[i] + primal_tol) return 0; 
-        if(avi->x[i] < avi->problem.blower[i] -primal_tol) return 0;
+        if(avi->x[i] > avi->problem->bupper[i] + primal_tol) return 0; 
+        if(avi->x[i] < avi->problem->blower[i] -primal_tol) return 0;
     }
 
     // General constraints
@@ -220,9 +217,9 @@ int daqp_check_optimal_avi(DAQPAVI* avi){
             continue;
         }
         c_float Ax = 0.0;
-        for(j=0; j < work->n; j++) Ax += avi->problem.A[disp++]*avi->x[j];
-        if(Ax > avi->problem.bupper[i]+primal_tol) return 0; 
-        if(Ax < avi->problem.blower[i] - primal_tol) return 0;
+        for(j=0; j < work->n; j++) Ax += avi->problem->A[disp++]*avi->x[j];
+        if(Ax > avi->problem->bupper[i]+primal_tol) return 0; 
+        if(Ax < avi->problem->blower[i] - primal_tol) return 0;
     }
     // All checks passed -> optimal KKT point found
     return 1;

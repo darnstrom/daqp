@@ -9,7 +9,7 @@ extern "C" {
 
 typedef struct{
     DAQPWorkspace* work;
-    DAQPProblem problem;
+    DAQPProblem* problem;
 
     c_float* Hsym;
     c_float* H1pI;

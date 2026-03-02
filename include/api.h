@@ -26,6 +26,7 @@ typedef struct{
 }DAQPResult;
 
 void daqp_solve(DAQPResult* res, DAQPWorkspace *work);
+void daqp_solve_avi(DAQPResult* res, DAQPAVI *avi);
 void daqp_quadprog(DAQPResult* res, DAQPProblem* qp,DAQPSettings* settings);
 void daqp_avi(DAQPResult *res, DAQPProblem* problem, DAQPSettings *settings);
 

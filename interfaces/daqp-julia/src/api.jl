@@ -193,7 +193,7 @@ creates an empty optimization model `d`.
 
 The following functions acts on such models: 
 
-* `setup(d,H,f,A,bupper,blower,sense)`: setup a QP problem (see `DAQPBase.quadprog` for problem details)
+* `setup(d,H,f,A,bupper,blower,sense)`: setup a problem (see `DAQPBase.quadprog` or DAQPBase.avi for details)
 * `solve(d)`: solve a populated model
 * `update(d,H,f,A,bupper,blower,sense)`: update an existing model 
 * `dict = DAQPBase.settings(d)`: return a Dictionary with the current settings for the model `d` 
@@ -207,6 +207,8 @@ mutable struct Model
     has_model::Bool
     x::Vector{Float64}
     λ::Vector{Float64}
+    avi_work::Ptr{DAQPBase.AVIWorkspaceC}
+    is_avi::Bool
     function Model()
         # Setup initial model
         work = Libc.calloc(1,sizeof(DAQPBase.Workspace))
@@ -215,6 +217,7 @@ mutable struct Model
         ccall((:allocate_daqp_settings,DAQPBase.libdaqp),Nothing,(Ptr{DAQPBase.Workspace},),work)
         finalizer(DAQPBase.delete!, daqp)
         daqp.has_model=false
+        daqp.is_avi=false
         return daqp 
     end
 end
@@ -222,8 +225,13 @@ end
 
 function delete!(daqp::DAQPBase.Model)
     if(daqp.work != C_NULL)
-        ccall((:free_daqp_workspace,DAQPBase.libdaqp),Nothing,(Ptr{DAQPBase.Workspace},),daqp.work)
-        ccall((:free_daqp_ldp,DAQPBase.libdaqp),Nothing,(Ptr{DAQPBase.Workspace},),daqp.work)
+        if(daqp.is_avi)
+            ccall((:free_daqp_avi,DAQPBase.libdaqp),Nothing,(Ptr{DAQPBase.AVIWorkspaceC},),daqp.avi_work)
+            Libc.free(daqp.avi_work)
+        else
+            ccall((:free_daqp_workspace,DAQPBase.libdaqp),Nothing,(Ptr{DAQPBase.Workspace},),daqp.work)
+            ccall((:free_daqp_ldp,DAQPBase.libdaqp),Nothing,(Ptr{DAQPBase.Workspace},),daqp.work)
+        end
         Libc.free(daqp.work);
         daqp.work = C_NULL
         Libc.free(daqp.qpc_ptr);
@@ -231,7 +239,7 @@ function delete!(daqp::DAQPBase.Model)
     end
 end
 
-function setup(daqp::DAQPBase.Model, qp::DAQPBase.QPj)
+function setup(daqp::DAQPBase.Model, qp::DAQPBase.QPj; is_avi=false)
     daqp.qpj = qp
     daqp.qpc = DAQPBase.QPc(daqp.qpj)
     old_settings = settings(daqp); # in case setup fails
@@ -245,8 +253,15 @@ function setup(daqp::DAQPBase.Model, qp::DAQPBase.QPj)
         # ensure proximal-point iterations are used for LPs
         (old_settings.eps_prox == 0) && settings(daqp,Dict(:eps_prox=>1))
     end
-
-    exitflag = ccall((:setup_daqp,DAQPBase.libdaqp),Cint,(Ptr{DAQPBase.QPc}, Ptr{DAQPBase.Workspace}, Ptr{Cdouble}), daqp.qpc_ptr, daqp.work, Ref{Cdouble}(setup_time))
+    
+    # Handle AVI with other setup 
+    if(is_avi)
+        daqp.is_avi = true
+        daqp.avi_work = Libc.calloc(1,sizeof(DAQPBase.AVIWorkspaceC))
+        exitflag = ccall((:setup_daqp_avi,DAQPBase.libdaqp),Cint,(Ptr{DAQPBase.AVIWorkspaceC},Ptr{DAQPBase.QPc}, Ptr{DAQPBase.Workspace}, Ptr{Cdouble}), daqp.avi_work, daqp.qpc_ptr, daqp.work, Ref{Cdouble}(setup_time))
+    else
+        exitflag = ccall((:setup_daqp,DAQPBase.libdaqp),Cint,(Ptr{DAQPBase.QPc}, Ptr{DAQPBase.Workspace}, Ptr{Cdouble}), daqp.qpc_ptr, daqp.work, Ref{Cdouble}(setup_time))
+    end
     if(exitflag < 0)
         # XXX: if setup fails DAQP currently clears settings
         ccall((:allocate_daqp_settings,DAQPBase.libdaqp),Nothing,(Ptr{DAQPBase.Workspace},),daqp.work)
@@ -262,17 +277,24 @@ end
 
 function setup(daqp::DAQPBase.Model, H::Matrix{Cdouble},f::Vector{Cdouble},
         A::Matrix{Cdouble},bupper::Vector{Cdouble},blower::Vector{Cdouble}=Cdouble[],
-        sense::Vector{Cint}=Cint[];A_rowmaj=false,break_points = Cint[])
-    return setup(daqp,QPj(H,f,A,bupper,blower,sense;A_rowmaj,break_points))
+        sense::Vector{Cint}=Cint[];A_rowmaj=false,break_points = Cint[],is_avi=false)
+    H = is_avi ? copy(H') : H
+    return setup(daqp,QPj(H,f,A,bupper,blower,sense;A_rowmaj,break_points);is_avi)
 end
 
 function solve(daqp::DAQPBase.Model)
     if(!daqp.has_model) return  zeros(0), NaN, -10, [] end
     result_ptr= Ref(DAQPResult(daqp.x,daqp.λ));
 
-    ccall((:daqp_solve, DAQPBase.libdaqp), Nothing,
-          (Ref{DAQPBase.DAQPResult},Ref{DAQPBase.Workspace}),
-          result_ptr,daqp.work)
+    if(daqp.is_avi)
+        ccall((:daqp_solve_avi, DAQPBase.libdaqp), Nothing,
+              (Ref{DAQPBase.DAQPResult},Ptr{DAQPBase.AVIWorkspaceC}),
+              result_ptr,daqp.avi_work)
+    else
+        ccall((:daqp_solve, DAQPBase.libdaqp), Nothing,
+              (Ref{DAQPBase.DAQPResult},Ref{DAQPBase.Workspace}),
+              result_ptr,daqp.work)
+    end
 
     result = unsafe_load(Base.unsafe_convert(Ptr{DAQPResult}, result_ptr))
     info = (x = daqp.x, λ=daqp.λ, fval=result.fval,
