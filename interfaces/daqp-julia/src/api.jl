@@ -30,7 +30,7 @@ is interpreted as
 * `H`           - cost matrix
 * `f`           - cost vector
 * `A`           - linear constraint matrix
-* `buppe`       - upper bounds for constraints
+* `bupper`       - upper bounds for constraints
 * `blower`      - lower bounds for constraints (default: -Inf)
 * `sense`       - constraint types, as a vector of Cints (default: 0). Example types:
   * `0 ` : inequality
@@ -110,6 +110,81 @@ function linprog(f::Vector{Float64},
     d = DAQPBase.Model() 
     DAQPBase.setup(d,QPj(zeros(0,0),f,A,bupper,blower,sense;A_rowmaj))
     return DAQPBase.solve(d);
+end
+"""
+# Example calls
+    xstar, lambda, exitflag, info = DAQPBase.avi(H,f,A,bupper)
+    xstar, lambda, exitflag, info = DAQPBase.avi(H,f,A,bupper,blower,sense) 
+
+finds the primal solution `xstar` and dual solution `lambda` to the affine variational inequality 
+
+Find `xstar` ∈ C ≜ {x : blower <= A x <= bupper}
+```
+⟨H*xstar f, y-xstar⟩ ≥ 0 for all y ∈ C 
+```
+If `bupper` and `blower` have more elements than rows of `A`, the first
+elements are interpreted as simple bounds. For example:
+
+```
+    A = [7.0 8.0]
+    blower = [-4.0; -5.0; -6.0]
+    bupper = [ 1.0;  2.0;  3.0]
+```
+is interpreted as
+
+```
+        -4.0 <= x₁ <= 1.0
+        -5.0 <= x₂ <= 2.0
+    -6.0 <= 7 x₁ + 8 x₂ <= 3.0
+
+```
+
+# Input 
+* `H`           - linear transform
+* `f`           - offset 
+* `A`           - linear constraint matrix
+* `bupper`       - upper bounds for constraints
+* `blower`      - lower bounds for constraints (default: -Inf)
+* `sense`       - constraint types, as a vector of Cints (default: 0). Example types:
+  * `0 ` : inequality
+  * `1 ` : active inequality (used as warm start)
+  * `5 ` : equality
+  * `8 ` : soft (allowed to be violated if necessary)
+  * `16` : binary (either upper or lower bound should hold with equality)
+
+# Output
+* `xstar`       - primal solution
+* `lambda`      - dual solution 
+* `exitflag`    - flag from solver (>0 success, <0 failure) 
+* `info`        - tuple containing profiling information from the solver. 
+
+"""
+function avi(H::Matrix{Float64},f::Vector{Float64}, 
+        A::Matrix{Float64},bupper::Vector{Float64},blower::Vector{Float64}=Float64[],sense::Vector{Cint}=Cint[];A_rowmaj=false,settings=nothing)
+    return avi(QPj(copy(H'),f,A,bupper,blower,sense;A_rowmaj);settings)
+end
+function avi(qpj::QPj;settings=nothing)
+    # Setup QP
+    qp = QPc(qpj);
+
+    # Setup output struct
+    xstar = zeros(Float64,qp.n); 
+    lam= zeros(Float64,qp.m); 
+    result= Ref(DAQPResult(xstar,lam));
+    ptr_settings = settings isa DAQPSettings ? Ref(settings) : Ptr{DAQPBase.DAQPSettings}(C_NULL)
+
+
+    ccall((:daqp_avi, DAQPBase.libdaqp), Nothing,
+          (Ref{DAQPBase.DAQPResult},Ref{DAQPBase.QPc},Ref{DAQPBase.DAQPSettings}), 
+          result,Ref(qp),ptr_settings)
+
+    info = (x = xstar, λ=lam, fval=result[].fval,
+            exitflag=result[].exitflag,
+            status = DAQPBase.flag2status[result[].exitflag],
+            solve_time = result[].solve_time,
+            setup_time = result[].setup_time,
+            iterations= result[].iter, nodes = result[].nodes)
+    return xstar,lam,result[].exitflag,info
 end
 """
     d = DAQPBase.Model() 
