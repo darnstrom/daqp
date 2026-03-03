@@ -140,6 +140,8 @@ int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time){
         own_settings = 0;
     allocate_daqp_workspace(work,qp->n,ns);
 
+    // TODO setup_daqp_avi...
+
     errorflag = setup_daqp_ldp(work,qp);
     if(errorflag < 0){
         if(own_settings==0) work->settings = NULL;
@@ -230,7 +232,7 @@ int setup_daqp_bnb(DAQPWorkspace* work, int nb, int ns){
 
 int setup_daqp_avi(DAQPAVI* avi, DAQPProblem* p, DAQPWorkspace* work, c_float* setup_time){
     avi->work = work;
-    avi->problem = malloc(sizeof(DAQPProblem));
+    avi->problem = p; 
 #ifdef PROFILING
     DAQPtimer timer;
     if(setup_time != NULL){
@@ -238,29 +240,9 @@ int setup_daqp_avi(DAQPAVI* avi, DAQPProblem* p, DAQPWorkspace* work, c_float* s
         tic(&timer);
     }
 #endif
-    double rho = 0.5;
-    int n = p->n;
-    int m = p->m;
-    int ms = p->ms;
+    const int n = p->n;
+    allocate_daqp_avi(avi,n);
 
-    // Allocate matrices
-    avi->Hsym = malloc(n*n*sizeof(c_float));
-    avi->H1pI = malloc(n*n*sizeof(c_float));
-    avi->H2pI = malloc(n*n*sizeof(c_float));
-    avi->P_H2= malloc(n*sizeof(int));
-
-    avi->LU_H = malloc(n*n*sizeof(c_float));
-    avi->P_H = malloc(n*sizeof(int));
-
-    avi->kkt_buffer = malloc((n*n+2*n)*sizeof(c_float));
-    avi->P_S = malloc(n*sizeof(int));
-
-    // Allocate iterate (maybe reuse from normal workspace...)
-    avi->Hx = malloc(n*sizeof(c_float));
-    avi->x = malloc(n*sizeof(c_float));
-    avi->y = malloc(n*sizeof(c_float));
-    avi->xtemp = malloc(n*sizeof(c_float));
-    //
     // Setup matrices Hsym, H1pI, and H2pI, LU_H
     int i,j,disp;
     c_float val;
@@ -272,37 +254,30 @@ int setup_daqp_avi(DAQPAVI* avi, DAQPProblem* p, DAQPWorkspace* work, c_float* s
             avi->H2pI[disp] = p->H[disp];
             avi->LU_H[disp] = p->H[disp];
             if(i==j){ 
-                avi->H1pI[disp] += rho;
-                avi->H2pI[disp] += rho;
+                avi->H1pI[disp] += 0.5; // TODO add option to settings 
+                avi->H2pI[disp] += 0.5;
             }
         }
     }
     // Set x0 to zero 
-    for(i=0;i<n;i++) avi->x[i] = 0;
+    for(i=0;i<n;i++) avi->x[i] = 0; // TODO separate from setup...
     // Factorize H and H2pI 
     daqp_lu(avi->LU_H, avi->P_H, n);
     daqp_lu(avi->H2pI, avi->P_H2, n);
 
-    // Setup QP
-    avi->problem->n = n; 
-    avi->problem->m = m; 
-    avi->problem->ms = ms; 
-    avi->problem->H = avi->H1pI;
-    avi->problem->f = p->f;
-    avi->problem->A = p->A;
-    avi->problem->bupper = p->bupper; 
-    avi->problem->blower = p->blower; 
-    avi->problem->sense = p->sense; 
-    avi->problem->nh = 0;
 
-    avi->work->settings = NULL;
-    int setup_flag = setup_daqp(avi->problem,avi->work,NULL);
+    avi->work->settings = NULL; // TODO Should be able to remove
+    
+    double* swp_pointer = p->H ;
+    p->H = avi->H1pI; // Setup QP with symmetric/regularized Hessian
+    int setup_flag = setup_daqp(avi->problem,avi->work,NULL); //TODO should be able to remove + do swap in setup_ldp 
+    p->H = swp_pointer; // Swap back nominal H
+
     if(setup_flag < 0){
         free_daqp_avi(avi);
         return setup_flag;
     }
 
-    avi->problem->H = p->H; // Switch back to nominal H
 #ifdef PROFILING
     if(setup_time != NULL){
         toc(&timer);
@@ -429,6 +404,25 @@ void allocate_daqp_ldp(DAQPWorkspace *work, int n, int m, int ms, int alloc_R, i
     }
 #endif
 }
+void allocate_daqp_avi(DAQPAVI* avi, const int n){
+    // Allocate matrices
+    avi->Hsym = malloc(n*n*sizeof(c_float));
+    avi->H1pI = malloc(n*n*sizeof(c_float));
+    avi->H2pI = malloc(n*n*sizeof(c_float));
+    avi->P_H2= malloc(n*sizeof(int));
+
+    avi->LU_H = malloc(n*n*sizeof(c_float));
+    avi->P_H = malloc(n*sizeof(int));
+
+    avi->kkt_buffer = malloc((n*n+2*n)*sizeof(c_float));
+    avi->P_S = malloc(n*sizeof(int));
+
+    // Allocate iterate (maybe reuse from normal workspace...)
+    avi->Hx = malloc(n*sizeof(c_float));
+    avi->x = malloc(n*sizeof(c_float));
+    avi->y = malloc(n*sizeof(c_float));
+    avi->xtemp = malloc(n*sizeof(c_float));
+}
 
 
 // Free memory for iterates
@@ -477,8 +471,6 @@ void free_daqp_avi(DAQPAVI* avi){
     free(avi->x);
     free(avi->y);
     free(avi->xtemp);
-
-    free(avi->problem);
 
     free_daqp_workspace(avi->work);
     free_daqp_ldp(avi->work);
