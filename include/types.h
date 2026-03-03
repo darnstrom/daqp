@@ -45,6 +45,8 @@ typedef struct{
     // Hierarchical QP
     int* break_points;
     int nh;
+    // Extra flags for problem
+    int problem_type; // 1 == AVI otherwise QP
 }DAQPProblem;
 
 typedef struct{
@@ -94,6 +96,24 @@ typedef struct{
     int nodecount;
     int itercount;
 }DAQPBnB;
+
+typedef struct{
+    c_float* Hsym;
+    c_float* H1pI;
+    c_float* H2pI;
+    int* P_H2;
+
+    c_float* LU_H;
+    int* P_H;
+
+    c_float* kkt_buffer;
+    int* P_S;
+
+    c_float* xtemp;
+    c_float* Hx;
+    c_float* x;
+    c_float* y;
+}DAQPAVI;
 
 typedef struct{
     DAQPProblem* qp;
@@ -161,6 +181,8 @@ typedef struct{
     // Hierarchical QP 
     int nh;
     int* break_points;
+    // AVI
+    DAQPAVI* avi;
 }DAQPWorkspace;
 
 # ifdef __cplusplus

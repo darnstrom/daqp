@@ -113,8 +113,8 @@ function linprog(f::Vector{Float64},
 end
 """
 # Example calls
-    xstar, lambda, exitflag, info = DAQPBase.avi(H,f,A,bupper)
-    xstar, lambda, exitflag, info = DAQPBase.avi(H,f,A,bupper,blower,sense) 
+    xstar, _, exitflag, info = DAQPBase.avi(H,f,A,bupper)
+    xstar, _, exitflag, info = DAQPBase.avi(H,f,A,bupper,blower,sense) 
 
 finds the primal solution `xstar` and dual solution `lambda` to the affine variational inequality 
 
@@ -154,37 +154,14 @@ is interpreted as
 
 # Output
 * `xstar`       - primal solution
-* `lambda`      - dual solution 
+* `_`           - placeholder
 * `exitflag`    - flag from solver (>0 success, <0 failure) 
 * `info`        - tuple containing profiling information from the solver. 
 
 """
 function avi(H::Matrix{Float64},f::Vector{Float64}, 
         A::Matrix{Float64},bupper::Vector{Float64},blower::Vector{Float64}=Float64[],sense::Vector{Cint}=Cint[];A_rowmaj=false,settings=nothing)
-    return avi(QPj(copy(H'),f,A,bupper,blower,sense;A_rowmaj);settings)
-end
-function avi(qpj::QPj;settings=nothing)
-    # Setup QP
-    qp = QPc(qpj);
-
-    # Setup output struct
-    xstar = zeros(Float64,qp.n); 
-    lam= zeros(Float64,qp.m); 
-    result= Ref(DAQPResult(xstar,lam));
-    ptr_settings = settings isa DAQPSettings ? Ref(settings) : Ptr{DAQPBase.DAQPSettings}(C_NULL)
-
-
-    ccall((:daqp_avi, DAQPBase.libdaqp), Nothing,
-          (Ref{DAQPBase.DAQPResult},Ref{DAQPBase.QPc},Ref{DAQPBase.DAQPSettings}), 
-          result,Ref(qp),ptr_settings)
-
-    info = (x = xstar, λ=lam, fval=result[].fval,
-            exitflag=result[].exitflag,
-            status = DAQPBase.flag2status[result[].exitflag],
-            solve_time = result[].solve_time,
-            setup_time = result[].setup_time,
-            iterations= result[].iter, nodes = result[].nodes)
-    return xstar,lam,result[].exitflag,info
+    return quadprog(QPj(H,f,A,bupper,blower,sense;A_rowmaj,is_avi=true);settings)
 end
 """
     d = DAQPBase.Model() 
@@ -207,8 +184,6 @@ mutable struct Model
     has_model::Bool
     x::Vector{Float64}
     λ::Vector{Float64}
-    avi_work::Ptr{DAQPBase.AVIWorkspaceC}
-    is_avi::Bool
     function Model()
         # Setup initial model
         work = Libc.calloc(1,sizeof(DAQPBase.Workspace))
@@ -217,7 +192,6 @@ mutable struct Model
         ccall((:allocate_daqp_settings,DAQPBase.libdaqp),Nothing,(Ptr{DAQPBase.Workspace},),work)
         finalizer(DAQPBase.delete!, daqp)
         daqp.has_model=false
-        daqp.is_avi=false
         return daqp 
     end
 end
@@ -225,13 +199,8 @@ end
 
 function delete!(daqp::DAQPBase.Model)
     if(daqp.work != C_NULL)
-        if(daqp.is_avi)
-            ccall((:free_daqp_avi,DAQPBase.libdaqp),Nothing,(Ptr{DAQPBase.AVIWorkspaceC},),daqp.avi_work)
-            Libc.free(daqp.avi_work)
-        else
-            ccall((:free_daqp_workspace,DAQPBase.libdaqp),Nothing,(Ptr{DAQPBase.Workspace},),daqp.work)
-            ccall((:free_daqp_ldp,DAQPBase.libdaqp),Nothing,(Ptr{DAQPBase.Workspace},),daqp.work)
-        end
+        ccall((:free_daqp_workspace,DAQPBase.libdaqp),Nothing,(Ptr{DAQPBase.Workspace},),daqp.work)
+        ccall((:free_daqp_ldp,DAQPBase.libdaqp),Nothing,(Ptr{DAQPBase.Workspace},),daqp.work)
         Libc.free(daqp.work);
         daqp.work = C_NULL
         Libc.free(daqp.qpc_ptr);
@@ -239,7 +208,7 @@ function delete!(daqp::DAQPBase.Model)
     end
 end
 
-function setup(daqp::DAQPBase.Model, qp::DAQPBase.QPj; is_avi=false)
+function setup(daqp::DAQPBase.Model, qp::DAQPBase.QPj)
     daqp.qpj = qp
     daqp.qpc = DAQPBase.QPc(daqp.qpj)
     old_settings = settings(daqp); # in case setup fails
@@ -255,13 +224,7 @@ function setup(daqp::DAQPBase.Model, qp::DAQPBase.QPj; is_avi=false)
     end
     
     # Handle AVI with other setup 
-    if(is_avi)
-        daqp.is_avi = true
-        daqp.avi_work = Libc.calloc(1,sizeof(DAQPBase.AVIWorkspaceC))
-        exitflag = ccall((:setup_daqp_avi,DAQPBase.libdaqp),Cint,(Ptr{DAQPBase.AVIWorkspaceC},Ptr{DAQPBase.QPc}, Ptr{DAQPBase.Workspace}, Ptr{Cdouble}), daqp.avi_work, daqp.qpc_ptr, daqp.work, Ref{Cdouble}(setup_time))
-    else
-        exitflag = ccall((:setup_daqp,DAQPBase.libdaqp),Cint,(Ptr{DAQPBase.QPc}, Ptr{DAQPBase.Workspace}, Ptr{Cdouble}), daqp.qpc_ptr, daqp.work, Ref{Cdouble}(setup_time))
-    end
+    exitflag = ccall((:setup_daqp,DAQPBase.libdaqp),Cint,(Ptr{DAQPBase.QPc}, Ptr{DAQPBase.Workspace}, Ptr{Cdouble}), daqp.qpc_ptr, daqp.work, Ref{Cdouble}(setup_time))
     if(exitflag < 0)
         # XXX: if setup fails DAQP currently clears settings
         ccall((:allocate_daqp_settings,DAQPBase.libdaqp),Nothing,(Ptr{DAQPBase.Workspace},),daqp.work)
@@ -277,24 +240,17 @@ end
 
 function setup(daqp::DAQPBase.Model, H::Matrix{Cdouble},f::Vector{Cdouble},
         A::Matrix{Cdouble},bupper::Vector{Cdouble},blower::Vector{Cdouble}=Cdouble[],
-        sense::Vector{Cint}=Cint[];A_rowmaj=false,break_points = Cint[],is_avi=false)
-    H = is_avi ? copy(H') : H
-    return setup(daqp,QPj(H,f,A,bupper,blower,sense;A_rowmaj,break_points);is_avi)
+        sense::Vector{Cint}=Cint[];A_rowmaj=false,break_points = Cint[], is_avi=false)
+    return setup(daqp,QPj(H,f,A,bupper,blower,sense;A_rowmaj,break_points,is_avi))
 end
 
 function solve(daqp::DAQPBase.Model)
     if(!daqp.has_model) return  zeros(0), NaN, -10, [] end
     result_ptr= Ref(DAQPResult(daqp.x,daqp.λ));
 
-    if(daqp.is_avi)
-        ccall((:daqp_solve_avi, DAQPBase.libdaqp), Nothing,
-              (Ref{DAQPBase.DAQPResult},Ptr{DAQPBase.AVIWorkspaceC}),
-              result_ptr,daqp.avi_work)
-    else
-        ccall((:daqp_solve, DAQPBase.libdaqp), Nothing,
-              (Ref{DAQPBase.DAQPResult},Ref{DAQPBase.Workspace}),
-              result_ptr,daqp.work)
-    end
+    ccall((:daqp_solve, DAQPBase.libdaqp), Nothing,
+          (Ref{DAQPBase.DAQPResult},Ref{DAQPBase.Workspace}),
+          result_ptr,daqp.work)
 
     result = unsafe_load(Base.unsafe_convert(Ptr{DAQPResult}, result_ptr))
     info = (x = daqp.x, λ=daqp.λ, fval=result.fval,

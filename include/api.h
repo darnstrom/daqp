@@ -44,7 +44,7 @@ void allocate_daqp_avi(DAQPAVI *avi, int n);
 void free_daqp_ldp(DAQPWorkspace *work);
 void free_daqp_workspace(DAQPWorkspace *work);
 void free_daqp_bnb(DAQPWorkspace* work);
-void free_daqp_avi(DAQPAVI* avi);
+void free_daqp_avi(DAQPWorkspace* work);
 
 void daqp_extract_result(DAQPResult* res, DAQPWorkspace* work);
 void daqp_default_settings(DAQPSettings *settings);

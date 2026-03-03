@@ -11,13 +11,14 @@ struct QPj
 
     break_points::Vector{Cint}
     nh::Cint
+    is_avi::Bool
 end
 function QPj() 
-    return QPj(0,0,0,Matrix{Cdouble}(undef,0,0),Vector{Cdouble}(undef,0),Matrix{Cdouble}(undef,0,0), Vector{Cdouble}(undef,0), Vector{Cdouble}(undef,0), Vector{Cint}(undef,0),Vector{Cint}(undef,0),0)
+    return QPj(0,0,0,Matrix{Cdouble}(undef,0,0),Vector{Cdouble}(undef,0),Matrix{Cdouble}(undef,0,0), Vector{Cdouble}(undef,0), Vector{Cdouble}(undef,0), Vector{Cint}(undef,0),Vector{Cint}(undef,0),0,false)
 end
 function QPj(H::Matrix{Float64},f::Vector{Float64},
         A::Matrix{Float64},bupper::Vector{Float64}, blower::Vector{Float64},
-        sense::Vector{Cint};A_rowmaj=false,break_points=Cint[])
+        sense::Vector{Cint};A_rowmaj=false,break_points=Cint[],is_avi=false)
     # TODO: check consistency of dimensions
     if(A_rowmaj)
         (n,mA) = size(A);
@@ -28,10 +29,9 @@ function QPj(H::Matrix{Float64},f::Vector{Float64},
     sense = isempty(sense) ? zeros(Cint,length(bupper)) : sense
     m = length(bupper);
     ms = m-mA;
-    if(!A_rowmaj)
-        A = A' # Transpose A for col => row major
-    end
-    return QPj(n,m,ms,H,f,A,bupper,blower,sense,break_points,length(break_points))
+    !A_rowmaj && (A = A') # Transpose A for col => row major
+    is_avi && (H = copy(H')) # Need to be row major
+    return QPj(n,m,ms,H,f,A,bupper,blower,sense,break_points,length(break_points),is_avi)
 end
 
 struct QPc 
@@ -47,14 +47,18 @@ struct QPc
 
     break_points::Ptr{Cint}
     nh::Cint
+    problem_type::Cint
 end
 function QPc(qpj::QPj)
     H_ptr = isempty(qpj.H) ? C_NULL : pointer(qpj.H)
     f_ptr = isempty(qpj.f) ? C_NULL : pointer(qpj.f)
+
+
+    problem_type = qpj.is_avi ? 1 : 0;
     return QPc(qpj.n,qpj.m,qpj.ms,
                H_ptr,f_ptr,
                pointer(qpj.A),pointer(qpj.bupper),pointer(qpj.blower),pointer(qpj.sense),
-               pointer(qpj.break_points),qpj.nh)
+               pointer(qpj.break_points),qpj.nh,problem_type)
 end
 
 struct DAQPSettings
@@ -145,25 +149,5 @@ struct Workspace
 
     nh::Cint
     break_points::Ptr{Cint}
-end
-
-struct AVIWorkspaceC
-    work::Ptr{DAQPBase.Workspace}
-    problem::Ptr{DAQPBase.QPc}
-
-    Hsym::Ptr{Cdouble}
-    H1pI::Ptr{Cdouble}
-    H2pI::Ptr{Cdouble}
-    P_H2::Ptr{Cint}
-
-    LU_H::Ptr{Cdouble}
-    P_H::Ptr{Cint}
-
-    kkt_buffer::Ptr{Cdouble}
-    P_S::Ptr{Cint}
-
-    xtemp::Ptr{Cdouble}
-    Hx::Ptr{Cdouble}
-    x::Ptr{Cdouble}
-    y::Ptr{Cdouble}
+    avi::Ptr{Cvoid}
 end

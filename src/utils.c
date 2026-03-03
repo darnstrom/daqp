@@ -28,7 +28,12 @@ int update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
 
     /** Update Rinv **/
     if(mask&UPDATE_Rinv){
-        error_flag = update_Rinv(work, qp->H);
+        if(work->avi == NULL)
+            error_flag = update_Rinv(work, qp->H);
+        else{
+            update_avi(work->avi,qp);
+            error_flag = update_Rinv(work, work->avi->H1pI);
+        }
         if(error_flag<0)
             return error_flag;
     }
@@ -347,6 +352,90 @@ int normalize_M(DAQPWorkspace* work){
             work->M[disp]*=scaling_i;
     }
     return 0;
+}
+
+int update_avi(DAQPAVI* avi, DAQPProblem* p){
+    const int n = p->n;
+    // Setup matrices Hsym, H1pI, and H2pI, LU_H
+    int i,j,disp;
+    c_float val;
+    for (i = 0, disp=0; i < n; i++) {
+        for (j = 0; j < n; j++, disp++) {
+            val = (p->H[disp] + p->H[j * n + i]) * 0.5;
+            avi->Hsym[disp] = val;
+            avi->H1pI[disp] = val;
+            avi->H2pI[disp] = p->H[disp];
+            avi->LU_H[disp] = p->H[disp];
+            if(i==j){ 
+                avi->H1pI[disp] += 0.5; // TODO add option to settings 
+                avi->H2pI[disp] += 0.5;
+            }
+        }
+    }
+    // Set x0 to zero 
+    for(i=0;i<n;i++) avi->x[i] = 0; // TODO separate from setup...
+    // Factorize H and H2pI 
+    daqp_lu(avi->LU_H, avi->P_H, n);
+    daqp_lu(avi->H2pI, avi->P_H2, n);
+    return 1;
+}
+
+int daqp_lu(c_float* A, int* P, int n) {
+    c_float max_val,pA;
+    for (int i = 0; i < n; i++) P[i] = i; // Initialize permutation vector
+    for (int i = 0; i < n; i++) {
+        // Pivot
+        max_val = 0.0;
+        int pivot = i;
+        for (int j = i; j < n; j++) {
+            pA = A[j*n+i];
+            pA = (pA < 0) ? -pA : pA; // |pA| 
+                if (pA > max_val) {
+                max_val = pA;
+                pivot = j;
+            }
+        }
+
+        // Check for singularity
+        if (max_val < 1e-12) return -1;
+
+        // Swap rows in A
+        for (int k = 0; k < n; k++) {
+            c_float temp = A[i * n + k];
+            A[i * n + k] = A[pivot * n + k];
+            A[pivot * n + k] = temp;
+        }
+        // Swap elements in permutation vector
+        int tempP = P[i];
+        P[i] = P[pivot];
+        P[pivot] = tempP;
+
+        // Elimination
+        for (int j = i + 1; j < n; j++) {
+            A[j * n + i] /= A[i * n + i]; // Store multiplier in L part
+            for (int k = i + 1; k < n; k++) {
+                A[j * n + k] -= A[j * n + i] * A[i * n + k];
+            }
+        }
+    }
+    return 0;
+}
+
+void daqp_lu_solve(c_float* LU, int* P, c_float* b, c_float* x, int n) {
+    // Solve Ly = Pb
+    for (int i = 0; i < n; i++) {
+        x[i] = b[P[i]]; // Apply permutation to b
+        for (int j = 0; j < i; j++) {
+            x[i] -= LU[i * n + j] * x[j];
+        }
+    }
+    // Solve Ux = y
+    for (int i = n - 1; i >= 0; i--) {
+        for (int j = i + 1; j < n; j++) {
+            x[i] -= LU[i * n + j] * x[j];
+        }
+        x[i] /= LU[i * n + i];
+    }
 }
 
 /* Remove Minrep */

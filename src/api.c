@@ -12,14 +12,18 @@ void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
 #endif
     // Select algorithm
     if(work->settings->eps_prox==0){
-        if(work->bnb != NULL)
-            res->exitflag = daqp_bnb(work);
-        else if(work->nh > 1)
-            res->exitflag = daqp_hiqp(work,res->lam);
-        else
-            res->exitflag = daqp_ldp(work);
-
-        if(res->exitflag > 0) ldp2qp_solution(work); // Retrieve qp solution 
+        if(work->avi == NULL){
+            if(work->bnb != NULL)
+                res->exitflag = daqp_bnb(work);
+            else if(work->nh > 1)
+                res->exitflag = daqp_hiqp(work,res->lam);
+            else
+                res->exitflag = daqp_ldp(work);
+            if(res->exitflag > 0) ldp2qp_solution(work); // Retrieve qp solution 
+        }
+        else{ //AVI
+            res->exitflag = solve_avi(work);
+        }
     }
     else{//Prox
         res->exitflag = daqp_prox(work);
@@ -31,32 +35,6 @@ void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
     // Package result
     daqp_extract_result(res,work);
     // Add time to result
-#ifdef PROFILING
-    res->solve_time = get_time(&timer);
-#else
-    res->solve_time = 0; 
-#endif
-}
-void daqp_solve_avi(DAQPResult *res, DAQPAVI* avi){
-    int i;
-#ifdef PROFILING
-    DAQPtimer timer;
-    tic(&timer);
-#endif
-    res->exitflag = _daqp_avi(avi);
-#ifdef PROFILING
-    toc(&timer);
-#endif
-    // Extract primal solution
-    for(i=0;i < avi->problem->n; i++) res->x[i] = avi->x[i];
-    // Extract dual variables
-    for(i=0;i < avi->problem->m;i++) 
-        res->lam[i] = 0;
-    for(i=0;i < avi->work->n_active; i++) 
-        res->lam[avi->work->WS[i]] = avi->work->lam_star[i];
-    
-    // Extract profiling info
-    res->iter = avi->work->iterations;
 #ifdef PROFILING
     res->solve_time = get_time(&timer);
 #else
@@ -82,20 +60,10 @@ void daqp_quadprog(DAQPResult *res, DAQPProblem* qp, DAQPSettings *settings){
     }
 }
 
+// XXX should be very similar to quadprog now
 void daqp_avi(DAQPResult *res, DAQPProblem* problem, DAQPSettings *settings){
-    // Setup AVI
-    DAQPAVI avi;
-    DAQPWorkspace work;
-    work.settings = settings;
-    int errorflag = setup_daqp_avi(&avi, problem, &work, &(res->setup_time));
-    if(errorflag < 0){
-        res->exitflag = errorflag;
-        return;
-    }
-    daqp_solve_avi(res, &avi);
-    // Free allocated memory 
-    if(settings != NULL) work.settings = NULL;
-    free_daqp_avi(&avi);
+    // Set the flag correctly
+    daqp_quadprog(res,problem,settings);
 }
 
 // Setup workspace and transform QP to LDP
@@ -140,8 +108,10 @@ int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time){
         own_settings = 0;
     allocate_daqp_workspace(work,qp->n,ns);
 
-    // TODO setup_daqp_avi...
-
+    if(qp->problem_type == 1){ // Problem type 1 == AVI
+        work->avi= malloc(sizeof(DAQPAVI));
+        allocate_daqp_avi(work->avi,qp->n);
+    }
     errorflag = setup_daqp_ldp(work,qp);
     if(errorflag < 0){
         if(own_settings==0) work->settings = NULL;
@@ -171,6 +141,7 @@ int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp){
     int error_flag;
     int alloc_R=0, alloc_v=0;
 
+
     // Only allocate Rinv if H is not NULL
     if(qp->H!=NULL){
         alloc_R = 1;
@@ -184,7 +155,6 @@ int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp){
 
     // Allocate memory for LDP
     allocate_daqp_ldp(work, qp->n, qp->m, qp->ms, alloc_R, alloc_v);
-
 
     // Update hierarchy if hqp
     if(qp->nh > 1) update_mask += UPDATE_hierarchy;
@@ -227,63 +197,6 @@ int setup_daqp_bnb(DAQPWorkspace* work, int nb, int ns){
         work->bnb->nWS= 0; 
         work->bnb->fixed_ids= malloc((nb+1)*sizeof(int));
     }
-    return 1;
-}
-
-int setup_daqp_avi(DAQPAVI* avi, DAQPProblem* p, DAQPWorkspace* work, c_float* setup_time){
-    avi->work = work;
-    avi->problem = p; 
-#ifdef PROFILING
-    DAQPtimer timer;
-    if(setup_time != NULL){
-        *setup_time = 0; // in case setup fails 
-        tic(&timer);
-    }
-#endif
-    const int n = p->n;
-    allocate_daqp_avi(avi,n);
-
-    // Setup matrices Hsym, H1pI, and H2pI, LU_H
-    int i,j,disp;
-    c_float val;
-    for (i = 0, disp=0; i < n; i++) {
-        for (j = 0; j < n; j++, disp++) {
-            val = (p->H[disp] + p->H[j * n + i]) * 0.5;
-            avi->Hsym[disp] = val;
-            avi->H1pI[disp] = val;
-            avi->H2pI[disp] = p->H[disp];
-            avi->LU_H[disp] = p->H[disp];
-            if(i==j){ 
-                avi->H1pI[disp] += 0.5; // TODO add option to settings 
-                avi->H2pI[disp] += 0.5;
-            }
-        }
-    }
-    // Set x0 to zero 
-    for(i=0;i<n;i++) avi->x[i] = 0; // TODO separate from setup...
-    // Factorize H and H2pI 
-    daqp_lu(avi->LU_H, avi->P_H, n);
-    daqp_lu(avi->H2pI, avi->P_H2, n);
-
-
-    avi->work->settings = NULL; // TODO Should be able to remove
-    
-    double* swp_pointer = p->H ;
-    p->H = avi->H1pI; // Setup QP with symmetric/regularized Hessian
-    int setup_flag = setup_daqp(avi->problem,avi->work,NULL); //TODO should be able to remove + do swap in setup_ldp 
-    p->H = swp_pointer; // Swap back nominal H
-
-    if(setup_flag < 0){
-        free_daqp_avi(avi);
-        return setup_flag;
-    }
-
-#ifdef PROFILING
-    if(setup_time != NULL){
-        toc(&timer);
-        *setup_time = get_time(&timer);
-    }
-#endif
     return 1;
 }
 
@@ -372,6 +285,8 @@ void allocate_daqp_workspace(DAQPWorkspace *work, int n, int ns){
     work->bnb = NULL;
     work->nh = 0;
     work->break_points = NULL;
+    work->avi = NULL;
+
     reset_daqp_workspace(work);
 }
 
@@ -452,28 +367,30 @@ void free_daqp_workspace(DAQPWorkspace *work){
     }
 
     free_daqp_bnb(work);
+    free_daqp_avi(work);
 
 }
 
-void free_daqp_avi(DAQPAVI* avi){
-    free(avi->Hsym);
-    free(avi->H1pI);
-    free(avi->H2pI);
-    free(avi->P_H2);
+void free_daqp_avi(DAQPWorkspace* work){
+    if(work->avi != NULL){
+        free(work->avi->Hsym);
+        free(work->avi->H1pI);
+        free(work->avi->H2pI);
+        free(work->avi->P_H2);
 
-    free(avi->LU_H);
-    free(avi->P_H);
+        free(work->avi->LU_H);
+        free(work->avi->P_H);
 
-    free(avi->kkt_buffer);
-    free(avi->P_S);
+        free(work->avi->kkt_buffer);
+        free(work->avi->P_S);
 
-    free(avi->Hx);
-    free(avi->x);
-    free(avi->y);
-    free(avi->xtemp);
-
-    free_daqp_workspace(avi->work);
-    free_daqp_ldp(avi->work);
+        free(work->avi->Hx);
+        free(work->avi->x);
+        free(work->avi->y);
+        free(work->avi->xtemp);
+        free(work->avi);
+        work->avi = NULL;
+    }
 }
         
 
@@ -492,7 +409,7 @@ void daqp_extract_result(DAQPResult* res, DAQPWorkspace* work){
     }
 
     // Shift back function value
-    if(work->v != NULL && (work->settings->eps_prox == 0
+    if(work->v != NULL && work->avi == NULL && (work->settings->eps_prox == 0
                 || work->Rinv != NULL || work->RinvD != NULL)){ // Normal QP
         res->fval = work->fval;
         for(i=0;i<work->n;i++) res->fval-=work->v[i]*work->v[i];
