@@ -129,6 +129,10 @@ void daqp_solve_avi_kkt(DAQPWorkspace* work) {
             }
         }
         rhs[i] = -sum;
+
+        // Soft constraints -> diagonal of S gets regularized
+        if(IS_SOFT(row_idx))
+            S[i*(nAS+1)]+=work->settings->rho_soft/SQUARE(work->scaling[row_idx]);
     }
 
     // Get lambda by solving S * lambda = rhs
