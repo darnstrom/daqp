@@ -15,6 +15,7 @@ cdef extern from "types.h":
     
         int* break_points
         int nh
+        int problem_type
 
     ctypedef struct DAQPSettings:
         double primal_tol;

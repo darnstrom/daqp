@@ -37,6 +37,17 @@ classdef daqp< handle
             info.setup_time = setup_time;
         end
 
+        function [x,fval,exitflag,info] = avi(H,f,A,bupper,blower,sense)
+            d = daqp();
+            [exitflag,setup_time] = d.setup(H,f,A,bupper,blower,sense,[],1);
+            if(exitflag <0)
+                x = [];fval=[];info=[];
+                return; 
+            end
+            [x,fval,exitflag,info] = d.solve();
+            info.setup_time = setup_time;
+        end
+
         function [x,es,exitflag,info] = hidaqp(As,bus,bls)
             nh = length(As);
             A = [];
@@ -87,9 +98,11 @@ classdef daqp< handle
             [x,fval,exitflag,info] = daqpmex('solve', this.work_ptr,...
                 this.H,this.f,this.A,this.bupper,this.blower,this.sense,this.break_points);
         end
-        function [exitflag,setup_time] = setup(this,H,f,A,bupper,blower,sense,break_points)
+        function [exitflag,setup_time] = setup(this,H,f,A,bupper,blower,sense,break_points,problem_type)
             if(nargin < 8)
                 break_points = [];
+            if(nargin < 9)
+                problem_type = 0;
             end
 
             % TODO Check validity
@@ -110,10 +123,13 @@ classdef daqp< handle
                 this.bupper = single(bupper);
                 this.blower = single(blower);
             end
+            if problem_type == 1 % AVI
+                this.H = this.H' % col.major => row.major
+            end
             this.sense = int32(sense);
             this.break_points= int32(break_points);
             [exitflag,setup_time] = daqpmex('setup', this.work_ptr,this.H,this.f,...
-                this.A,this.bupper,this.blower,this.sense,this.break_points);
+                this.A,this.bupper,this.blower,this.sense,this.break_points,int32(problem_type));
         end
 
         function settings = settings(this,varargin)

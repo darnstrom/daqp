@@ -77,8 +77,8 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  // Get dimensions 
 	  int n = mxGetM(prhs[4]);
 	  int m = mxGetM(prhs[5]);
-	  int ms = m-mxGetN(prhs[4]);
-    int nh = mxGetM(prhs[8]);
+      int ms = m-mxGetN(prhs[4]);
+      int nh = mxGetM(prhs[8]);
 	  
 	  // Setup QP struct
 	  qp->n = n;
@@ -90,8 +90,9 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  qp->bupper= (c_float *)mxGetPr(prhs[5]);
 	  qp->blower= (c_float *)mxGetPr(prhs[6]);
 	  qp->sense= (int *)mxGetPr(prhs[7]);
-    qp->break_points= (nh > 1) ?  (int *)mxGetPr(prhs[8]) : NULL;
-    qp->nh=nh;
+      qp->break_points= (nh > 1) ?  (int *)mxGetPr(prhs[8]) : NULL;
+      qp->nh=nh;
+      qp->problem_type= (int)prhs[9];
 
 	  
 	  c_float solve_time;

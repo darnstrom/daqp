@@ -4,6 +4,7 @@ cimport daqp
 def solve(double[:, :] H, double[:] f, double[:, :] A,
           double[:] bupper, double[:] blower=None,
           int[:] sense =None, int[:] break_points=np.zeros(0,dtype=np.intc),
+          is_binary=False,
           primal_tol = DEFAULT_PRIM_TOL, dual_tol = DEFAULT_DUAL_TOL,
           zero_tol = DEFAULT_ZERO_TOL, pivot_tol = DEFAULT_PIVOT_TOL,
           progress_tol = DEFAULT_PROG_TOL, cycle_tol = DEFAULT_CYCLE_TOL,
@@ -53,6 +54,10 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
           * 8  ->  Soft constraint (allowed to be violated if necessary) 
           * 16 ->  Binary constraint (the upper or lower bound should hold with equality)
     See <https://darnstrom.github.io/daqp/parameters>`_ for more information
+    break_points:
+        Break points that define prioritized constraints
+    is_avi:
+        flag for interpreting the problem as an AVI (relevant for asymmetric H) 
 
     Keyword arguments are used for settings. For example:
        daqp.solve(H, f, A, bupper, blower, sense, primal_tol=1e-6, iter_limit=1000)
@@ -82,7 +87,7 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
     """
 
     # Setup problem
-    cdef int n,m,ms,nb
+    cdef int n,m,ms,nb,problem_type
     cdef int* bin_ids_cand 
     cdef double *A_ptr, *bu_ptr, *bl_ptr
     cdef int* sense_ptr
@@ -96,6 +101,9 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
         blower = np.full(m, -DAQP_INF)
     if sense is None:
         sense = np.zeros(m, dtype=np.intc)
+    problem_type = 1 if is_avi else 0
+
+        
 
     
     H_ptr = NULL if H is None else &H[0,0]
@@ -109,7 +117,7 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
         bu_ptr, bl_ptr, sense_ptr  = &bupper[0], &blower[0], &sense[0]
 
 
-    cdef DAQPProblem problem = [n,m,m-mA, H_ptr, f_ptr, A_ptr, bu_ptr, bl_ptr, sense_ptr, bp_ptr, nh]
+    cdef DAQPProblem problem = [n,m,m-mA, H_ptr, f_ptr, A_ptr, bu_ptr, bl_ptr, sense_ptr, bp_ptr, nh, problem_type]
 
     # Setup settings
     cdef DAQPSettings settings = [primal_tol, dual_tol, zero_tol, pivot_tol,
