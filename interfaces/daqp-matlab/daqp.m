@@ -101,6 +101,7 @@ classdef daqp< handle
         function [exitflag,setup_time] = setup(this,H,f,A,bupper,blower,sense,break_points,problem_type)
             if(nargin < 8)
                 break_points = [];
+            end
             if(nargin < 9)
                 problem_type = 0;
             end
