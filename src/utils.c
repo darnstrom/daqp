@@ -359,6 +359,7 @@ int update_avi(DAQPAVI* avi, DAQPProblem* p){
     // Setup matrices Hsym, H1pI, and H2pI, LU_H
     int i,j,disp;
     c_float val;
+    avi->rho = 0.0;
     for (i = 0, disp=0; i < n; i++) {
         for (j = 0; j < n; j++, disp++) {
             val = (p->H[disp] + p->H[j * n + i]) * 0.5;
@@ -366,12 +367,17 @@ int update_avi(DAQPAVI* avi, DAQPProblem* p){
             avi->H1pI[disp] = val;
             avi->H2pI[disp] = p->H[disp];
             avi->LU_H[disp] = p->H[disp];
-            if(i==j){ 
-                avi->H1pI[disp] += 0.5; // TODO add option to settings 
-                avi->H2pI[disp] += 0.5;
-            }
+            avi->rho += SQUARE(p->H[disp]);
         }
     }
+    // Regularization 
+    avi->rho = sqrt(avi->rho)/2;
+    for(i=0,disp=0; i<n;i++){
+        avi->H1pI[disp] += avi->rho;
+        avi->H2pI[disp] += avi->rho;
+        disp += n+1;
+    }
+
     // Set x0 to zero 
     for(i=0;i<n;i++) avi->x[i] = 0; // TODO separate from setup...
     // Factorize H and H2pI 

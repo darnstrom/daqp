@@ -113,6 +113,8 @@ typedef struct{
     c_float* Hx;
     c_float* x;
     c_float* y;
+
+    c_float rho;
 }DAQPAVI;
 
 typedef struct{

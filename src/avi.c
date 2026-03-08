@@ -57,7 +57,7 @@ int solve_avi(DAQPWorkspace *work) {
         }
 
         for (i = 0; i < work->n; i++){
-            avi->xtemp[i] = 0.5*avi->y[i]+avi->Hx[i];
+            avi->xtemp[i] = avi->rho*avi->y[i]+avi->Hx[i];
             avi->y[i] -= avi->x[i];
         }
         for (i = 0; i < n; i++) {
