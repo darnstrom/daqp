@@ -6,7 +6,8 @@ Base.@kwdef mutable struct AVISettings
     alpha::Float64 = 1.0
     beta::Float64 = 0.25
     regularization::Float64 = 0.5 
-    terminate_counter::Int = 10
+    max_terminate_counter::Int = 5
+    min_terminate_counter::Int = 5
 end
 
 struct AVIWorkspace
@@ -110,7 +111,7 @@ function solve(ws::AVIWorkspace)
     ϵp, ϵd = ws.settings.primal_tol, ws.settings.dual_tol
     α,β = ws.settings.alpha, ws.settings.beta
     tot_iter,outer_iter,nkkt = 0,0,0
-    counter,terminate_limit = 0,1
+    counter,terminate_limit = 0,ws.settings.min_terminate_counter
     #isnan(ws.x[1]) && (ws.x .= -ws.H\ws.f) # Use unconstrained optimum as x0
     isnan(ws.x[1]) && (ws.x .= zeros(n)) # Use unconstrained optimum as x0
     @inbounds for k in 1:ws.settings.iter_limit
@@ -135,7 +136,6 @@ function solve(ws::AVIWorkspace)
                     exitflag, outer_iter = 1,k
                     break
                 end
-                terminate_limit = min(2*terminate_limit, ws.settings.terminate_counter)
                 ws.x .= xt
                 continue
             end
