@@ -7,10 +7,12 @@ int solve_avi(DAQPWorkspace *work) {
     DAQPAVI* avi = work->avi;
     int n = work->n;
     int i,j,k,disp;
+    int exitflag = -10;
     c_float val,sum,sum2;
     int tot_iter = 0;
     int counter = 0;
-    int exitflag = -4;
+    int terminate_limit = 5;
+    c_float minimum_newton_residual = DAQP_INF;
 
     // Start the iterations
     // TODO iter_limit should be the for tot_iter...
@@ -35,11 +37,34 @@ int solve_avi(DAQPWorkspace *work) {
         if (exitflag < 0) break;
         ldp2qp_solution(work);
         tot_iter += work->iterations;
-        for(i=0; i < n; i++) avi->y[i]=work->x[i];
+
+        if (counter == terminate_limit){ // Check if Newton step made progress
+            // Compute ||natural residual||^2
+            sum = 0.0;
+            for(i=0; i < n; i++){
+                val = work->avi->x[i]-work->x[i];
+                sum += val*val;
+            }
+            // If no decrease since last Newton iterate -> revert Newton step 
+            if(sum > minimum_newton_residual){
+                for(i = 0; i < n; i++) work->avi->x[i] = work->xold[i];
+                terminate_limit += 5; // Increase terminate limit to give DR more time to converge
+                if(terminate_limit > 30) terminate_limit = 30;
+            }
+            else{
+                minimum_newton_residual = sum;
+                for(i=0; i < n; i++) avi->y[i]=work->x[i];
+            }
+        }
+        else{ // Update y iterate
+            for(i=0; i < n; i++) avi->y[i]=work->x[i];
+        }
 
         // AS has not changed -> Check KKT conditions
         if (work->iterations == 1) {
-            if (++counter == 5) {
+            if (++counter == terminate_limit) {
+                for(i=0; i < n; i++) work->xold[i] = work->avi->x[i]; // Store xold in case Newton step fails
+                // Find KKT point
                 daqp_solve_avi_kkt(work);
                 if (daqp_check_optimal_avi(work)) {
                     for(i=0; i < n; i++) work->x[i] = work->avi->x[i]; // TODO no need for local x in avi 
