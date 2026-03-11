@@ -10,7 +10,6 @@ int solve_avi(DAQPWorkspace *work) {
     c_float val,sum,sum2;
     int tot_iter = 0;
     int counter = 0;
-    int terminate_limit = 1;
     int exitflag = -4;
 
     // Start the iterations
@@ -40,15 +39,13 @@ int solve_avi(DAQPWorkspace *work) {
 
         // AS has not changed -> Check KKT conditions
         if (work->iterations == 1) {
-            if (++counter == terminate_limit) {
+            if (++counter == 5) {
                 daqp_solve_avi_kkt(work);
                 if (daqp_check_optimal_avi(work)) {
                     for(i=0; i < n; i++) work->x[i] = work->avi->x[i]; // TODO no need for local x in avi 
                     exitflag = 1;
                     break;
                 } 
-                terminate_limit *= 2;
-                if(terminate_limit > 10) terminate_limit = 10;
                 continue;
             }
         }
@@ -121,7 +118,7 @@ void daqp_solve_avi_kkt(DAQPWorkspace* work) {
         row_idx = WS[i];
         sum = IS_LOWER(row_idx) ? work->qp->blower[row_idx] : work->qp->bupper[row_idx];
         if(row_idx < work->ms) // Simple bound
-            sum = -temp[row_idx];
+            sum += temp[row_idx];
         else{ // General constraint
             disp = (row_idx-work->ms)*n;
             for (k = 0; k < n; k++) {
