@@ -4,7 +4,7 @@ cimport daqp
 def solve(double[:, :] H, double[:] f, double[:, :] A,
           double[:] bupper, double[:] blower=None,
           int[:] sense =None, int[:] break_points=np.zeros(0,dtype=np.intc),
-          is_binary=False,
+          is_avi=False,
           primal_tol = DEFAULT_PRIM_TOL, dual_tol = DEFAULT_DUAL_TOL,
           zero_tol = DEFAULT_ZERO_TOL, pivot_tol = DEFAULT_PIVOT_TOL,
           progress_tol = DEFAULT_PROG_TOL, cycle_tol = DEFAULT_CYCLE_TOL,
