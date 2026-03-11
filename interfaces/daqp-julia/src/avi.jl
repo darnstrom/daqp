@@ -113,6 +113,9 @@ function solve(ws::AVIWorkspace)
     tot_iter,outer_iter,nkkt = 0,0,0
     counter,terminate_limit = 0,ws.settings.min_terminate_counter
     #isnan(ws.x[1]) && (ws.x .= -ws.H\ws.f) # Use unconstrained optimum as x0
+    yold = zeros(n)
+    xt = zeros(n)
+    res = Inf
     isnan(ws.x[1]) && (ws.x .= zeros(n)) # Use unconstrained optimum as x0
     @inbounds for k in 1:ws.settings.iter_limit
         mul!(ws.Hx,ws.H,ws.x)
@@ -121,6 +124,18 @@ function solve(ws::AVIWorkspace)
 
         DAQPBase.update(ws.daqp_workspace, nothing, ws.xtemp, nothing, nothing,nothing)
         ws.y[:], _, exitflag, info = DAQPBase.solve(ws.daqp_workspace)
+        if counter == terminate_limit  ## Happens after a kkt point has been tested
+            res_cand = norm(ws.y-ws.x)
+            println("Newton: $(res_cand^2)")
+            if res_cand > res
+                # Revert newton step
+                ws.y .= yold 
+                ws.x .= xt
+                terminate_limit = min(terminate_limit + 5, 30)
+            else
+                res = res_cand
+            end
+        end
         exitflag < 0 && break 
         tot_iter += info.iterations
 
@@ -129,7 +144,7 @@ function solve(ws::AVIWorkspace)
             if (counter += 1) == terminate_limit 
                 nkkt += 1
                 ASu,ASl = _get_AS(info.λ,ϵd) 
-                xt,λ,AS = _solve_kkt(ws,ASu,ASl)
+                xt[:],λ,AS = _solve_kkt(ws,ASu,ASl)
                 if _is_optimal(λ,xt,info.λ,ws,ASu,ASl)
                     ws.x .= xt
                     λstar,ASstar = copy(λ),AS
@@ -137,6 +152,7 @@ function solve(ws::AVIWorkspace)
                     break
                 end
                 ws.x .= xt
+                yold .= ws.y # Backup in case newton step fails
                 continue
             end
         else

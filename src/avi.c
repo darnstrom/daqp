@@ -197,7 +197,7 @@ int daqp_check_optimal_avi(DAQPWorkspace* work){
     for(i=0; i < work->ms; i++){
         if(IS_ACTIVE(i)) continue;
         if(work->avi->x[i] > work->qp->bupper[i] + primal_tol) return 0; 
-        if(work->avi->x[i] < work->qp->blower[i] -primal_tol) return 0;
+        if(work->avi->x[i] < work->qp->blower[i] - primal_tol) return 0;
     }
 
     // General constraints
