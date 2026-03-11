@@ -32,7 +32,7 @@ int update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
             error_flag = update_Rinv(work, qp->H);
         else{
             update_avi(work->avi,qp);
-            error_flag = update_Rinv(work, work->avi->H1pI);
+            error_flag = update_Rinv(work, work->avi->Hs_rho);
         }
         if(error_flag<0)
             return error_flag;
@@ -356,7 +356,7 @@ int normalize_M(DAQPWorkspace* work){
 
 int update_avi(DAQPAVI* avi, DAQPProblem* p){
     const int n = p->n;
-    // Setup matrices Hsym, H1pI, and H2pI, LU_H
+    // Setup matrices Hsym, Hs_rho, and H_rho, LU_H
     int i,j,disp;
     c_float val;
     avi->rho = 0.0;
@@ -364,8 +364,8 @@ int update_avi(DAQPAVI* avi, DAQPProblem* p){
         for (j = 0; j < n; j++, disp++) {
             val = (p->H[disp] + p->H[j * n + i]) * 0.5;
             avi->Hsym[disp] = val;
-            avi->H1pI[disp] = val;
-            avi->H2pI[disp] = p->H[disp];
+            avi->Hs_rho[disp] = val;
+            avi->H_rho[disp] = p->H[disp];
             avi->LU_H[disp] = p->H[disp];
             avi->rho += SQUARE(p->H[disp]);
         }
@@ -373,16 +373,16 @@ int update_avi(DAQPAVI* avi, DAQPProblem* p){
     // Regularization 
     avi->rho = sqrt(avi->rho)/2;
     for(i=0,disp=0; i<n;i++){
-        avi->H1pI[disp] += avi->rho;
-        avi->H2pI[disp] += avi->rho;
+        avi->Hs_rho[disp] += avi->rho;
+        avi->H_rho[disp] += avi->rho;
         disp += n+1;
     }
 
     // Set x0 to zero 
     for(i=0;i<n;i++) avi->x[i] = 0; // TODO separate from setup...
-    // Factorize H and H2pI 
+    // Factorize H and H_rho 
     daqp_lu(avi->LU_H, avi->P_H, n);
-    daqp_lu(avi->H2pI, avi->P_H2, n);
+    daqp_lu(avi->H_rho, avi->P_H2, n);
     return 1;
 }
 

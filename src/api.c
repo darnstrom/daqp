@@ -322,8 +322,8 @@ void allocate_daqp_ldp(DAQPWorkspace *work, int n, int m, int ms, int alloc_R, i
 void allocate_daqp_avi(DAQPAVI* avi, const int n){
     // Allocate matrices
     avi->Hsym = malloc(n*n*sizeof(c_float));
-    avi->H1pI = malloc(n*n*sizeof(c_float));
-    avi->H2pI = malloc(n*n*sizeof(c_float));
+    avi->Hs_rho = malloc(n*n*sizeof(c_float));
+    avi->H_rho = malloc(n*n*sizeof(c_float));
     avi->P_H2= malloc(n*sizeof(int));
 
     avi->LU_H = malloc(n*n*sizeof(c_float));
@@ -374,8 +374,8 @@ void free_daqp_workspace(DAQPWorkspace *work){
 void free_daqp_avi(DAQPWorkspace* work){
     if(work->avi != NULL){
         free(work->avi->Hsym);
-        free(work->avi->H1pI);
-        free(work->avi->H2pI);
+        free(work->avi->Hs_rho);
+        free(work->avi->H_rho);
         free(work->avi->P_H2);
 
         free(work->avi->LU_H);

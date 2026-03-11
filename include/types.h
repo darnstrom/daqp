@@ -99,8 +99,8 @@ typedef struct{
 
 typedef struct{
     c_float* Hsym;
-    c_float* H1pI;
-    c_float* H2pI;
+    c_float* Hs_rho;
+    c_float* H_rho;
     int* P_H2;
 
     c_float* LU_H;

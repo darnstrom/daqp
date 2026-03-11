@@ -22,7 +22,7 @@ int solve_avi(DAQPWorkspace *work) {
             sum = sum2 = 0.0;
             for(j=0; j < work->n; j++) {
                 sum += work->qp->H[disp]*avi->x[j];
-                sum2 += avi->H1pI[disp++]*avi->x[j];
+                sum2 += avi->Hs_rho[disp++]*avi->x[j];
             }
             avi->Hx[i] = sum;
             avi->xtemp[i] = sum + work->qp->f[i] - sum2;
@@ -90,8 +90,9 @@ int solve_avi(DAQPWorkspace *work) {
                 avi->xtemp[j] += val * avi->y[i];
             }
         }
-        daqp_lu_solve(avi->H2pI, avi->P_H2, avi->xtemp, avi->x, n);
+        daqp_lu_solve(avi->H_rho, avi->P_H2, avi->xtemp, avi->x, n);
     }
+    if(k==work->settings->iter_limit) exitflag = -4;
     work->iterations = tot_iter;
     return exitflag;
 }
@@ -207,7 +208,7 @@ int daqp_check_optimal_avi(DAQPWorkspace* work){
         }
         c_float Ax = 0.0;
         for(j=0; j < work->n; j++) Ax += work->qp->A[disp++]*work->avi->x[j];
-        if(Ax > work->qp->bupper[i]+primal_tol) return 0; 
+        if(Ax > work->qp->bupper[i] + primal_tol) return 0; 
         if(Ax < work->qp->blower[i] - primal_tol) return 0;
     }
     // All checks passed -> optimal KKT point found
