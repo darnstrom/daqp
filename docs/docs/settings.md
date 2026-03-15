@@ -24,7 +24,7 @@ Table of contents
 | `pivot_tol` | Value used for determining if rows in the LDL' factorization should be exchanged. A higher value improves stability. | 1e-6|
 | `progress_tol` | Minimum change in objective function to consider it progress | 1e-6|
 | `cycle_tol` | Allowed number of iterations without progress before terminating| 10 |
-| `iter_limit` | Maximum number of iterations before terminating| 1000 |
+| `iter_limit` | Maximum number of iterations before terminating| 10000 |
 | `fval_bound` | Maximum allowed objective function value. The solver terminates if the dual objective exceeds this value (since it is a lower bound of the optimal value). | 1e30|
 | `eps_prox` | Regularization parameter used for proximal-point iterations (0 means that no proximal-point iterations are performed) | 0|
 | `eta_prox` | Tolerance that determines if a fix-point has been reached during proximal-point iterations | 1e-6|
