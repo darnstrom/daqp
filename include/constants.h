@@ -55,10 +55,10 @@ extern "C" {
 #define DAQP_SET_INACTIVE(x) (work->sense[x]&=~1)
 
 // marks if a constraints is active at its lower bound
-#define LOWER 2 
-#define IS_LOWER(x) (work->sense[x]&2)
-#define SET_LOWER(x) (work->sense[x]|=2)
-#define SET_UPPER(x) (work->sense[x]&=~2)
+#define DAQP_LOWER 2 
+#define DAQP_IS_LOWER(x) (work->sense[x]&2)
+#define DAQP_SET_LOWER(x) (work->sense[x]|=2)
+#define DAQP_SET_UPPER(x) (work->sense[x]&=~2)
 
 // marks if a constraint cannot be activated/deactivated
 #define IMMUTABLE 4 

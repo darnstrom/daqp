@@ -180,7 +180,7 @@ void save_warmstart(DAQPNode* node, DAQPWorkspace* work){
     node->WS_start = work->bnb->nWS;
 
     for(i =work->bnb->neq; i<work->n_active;i++){
-        id_to_add = (work->WS[i]+(IS_LOWER(work->WS[i]) << (LOWER_BIT-1)));
+        id_to_add = (work->WS[i]+(DAQP_IS_LOWER(work->WS[i]) << (LOWER_BIT-1)));
         if((work->sense[work->WS[i]]&(IMMUTABLE+BINARY))!=IMMUTABLE+BINARY)
             work->bnb->tree_WS[work->bnb->nWS++]= id_to_add;
     }
@@ -191,11 +191,11 @@ int add_upper_lower(const int add_id, DAQPWorkspace* work){
     int true_add_id = REMOVE_LOWER_FLAG(add_id);
     // Setup new binary constraint
     if(EXTRACT_LOWER_FLAG(add_id)){
-        SET_LOWER(true_add_id);
+        DAQP_SET_LOWER(true_add_id);
         add_constraint(work,true_add_id,-1.0);
     }
     else{
-        SET_UPPER(true_add_id);
+        DAQP_SET_UPPER(true_add_id);
         add_constraint(work,true_add_id,1.0);
     }
     return 1;

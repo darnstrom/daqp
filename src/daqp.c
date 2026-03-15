@@ -28,9 +28,9 @@ int daqp_ldp(DAQPWorkspace *work){
                         // Correct LOWER/UPPER (important for equality constraints)
                         for(i = 0; i < work->n_active; i++){
                             if (work->lam[i] >= 0)
-                                SET_UPPER(work->WS[i]);
+                                DAQP_SET_UPPER(work->WS[i]);
                             else
-                                SET_LOWER(work->WS[i]);
+                                DAQP_SET_LOWER(work->WS[i]);
                         }
                         reset_daqp_workspace(work);
                         activate_constraints(work);

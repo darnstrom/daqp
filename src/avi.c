@@ -142,7 +142,8 @@ void daqp_solve_avi_kkt(DAQPWorkspace* work) {
 
     for (i = 0; i < nAS; i++) {
         row_idx = WS[i];
-        sum = IS_LOWER(row_idx) ? work->qp->blower[row_idx] : work->qp->bupper[row_idx];
+        sum = DAQP_IS_LOWER(row_idx) ? 
+            work->qp->blower[row_idx] : work->qp->bupper[row_idx];
         if(row_idx < work->ms) // Simple bound
             sum += temp[row_idx];
         else{ // General constraint
@@ -186,7 +187,7 @@ int daqp_check_optimal_avi(DAQPWorkspace* work){
     c_float primal_tol = work->settings->primal_tol;
     // First check dual variables
     for(i=0; i < work->n_active; i++){
-        if(IS_LOWER(work->WS[i])){
+        if(DAQP_IS_LOWER(work->WS[i])){
             if(work->lam_star[i] > dual_tol) return 0;
         }
         else{

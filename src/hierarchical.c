@@ -27,7 +27,7 @@ int daqp_hiqp(DAQPWorkspace *work, c_float *lambda){
         for(j =start;j<end;j++){
             SET_SOFT(j);
             if(DAQP_IS_ACTIVE(j)){
-                if(IS_LOWER(j))
+                if(DAQP_IS_LOWER(j))
                     add_constraint(work,j, -1.0);
                 else
                     add_constraint(work,j, 1.0);
@@ -57,7 +57,7 @@ int daqp_hiqp(DAQPWorkspace *work, c_float *lambda){
                 else if(w > work->settings->primal_tol)
                     work->dupper[id]+=w;
                 if(lambda != NULL){
-                    w += IS_LOWER(id) ? -1e-14 : 1e-14; // For weakly active
+                    w += DAQP_IS_LOWER(id) ? -1e-14 : 1e-14; // For weakly active
                     lambda[id] = w;
                 }
 
