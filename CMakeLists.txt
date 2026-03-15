@@ -76,8 +76,17 @@ if(MATLAB)
 endif()
 
 if(JULIA)
-  set(JULIA_INTERFACE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/interfaces/daqp-julia")
-  file(COPY "${JULIA_INTERFACE_DIR}" DESTINATION "interfaces")
-  add_custom_command(TARGET daqp POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:daqp> "interfaces/daqp-julia")
-  add_test(NAME Julia COMMAND sh -c "julia --color=yes --project=interfaces/daqp-julia -e \"using Pkg; Pkg.test()\"")
+    set(JULIA_INTERFACE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/interfaces/daqp-julia")
+    set(JULIA_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/interfaces/daqp-julia")
+
+    add_custom_target(sync_julia_interface ALL
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${JULIA_INTERFACE_DIR}" "${JULIA_BINARY_DIR}"
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:daqp> "${JULIA_BINARY_DIR}"
+        DEPENDS daqp
+        COMMENT "Syncing Julia files and library..."
+    )
+
+    add_dependencies(sync_julia_interface daqp)
+
+    add_test(NAME Julia COMMAND sh -c "julia --color=yes --project=${CMAKE_CURRENT_BINARY_DIR}/interfaces/daqp-julia -e \"using Pkg; Pkg.test()\"")
 endif()
