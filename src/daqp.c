@@ -110,21 +110,6 @@ void ldp2qp_solution(DAQPWorkspace *work){
     }
 }
 
-void warmstart_workspace(DAQPWorkspace* work, int* WS, const int n_active){
-    int i;
-    // TODO, will probably be error with equality constraints here... 
-    // (Make sure reorder always adds inequality constraints...)
-    reset_daqp_workspace(work); // Reset workspace
-    for(i = 0; i<n_active; i++){
-        if(work->sing_ind!=DAQP_EMPTY_IND){
-            add_constraint(work,WS[i],1.0); 
-        }else{ //Make sure that the unadded constraints are inactive in sense
-            DAQP_SET_INACTIVE(work->WS[i]);
-        }
-    }
-}
-
-
 // Reset workspace to default values
 void reset_daqp_workspace(DAQPWorkspace *work){
     work->sing_ind=DAQP_EMPTY_IND;

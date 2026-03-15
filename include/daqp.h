@@ -11,8 +11,6 @@ extern "C" {
 
 int daqp_ldp(DAQPWorkspace *work);
 void ldp2qp_solution(DAQPWorkspace *work);
-
-void warmstart_workspace(DAQPWorkspace* work, int* WS, const int n_active); 
 void reset_daqp_workspace(DAQPWorkspace *work);
 
 # ifdef __cplusplus
