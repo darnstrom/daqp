@@ -38,7 +38,9 @@ jobs:
       uses: pypa/cibuildwheel@v3.4.0
       env:
         CIBW_SKIP: "pp* *-musllinux*"
+        CIBW_ARCHS_MACOS: "x86_64 arm64"
         CIBW_TEST_REQUIRES: "pytest numpy"
+        CIBW_TEST_SOURCES: "{project}/test"
         CIBW_TEST_COMMAND: "pytest -s {project}/test"
       with:
         package-dir: interfaces/daqp-python
