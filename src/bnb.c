@@ -25,19 +25,19 @@ int daqp_bnb(DAQPWorkspace* work){
     while( work->bnb->n_nodes > 0 ){
 
         node = work->bnb->tree+(--work->bnb->n_nodes);
-        exitflag = process_node(node,work); // Solve relaxation
+        exitflag = daqp_process_node(node,work); // Solve relaxation
         // Cut conditions
         if(exitflag==DAQP_EXIT_INFEASIBLE) continue; // Dominance cut
         if(exitflag<0) return exitflag; // Inner solver failed => abort
 
         // Find index to branch over 
-        branch_id = get_branch_id(work); 
+        branch_id = daqp_get_branch_id(work); 
         if(branch_id==-1){// Nothing to branch over => integer feasible
             work->settings->fval_bound = (0.5*work->fval - work->settings->abs_subopt)*eps_r;
             swp_ptr=work->xold; work->xold= work->u; work->u=swp_ptr; // Store feasible sol
         }
         else{
-            spawn_children(node,branch_id, work);
+            daqp_spawn_children(node,branch_id, work);
         }
     }
 
@@ -55,7 +55,7 @@ int daqp_bnb(DAQPWorkspace* work){
     }
 }
 
-int process_node(DAQPNode* node, DAQPWorkspace* work){
+int daqp_process_node(DAQPNode* node, DAQPWorkspace* work){
     int exitflag;
     work->bnb->nodecount+=1;
     if(node->depth >=0){
@@ -65,17 +65,17 @@ int process_node(DAQPNode* node, DAQPWorkspace* work){
         if(work->bnb->n_nodes==0 || (node-1)->depth!=node->depth){ 
             // Sibling has been processed => need to fix workspace state
             work->bnb->n_clean += (node->depth-(node+1)->depth);
-            node_cleanup_workspace(work->bnb->n_clean,work);
-            warmstart_node(node,work);
+            daqp_node_cleanup_workspace(work->bnb->n_clean,work);
+            daqp_warmstart_node(node,work);
         }
         else{
             //work->bnb->n_clean = node->depth;
             //node_cleanup_workspace(work->bnb->n_clean,work);
             //warmstart_node(node,work);
-            add_upper_lower(node->bin_id,work);
+            daqp_add_upper_lower(node->bin_id,work);
             work->sense[DAQP_REMOVE_LOWER_FLAG(node->bin_id)] |= DAQP_IMMUTABLE; //Equality
             if(work->sing_ind != DAQP_EMPTY_IND) // Need to cold start to not miss integer feasible
-                setup_cold_bnb(node,work);
+                daqp_setup_cold_bnb(node,work);
 
         }
         // Add binary constraint 
@@ -85,7 +85,7 @@ int process_node(DAQPNode* node, DAQPWorkspace* work){
     work->bnb->itercount += work->iterations;
     
     if(exitflag == DAQP_EXIT_CYCLE){// Try to repair (cold start)
-        setup_cold_bnb(node,work);
+        daqp_setup_cold_bnb(node,work);
         exitflag = daqp_ldp(work);
         work->bnb->itercount += work->iterations;
     }
@@ -93,7 +93,7 @@ int process_node(DAQPNode* node, DAQPWorkspace* work){
     return exitflag;
 }
 
-int get_branch_id(DAQPWorkspace* work){
+int daqp_get_branch_id(DAQPWorkspace* work){
     int i,disp;
     int branch_id = DAQP_EMPTY_IND;
     for(i=0; i < work->bnb->nb; i++){
@@ -123,9 +123,9 @@ int get_branch_id(DAQPWorkspace* work){
     return branch_id;
 }
 
-void spawn_children(DAQPNode* node, const int branch_id, DAQPWorkspace* work){
+void daqp_spawn_children(DAQPNode* node, const int branch_id, DAQPWorkspace* work){
 
-    save_warmstart(node,work);
+    daqp_save_warmstart(node,work);
 
     // Update child1 (reuse current node) 
     node->bin_id = DAQP_TOGGLE_LOWER_FLAG(branch_id);
@@ -140,7 +140,7 @@ void spawn_children(DAQPNode* node, const int branch_id, DAQPWorkspace* work){
     work->bnb->n_nodes+=2;
 }
 
-void node_cleanup_workspace(int n_clean, DAQPWorkspace* work){
+void daqp_node_cleanup_workspace(int n_clean, DAQPWorkspace* work){
     int i;
     // Cleanup sense 
     for(i=n_clean; i<work->n_active; i++)
@@ -153,17 +153,17 @@ void node_cleanup_workspace(int n_clean, DAQPWorkspace* work){
 }
 
 
-void warmstart_node(DAQPNode* node, DAQPWorkspace* work){
+void daqp_warmstart_node(DAQPNode* node, DAQPWorkspace* work){
     int i;
     // Add fixed constraints
     for(i=work->bnb->n_clean - work->bnb->neq; i< node->depth+1;i++){ 
-        add_upper_lower(work->bnb->fixed_ids[i],work);
+        daqp_add_upper_lower(work->bnb->fixed_ids[i],work);
         DAQP_SET_IMMUTABLE(DAQP_REMOVE_LOWER_FLAG(work->bnb->fixed_ids[i]));
     }
     work->bnb->n_clean = work->bnb->neq+node->depth; 
     // Add free constraints
     for(i=node->WS_start; i < node->WS_end; i++){
-        add_upper_lower(work->bnb->tree_WS[i],work);
+        daqp_add_upper_lower(work->bnb->tree_WS[i],work);
         if(work->sing_ind != DAQP_EMPTY_IND) {
             work->n_active--;
             DAQP_SET_INACTIVE(work->WS[work->n_active]);
@@ -174,7 +174,7 @@ void warmstart_node(DAQPNode* node, DAQPWorkspace* work){
     work->bnb->nWS = node->WS_start; // always move up tree after warmstart 
 }
 
-void save_warmstart(DAQPNode* node, DAQPWorkspace* work){
+void daqp_save_warmstart(DAQPNode* node, DAQPWorkspace* work){
     int id_to_add, i;
     // Save warmstart 
     node->WS_start = work->bnb->nWS;
@@ -187,7 +187,7 @@ void save_warmstart(DAQPNode* node, DAQPWorkspace* work){
     node->WS_end = work->bnb->nWS;
 }
 
-int add_upper_lower(const int add_id, DAQPWorkspace* work){
+int daqp_add_upper_lower(const int add_id, DAQPWorkspace* work){
     int true_add_id = DAQP_REMOVE_LOWER_FLAG(add_id);
     // Setup new binary constraint
     if(DAQP_EXTRACT_LOWER_FLAG(add_id)){
@@ -201,14 +201,14 @@ int add_upper_lower(const int add_id, DAQPWorkspace* work){
     return 1;
 }
 
-void setup_cold_bnb(DAQPNode* node,DAQPWorkspace *work){
+void daqp_setup_cold_bnb(DAQPNode* node,DAQPWorkspace *work){
     int i;
-    node_cleanup_workspace(work->bnb->n_clean,work);
+    daqp_node_cleanup_workspace(work->bnb->n_clean,work);
     work->sing_ind=DAQP_EMPTY_IND;
     work->n_active=work->bnb->n_clean;
     work->reuse_ind=work->bnb->n_clean;
     for(i=work->bnb->n_clean - work->bnb->neq; i< node->depth+1;i++){
-        add_upper_lower(work->bnb->fixed_ids[i],work);
+        daqp_add_upper_lower(work->bnb->fixed_ids[i],work);
         DAQP_SET_IMMUTABLE(DAQP_REMOVE_LOWER_FLAG(work->bnb->fixed_ids[i]));
     }
     work->bnb->n_clean = work->bnb->neq+node->depth;
