@@ -20,11 +20,11 @@ void save_warmstart(DAQPNode* node, DAQPWorkspace* work);
 int add_upper_lower(const int add_id, DAQPWorkspace* work); 
 void setup_cold_bnb(DAQPNode* node, DAQPWorkspace* work);
 
-#define LOWER_BIT 16
-#define EXTRACT_LOWER_FLAG(x) (x>>(LOWER_BIT-1))
-#define REMOVE_LOWER_FLAG(x) (x&~(1<<LOWER_BIT))
-#define ADD_LOWER_FLAG(x) (x|(1<<LOWER_BIT))
-#define TOGGLE_LOWER_FLAG(x) (x^(1<<LOWER_BIT))
+#define DAQP_LOWER_BIT 16
+#define DAQP_EXTRACT_LOWER_FLAG(x) (x>>(DAQP_LOWER_BIT-1))
+#define DAQP_REMOVE_LOWER_FLAG(x) (x&~(1<<DAQP_LOWER_BIT))
+#define DAQP_ADD_LOWER_FLAG(x) (x|(1<<DAQP_LOWER_BIT))
+#define DAQP_TOGGLE_LOWER_FLAG(x) (x^(1<<DAQP_LOWER_BIT))
 
 # ifdef __cplusplus
 }
