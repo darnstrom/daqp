@@ -87,8 +87,8 @@ int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time){
     int i;
     if(qp->sense != NULL){
         for(i = 0; i < qp->m ; i++){
-            if(qp->sense[i] & SOFT) ns++;
-            if(qp->sense[i] & BINARY) nb++;
+            if(qp->sense[i] & DAQP_SOFT) ns++;
+            if(qp->sense[i] & DAQP_BINARY) nb++;
         }
     }
     // Correct number of soft constraints if several hierarchies
@@ -187,7 +187,7 @@ int setup_daqp_bnb(DAQPWorkspace* work, int nb, int ns){
         // Detect which constraints are binary
         work->bnb->bin_ids = malloc(nb*sizeof(int));
         for(i = 0, nadded = 0; nadded < nb; i++){
-            if(work->qp->sense[i] & BINARY)
+            if(work->qp->sense[i] & DAQP_BINARY)
                 work->bnb->bin_ids[nadded++] = i;
         }
 

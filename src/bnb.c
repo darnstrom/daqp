@@ -144,7 +144,7 @@ void node_cleanup_workspace(int n_clean, DAQPWorkspace* work){
     int i;
     // Cleanup sense 
     for(i=n_clean; i<work->n_active; i++)
-        work->sense[work->WS[i]]&= IS_BINARY(work->WS[i]) ? 
+        work->sense[work->WS[i]]&= DAQP_IS_BINARY(work->WS[i]) ? 
             ~(DAQP_ACTIVE+DAQP_IMMUTABLE): ~DAQP_ACTIVE;
     // Reset workspace
     work->sing_ind=EMPTY_IND;
@@ -181,7 +181,7 @@ void save_warmstart(DAQPNode* node, DAQPWorkspace* work){
 
     for(i =work->bnb->neq; i<work->n_active;i++){
         id_to_add = (work->WS[i]+(DAQP_IS_LOWER(work->WS[i]) << (LOWER_BIT-1)));
-        if((work->sense[work->WS[i]]&(DAQP_IMMUTABLE+BINARY))!=DAQP_IMMUTABLE+BINARY)
+        if((work->sense[work->WS[i]]&(DAQP_IMMUTABLE+DAQP_BINARY))!=DAQP_IMMUTABLE+DAQP_BINARY)
             work->bnb->tree_WS[work->bnb->nWS++]= id_to_add;
     }
     node->WS_end = work->bnb->nWS;

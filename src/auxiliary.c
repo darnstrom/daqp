@@ -30,9 +30,9 @@ void add_constraint(DAQPWorkspace *work, const int add_ind, c_float lam){
 #ifdef SOFT_WEIGHTS
     if((DAQP_IS_LOWER(add_ind) && lam <= -work->d_ls[add_ind])||
             (DAQP_IS_LOWER(add_ind)==0 && lam >=  work->d_us[add_ind]))
-        SET_SLACK_FREE(add_ind);
+        DAQP_SET_SLACK_FREE(add_ind);
     else
-        SET_SLACK_FIXED(add_ind);
+        DAQP_SET_SLACK_FIXED(add_ind);
 #endif
     update_LDL_add(work, add_ind);
     work->WS[work->n_active] = add_ind;
@@ -64,7 +64,7 @@ void compute_primal_and_fval(DAQPWorkspace *work){
             for(j=0,disp=work->n*(work->WS[i]-work->ms);j<work->n;j++)
                 work->u[j]-=work->M[disp++]*work->lam_star[i];
         }
-        if(IS_SOFT(work->WS[i])){
+        if(DAQP_IS_SOFT(work->WS[i])){
 #ifdef SOFT_WEIGHTS
             if(DAQP_IS_LOWER(work->WS[i]))
                 fval+=SQUARE(work->lam_star[i])*work->rho_ls[work->WS[i]];
@@ -170,7 +170,7 @@ int remove_blocking(DAQPWorkspace *work){
         lam_slack = work->lam[i];
         p = (work->sing_ind == EMPTY_IND) ? work->lam_star[i]-work->lam[i] : work->lam_star[i];
         if(DAQP_IS_LOWER(ind)){
-            if(IS_SLACK_FREE(ind)){ // lam <= -d_ls
+            if(DAQP_IS_SLACK_FREE(ind)){ // lam <= -d_ls
                 lam_slack += work->d_ls[ind];
                 // lam* <= -d_ls for lower -> nothing to do
                 if(p < dual_tol || work->lam_star[i] <= -work->d_ls[ind]+dual_tol) continue;
@@ -185,7 +185,7 @@ int remove_blocking(DAQPWorkspace *work){
             }
         }
         else{ // IS_UPPER
-            if(IS_SLACK_FREE(ind)){ // lam >= d_us
+            if(DAQP_IS_SLACK_FREE(ind)){ // lam >= d_us
                 lam_slack -= work->d_us[ind];
                 //lam* >= d_us for upper -> nothing to do
                 if(p > -dual_tol || work->lam_star[i] >= work->d_us[ind]) continue;
@@ -225,7 +225,7 @@ int remove_blocking(DAQPWorkspace *work){
     lam_slack = work->lam[rm_ind];
 
     remove_constraint(work,rm_ind);
-    if(IS_SOFT(abs_rm_id)==0 || work->sing_ind != EMPTY_IND) return 1;
+    if(DAQP_IS_SOFT(abs_rm_id)==0 || work->sing_ind != EMPTY_IND) return 1;
 
     // Reactivate
     if((DAQP_IS_LOWER(abs_rm_id))){
@@ -286,14 +286,14 @@ void compute_CSP(DAQPWorkspace *work){
         if(DAQP_IS_LOWER(work->WS[i])){
             sum = -work->dlower[work->WS[i]];
 #ifdef SOFT_WEIGHTS
-            if(IS_SOFT(work->WS[i]) && IS_SLACK_FREE(work->WS[i])) 
+            if(DAQP_IS_SOFT(work->WS[i]) && DAQP_IS_SLACK_FREE(work->WS[i])) 
                 sum-= work->d_ls[work->WS[i]]*work->rho_ls[work->WS[i]]; 
 #endif
         }
         else{
             sum = -work->dupper[work->WS[i]];
 #ifdef SOFT_WEIGHTS
-            if(IS_SOFT(work->WS[i]) && IS_SLACK_FREE(work->WS[i])) 
+            if(DAQP_IS_SOFT(work->WS[i]) && DAQP_IS_SLACK_FREE(work->WS[i])) 
                 sum+= work->d_us[work->WS[i]]*work->rho_us[work->WS[i]]; 
 #endif
         }
@@ -349,7 +349,7 @@ void pivot_last(DAQPWorkspace *work){
             work->D[rm_ind] < work->D[work->n_active-1]){ // element in D smallar than neighbor
         const int ind_old = work->WS[rm_ind];
         // Ensure that binaries never swap order (since this order is exploited) 
-        if(IS_BINARY(ind_old) && IS_BINARY(work->WS[work->n_active-1])) return; 
+        if(DAQP_IS_BINARY(ind_old) && DAQP_IS_BINARY(work->WS[work->n_active-1])) return; 
         if(work->bnb != NULL && rm_ind < work->bnb->n_clean) return;
 
         c_float lam_old = work->lam[rm_ind];
@@ -369,13 +369,13 @@ int activate_constraints(DAQPWorkspace *work){
         if(DAQP_IS_ACTIVE(i)){
 #ifdef SOFT_WEIGHTS
             if(DAQP_IS_LOWER(i)){
-                if(IS_SLACK_FREE(i))
+                if(DAQP_IS_SLACK_FREE(i))
                     add_constraint(work,i, -(work->d_ls[i]+1));
                 else
                     add_constraint(work,i, -0.9*work->d_ls[i]);
             }
             else{ //IS Upper
-                if(IS_SLACK_FREE(i))
+                if(DAQP_IS_SLACK_FREE(i))
                     add_constraint(work,i, work->d_us[i]+1);
                 else
                     add_constraint(work,i, 0.9*work->d_us[i]);

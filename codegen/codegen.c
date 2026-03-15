@@ -95,7 +95,7 @@ void write_daqp_workspace_h(FILE *f, DAQPWorkspace* work){
     }
     else{// Simply count soft constraints if not hierarchical
         for(i = 0; i < m ; i++)
-            if(work->sense[i] & SOFT) ntot++;
+            if(work->sense[i] & DAQP_SOFT) ntot++;
     }
 
     // Refdefine NX, N_CONSTR and N_SIMPLE to static
@@ -140,7 +140,7 @@ void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work){
     int ms = work->ms;
     int ntot = n;
     for(i = 0; i < m ; i++) 
-        if(work->sense[i] & SOFT) ntot++;
+        if(work->sense[i] & DAQP_SOFT) ntot++;
 
     fprintf(f, "// Workspace\n");
     // LDP data

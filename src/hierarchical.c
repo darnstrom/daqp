@@ -25,7 +25,7 @@ int daqp_hiqp(DAQPWorkspace *work, c_float *lambda){
         work->m = end;
         // Soften constraints and activate 
         for(j =start;j<end;j++){
-            SET_SOFT(j);
+            DAQP_SET_SOFT(j);
             if(DAQP_IS_ACTIVE(j)){
                 if(DAQP_IS_LOWER(j))
                     add_constraint(work,j, -1.0);
@@ -50,7 +50,7 @@ int daqp_hiqp(DAQPWorkspace *work, c_float *lambda){
         // Perturb rhs with slacks in level 
         for(j=0; j<work->n_active;j++){
             id=work->WS[j];
-            if(IS_SOFT(id)){ 
+            if(DAQP_IS_SOFT(id)){ 
                 w = work->lam_star[j]*work->settings->rho_soft;
                 if(w < -work->settings->primal_tol)
                     work->dlower[id]+=w;
@@ -65,7 +65,7 @@ int daqp_hiqp(DAQPWorkspace *work, c_float *lambda){
         }
 
         // Make constraints in current level hard
-        for(j=start; j<end;j++) SET_HARD(j);
+        for(j=start; j<end;j++) DAQP_SET_HARD(j);
         
         // find first active constraint in current level 
         for(j=0;j < work->n_active; j++) if(work->WS[j]>=start) break;

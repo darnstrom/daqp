@@ -67,21 +67,21 @@ extern "C" {
 #define DAQP_SET_MUTABLE(x) (work->sense[x]&=~4)
 
 // marks that a constraint might be violated (but the slack is penalized)
-#define SOFT 8
-#define IS_SOFT(x) (work->sense[x]&8)
-#define SET_SOFT(x) (work->sense[x]|=8)
-#define SET_HARD(x) (work->sense[x]&=~8)
+#define DAQP_SOFT 8
+#define DAQP_IS_SOFT(x) (work->sense[x]&8)
+#define DAQP_SET_SOFT(x) (work->sense[x]|=8)
+#define DAQP_SET_HARD(x) (work->sense[x]&=~8)
 
 // marks that a constraint has to be active at either its upper or lower bound 
-#define BINARY 16 
-#define IS_BINARY(x) (work->sense[x]&16)
+#define DAQP_BINARY 16 
+#define DAQP_IS_BINARY(x) (work->sense[x]&16)
 
 // marks that the soft slack is at its lower bound (d_ls or d_us) 
-#define SLACK_FIXED 32
-#define IS_SLACK_FIXED(x) (work->sense[x]&32)
-#define IS_SLACK_FREE(x) ((work->sense[x]&32)==0)
-#define SET_SLACK_FIXED(x) (work->sense[x]|=32)
-#define SET_SLACK_FREE(x) (work->sense[x]&=~32)
+#define DAQP_SLACK_FIXED 32
+#define DAQP_IS_SLACK_FIXED(x) (work->sense[x]&32)
+#define DAQP_IS_SLACK_FREE(x) ((work->sense[x]&32)==0)
+#define DAQP_SET_SLACK_FIXED(x) (work->sense[x]|=32)
+#define DAQP_SET_SLACK_FREE(x) (work->sense[x]&=~32)
 
 #define IS_SIMPLE(x) (x < work->ms)
 
