@@ -255,7 +255,7 @@ int update_d(DAQPWorkspace *work, c_float *bupper, c_float *blower){
 #ifndef DAQP_ASSUME_VALID
     c_float diff;
     for(i =0;i<work->m;i++){
-        if(IS_IMMUTABLE(i)) continue;
+        if(DAQP_IS_IMMUTABLE(i)) continue;
         diff = bupper[i] - blower[i];
         // Check for trivial infeasibility
         if ( diff < -work->settings->primal_tol ){
@@ -263,7 +263,7 @@ int update_d(DAQPWorkspace *work, c_float *bupper, c_float *blower){
         }
         // Check for unmarked equality constraint (blower == bupper)
         else if ( diff < work->settings->zero_tol ){
-            work->sense[i] |= DAQP_ACTIVE + IMMUTABLE;
+            work->sense[i] |= DAQP_ACTIVE + DAQP_IMMUTABLE;
             do_activate = 1;
         }
         // TODO: Make innactive here
@@ -340,10 +340,10 @@ int normalize_M(DAQPWorkspace* work){
         if(scaling_i < zero_tol){
 #ifndef DAQP_ASSUME_VALID
             if(work->qp->bupper[i] < -zero_tol || work->qp->blower[i] > zero_tol)
-                if(work->sense[i] != IMMUTABLE)
+                if(work->sense[i] != DAQP_IMMUTABLE)
                     return DAQP_EXIT_INFEASIBLE;
 #endif
-            work->sense[i] = IMMUTABLE; // ignore zero-row constraint
+            work->sense[i] = DAQP_IMMUTABLE; // ignore zero-row constraint
             continue; // TODO: mark infeasibility if dupper & dlower are nonzero
         }
         scaling_i = 1/sqrt(scaling_i);
@@ -452,7 +452,7 @@ void daqp_minrep_work(int* is_redundant, DAQPWorkspace* work){
         is_redundant[i] = -1;
 
     for(i=0; i < work->m; i++){
-        if(is_redundant[i] != -1 || (work->sense[i]&IMMUTABLE) !=  0) continue;
+        if(is_redundant[i] != -1 || DAQP_IS_IMMUTABLE(i)) continue;
         reset_daqp_workspace(work);
         work->sense[i] = 5;
         add_constraint(work,i,1.0);
@@ -464,7 +464,7 @@ void daqp_minrep_work(int* is_redundant, DAQPWorkspace* work){
         }
         else{
             is_redundant[i] = 0;
-            work->sense[i] &=~IMMUTABLE;
+            work->sense[i] &=~DAQP_IMMUTABLE;
             if(exitflag==DAQP_EXIT_OPTIMAL)
                 for(j=0; j < work->n_active; j++) // all active constraint must also be nonredundant
                     is_redundant[work->WS[j]] = 0;

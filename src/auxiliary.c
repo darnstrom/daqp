@@ -93,7 +93,7 @@ int add_infeasible(DAQPWorkspace *work){
     // Simple bounds 
     for(j=0, disp=0;j<work->ms;j++){
         // Never activate immutable or already active constraints 
-        if(work->sense[j]&(DAQP_ACTIVE+IMMUTABLE)){ 
+        if(work->sense[j]&(DAQP_ACTIVE+DAQP_IMMUTABLE)){ 
             disp+=work->n-j;
             continue;
         }
@@ -120,7 +120,7 @@ int add_infeasible(DAQPWorkspace *work){
     /* General two-sided constraints */
     for(j=work->ms, disp=0;j<work->m;j++){
         // Never activate immutable or already active constraints 
-        if(work->sense[j]&(DAQP_ACTIVE+IMMUTABLE)){ 
+        if(work->sense[j]&(DAQP_ACTIVE+DAQP_IMMUTABLE)){ 
             disp+=work->n;// Skip ahead in M
             continue;
         }
@@ -166,7 +166,7 @@ int remove_blocking(DAQPWorkspace *work){
     c_float p;
     for(i=0;i<work->n_active;i++){
         ind = work->WS[i];
-        if(IS_IMMUTABLE(ind)) continue;
+        if(DAQP_IS_IMMUTABLE(ind)) continue;
         lam_slack = work->lam[i];
         p = (work->sing_ind == EMPTY_IND) ? work->lam_star[i]-work->lam[i] : work->lam_star[i];
         if(DAQP_IS_LOWER(ind)){
@@ -246,7 +246,7 @@ int remove_blocking(DAQPWorkspace *work){
     c_float alpha_cand;
     const c_float dual_tol = work->settings->dual_tol;
     for(i=0;i<work->n_active;i++){
-        if(IS_IMMUTABLE(work->WS[i])) continue;
+        if(DAQP_IS_IMMUTABLE(work->WS[i])) continue;
         if(DAQP_IS_LOWER(work->WS[i])){
             if(work->lam_star[i]<dual_tol) continue; //lam <= 0 for lower -> dual feasible
         }
@@ -399,7 +399,7 @@ int activate_constraints(DAQPWorkspace *work){
 void deactivate_constraints(DAQPWorkspace *work){
     int i;
     for(i =0;i<work->n_active;i++){
-        if(IS_IMMUTABLE(work->WS[i])) continue; 
+        if(DAQP_IS_IMMUTABLE(work->WS[i])) continue; 
         DAQP_SET_INACTIVE(work->WS[i]); 
     }
 }

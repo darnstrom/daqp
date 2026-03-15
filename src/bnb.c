@@ -73,7 +73,7 @@ int process_node(DAQPNode* node, DAQPWorkspace* work){
             //node_cleanup_workspace(work->bnb->n_clean,work);
             //warmstart_node(node,work);
             add_upper_lower(node->bin_id,work);
-            work->sense[REMOVE_LOWER_FLAG(node->bin_id)] |= IMMUTABLE; // Make equality
+            work->sense[REMOVE_LOWER_FLAG(node->bin_id)] |= DAQP_IMMUTABLE; // Equality
             if(work->sing_ind != EMPTY_IND) // Need to cold start to not miss integer feasible
                 setup_cold_bnb(node,work);
 
@@ -145,7 +145,7 @@ void node_cleanup_workspace(int n_clean, DAQPWorkspace* work){
     // Cleanup sense 
     for(i=n_clean; i<work->n_active; i++)
         work->sense[work->WS[i]]&= IS_BINARY(work->WS[i]) ? 
-            ~(DAQP_ACTIVE+IMMUTABLE): ~DAQP_ACTIVE;
+            ~(DAQP_ACTIVE+DAQP_IMMUTABLE): ~DAQP_ACTIVE;
     // Reset workspace
     work->sing_ind=EMPTY_IND;
     work->n_active=n_clean;
@@ -158,7 +158,7 @@ void warmstart_node(DAQPNode* node, DAQPWorkspace* work){
     // Add fixed constraints
     for(i=work->bnb->n_clean - work->bnb->neq; i< node->depth+1;i++){ 
         add_upper_lower(work->bnb->fixed_ids[i],work);
-        SET_IMMUTABLE(REMOVE_LOWER_FLAG(work->bnb->fixed_ids[i]));
+        DAQP_SET_IMMUTABLE(REMOVE_LOWER_FLAG(work->bnb->fixed_ids[i]));
     }
     work->bnb->n_clean = work->bnb->neq+node->depth; 
     // Add free constraints
@@ -181,7 +181,7 @@ void save_warmstart(DAQPNode* node, DAQPWorkspace* work){
 
     for(i =work->bnb->neq; i<work->n_active;i++){
         id_to_add = (work->WS[i]+(DAQP_IS_LOWER(work->WS[i]) << (LOWER_BIT-1)));
-        if((work->sense[work->WS[i]]&(IMMUTABLE+BINARY))!=IMMUTABLE+BINARY)
+        if((work->sense[work->WS[i]]&(DAQP_IMMUTABLE+BINARY))!=DAQP_IMMUTABLE+BINARY)
             work->bnb->tree_WS[work->bnb->nWS++]= id_to_add;
     }
     node->WS_end = work->bnb->nWS;
@@ -209,7 +209,7 @@ void setup_cold_bnb(DAQPNode* node,DAQPWorkspace *work){
     work->reuse_ind=work->bnb->n_clean;
     for(i=work->bnb->n_clean - work->bnb->neq; i< node->depth+1;i++){
         add_upper_lower(work->bnb->fixed_ids[i],work);
-        SET_IMMUTABLE(REMOVE_LOWER_FLAG(work->bnb->fixed_ids[i]));
+        DAQP_SET_IMMUTABLE(REMOVE_LOWER_FLAG(work->bnb->fixed_ids[i]));
     }
     work->bnb->n_clean = work->bnb->neq+node->depth;
 }

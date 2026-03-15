@@ -61,10 +61,10 @@ extern "C" {
 #define DAQP_SET_UPPER(x) (work->sense[x]&=~2)
 
 // marks if a constraint cannot be activated/deactivated
-#define IMMUTABLE 4 
-#define IS_IMMUTABLE(x) (work->sense[x]&4)
-#define SET_IMMUTABLE(x) (work->sense[x]|=4)
-#define SET_MUTABLE(x) (work->sense[x]&=~4)
+#define DAQP_IMMUTABLE 4
+#define DAQP_IS_IMMUTABLE(x) (work->sense[x]&4)
+#define DAQP_SET_IMMUTABLE(x) (work->sense[x]|=4)
+#define DAQP_SET_MUTABLE(x) (work->sense[x]&=~4)
 
 // marks that a constraint might be violated (but the slack is penalized)
 #define SOFT 8

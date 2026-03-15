@@ -74,7 +74,7 @@ int daqp_hiqp(DAQPWorkspace *work, c_float *lambda){
         // TODO: can factorization be directly reused?
         int n_active_old = (work->n_active < work->n) ? work->n_active : work->n;
         for(int jj=n_active_old; jj < work->n_active ;jj++) {
-            work->sense[work->WS[jj]]&=~(DAQP_ACTIVE+IMMUTABLE);
+            work->sense[work->WS[jj]]&=~(DAQP_ACTIVE+DAQP_IMMUTABLE);
         }
         work->n_active =j;
         work->reuse_ind=j;
@@ -85,10 +85,10 @@ int daqp_hiqp(DAQPWorkspace *work, c_float *lambda){
             if(work->sing_ind != EMPTY_IND){
                 remove_constraint(work,j);
                 work->sing_ind = EMPTY_IND;
-                SET_MUTABLE(work->WS[j]);
+                DAQP_SET_MUTABLE(work->WS[j]);
             }
             else{
-                if(IS_IMMUTABLE(work->WS[j])) nfree--;
+                if(DAQP_IS_IMMUTABLE(work->WS[j])) nfree--;
             }
         }
 

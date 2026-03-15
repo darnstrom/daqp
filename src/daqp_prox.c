@@ -99,7 +99,7 @@ static int gradient_step(DAQPWorkspace* work){
     // Find constraint j to add: j =  argmin_j s_j
     // Simple bounds
     for(j=0, disp=0;j<ms;j++){
-        if(work->sense[j]&(DAQP_ACTIVE+IMMUTABLE)) continue;
+        if(work->sense[j]&(DAQP_ACTIVE+DAQP_IMMUTABLE)) continue;
         delta_s = work->x[j]-work->xold[j];
         if(delta_s>0 && //Feasible descent direction
                 work->qp->bupper[j]<DAQP_INF && // Not single-sided
@@ -116,7 +116,7 @@ static int gradient_step(DAQPWorkspace* work){
     }
     //General bounds
     for(j=ms, disp=0;j<m;j++){
-        if(work->sense[j]&(DAQP_ACTIVE+IMMUTABLE)){
+        if(work->sense[j]&(DAQP_ACTIVE+DAQP_IMMUTABLE)){
             disp+=nx;// Skip ahead in A
             continue;
         }
