@@ -108,7 +108,7 @@ int get_branch_id(DAQPWorkspace* work){
     // Determine if upper or lower child should be processed first 
     // by computing whether the upper or lower bound is closer to be activated
     c_float diff = 0.5*(work->dupper[branch_id]+work->dlower[branch_id]);
-    if(IS_SIMPLE(branch_id)){//Simple bound
+    if(branch_id < work->ms){//Simple bound
         if(work->Rinv==NULL) diff-=work->u[branch_id]; //Hessian is identify 
         else{
             for(i=branch_id,disp=branch_id+R_OFFSET(branch_id,work->n);i<work->n;i++)

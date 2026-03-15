@@ -83,8 +83,6 @@ extern "C" {
 #define DAQP_SET_SLACK_FIXED(x) (work->sense[x]|=32)
 #define DAQP_SET_SLACK_FREE(x) (work->sense[x]&=~32)
 
-#define IS_SIMPLE(x) (x < work->ms)
-
 # ifdef __cplusplus
 }
 # endif // ifdef __cplusplus

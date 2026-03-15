@@ -53,7 +53,7 @@ void compute_primal_and_fval(DAQPWorkspace *work){
     //u[m] <-- Mk'*lam_star (zero if empty set)
     for(i=0;i<work->n_active;i++){
         id = work->WS[i];
-        if(IS_SIMPLE(id)){
+        if(id < work->ms){
             // Simple constraint 
             if(work->Rinv!=NULL){ // Hessian is not identity
                 for(j=id, disp=R_OFFSET(id,work->n);j<work->n;++j)

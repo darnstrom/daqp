@@ -18,7 +18,7 @@ void update_LDL_add(DAQPWorkspace *work, const int add_ind){
 
     // di <-- Mi' Mi
     // If normalized this will always be 1...
-    if(IS_SIMPLE(add_ind)){
+    if(add_ind < work->ms){
         Mi = (work->Rinv)? work->Rinv+R_OFFSET(add_ind,work->n): NULL;
         start_col = add_ind;
     }
@@ -49,7 +49,7 @@ void update_LDL_add(DAQPWorkspace *work, const int add_ind){
         id = work->WS[i];
         if(DAQP_IS_SOFT(id) && DAQP_IS_SLACK_FREE(id)) ns_active++;
         // Use Rinv or M for Mk depending on if k is simple bound or not 
-        if(IS_SIMPLE(id)){ 
+        if(id < work->ms){ 
             Mk = (work->Rinv) ? work->Rinv+R_OFFSET(id,work->n): NULL;
             j= (start_col > id) ? start_col : id;
         }
