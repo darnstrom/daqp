@@ -44,7 +44,7 @@ void add_constraint(DAQPWorkspace *work, const int add_ind, c_float lam){
 }
 
 void compute_primal_and_fval(DAQPWorkspace *work){
-    int i,j,disp;
+    int i,j,disp,id;
     c_float fval=0;
     // Reset u & soft slack
     for(j=0;j<work->n;j++)
@@ -52,24 +52,25 @@ void compute_primal_and_fval(DAQPWorkspace *work){
     work->soft_slack = 0;
     //u[m] <-- Mk'*lam_star (zero if empty set)
     for(i=0;i<work->n_active;i++){
-        if(IS_SIMPLE(work->WS[i])){
+        id = work->WS[i];
+        if(IS_SIMPLE(id)){
             // Simple constraint 
             if(work->Rinv!=NULL){ // Hessian is not identity
-                for(j=work->WS[i], disp=R_OFFSET(work->WS[i],work->n);j<work->n;++j)
+                for(j=id, disp=R_OFFSET(id,work->n);j<work->n;++j)
                     work->u[j]-=work->Rinv[disp+j]*work->lam_star[i];
             }
-            else work->u[work->WS[i]]-=work->lam_star[i]; // Hessian is identity
+            else work->u[id]-=work->lam_star[i]; // Hessian is identity
         }
         else{ // General constraint
-            for(j=0,disp=work->n*(work->WS[i]-work->ms);j<work->n;j++)
+            for(j=0,disp=work->n*(id-work->ms);j<work->n;j++)
                 work->u[j]-=work->M[disp++]*work->lam_star[i];
         }
-        if(DAQP_IS_SOFT(work->WS[i])){
+        if(DAQP_IS_SOFT(id)){
 #ifdef SOFT_WEIGHTS
-            if(DAQP_IS_LOWER(work->WS[i]))
-                fval+=SQUARE(work->lam_star[i])*work->rho_ls[work->WS[i]];
+            if(DAQP_IS_LOWER(id))
+                fval+=SQUARE(work->lam_star[i])*work->rho_ls[id];
             else
-                fval+=SQUARE(work->lam_star[i])*work->rho_us[work->WS[i]];
+                fval+=SQUARE(work->lam_star[i])*work->rho_us[id];
 #else
             fval+= SQUARE(work->lam_star[i]);
 #endif
