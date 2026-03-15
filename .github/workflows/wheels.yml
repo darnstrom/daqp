@@ -34,13 +34,13 @@ jobs:
         cp CMakeLists.txt interfaces/daqp-python/csrc/CMakeLists.txt
         cp LICENSE interfaces/daqp-python/LICENSE
 
-        cd interfaces/daqp-python
-        python -m pip install --upgrade pip
-        python -m pip install --upgrade build
-        python -m pip install cibuildwheel
-        python -m cibuildwheel --output-dir wheelhouse
+    - name: Build wheels with cibuildwheel
+      uses: pypa/cibuildwheel@v2
+      with:
+        package-dir: interfaces/daqp-python
+        output-dir: interfaces/daqp-python/wheelhouse
       env:
-        CIBW_SKIP: "pp* *-manylinux_i686 *-musllinux*" # Skip 32 bit linux
+        CIBW_SKIP: "pp* *-manylinux_i686 *-musllinux*"
         CIBW_TEST_REQUIRES: "pytest numpy"
         CIBW_TEST_COMMAND: "pytest -s {project}/test"
 
@@ -48,6 +48,8 @@ jobs:
       if: startsWith(matrix.os, 'ubuntu')
       run: |
         cd interfaces/daqp-python
+        python -m pip install --upgrade pip
+        python -m pip install --upgrade build
         python -m build . --sdist --outdir wheelhouse
 
     - name: Release to pypi
