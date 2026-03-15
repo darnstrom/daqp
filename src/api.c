@@ -12,14 +12,18 @@ void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
 #endif
     // Select algorithm
     if(work->settings->eps_prox==0){
-        if(work->bnb != NULL)
-            res->exitflag = daqp_bnb(work);
-        else if(work->nh > 1)
-            res->exitflag = daqp_hiqp(work,res->lam);
-        else
-            res->exitflag = daqp_ldp(work);
-
-        if(res->exitflag > 0) ldp2qp_solution(work); // Retrieve qp solution 
+        if(work->avi == NULL){
+            if(work->bnb != NULL)
+                res->exitflag = daqp_bnb(work);
+            else if(work->nh > 1)
+                res->exitflag = daqp_hiqp(work,res->lam);
+            else
+                res->exitflag = daqp_ldp(work);
+            if(res->exitflag > 0) ldp2qp_solution(work); // Retrieve qp solution 
+        }
+        else{ //AVI
+            res->exitflag = solve_avi(work);
+        }
     }
     else{//Prox
         res->exitflag = daqp_prox(work);
@@ -54,6 +58,12 @@ void daqp_quadprog(DAQPResult *res, DAQPProblem* qp, DAQPSettings *settings){
         free_daqp_workspace(&work);
         free_daqp_ldp(&work);
     }
+}
+
+// XXX should be very similar to quadprog now
+void daqp_avi(DAQPResult *res, DAQPProblem* problem, DAQPSettings *settings){
+    // Set the flag correctly
+    daqp_quadprog(res,problem,settings);
 }
 
 // Setup workspace and transform QP to LDP
@@ -98,6 +108,10 @@ int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time){
         own_settings = 0;
     allocate_daqp_workspace(work,qp->n,ns);
 
+    if(qp->problem_type == 1){ // Problem type 1 == AVI
+        work->avi= malloc(sizeof(DAQPAVI));
+        allocate_daqp_avi(work->avi,qp->n);
+    }
     errorflag = setup_daqp_ldp(work,qp);
     if(errorflag < 0){
         if(own_settings==0) work->settings = NULL;
@@ -127,6 +141,7 @@ int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp){
     int error_flag;
     int alloc_R=0, alloc_v=0;
 
+
     // Only allocate Rinv if H is not NULL
     if(qp->H!=NULL){
         alloc_R = 1;
@@ -140,7 +155,6 @@ int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp){
 
     // Allocate memory for LDP
     allocate_daqp_ldp(work, qp->n, qp->m, qp->ms, alloc_R, alloc_v);
-
 
     // Update hierarchy if hqp
     if(qp->nh > 1) update_mask += UPDATE_hierarchy;
@@ -271,6 +285,8 @@ void allocate_daqp_workspace(DAQPWorkspace *work, int n, int ns){
     work->bnb = NULL;
     work->nh = 0;
     work->break_points = NULL;
+    work->avi = NULL;
+
     reset_daqp_workspace(work);
 }
 
@@ -303,6 +319,25 @@ void allocate_daqp_ldp(DAQPWorkspace *work, int n, int m, int ms, int alloc_R, i
     }
 #endif
 }
+void allocate_daqp_avi(DAQPAVI* avi, const int n){
+    // Allocate matrices
+    avi->Hsym = malloc(n*n*sizeof(c_float));
+    avi->Hs_rho = malloc(n*n*sizeof(c_float));
+    avi->H_rho = malloc(n*n*sizeof(c_float));
+    avi->P_H2= malloc(n*sizeof(int));
+
+    avi->LU_H = malloc(n*n*sizeof(c_float));
+    avi->P_H = malloc(n*sizeof(int));
+
+    avi->kkt_buffer = malloc((n*n+2*n)*sizeof(c_float));
+    avi->P_S = malloc(n*sizeof(int));
+
+    // Allocate iterate (maybe reuse from normal workspace...)
+    avi->Hx = malloc(n*sizeof(c_float));
+    avi->x = malloc(n*sizeof(c_float));
+    avi->y = malloc(n*sizeof(c_float));
+    avi->xtemp = malloc(n*sizeof(c_float));
+}
 
 
 // Free memory for iterates
@@ -332,8 +367,32 @@ void free_daqp_workspace(DAQPWorkspace *work){
     }
 
     free_daqp_bnb(work);
+    free_daqp_avi(work);
 
 }
+
+void free_daqp_avi(DAQPWorkspace* work){
+    if(work->avi != NULL){
+        free(work->avi->Hsym);
+        free(work->avi->Hs_rho);
+        free(work->avi->H_rho);
+        free(work->avi->P_H2);
+
+        free(work->avi->LU_H);
+        free(work->avi->P_H);
+
+        free(work->avi->kkt_buffer);
+        free(work->avi->P_S);
+
+        free(work->avi->Hx);
+        free(work->avi->x);
+        free(work->avi->y);
+        free(work->avi->xtemp);
+        free(work->avi);
+        work->avi = NULL;
+    }
+}
+        
 
 // Extract solution information from workspace 
 void daqp_extract_result(DAQPResult* res, DAQPWorkspace* work){
@@ -350,7 +409,7 @@ void daqp_extract_result(DAQPResult* res, DAQPWorkspace* work){
     }
 
     // Shift back function value
-    if(work->v != NULL && (work->settings->eps_prox == 0
+    if(work->v != NULL && work->avi == NULL && (work->settings->eps_prox == 0
                 || work->Rinv != NULL || work->RinvD != NULL)){ // Normal QP
         res->fval = work->fval;
         for(i=0;i<work->n;i++) res->fval-=work->v[i]*work->v[i];

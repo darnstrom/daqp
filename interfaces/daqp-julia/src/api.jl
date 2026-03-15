@@ -30,7 +30,7 @@ is interpreted as
 * `H`           - cost matrix
 * `f`           - cost vector
 * `A`           - linear constraint matrix
-* `buppe`       - upper bounds for constraints
+* `bupper`       - upper bounds for constraints
 * `blower`      - lower bounds for constraints (default: -Inf)
 * `sense`       - constraint types, as a vector of Cints (default: 0). Example types:
   * `0 ` : inequality
@@ -112,13 +112,65 @@ function linprog(f::Vector{Float64},
     return DAQPBase.solve(d);
 end
 """
+# Example calls
+    xstar, _, exitflag, info = DAQPBase.avi(H,f,A,bupper)
+    xstar, _, exitflag, info = DAQPBase.avi(H,f,A,bupper,blower,sense) 
+
+finds the primal solution `xstar` and dual solution `lambda` to the affine variational inequality 
+
+Find `xstar` ∈ C ≜ {x : blower <= A x <= bupper}
+```
+⟨H*xstar f, y-xstar⟩ ≥ 0 for all y ∈ C 
+```
+If `bupper` and `blower` have more elements than rows of `A`, the first
+elements are interpreted as simple bounds. For example:
+
+```
+    A = [7.0 8.0]
+    blower = [-4.0; -5.0; -6.0]
+    bupper = [ 1.0;  2.0;  3.0]
+```
+is interpreted as
+
+```
+        -4.0 <= x₁ <= 1.0
+        -5.0 <= x₂ <= 2.0
+    -6.0 <= 7 x₁ + 8 x₂ <= 3.0
+
+```
+
+# Input 
+* `H`           - linear transform
+* `f`           - offset 
+* `A`           - linear constraint matrix
+* `bupper`       - upper bounds for constraints
+* `blower`      - lower bounds for constraints (default: -Inf)
+* `sense`       - constraint types, as a vector of Cints (default: 0). Example types:
+  * `0 ` : inequality
+  * `1 ` : active inequality (used as warm start)
+  * `5 ` : equality
+  * `8 ` : soft (allowed to be violated if necessary)
+  * `16` : binary (either upper or lower bound should hold with equality)
+
+# Output
+* `xstar`       - primal solution
+* `_`           - placeholder
+* `exitflag`    - flag from solver (>0 success, <0 failure) 
+* `info`        - tuple containing profiling information from the solver. 
+
+"""
+function avi(H::Matrix{Float64},f::Vector{Float64}, 
+        A::Matrix{Float64},bupper::Vector{Float64},blower::Vector{Float64}=Float64[],sense::Vector{Cint}=Cint[];A_rowmaj=false,settings=nothing)
+    return quadprog(QPj(H,f,A,bupper,blower,sense;A_rowmaj,is_avi=true);settings)
+end
+"""
     d = DAQPBase.Model() 
 creates an empty optimization model `d`. 
 
 
 The following functions acts on such models: 
 
-* `setup(d,H,f,A,bupper,blower,sense)`: setup a QP problem (see `DAQPBase.quadprog` for problem details)
+* `setup(d,H,f,A,bupper,blower,sense)`: setup a problem (see `DAQPBase.quadprog` or DAQPBase.avi for details)
 * `solve(d)`: solve a populated model
 * `update(d,H,f,A,bupper,blower,sense)`: update an existing model 
 * `dict = DAQPBase.settings(d)`: return a Dictionary with the current settings for the model `d` 
@@ -170,7 +222,8 @@ function setup(daqp::DAQPBase.Model, qp::DAQPBase.QPj)
         # ensure proximal-point iterations are used for LPs
         (old_settings.eps_prox == 0) && settings(daqp,Dict(:eps_prox=>1))
     end
-
+    
+    # Handle AVI with other setup 
     exitflag = ccall((:setup_daqp,DAQPBase.libdaqp),Cint,(Ptr{DAQPBase.QPc}, Ptr{DAQPBase.Workspace}, Ptr{Cdouble}), daqp.qpc_ptr, daqp.work, Ref{Cdouble}(setup_time))
     if(exitflag < 0)
         # XXX: if setup fails DAQP currently clears settings
@@ -187,8 +240,8 @@ end
 
 function setup(daqp::DAQPBase.Model, H::Matrix{Cdouble},f::Vector{Cdouble},
         A::Matrix{Cdouble},bupper::Vector{Cdouble},blower::Vector{Cdouble}=Cdouble[],
-        sense::Vector{Cint}=Cint[];A_rowmaj=false,break_points = Cint[])
-    return setup(daqp,QPj(H,f,A,bupper,blower,sense;A_rowmaj,break_points))
+        sense::Vector{Cint}=Cint[];A_rowmaj=false,break_points = Cint[], is_avi=false)
+    return setup(daqp,QPj(H,f,A,bupper,blower,sense;A_rowmaj,break_points,is_avi))
 end
 
 function solve(daqp::DAQPBase.Model)

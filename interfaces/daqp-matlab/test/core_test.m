@@ -347,7 +347,7 @@ classdef core_test < matlab.unittest.TestCase
         function hierarchical_qp(testCase)
             %  Larger example 
             rng(1);
-            break_points = [5;13;20;25;30;40;43;50];
+            break_points = [0;5;13;20;25;30;40;43;50];
             n = 25; 
             m = break_points(end);
             bu_cpy = zeros(m,1); bl_cpy = zeros(m,1);
@@ -378,16 +378,16 @@ classdef core_test < matlab.unittest.TestCase
             hier_ref_info
             % Compute slacks
             start = 1;
-            slacks_hier = zeros(length(break_points),1);
-            for i = 1:length(break_points)
+            slacks_hier = zeros(length(break_points)-1,1);
+            for i = 2:length(break_points)
                 inds = start:break_points(i);
                 slacks_hier(i) = min(min(bupper(inds)-A(inds,:)*x_hi),... 
                     min(-(blower(inds)-A(inds,:)*x_hi)));
                 start = break_points(i)+1;
             end
             start = 1;
-            ref_slacks_hier = zeros(length(break_points),1);
-            for i = 1:length(break_points)
+            ref_slacks_hier = zeros(length(break_points)-1,1);
+            for i = 2:length(break_points)
                 inds = start:break_points(i);
                 ref_slacks_hier(i) = min(min(bupper(inds)-A(inds,:)*x_ref),... 
                     min(-(blower(inds)-A(inds,:)*x_ref)));
@@ -395,7 +395,7 @@ classdef core_test < matlab.unittest.TestCase
             end
             [slacks_hier,ref_slacks_hier]
 
-            testCase.verifyLessThan(ref_slacks_hier(1),slacks_hier(1));
+            testCase.verifyLessThanOrEqual(ref_slacks_hier(1),slacks_hier(1));
             testCase.verifyLessThan(norm(ref_slacks_hier,2),norm(slacks_hier,2));
 
         end

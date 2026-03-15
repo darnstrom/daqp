@@ -190,9 +190,11 @@ void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work){
         fprintf(f, "&daqp_bnb_work,\n");
     // Hierarhical
     if(work->nh > 1)
-        fprintf(f, "%d,daqp_break_points};\n\n",work->nh);
+        fprintf(f, "%d,daqp_break_points,\n",work->nh);
     else
-        fprintf(f, "0, NULL};\n\n");
+        fprintf(f, "0, NULL,\n");
+    // AVI
+    fprintf(f, "NULL};\n\n"); // TODO: Generate for avi (also requires problem to be generated) 
 }
 
 void write_daqp_settings_src(FILE*  f, DAQPSettings* settings){

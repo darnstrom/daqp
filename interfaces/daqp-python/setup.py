@@ -27,6 +27,7 @@ else:
 cython_ext = Extension('daqp',
         sources = ['daqp.pyx',
             'csrc/src/api.c', 
+            'csrc/src/avi.c', 
             'csrc/src/auxiliary.c', 
             'csrc/src/bnb.c', 
             'csrc/src/daqp.c', 

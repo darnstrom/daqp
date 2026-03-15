@@ -9,6 +9,7 @@ extern "C" {
 #include "daqp_prox.h"
 #include "bnb.h"
 #include "hierarchical.h"
+#include "avi.h"
 
 typedef struct{
     c_float *x;
@@ -25,19 +26,25 @@ typedef struct{
 }DAQPResult;
 
 void daqp_solve(DAQPResult* res, DAQPWorkspace *work);
+void daqp_solve_avi(DAQPResult* res, DAQPAVI *avi);
 void daqp_quadprog(DAQPResult* res, DAQPProblem* qp,DAQPSettings* settings);
+void daqp_avi(DAQPResult *res, DAQPProblem* problem, DAQPSettings *settings);
 
 int setup_daqp(DAQPProblem *qp, DAQPWorkspace* work, c_float* setup_time);
 int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem* qp);
 void setup_daqp_hiqp(DAQPWorkspace *work, int* break_points, int nh);
 int setup_daqp_bnb(DAQPWorkspace* work, int nb, int ns);
+int setup_daqp_avi(DAQPAVI* avi, DAQPProblem* p, DAQPWorkspace* work, c_float* setup_time);
+
 void allocate_daqp_settings(DAQPWorkspace *work);
 void allocate_daqp_workspace(DAQPWorkspace *work, int n, int ns);
 void allocate_daqp_ldp(DAQPWorkspace *work, int n, int m, int ms, int alloc_R, int alloc_v);
+void allocate_daqp_avi(DAQPAVI *avi, int n);
 
 void free_daqp_ldp(DAQPWorkspace *work);
 void free_daqp_workspace(DAQPWorkspace *work);
 void free_daqp_bnb(DAQPWorkspace* work);
+void free_daqp_avi(DAQPWorkspace* work);
 
 void daqp_extract_result(DAQPResult* res, DAQPWorkspace* work);
 void daqp_default_settings(DAQPSettings *settings);

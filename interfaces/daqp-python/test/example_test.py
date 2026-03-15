@@ -16,7 +16,6 @@ class Testing(unittest.TestCase):
 
     def test_python_demo(self):
         """Python demo code test."""
-        # Test camera movement
         H = np.array([[1, 0], [0, 1]], dtype=c_double)
         f = np.array([1, 1], dtype=c_double)
         A = np.array([[1, 1], [1, -1]], dtype=c_double)
@@ -25,7 +24,6 @@ class Testing(unittest.TestCase):
         sense = np.array([0, 0, 0, 0], dtype=c_int)
         xstar, fval, exitflag, lam = daqp.solve(H, f, A, bupper, blower, sense)
         self.assertEqual(exitflag, 1)
-
 
 if __name__ == '__main__':
     unittest.main()

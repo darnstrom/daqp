@@ -291,8 +291,21 @@ end
     for _ in 1:10
         n = 100; m = 500
         xref,H,f,A,b = generate_test_avi(n,m);
-        x,λ,info = DAQPBase.solve_avi(H,f,A,b);
-        #println("$(info.status) | $(norm(xref-x)) | $(info.iterations)")
-        @test norm(xref-x) < n*tol;
+        # C api
+        x,λ,info = DAQPBase.avi(H,f,A,b);
+        @test norm(xref-x) < tol;
+
+        # Pure Julia implemenetation 
+        x,λ,info = DAQPBase.solve_avi_jl(H,f,A,b);
+        @test norm(xref-x) < tol;
+
+        # With setup
+        d = DAQPBase.Model()
+        DAQPBase.setup(d,H,f,A,b;is_avi=true)
+        x,fval,exitflag,info = solve(d)
+        @test norm(xref-x) < tol;
+        x,fval,exitflag,info = solve(d)
+        @test info.iterations == 5 
+        @test norm(xref-x) < tol;
     end
 end
