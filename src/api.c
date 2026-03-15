@@ -314,8 +314,8 @@ void allocate_daqp_ldp(DAQPWorkspace *work, int n, int m, int ms, int alloc_R, i
     for(i = 0; i< m; i++){
         work->d_ls[i] = 0;
         work->d_us[i] = 0;
-        work->rho_ls[i] = DEFAULT_RHO_SOFT;
-        work->rho_us[i] = DEFAULT_RHO_SOFT;
+        work->rho_ls[i] = DAQP_DEFAULT_RHO_SOFT;
+        work->rho_us[i] = DAQP_DEFAULT_RHO_SOFT;
     }
 #endif
 }
@@ -430,26 +430,26 @@ void daqp_extract_result(DAQPResult* res, DAQPWorkspace* work){
 }
 
 void daqp_default_settings(DAQPSettings* settings){
-    settings->primal_tol = DEFAULT_PRIM_TOL;
-    settings->dual_tol = DEFAULT_DUAL_TOL; 
-    settings->zero_tol = DEFAULT_ZERO_TOL;
-    settings->pivot_tol = DEFAULT_PIVOT_TOL;
-    settings->progress_tol= DEFAULT_PROG_TOL;
+    settings->primal_tol = DAQP_DEFAULT_PRIM_TOL;
+    settings->dual_tol = DAQP_DEFAULT_DUAL_TOL; 
+    settings->zero_tol = DAQP_DEFAULT_ZERO_TOL;
+    settings->pivot_tol = DAQP_DEFAULT_PIVOT_TOL;
+    settings->progress_tol= DAQP_DEFAULT_PROG_TOL;
 
-    settings->cycle_tol = DEFAULT_CYCLE_TOL;
-    settings->iter_limit = DEFAULT_ITER_LIMIT;
+    settings->cycle_tol = DAQP_DEFAULT_CYCLE_TOL;
+    settings->iter_limit = DAQP_DEFAULT_ITER_LIMIT;
     settings->fval_bound = DAQP_INF; 
 
     settings->eps_prox = 0;
-    settings->eta_prox = DEFAULT_ETA;
+    settings->eta_prox = DAQP_DEFAULT_ETA;
 
-    settings->rho_soft = DEFAULT_RHO_SOFT; 
+    settings->rho_soft = DAQP_DEFAULT_RHO_SOFT; 
 
-    settings->rel_subopt = DEFAULT_REL_SUBOPT;
-    settings->abs_subopt = DEFAULT_ABS_SUBOPT;
+    settings->rel_subopt = DAQP_DEFAULT_REL_SUBOPT;
+    settings->abs_subopt = DAQP_DEFAULT_ABS_SUBOPT;
 
-    settings->sing_tol = DEFAULT_SING_TOL;
-    settings->refactor_tol = DEFAULT_REFACTOR_TOL;
+    settings->sing_tol = DAQP_DEFAULT_SING_TOL;
+    settings->refactor_tol = DAQP_DEFAULT_REFACTOR_TOL;
 }
 
 /* Remove redundant constraints*/
