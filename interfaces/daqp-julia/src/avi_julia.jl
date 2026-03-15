@@ -43,7 +43,7 @@ AVIWorkspace() = AVIWorkspace(zeros(0,0),zeros(0),zeros(0,0),zeros(0),zeros(0),z
                               zeros(0),zeros(0), Model(), zeros(0), AVISettings())
 
 
-function setup_avi(H,f,A,bu,bl,sense;x0 = zeros(0), rho_soft = 1e6, daqp_workspace=nothing, settings=AVISettings())
+function setup_avi_jl(H,f,A,bu,bl,sense;x0 = zeros(0), rho_soft = 1e6, daqp_workspace=nothing, settings=AVISettings())
     n,m = length(f),length(bu)
     bl = isempty(bl) ? fill(-1e30,m) : bl
     sense = isempty(sense) ? zeros(Cint,m) : sense
@@ -126,7 +126,6 @@ function solve(ws::AVIWorkspace)
         ws.y[:], _, exitflag, info = DAQPBase.solve(ws.daqp_workspace)
         if counter == terminate_limit  ## Happens after a kkt point has been tested
             res_cand = norm(ws.y-ws.x)
-            println("Newton: $(res_cand^2)")
             if res_cand > res
                 # Revert newton step
                 ws.y .= yold 
@@ -205,8 +204,8 @@ function _solve_kkt(ws,ASu,ASl)
 end
 
 """
-    x, λ, info = DAQPBase.solve_avi(H,f,A,b)
-    x, λ, info = DAQPBase.solve_avi(H,f,A,bupper,blower)
+    x, λ, info = DAQPBase.solve_avi_jl(H,f,A,b)
+    x, λ, info = DAQPBase.solve_avi_jl(H,f,A,bupper,blower)
 
 finds a solution `x` to the affine variational inequality 
 
@@ -228,7 +227,7 @@ x ∈ {x: blower ≤ Ax ≤ bupper} such that:
 * `info` 		- tuple containing extra information from the solver such as status, active set and number of iterations.
 
 """
-function solve_avi(H::AbstractMatrix,f::AbstractVector,A::AbstractMatrix,bupper::AbstractVector,blower::AbstractVector=Float64[], sense=Cint[]; x0 = zeros(0), settings=AVISettings())
-    exitflag, ws = setup_avi(H,f,A,bupper,blower,sense;x0,settings)
+function solve_avi_jl(H::AbstractMatrix,f::AbstractVector,A::AbstractMatrix,bupper::AbstractVector,blower::AbstractVector=Float64[], sense=Cint[]; x0 = zeros(0), settings=AVISettings())
+    exitflag, ws = setup_avi_jl(H,f,A,bupper,blower,sense;x0,settings)
     return solve(ws)
 end

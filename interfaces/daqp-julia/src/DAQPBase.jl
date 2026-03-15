@@ -18,7 +18,6 @@ export settings
 export isfeasible
 
 include("daqp_julia.jl")
-
-include("avi.jl")
+include("avi_julia.jl")
 
 end
