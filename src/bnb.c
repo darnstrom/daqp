@@ -111,12 +111,12 @@ int get_branch_id(DAQPWorkspace* work){
     if(IS_SIMPLE(branch_id)){//Simple bound
         if(work->Rinv==NULL) diff-=work->u[branch_id]; //Hessian is identify 
         else{
-            for(i=branch_id,disp=branch_id+R_OFFSET(branch_id,NX);i<NX;i++) // 
+            for(i=branch_id,disp=branch_id+R_OFFSET(branch_id,work->n);i<work->n;i++)
                 diff-=work->Rinv[disp++]*work->u[i];
         }
     }
     else{//General bound
-        for(i=0,disp=NX*(branch_id-N_SIMPLE);i<NX;i++) 
+        for(i=0,disp=work->n*(branch_id-N_SIMPLE);i<work->n;i++) 
             diff-=work->M[disp++]*work->u[i];
     }
     branch_id = diff<0 ? branch_id : ADD_LOWER_FLAG(branch_id);

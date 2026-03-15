@@ -47,7 +47,7 @@ void compute_primal_and_fval(DAQPWorkspace *work){
     int i,j,disp;
     c_float fval=0;
     // Reset u & soft slack
-    for(j=0;j<NX;j++)
+    for(j=0;j<work->n;j++)
         work->u[j]=0;
     work->soft_slack = 0;
     //u[m] <-- Mk'*lam_star (zero if empty set)
@@ -55,13 +55,13 @@ void compute_primal_and_fval(DAQPWorkspace *work){
         if(IS_SIMPLE(work->WS[i])){
             // Simple constraint 
             if(work->Rinv!=NULL){ // Hessian is not identity
-                for(j=work->WS[i], disp=R_OFFSET(work->WS[i],NX);j<NX;++j)
+                for(j=work->WS[i], disp=R_OFFSET(work->WS[i],work->n);j<work->n;++j)
                     work->u[j]-=work->Rinv[disp+j]*work->lam_star[i];
             }
             else work->u[work->WS[i]]-=work->lam_star[i]; // Hessian is identity
         }
         else{ // General constraint
-            for(j=0,disp=NX*(work->WS[i]-N_SIMPLE);j<NX;j++)
+            for(j=0,disp=work->n*(work->WS[i]-N_SIMPLE);j<work->n;j++)
                 work->u[j]-=work->M[disp++]*work->lam_star[i];
         }
         if(IS_SOFT(work->WS[i])){
@@ -80,7 +80,7 @@ void compute_primal_and_fval(DAQPWorkspace *work){
     fval=fval*work->settings->rho_soft;
 #endif
     work->soft_slack=fval;// XXX: keep this for now to return SOFT_OPTIMAL
-    for(j=0;j<NX;j++)
+    for(j=0;j<work->n;j++)
         fval+=work->u[j]*work->u[j];
     work->fval = fval;
 }
@@ -94,16 +94,16 @@ int add_infeasible(DAQPWorkspace *work){
     for(j=0, disp=0;j<N_SIMPLE;j++){
         // Never activate immutable or already active constraints 
         if(work->sense[j]&(ACTIVE+IMMUTABLE)){ 
-            disp+=NX-j;
+            disp+=work->n-j;
             continue;
         }
         if(work->Rinv==NULL){// Hessian is identify
             Mu=work->u[j]; 
         }
         else{
-            Mu = daqp_dot(work->Rinv+disp,work->u+j,NX-j);
+            Mu = daqp_dot(work->Rinv+disp,work->u+j,work->n-j);
         }
-        disp+=NX-j;
+        disp+=work->n-j;
         min_cand = work->dupper[j]-Mu;
         if(min_cand < min_val && (work->scaling == NULL || min_cand < ep*work->scaling[j])){
             add_ind = j; isupper = 1;
@@ -121,11 +121,11 @@ int add_infeasible(DAQPWorkspace *work){
     for(j=N_SIMPLE, disp=0;j<N_CONSTR;j++){
         // Never activate immutable or already active constraints 
         if(work->sense[j]&(ACTIVE+IMMUTABLE)){ 
-            disp+=NX;// Skip ahead in M
+            disp+=work->n;// Skip ahead in M
             continue;
         }
-        Mu = daqp_dot(work->M+disp,work->u,NX);
-        disp+=NX;
+        Mu = daqp_dot(work->M+disp,work->u,work->n);
+        disp+=work->n;
 
         min_cand = work->dupper[j]-Mu;
         if(min_cand < min_val && (work->scaling == NULL || min_cand < ep*work->scaling[j])){

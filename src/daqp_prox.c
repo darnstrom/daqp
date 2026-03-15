@@ -5,14 +5,14 @@ static int gradient_step(DAQPWorkspace* work);
 
 int daqp_prox(DAQPWorkspace *work){
     int i,total_iter=0;
-    const int nx=NX;
+    const int nx=work->n;
     int exitflag;
     c_float *swp_ptr;
     c_float diff,eps=work->settings->eps_prox;
     c_float tol_stat, eta=work->settings->eta_prox;
     int cycle_counter = 0;
     c_float best_fval = DAQP_INF;
-    for(i=0;i < NX;i++) work->x[i] = 0; // TODO add option for user to set x0
+    for(i=0;i < work->n;i++) work->x[i] = 0; // TODO add option for user to set x0
 
     while(total_iter  <  work->settings->iter_limit){
         // xold <-- x
@@ -42,7 +42,7 @@ int daqp_prox(DAQPWorkspace *work){
                 break;
             }
             // Take gradient step if LP (and the iterate is not constrained to a vertex)
-            if((work->Rinv == NULL && work->RinvD ==NULL )&&(work->n_active != NX)){
+            if((work->Rinv == NULL && work->RinvD ==NULL )&&(work->n_active != work->n)){
                 if(gradient_step(work)==EMPTY_IND){
                     exitflag= EXIT_UNBOUNDED;
                     break;
@@ -92,7 +92,7 @@ int daqp_prox(DAQPWorkspace *work){
 // TODO: could probably reuse code from daqp
 static int gradient_step(DAQPWorkspace* work){
     int j,k,disp,add_ind=EMPTY_IND;
-    const int nx=NX;
+    const int nx=work->n;
     const int m=N_CONSTR;
     const int ms=N_SIMPLE;
     c_float Ax,delta_s, min_alpha=DAQP_INF;

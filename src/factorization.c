@@ -19,16 +19,16 @@ void update_LDL_add(DAQPWorkspace *work, const int add_ind){
     // di <-- Mi' Mi
     // If normalized this will always be 1...
     if(IS_SIMPLE(add_ind)){
-        Mi = (work->Rinv)? work->Rinv+R_OFFSET(add_ind,NX): NULL;
+        Mi = (work->Rinv)? work->Rinv+R_OFFSET(add_ind,work->n): NULL;
         start_col = add_ind;
     }
     else{
-        Mi = work->M+NX*(add_ind-N_SIMPLE);
+        Mi = work->M+work->n*(add_ind-N_SIMPLE);
         start_col = 0;
     }
     if(Mi==NULL) sum = 1;
     else
-        for(i=start_col,sum=0;i<NX;i++)
+        for(i=start_col,sum=0;i<work->n;i++)
             sum+=Mi[i]*Mi[i];
 
     if(IS_SOFT(add_ind) && IS_SLACK_FREE(add_ind)){
@@ -50,11 +50,11 @@ void update_LDL_add(DAQPWorkspace *work, const int add_ind){
         if(IS_SOFT(id) && IS_SLACK_FREE(id)) ns_active++;
         // Use Rinv or M for Mk depending on if k is simple bound or not 
         if(IS_SIMPLE(id)){ 
-            Mk = (work->Rinv) ? work->Rinv+R_OFFSET(id,NX): NULL;
+            Mk = (work->Rinv) ? work->Rinv+R_OFFSET(id,work->n): NULL;
             j= (start_col > id) ? start_col : id;
         }
         else{
-            Mk = work->M+NX*(id-N_SIMPLE);
+            Mk = work->M+work->n*(id-N_SIMPLE);
             j= start_col;
         }
         // Multiply Mk*Mi (NULL signify unity)
@@ -63,7 +63,7 @@ void update_LDL_add(DAQPWorkspace *work, const int add_ind){
         else if(Mi == NULL)
             sum = Mk[j];
         else
-            sum = daqp_dot(Mk+j,Mi+j,NX-j);
+            sum = daqp_dot(Mk+j,Mi+j,work->n-j);
 
         work->L[new_L_start+i] = sum;
     }
