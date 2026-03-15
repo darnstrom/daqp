@@ -7,7 +7,7 @@ c_float daqp_dot(const c_float* v1, const c_float* v2, const int n) {
 }
 
 
-void update_LDL_add(DAQPWorkspace *work, const int add_ind){
+void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind){
     work->sing_ind = DAQP_EMPTY_IND;
     int i,j,disp,id;
     int new_L_start= DAQP_ARSUM(work->n_active);
@@ -94,7 +94,7 @@ void update_LDL_add(DAQPWorkspace *work, const int add_ind){
         work->D[work->n_active]=0;
     }
 }
-void update_LDL_remove(DAQPWorkspace *work, const int rm_ind){
+void daqp_update_LDL_remove(DAQPWorkspace *work, const int rm_ind){
     if(work->n_active==rm_ind+1)
         return;
     int i, j, r, old_disp, new_disp, w_count, n_update=work->n_active-rm_ind-1;

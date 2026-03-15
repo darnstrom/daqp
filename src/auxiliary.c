@@ -4,7 +4,7 @@ void daqp_remove_constraint(DAQPWorkspace* work, const int rm_ind){
     int i;
     // Update data structures
     DAQP_SET_INACTIVE(work->WS[rm_ind]); 
-    update_LDL_remove(work,rm_ind);
+    daqp_update_LDL_remove(work,rm_ind);
     (work->n_active)--;
 
     for(i=rm_ind;i<work->n_active;i++){
@@ -34,7 +34,7 @@ void daqp_add_constraint(DAQPWorkspace *work, const int add_ind, c_float lam){
     else
         DAQP_SET_SLACK_FIXED(add_ind);
 #endif
-    update_LDL_add(work, add_ind);
+    daqp_update_LDL_add(work, add_ind);
     work->WS[work->n_active] = add_ind;
     work->lam[work->n_active] = lam;
     work->n_active++;
