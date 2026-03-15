@@ -10,7 +10,7 @@ c_float daqp_dot(const c_float* v1, const c_float* v2, const int n) {
 void update_LDL_add(DAQPWorkspace *work, const int add_ind){
     work->sing_ind = DAQP_EMPTY_IND;
     int i,j,disp,id;
-    int new_L_start= ARSUM(work->n_active);
+    int new_L_start= DAQP_ARSUM(work->n_active);
     int start_col;
     int ns_active=0;
     c_float sum;
@@ -19,7 +19,7 @@ void update_LDL_add(DAQPWorkspace *work, const int add_ind){
     // di <-- Mi' Mi
     // If normalized this will always be 1...
     if(add_ind < work->ms){
-        Mi = (work->Rinv)? work->Rinv+R_OFFSET(add_ind,work->n): NULL;
+        Mi = (work->Rinv)? work->Rinv+DAQP_R_OFFSET(add_ind,work->n): NULL;
         start_col = add_ind;
     }
     else{
@@ -50,7 +50,7 @@ void update_LDL_add(DAQPWorkspace *work, const int add_ind){
         if(DAQP_IS_SOFT(id) && DAQP_IS_SLACK_FREE(id)) ns_active++;
         // Use Rinv or M for Mk depending on if k is simple bound or not 
         if(id < work->ms){ 
-            Mk = (work->Rinv) ? work->Rinv+R_OFFSET(id,work->n): NULL;
+            Mk = (work->Rinv) ? work->Rinv+DAQP_R_OFFSET(id,work->n): NULL;
             j= (start_col > id) ? start_col : id;
         }
         else{
@@ -100,7 +100,7 @@ void update_LDL_remove(DAQPWorkspace *work, const int rm_ind){
     int i, j, r, old_disp, new_disp, w_count, n_update=work->n_active-rm_ind-1;
     c_float* w = &work->zldl[rm_ind]; // zldl will be obsolete => use to allocations
     // Extract parts to keep/update in L & D
-    new_disp=ARSUM(rm_ind);
+    new_disp=DAQP_ARSUM(rm_ind);
     old_disp=new_disp+(rm_ind+1);
     w_count= 0;
     // Remove column rm_ind (and add parts of L in its new place)
@@ -116,7 +116,7 @@ void update_LDL_remove(DAQPWorkspace *work, const int rm_ind){
     // L2 block
     c_float p,beta,dbar,alpha=work->D[rm_ind];
     // i - Element/row to update|j - Column which is looped over|r - Row to loop over
-    old_disp=ARSUM(rm_ind)+rm_ind;
+    old_disp=DAQP_ARSUM(rm_ind)+rm_ind;
     for(j = 0, i=rm_ind+1;j<n_update;j++,i++){
         p=w[j];
         dbar = work->D[i]+alpha*p*p;

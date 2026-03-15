@@ -111,7 +111,7 @@ int get_branch_id(DAQPWorkspace* work){
     if(branch_id < work->ms){//Simple bound
         if(work->Rinv==NULL) diff-=work->u[branch_id]; //Hessian is identify 
         else{
-            for(i=branch_id,disp=branch_id+R_OFFSET(branch_id,work->n);i<work->n;i++)
+            for(i=branch_id,disp=branch_id+DAQP_R_OFFSET(branch_id,work->n);i<work->n;i++)
                 diff-=work->Rinv[disp++]*work->u[i];
         }
     }

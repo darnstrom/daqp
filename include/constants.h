@@ -26,8 +26,8 @@ extern "C" {
 #define DAQP_DEFAULT_REFACTOR_TOL 1e-9
 
 // MACROS
-#define ARSUM(x) ((x)*(x+1)/2)
-#define R_OFFSET(X,Y) (((2*Y-X-1)*X)/2)
+#define DAQP_ARSUM(x) ((x)*(x+1)/2)
+#define DAQP_R_OFFSET(X,Y) (((2*Y-X-1)*X)/2)
 
 // EXIT FLAGS
 #define DAQP_EXIT_SOFT_OPTIMAL 2

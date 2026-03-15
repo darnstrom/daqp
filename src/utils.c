@@ -190,7 +190,7 @@ int update_M(DAQPWorkspace *work, c_float *A, const int mask){
     int stop_id =  (mask & DAQP_UPDATE_Rinv) ? n : n-work->ms;
     if(work->Rinv != NULL){
         for(k = 0,disp2=n*mA-1;k<mA;k++,disp2-=n){
-            disp=ARSUM(n);
+            disp=DAQP_ARSUM(n);
             for(j = 0; j< stop_id ; ++j){
                 for(i=0;i<j;++i)
                     work->M[disp2-i] += work->Rinv[--disp]*A[disp2-j];
@@ -234,7 +234,7 @@ void update_v(c_float *f, DAQPWorkspace *work, const int mask){
         return;
     }
     int stop_id =  (mask & DAQP_UPDATE_Rinv) ? 0 : work->ms;
-    for(j=n-1,disp=ARSUM(n);j>=stop_id;j--){
+    for(j=n-1,disp=DAQP_ARSUM(n);j>=stop_id;j--){
         for(i=n-1;i>j;i--)
             work->v[i] +=work->Rinv[--disp]*f[j];
         work->v[j]=work->Rinv[--disp]*f[j];

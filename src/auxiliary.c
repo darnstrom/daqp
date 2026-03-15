@@ -56,7 +56,7 @@ void compute_primal_and_fval(DAQPWorkspace *work){
         if(id < work->ms){
             // Simple constraint 
             if(work->Rinv!=NULL){ // Hessian is not identity
-                for(j=id, disp=R_OFFSET(id,work->n);j<work->n;++j)
+                for(j=id, disp=DAQP_R_OFFSET(id,work->n);j<work->n;++j)
                     work->u[j]-=work->Rinv[disp+j]*work->lam_star[i];
             }
             else work->u[id]-=work->lam_star[i]; // Hessian is identity
@@ -282,7 +282,7 @@ void compute_CSP(DAQPWorkspace *work){
     int i,j,disp,start_disp;
     c_float sum;
     // Forward substitution (xi <-- L\d)
-    for(i=work->reuse_ind,disp=ARSUM(work->reuse_ind); i<work->n_active; i++){
+    for(i=work->reuse_ind,disp=DAQP_ARSUM(work->reuse_ind); i<work->n_active; i++){
         // Setup RHS
         if(DAQP_IS_LOWER(work->WS[i])){
             sum = -work->dlower[work->WS[i]];
@@ -307,7 +307,7 @@ void compute_CSP(DAQPWorkspace *work){
     for(i=work->reuse_ind; i<work->n_active; i++)
         work->zldl[i] = work->xldl[i]/work->D[i];
     //Backward substitution  (lam_star <-- L'\z)
-    start_disp = ARSUM(work->n_active)-1;
+    start_disp = DAQP_ARSUM(work->n_active)-1;
     for(i = work->n_active-1;i>=0;i--){
         sum=work->zldl[i];
         disp = start_disp--;
@@ -323,7 +323,7 @@ void compute_CSP(DAQPWorkspace *work){
 //TODO this could probably be directly calculated in L
 void compute_singular_direction(DAQPWorkspace *work){
     // Step direction is stored in lam_star
-    int i,j,disp,offset_L= ARSUM(work->sing_ind);
+    int i,j,disp,offset_L= DAQP_ARSUM(work->sing_ind);
     int start_disp= offset_L-1;
 
     // Backwards substitution (p_tidle <-- L'\(-l))
