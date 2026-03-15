@@ -8,7 +8,6 @@ extern "C" {
 #include <stddef.h>
 
 #define EMPTY_IND -1 
-#define N_CONSTR work->m 
 #define N_SIMPLE work->ms 
 #define DAQP_INF ((c_float)1e30)
 

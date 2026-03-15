@@ -118,7 +118,7 @@ int add_infeasible(DAQPWorkspace *work){
         }
     }
     /* General two-sided constraints */
-    for(j=N_SIMPLE, disp=0;j<N_CONSTR;j++){
+    for(j=N_SIMPLE, disp=0;j<work->m;j++){
         // Never activate immutable or already active constraints 
         if(work->sense[j]&(ACTIVE+IMMUTABLE)){ 
             disp+=work->n;// Skip ahead in M
@@ -365,7 +365,7 @@ void pivot_last(DAQPWorkspace *work){
 int activate_constraints(DAQPWorkspace *work){
     //TODO prioritize inequalities?
     int i;
-    for(i =0;i<N_CONSTR;i++){
+    for(i =0;i<work->m;i++){
         if(IS_ACTIVE(i)){
 #ifdef SOFT_WEIGHTS
             if(IS_LOWER(i)){
@@ -388,7 +388,7 @@ int activate_constraints(DAQPWorkspace *work){
 #endif
         }
         if(work->sing_ind != EMPTY_IND){
-            for(;i<N_CONSTR;i++) SET_INACTIVE(i); // correct sense for unadded constraints
+            for(;i<work->m;i++) SET_INACTIVE(i); // correct sense for unadded constraints
             return EXIT_OVERDETERMINED_INITIAL;
         }
     }

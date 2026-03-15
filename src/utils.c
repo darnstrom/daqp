@@ -19,9 +19,9 @@ int update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
     /** Update constraint sense **/
     if(mask&UPDATE_sense){
         if(work->qp->sense == NULL) // Assume all constraints are "normal" inequality constraints
-            for(i=0;i<N_CONSTR;i++) work->sense[i] = 0;
+            for(i=0;i<work->m;i++) work->sense[i] = 0;
         else{
-            for(i=0;i<N_CONSTR;i++) work->sense[i] = qp->sense[i];
+            for(i=0;i<work->m;i++) work->sense[i] = qp->sense[i];
             do_activate = 1;
         }
     }
@@ -64,7 +64,7 @@ int update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
 #ifdef SOFT_WEIGHTS
     // TODO: Use mask or something to avoid scaling something more times... 
     if(work->d_ls != NULL && work->scaling !=NULL){
-        for(i=0;i<N_CONSTR; i++){
+        for(i=0;i<work->m; i++){
             work->d_ls[i]*=work->scaling[i];
             work->d_us[i]*=work->scaling[i];
             work->rho_ls[i]/=SQUARE(work->scaling[i]);
@@ -186,7 +186,7 @@ int update_Rinv(DAQPWorkspace *work, c_float *H){
 int update_M(DAQPWorkspace *work, c_float *A, const int mask){
     int i,j,k,disp,disp2;
     const int n = work->n;
-    const int mA = N_CONSTR-N_SIMPLE;
+    const int mA = work->m-N_SIMPLE;
     int stop_id =  (UPDATE_Rinv &mask) ? n : n-N_SIMPLE;
     if(work->Rinv != NULL){
         for(k = 0,disp2=n*mA-1;k<mA;k++,disp2-=n){
@@ -254,7 +254,7 @@ int update_d(DAQPWorkspace *work, c_float *bupper, c_float *blower){
 
 #ifndef DAQP_ASSUME_VALID
     c_float diff;
-    for(i =0;i<N_CONSTR;i++){
+    for(i =0;i<work->m;i++){
         if(IS_IMMUTABLE(i)) continue;
         diff = bupper[i] - blower[i];
         // Check for trivial infeasibility
@@ -274,13 +274,13 @@ int update_d(DAQPWorkspace *work, c_float *bupper, c_float *blower){
     work->reuse_ind = 0; // RHS of KKT system changed => cannot reuse intermediate results
     // Take into scaling of constraints
     if(work->scaling != NULL){
-        for(i = 0;i<N_CONSTR;i++){
+        for(i = 0;i<work->m;i++){
             work->dupper[i] = bupper[i]*work->scaling[i];
             work->dlower[i] = blower[i]*work->scaling[i];
         }
     }
     else{
-        for(i = 0;i<N_CONSTR;i++){
+        for(i = 0;i<work->m;i++){
             work->dupper[i] = bupper[i];
             work->dlower[i] = blower[i];
         }
@@ -302,7 +302,7 @@ int update_d(DAQPWorkspace *work, c_float *bupper, c_float *blower){
         }
     }
     //General bounds
-    for(i = N_SIMPLE, disp=0;i<N_CONSTR;i++){
+    for(i = N_SIMPLE, disp=0;i<work->m;i++){
         for(j=0, sum=0;j<n;j++)
             sum+=work->M[disp++]*work->v[j];
         work->dupper[i]+=sum;
@@ -333,7 +333,7 @@ int normalize_M(DAQPWorkspace* work){
     c_float scaling_i;
     c_float zero_tol = work->settings->zero_tol;
     // Normalize general constraints 
-    for(i=N_SIMPLE, disp=0;i<N_CONSTR;i++){
+    for(i=N_SIMPLE, disp=0;i<work->m;i++){
         scaling_i = 0;
         for(j=0;j<work->n;disp++,j++)
             scaling_i+=work->M[disp]*work->M[disp];

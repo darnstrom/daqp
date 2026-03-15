@@ -93,7 +93,7 @@ int daqp_prox(DAQPWorkspace *work){
 static int gradient_step(DAQPWorkspace* work){
     int j,k,disp,add_ind=EMPTY_IND;
     const int nx=work->n;
-    const int m=N_CONSTR;
+    const int m=work->m;
     const int ms=N_SIMPLE;
     c_float Ax,delta_s, min_alpha=DAQP_INF;
     // Find constraint j to add: j =  argmin_j s_j
