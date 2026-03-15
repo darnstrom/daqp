@@ -1,6 +1,6 @@
 #include "auxiliary.h"
 #include "factorization.h"
-void remove_constraint(DAQPWorkspace* work, const int rm_ind){
+void daqp_remove_constraint(DAQPWorkspace* work, const int rm_ind){
     int i;
     // Update data structures
     DAQP_SET_INACTIVE(work->WS[rm_ind]); 
@@ -21,10 +21,10 @@ void remove_constraint(DAQPWorkspace* work, const int rm_ind){
         work->D[work->n_active-1] = 0;
     }
     else{ // Pivot for improved numerics
-        pivot_last(work);
+        daqp_pivot_last(work);
     }
 }
-void add_constraint(DAQPWorkspace *work, const int add_ind, c_float lam){
+void daqp_add_constraint(DAQPWorkspace *work, const int add_ind, c_float lam){
     // Update data structures  
     DAQP_SET_ACTIVE(add_ind);
 #ifdef SOFT_WEIGHTS
@@ -40,10 +40,10 @@ void add_constraint(DAQPWorkspace *work, const int add_ind, c_float lam){
     work->n_active++;
 
     // Pivot for improved numerics
-    pivot_last(work);
+    daqp_pivot_last(work);
 }
 
-void compute_primal_and_fval(DAQPWorkspace *work){
+void daqp_compute_primal_and_fval(DAQPWorkspace *work){
     int i,j,disp,id;
     c_float fval=0;
     // Reset u & soft slack
@@ -85,7 +85,7 @@ void compute_primal_and_fval(DAQPWorkspace *work){
         fval+=work->u[j]*work->u[j];
     work->fval = fval;
 }
-int add_infeasible(DAQPWorkspace *work){
+int daqp_add_infeasible(DAQPWorkspace *work){
     int j,disp;
     c_float ep = -work->settings->primal_tol;
     c_float min_val = ep;
@@ -153,13 +153,13 @@ int add_infeasible(DAQPWorkspace *work){
     swp_ptr=work->lam; work->lam = work->lam_star; work->lam_star=swp_ptr;
     // Add the constraint
     if(isupper)
-        add_constraint(work,add_ind,1);
+        daqp_add_constraint(work,add_ind,1);
     else
-        add_constraint(work,add_ind,-1);
+        daqp_add_constraint(work,add_ind,-1);
     return 1;
 }
 #ifdef SOFT_WEIGHTS
-int remove_blocking(DAQPWorkspace *work){
+int daqp_remove_blocking(DAQPWorkspace *work){
     int i, ind, rm_ind = DAQP_EMPTY_IND;
     c_float alpha=DAQP_INF;
     c_float alpha_cand, lam_slack;
@@ -225,7 +225,7 @@ int remove_blocking(DAQPWorkspace *work){
     int abs_rm_id = work->WS[rm_ind];
     lam_slack = work->lam[rm_ind];
 
-    remove_constraint(work,rm_ind);
+    daqp_remove_constraint(work,rm_ind);
     if(DAQP_IS_SOFT(abs_rm_id)==0 || work->sing_ind != DAQP_EMPTY_IND) return 1;
 
     // Reactivate
@@ -236,12 +236,12 @@ int remove_blocking(DAQPWorkspace *work){
         if(lam_slack  < 0) return 1;
     }
     // Reactive and toggle sense to correctly update factorization
-    add_constraint(work,abs_rm_id,lam_slack);
+    daqp_add_constraint(work,abs_rm_id,lam_slack);
 
     return 1;
 }
 #else // not SOFT_WEIGHTS
-int remove_blocking(DAQPWorkspace *work){
+int daqp_remove_blocking(DAQPWorkspace *work){
     int i,rm_ind = DAQP_EMPTY_IND; 
     c_float alpha=DAQP_INF;
     c_float alpha_cand;
@@ -273,12 +273,12 @@ int remove_blocking(DAQPWorkspace *work){
 
     // Remove the constraint from the working set and update LDL
     work->sing_ind=DAQP_EMPTY_IND;
-    remove_constraint(work,rm_ind);
+    daqp_remove_constraint(work,rm_ind);
     return 1;
 }
 #endif // SOFT_WEIGHTS
 
-void compute_CSP(DAQPWorkspace *work){
+void daqp_compute_CSP(DAQPWorkspace *work){
     int i,j,disp,start_disp;
     c_float sum;
     // Forward substitution (xi <-- L\d)
@@ -321,7 +321,7 @@ void compute_CSP(DAQPWorkspace *work){
 }
 
 //TODO this could probably be directly calculated in L
-void compute_singular_direction(DAQPWorkspace *work){
+void daqp_compute_singular_direction(DAQPWorkspace *work){
     // Step direction is stored in lam_star
     int i,j,disp,offset_L= DAQP_ARSUM(work->sing_ind);
     int start_disp= offset_L-1;
@@ -343,7 +343,7 @@ void compute_singular_direction(DAQPWorkspace *work){
 }
 
 
-void pivot_last(DAQPWorkspace *work){
+void daqp_pivot_last(DAQPWorkspace *work){
     const int rm_ind = work->n_active-2; 
     if(work->n_active > 1 && 
             work->D[rm_ind] < work->settings->pivot_tol && // element in D small enough
@@ -354,16 +354,16 @@ void pivot_last(DAQPWorkspace *work){
         if(work->bnb != NULL && rm_ind < work->bnb->n_clean) return;
 
         c_float lam_old = work->lam[rm_ind];
-        remove_constraint(work,rm_ind); // pivot_last might be recursively called here 
+        daqp_remove_constraint(work,rm_ind); // pivot_last might be recursively called here 
 
         if(work->sing_ind!=DAQP_EMPTY_IND) return; // Abort if D becomes singular
 
-        add_constraint(work,ind_old,lam_old);
+        daqp_add_constraint(work,ind_old,lam_old);
     }	
 }
 
 // Activate constrainte that are marked active in sense
-int activate_constraints(DAQPWorkspace *work){
+int daqp_activate_constraints(DAQPWorkspace *work){
     //TODO prioritize inequalities?
     int i;
     for(i =0;i<work->m;i++){
@@ -371,21 +371,21 @@ int activate_constraints(DAQPWorkspace *work){
 #ifdef SOFT_WEIGHTS
             if(DAQP_IS_LOWER(i)){
                 if(DAQP_IS_SLACK_FREE(i))
-                    add_constraint(work,i, -(work->d_ls[i]+1));
+                    daqp_add_constraint(work,i, -(work->d_ls[i]+1));
                 else
-                    add_constraint(work,i, -0.9*work->d_ls[i]);
+                    daqp_add_constraint(work,i, -0.9*work->d_ls[i]);
             }
             else{ //IS Upper
                 if(DAQP_IS_SLACK_FREE(i))
-                    add_constraint(work,i, work->d_us[i]+1);
+                    daqp_add_constraint(work,i, work->d_us[i]+1);
                 else
-                    add_constraint(work,i, 0.9*work->d_us[i]);
+                    daqp_add_constraint(work,i, 0.9*work->d_us[i]);
             }
 #else
             if(DAQP_IS_LOWER(i))
-                add_constraint(work,i, -1.0);
+                daqp_add_constraint(work,i, -1.0);
             else
-                add_constraint(work,i, 1.0);
+                daqp_add_constraint(work,i, 1.0);
 #endif
         }
         if(work->sing_ind != DAQP_EMPTY_IND){
@@ -397,7 +397,7 @@ int activate_constraints(DAQPWorkspace *work){
 }
 
 // Deactivate all active constraints that are mutable (i.e., not equality constraints)
-void deactivate_constraints(DAQPWorkspace *work){
+void daqp_deactivate_constraints(DAQPWorkspace *work){
     int i;
     for(i =0;i<work->n_active;i++){
         if(DAQP_IS_IMMUTABLE(work->WS[i])) continue; 

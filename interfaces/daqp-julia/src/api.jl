@@ -336,7 +336,7 @@ function update(daqp::DAQPBase.Model, H,f,A,bupper,blower,sense=nothing,break_po
 end
 
 function reset(p::Ptr{DAQPBase.Workspace})
-    ccall((:deactivate_constraints,libdaqp),Cvoid,(Ptr{DAQPBase.Workspace},),p);
+    ccall((:daqp_deactivate_constraints,libdaqp),Cvoid,(Ptr{DAQPBase.Workspace},),p);
     ccall((:reset_daqp_workspace,libdaqp),Cvoid,(Ptr{DAQPBase.Workspace},),p);
 end
 

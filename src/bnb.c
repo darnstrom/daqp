@@ -192,11 +192,11 @@ int add_upper_lower(const int add_id, DAQPWorkspace* work){
     // Setup new binary constraint
     if(DAQP_EXTRACT_LOWER_FLAG(add_id)){
         DAQP_SET_LOWER(true_add_id);
-        add_constraint(work,true_add_id,-1.0);
+        daqp_add_constraint(work,true_add_id,-1.0);
     }
     else{
         DAQP_SET_UPPER(true_add_id);
-        add_constraint(work,true_add_id,1.0);
+        daqp_add_constraint(work,true_add_id,1.0);
     }
     return 1;
 }

@@ -83,11 +83,11 @@ int update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
     if(do_activate == 1){
         reset_daqp_workspace(work);
         if(work->nh < 2)
-            error_flag = activate_constraints(work);
+            error_flag = daqp_activate_constraints(work);
         else{// Activate the first level (since those constraints are hard)
             int m_tmp = work->m;
             work->m = work->break_points[0];
-            error_flag = activate_constraints(work);
+            error_flag = daqp_activate_constraints(work);
             work->m = m_tmp;
         }
         if(error_flag<0)
@@ -455,7 +455,7 @@ void daqp_minrep_work(int* is_redundant, DAQPWorkspace* work){
         if(is_redundant[i] != -1 || DAQP_IS_IMMUTABLE(i)) continue;
         reset_daqp_workspace(work);
         work->sense[i] = 5;
-        add_constraint(work,i,1.0);
+        daqp_add_constraint(work,i,1.0);
         //work->dupper[i] += tol_weak; TODO support weaky infeasible constraints
         exitflag = daqp_ldp(work);
         if(exitflag== DAQP_EXIT_INFEASIBLE){
@@ -470,7 +470,7 @@ void daqp_minrep_work(int* is_redundant, DAQPWorkspace* work){
                     is_redundant[work->WS[j]] = 0;
         }
         // work->dupper[i] -= tol_weak; // TODO support weakly infeasible constraints
-        deactivate_constraints(work);
+        daqp_deactivate_constraints(work);
     }
 }
 

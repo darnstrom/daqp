@@ -8,17 +8,17 @@ int daqp_ldp(DAQPWorkspace *work){
 
     for(iter=1; iter < work->settings->iter_limit; ++iter){
         if(work->sing_ind==DAQP_EMPTY_IND){ 
-            compute_CSP(work);
+            daqp_compute_CSP(work);
             // Check dual feasibility of CSP
-            if(!remove_blocking(work)){ //lam_star >= 0 (i.e., dual feasible)
-                compute_primal_and_fval(work);
+            if(!daqp_remove_blocking(work)){ //lam_star >= 0 (i.e., dual feasible)
+                daqp_compute_primal_and_fval(work);
                 // fval termination criterion
                 if(work->fval > fval_bound){
                     exitflag = DAQP_EXIT_INFEASIBLE;
                     break;
                 }
                 // Try to add infeasible constraint 
-                if(!add_infeasible(work)){ //mu >= (i.e., primal feasible)
+                if(!daqp_add_infeasible(work)){ //mu >= (i.e., primal feasible)
                                            // All KKT-conditions satisfied -> optimum found 
 
                     // If ill-conditioned basis, refactor
@@ -33,7 +33,7 @@ int daqp_ldp(DAQPWorkspace *work){
                                 DAQP_SET_LOWER(work->WS[i]);
                         }
                         reset_daqp_workspace(work);
-                        activate_constraints(work);
+                        daqp_activate_constraints(work);
                         continue; // Try again with new LDL factorization
                     }
 
@@ -54,7 +54,7 @@ int daqp_ldp(DAQPWorkspace *work){
                         else{// Cycling -> Try to reorder and refactorize LDL
                             tried_repair =1;
                             reset_daqp_workspace(work);
-                            activate_constraints(work);
+                            daqp_activate_constraints(work);
                             cycle_counter=0;
                             best_fval = -1;
                         }
@@ -67,8 +67,8 @@ int daqp_ldp(DAQPWorkspace *work){
             }
         }
         else{// Singular case
-            compute_singular_direction(work);
-            if(!remove_blocking(work)){ 
+            daqp_compute_singular_direction(work);
+            if(!daqp_remove_blocking(work)){ 
                 exitflag = DAQP_EXIT_INFEASIBLE;
                 break;
             }
