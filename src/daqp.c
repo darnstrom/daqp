@@ -7,7 +7,7 @@ int daqp_ldp(DAQPWorkspace *work){
     c_float fval_bound = 2*work->settings->fval_bound; // Internal objective is twice the nomninal
 
     for(iter=1; iter < work->settings->iter_limit; ++iter){
-        if(work->sing_ind==EMPTY_IND){ 
+        if(work->sing_ind==DAQP_EMPTY_IND){ 
             compute_CSP(work);
             // Check dual feasibility of CSP
             if(!remove_blocking(work)){ //lam_star >= 0 (i.e., dual feasible)
@@ -116,7 +116,7 @@ void warmstart_workspace(DAQPWorkspace* work, int* WS, const int n_active){
     // (Make sure reorder always adds inequality constraints...)
     reset_daqp_workspace(work); // Reset workspace
     for(i = 0; i<n_active; i++){
-        if(work->sing_ind!=EMPTY_IND){
+        if(work->sing_ind!=DAQP_EMPTY_IND){
             add_constraint(work,WS[i],1.0); 
         }else{ //Make sure that the unadded constraints are inactive in sense
             DAQP_SET_INACTIVE(work->WS[i]);
@@ -127,7 +127,7 @@ void warmstart_workspace(DAQPWorkspace* work, int* WS, const int n_active){
 
 // Reset workspace to default values
 void reset_daqp_workspace(DAQPWorkspace *work){
-    work->sing_ind=EMPTY_IND;
+    work->sing_ind=DAQP_EMPTY_IND;
     work->n_active =0;
     work->reuse_ind=0;
 }

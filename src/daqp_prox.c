@@ -43,7 +43,7 @@ int daqp_prox(DAQPWorkspace *work){
             }
             // Take gradient step if LP (and the iterate is not constrained to a vertex)
             if((work->Rinv == NULL && work->RinvD ==NULL )&&(work->n_active != work->n)){
-                if(gradient_step(work)==EMPTY_IND){
+                if(gradient_step(work)==DAQP_EMPTY_IND){
                     exitflag= DAQP_EXIT_UNBOUNDED;
                     break;
                 }
@@ -91,7 +91,7 @@ int daqp_prox(DAQPWorkspace *work){
 // Gradient step
 // TODO: could probably reuse code from daqp
 static int gradient_step(DAQPWorkspace* work){
-    int j,k,disp,add_ind=EMPTY_IND;
+    int j,k,disp,add_ind=DAQP_EMPTY_IND;
     const int nx=work->n;
     const int m=work->m;
     const int ms=work->ms;
@@ -145,7 +145,7 @@ static int gradient_step(DAQPWorkspace* work){
         }
     }
     // update iterate
-    if(add_ind != EMPTY_IND)
+    if(add_ind != DAQP_EMPTY_IND)
         for(k=0;k<nx;k++) // x <-- x+alpha deltax
             work->x[k]+=min_alpha*(work->x[k]-work->xold[k]);
 

@@ -74,7 +74,7 @@ int process_node(DAQPNode* node, DAQPWorkspace* work){
             //warmstart_node(node,work);
             add_upper_lower(node->bin_id,work);
             work->sense[REMOVE_LOWER_FLAG(node->bin_id)] |= DAQP_IMMUTABLE; // Equality
-            if(work->sing_ind != EMPTY_IND) // Need to cold start to not miss integer feasible
+            if(work->sing_ind != DAQP_EMPTY_IND) // Need to cold start to not miss integer feasible
                 setup_cold_bnb(node,work);
 
         }
@@ -95,7 +95,7 @@ int process_node(DAQPNode* node, DAQPWorkspace* work){
 
 int get_branch_id(DAQPWorkspace* work){
     int i,disp;
-    int branch_id = EMPTY_IND;
+    int branch_id = DAQP_EMPTY_IND;
     for(i=0; i < work->bnb->nb; i++){
         // Branch on first inactive constraint 
         if(DAQP_IS_ACTIVE(work->bnb->bin_ids[i])) continue;
@@ -103,7 +103,7 @@ int get_branch_id(DAQPWorkspace* work){
         break;
     }
 
-    if(branch_id == EMPTY_IND) return EMPTY_IND; // Nothing to branch over (=>integer feasible)
+    if(branch_id == DAQP_EMPTY_IND) return DAQP_EMPTY_IND; // Nothing to branch over (=>integer feasible)
 
     // Determine if upper or lower child should be processed first 
     // by computing whether the upper or lower bound is closer to be activated
@@ -147,7 +147,7 @@ void node_cleanup_workspace(int n_clean, DAQPWorkspace* work){
         work->sense[work->WS[i]]&= DAQP_IS_BINARY(work->WS[i]) ? 
             ~(DAQP_ACTIVE+DAQP_IMMUTABLE): ~DAQP_ACTIVE;
     // Reset workspace
-    work->sing_ind=EMPTY_IND;
+    work->sing_ind=DAQP_EMPTY_IND;
     work->n_active=n_clean;
     work->reuse_ind=n_clean; 
 }
@@ -164,10 +164,10 @@ void warmstart_node(DAQPNode* node, DAQPWorkspace* work){
     // Add free constraints
     for(i=node->WS_start; i < node->WS_end; i++){
         add_upper_lower(work->bnb->tree_WS[i],work);
-        if(work->sing_ind != EMPTY_IND) {
+        if(work->sing_ind != DAQP_EMPTY_IND) {
             work->n_active--;
             DAQP_SET_INACTIVE(work->WS[work->n_active]);
-            work->sing_ind = EMPTY_IND;
+            work->sing_ind = DAQP_EMPTY_IND;
             break; // Abort warm start if singular basis 
         }
     }
@@ -204,7 +204,7 @@ int add_upper_lower(const int add_id, DAQPWorkspace* work){
 void setup_cold_bnb(DAQPNode* node,DAQPWorkspace *work){
     int i;
     node_cleanup_workspace(work->bnb->n_clean,work);
-    work->sing_ind=EMPTY_IND;
+    work->sing_ind=DAQP_EMPTY_IND;
     work->n_active=work->bnb->n_clean;
     work->reuse_ind=work->bnb->n_clean;
     for(i=work->bnb->n_clean - work->bnb->neq; i< node->depth+1;i++){

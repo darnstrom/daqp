@@ -89,7 +89,7 @@ int add_infeasible(DAQPWorkspace *work){
     c_float ep = -work->settings->primal_tol;
     c_float min_val = ep;
     c_float Mu,min_cand;
-    int isupper=0, add_ind=EMPTY_IND;
+    int isupper=0, add_ind=DAQP_EMPTY_IND;
     // Simple bounds 
     for(j=0, disp=0;j<work->ms;j++){
         // Never activate immutable or already active constraints 
@@ -141,7 +141,7 @@ int add_infeasible(DAQPWorkspace *work){
         }
     }
     // No constraint is infeasible => return
-    if(add_ind == EMPTY_IND) return 0;
+    if(add_ind == DAQP_EMPTY_IND) return 0;
     // Otherwise add infeasible constraint to working set 
     if(isupper)
         DAQP_SET_UPPER(add_ind);
@@ -159,7 +159,7 @@ int add_infeasible(DAQPWorkspace *work){
 }
 #ifdef SOFT_WEIGHTS
 int remove_blocking(DAQPWorkspace *work){
-    int i, ind, rm_ind = EMPTY_IND;
+    int i, ind, rm_ind = DAQP_EMPTY_IND;
     c_float alpha=DAQP_INF;
     c_float alpha_cand, lam_slack;
     const c_float dual_tol = work->settings->dual_tol;
@@ -168,7 +168,7 @@ int remove_blocking(DAQPWorkspace *work){
         ind = work->WS[i];
         if(DAQP_IS_IMMUTABLE(ind)) continue;
         lam_slack = work->lam[i];
-        p = (work->sing_ind == EMPTY_IND) ? work->lam_star[i]-work->lam[i] : work->lam_star[i];
+        p = (work->sing_ind == DAQP_EMPTY_IND) ? work->lam_star[i]-work->lam[i] : work->lam_star[i];
         if(DAQP_IS_LOWER(ind)){
             if(DAQP_IS_SLACK_FREE(ind)){ // lam <= -d_ls
                 lam_slack += work->d_ls[ind];
@@ -178,7 +178,7 @@ int remove_blocking(DAQPWorkspace *work){
             else{ // slack bound active (implying that -d_ls <= lam <= 0)
                 // Remaining within the bound -d_ls <=lam* <= 0 -> nothing to do
                 if(work->lam_star[i] <= dual_tol && (work->lam_star[i]+dual_tol >= -work->d_ls[ind]) &&
-                        work->sing_ind == EMPTY_IND) continue;
+                        work->sing_ind == DAQP_EMPTY_IND) continue;
                 if(p < 0){ // lam* < -d_ls
                     lam_slack += work->d_ls[ind];
                 }
@@ -193,7 +193,7 @@ int remove_blocking(DAQPWorkspace *work){
             else{ // slack bound active (implying that 0 <= lam <=d_us)
                 // Remaining within the bound 0 <=lam* <=d_us -> nothing to do
                 if(work->lam_star[i] >= -dual_tol && (work->lam_star[i] <= dual_tol+work->d_us[ind])
-                        && work->sing_ind == EMPTY_IND) continue;
+                        && work->sing_ind == DAQP_EMPTY_IND) continue;
                 if(p > 0) // lam* > d_us
                     lam_slack -= work->d_us[ind];
             }
@@ -205,10 +205,10 @@ int remove_blocking(DAQPWorkspace *work){
             rm_ind = i;
         }
     }
-    if(rm_ind == EMPTY_IND) return 0; // Either dual feasible or primal infeasible
+    if(rm_ind == DAQP_EMPTY_IND) return 0; // Either dual feasible or primal infeasible
     // If blocking constraint -> update lambda
     alpha *= 1.001;
-    if(work->sing_ind == EMPTY_IND)
+    if(work->sing_ind == DAQP_EMPTY_IND)
         for(i=0;i<work->n_active;i++){
             work->lam[i]+=alpha*(work->lam_star[i]-work->lam[i]);
         }
@@ -220,12 +220,12 @@ int remove_blocking(DAQPWorkspace *work){
 
 
     // Remove the constraint from the working set and update LDL
-    work->sing_ind=EMPTY_IND;
+    work->sing_ind=DAQP_EMPTY_IND;
     int abs_rm_id = work->WS[rm_ind];
     lam_slack = work->lam[rm_ind];
 
     remove_constraint(work,rm_ind);
-    if(DAQP_IS_SOFT(abs_rm_id)==0 || work->sing_ind != EMPTY_IND) return 1;
+    if(DAQP_IS_SOFT(abs_rm_id)==0 || work->sing_ind != DAQP_EMPTY_IND) return 1;
 
     // Reactivate
     if((DAQP_IS_LOWER(abs_rm_id))){
@@ -241,7 +241,7 @@ int remove_blocking(DAQPWorkspace *work){
 }
 #else // not SOFT_WEIGHTS
 int remove_blocking(DAQPWorkspace *work){
-    int i,rm_ind = EMPTY_IND; 
+    int i,rm_ind = DAQP_EMPTY_IND; 
     c_float alpha=DAQP_INF;
     c_float alpha_cand;
     const c_float dual_tol = work->settings->dual_tol;
@@ -252,7 +252,7 @@ int remove_blocking(DAQPWorkspace *work){
         }
         else if(work->lam_star[i]>-dual_tol) continue; //lam* >= 0 for upper-> dual feasible
 
-        if(work->sing_ind == EMPTY_IND)
+        if(work->sing_ind == DAQP_EMPTY_IND)
             alpha_cand= -work->lam[i]/(work->lam_star[i]-work->lam[i]);
         else
             alpha_cand= -work->lam[i]/work->lam_star[i];
@@ -261,9 +261,9 @@ int remove_blocking(DAQPWorkspace *work){
             rm_ind = i;
         }
     }
-    if(rm_ind == EMPTY_IND) return 0; // Either dual feasible or primal infeasible
+    if(rm_ind == DAQP_EMPTY_IND) return 0; // Either dual feasible or primal infeasible
     // If blocking constraint -> update lambda
-    if(work->sing_ind == EMPTY_IND)
+    if(work->sing_ind == DAQP_EMPTY_IND)
         for(i=0;i<work->n_active;i++)
             work->lam[i]+=alpha*(work->lam_star[i]-work->lam[i]);
     else
@@ -271,7 +271,7 @@ int remove_blocking(DAQPWorkspace *work){
             work->lam[i]+=alpha*work->lam_star[i];
 
     // Remove the constraint from the working set and update LDL
-    work->sing_ind=EMPTY_IND;
+    work->sing_ind=DAQP_EMPTY_IND;
     remove_constraint(work,rm_ind);
     return 1;
 }
@@ -355,7 +355,7 @@ void pivot_last(DAQPWorkspace *work){
         c_float lam_old = work->lam[rm_ind];
         remove_constraint(work,rm_ind); // pivot_last might be recursively called here 
 
-        if(work->sing_ind!=EMPTY_IND) return; // Abort if D becomes singular
+        if(work->sing_ind!=DAQP_EMPTY_IND) return; // Abort if D becomes singular
 
         add_constraint(work,ind_old,lam_old);
     }	
@@ -387,7 +387,7 @@ int activate_constraints(DAQPWorkspace *work){
                 add_constraint(work,i, 1.0);
 #endif
         }
-        if(work->sing_ind != EMPTY_IND){
+        if(work->sing_ind != DAQP_EMPTY_IND){
             for(;i<work->m;i++) DAQP_SET_INACTIVE(i); // correct sense
             return DAQP_EXIT_OVERDETERMINED_INITIAL;
         }

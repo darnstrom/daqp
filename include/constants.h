@@ -7,7 +7,7 @@ extern "C" {
 
 #include <stddef.h>
 
-#define EMPTY_IND -1 
+#define DAQP_EMPTY_IND -1 
 #define DAQP_INF ((c_float)1e30)
 
 // DEFAULT SETTINGS 

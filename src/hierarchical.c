@@ -31,7 +31,8 @@ int daqp_hiqp(DAQPWorkspace *work, c_float *lambda){
                     add_constraint(work,j, -1.0);
                 else
                     add_constraint(work,j, 1.0);
-                if(work->sing_ind != EMPTY_IND) return DAQP_EXIT_OVERDETERMINED_INITIAL;
+                if(work->sing_ind != DAQP_EMPTY_IND) 
+                    return DAQP_EXIT_OVERDETERMINED_INITIAL;
                 }
         }
 
@@ -78,13 +79,13 @@ int daqp_hiqp(DAQPWorkspace *work, c_float *lambda){
         }
         work->n_active =j;
         work->reuse_ind=j;
-        work->sing_ind = EMPTY_IND;
+        work->sing_ind = DAQP_EMPTY_IND;
         for(; j<n_active_old ;j++){
             add_constraint(work,work->WS[j],work->lam_star[j]);
             // Skip if WS becomes overdtermined
-            if(work->sing_ind != EMPTY_IND){
+            if(work->sing_ind != DAQP_EMPTY_IND){
                 remove_constraint(work,j);
-                work->sing_ind = EMPTY_IND;
+                work->sing_ind = DAQP_EMPTY_IND;
                 DAQP_SET_MUTABLE(work->WS[j]);
             }
             else{
