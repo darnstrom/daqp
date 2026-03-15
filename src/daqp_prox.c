@@ -74,10 +74,10 @@ int daqp_prox(DAQPWorkspace *work){
         else{
             for(i = 0; i<nx;i++) 
                 work->v[i] = work->qp->f[i]-eps*work->x[i];
-            update_v(work->v,work,0);
+            daqp_update_v(work->v,work,0);
         }
         // Perturb RHS of constraints 
-        update_d(work, work->qp->bupper,work->qp->blower);
+        daqp_update_d(work, work->qp->bupper,work->qp->blower);
     }
     // Finalize results
     if(total_iter >= work->settings->iter_limit) exitflag = DAQP_EXIT_ITERLIMIT; 

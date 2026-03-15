@@ -161,7 +161,7 @@ int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp){
     if(qp->nh > 1) update_mask += DAQP_UPDATE_hierarchy;
 
     // Form LDP
-    error_flag = update_ldp(update_mask, work, qp);
+    error_flag = daqp_update_ldp(update_mask, work, qp);
     if(error_flag<0){
         free_daqp_ldp(work);
         return error_flag;

@@ -331,7 +331,7 @@ function update(daqp::DAQPBase.Model, H,f,A,bupper,blower,sense=nothing,break_po
     end
     daqp.qpc = QPc(daqp.qpj);
 
-    exitflag = ccall((:update_ldp,DAQPBase.libdaqp),Cint,(Cint,Ptr{DAQPBase.Workspace},Ptr{DAQPBase.QPc}), 
+    exitflag = ccall((:daqp_update_ldp,DAQPBase.libdaqp),Cint,(Cint,Ptr{DAQPBase.Workspace},Ptr{DAQPBase.QPc}), 
                      update_mask, daqp.work,Ref(daqp.qpc));
 end
 

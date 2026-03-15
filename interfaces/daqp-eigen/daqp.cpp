@@ -249,7 +249,7 @@ int DAQP::update(Eigen::MatrixXd const& H,
 
     qp_ = {n, m, ms, H_ptr, f_ptr, A_ptr, bu_ptr, bl_ptr, sense_ptr, bp_ptr, n_tasks};
 
-    int status = update_ldp(update_mask, &work_, &qp_);
+    int status = daqp_update_ldp(update_mask, &work_, &qp_);
     is_solved_ = is_slack_computed_ = false;
     return status;
 }

@@ -3,7 +3,7 @@
 #include <math.h>
 #include <stdio.h>
 
-int update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
+int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
     // TODO: copy dimensions from work->qp? 
     int error_flag, i;
     int do_activate = 0;
@@ -29,34 +29,34 @@ int update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
     /** Update Rinv **/
     if(mask&DAQP_UPDATE_Rinv){
         if(work->avi == NULL)
-            error_flag = update_Rinv(work, qp->H);
+            error_flag = daqp_update_Rinv(work, qp->H);
         else{
-            update_avi(work->avi,qp);
-            error_flag = update_Rinv(work, work->avi->Hs_rho);
+            daqp_update_avi(work->avi,qp);
+            error_flag = daqp_update_Rinv(work, work->avi->Hs_rho);
         }
         if(error_flag<0)
             return error_flag;
     }
     /** Update M **/
     if(mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M){
-        error_flag = update_M(work,qp->A,mask);
+        error_flag = daqp_update_M(work,qp->A,mask);
         if(error_flag<0)
             return error_flag;
     }
 
     /** Update v **/
     if(mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_v){
-        update_v(qp->f,work,mask);
+        daqp_update_v(qp->f,work,mask);
     }
 
     // Normalize Rinv
     if(mask&DAQP_UPDATE_Rinv){
-        normalize_Rinv(work);
+        daqp_normalize_Rinv(work);
     }
 
     /** Update d **/
     if(mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M||mask&DAQP_UPDATE_v||mask&DAQP_UPDATE_d){
-        error_flag = update_d(work,qp->bupper,qp->blower);
+        error_flag = daqp_update_d(work,qp->bupper,qp->blower);
         if(error_flag<0) return error_flag;
         if(error_flag==1) do_activate = 1;
     }
@@ -97,7 +97,7 @@ int update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
     return 0;
 }
 
-int update_Rinv(DAQPWorkspace *work, c_float *H){
+int daqp_update_Rinv(DAQPWorkspace *work, c_float *H){
     int i,j,k,disp,disp2,disp3;
     const int n = work->n; 
         // Check if diagonal
@@ -183,7 +183,7 @@ int update_Rinv(DAQPWorkspace *work, c_float *H){
     return 1;
 }
 
-int update_M(DAQPWorkspace *work, c_float *A, const int mask){
+int daqp_update_M(DAQPWorkspace *work, c_float *A, const int mask){
     int i,j,k,disp,disp2;
     const int n = work->n;
     const int mA = work->m-work->ms;
@@ -219,10 +219,10 @@ int update_M(DAQPWorkspace *work, c_float *A, const int mask){
     }
 
     reset_daqp_workspace(work); // Internal factorizations need to be redone!
-    return normalize_M(work);
+    return daqp_normalize_M(work);
 }
 
-void update_v(c_float *f, DAQPWorkspace *work, const int mask){
+void daqp_update_v(c_float *f, DAQPWorkspace *work, const int mask){
     int i,j,disp;
     const int n = work->n;
     if(work->v == NULL || f == NULL) return;
@@ -246,7 +246,7 @@ void update_v(c_float *f, DAQPWorkspace *work, const int mask){
     }
 }
 
-int update_d(DAQPWorkspace *work, c_float *bupper, c_float *blower){
+int daqp_update_d(DAQPWorkspace *work, c_float *bupper, c_float *blower){
     /* Compute d  = b+M*v */
     int i,j,disp;
     int do_activate = 0;
@@ -311,7 +311,7 @@ int update_d(DAQPWorkspace *work, c_float *bupper, c_float *blower){
     return do_activate;
 }
 
-void normalize_Rinv(DAQPWorkspace* work){
+void daqp_normalize_Rinv(DAQPWorkspace* work){
     int i,j,disp;
     c_float scaling_i;
     // Normalize simple constraints
@@ -328,7 +328,7 @@ void normalize_Rinv(DAQPWorkspace* work){
         }
     }
 }
-int normalize_M(DAQPWorkspace* work){
+int daqp_normalize_M(DAQPWorkspace* work){
     int i,j,disp;
     c_float scaling_i;
     c_float zero_tol = work->settings->zero_tol;
@@ -354,7 +354,7 @@ int normalize_M(DAQPWorkspace* work){
     return 0;
 }
 
-int update_avi(DAQPAVI* avi, DAQPProblem* p){
+int daqp_update_avi(DAQPAVI* avi, DAQPProblem* p){
     const int n = p->n;
     // Setup matrices Hsym, Hs_rho, and H_rho, LU_H
     int i,j,disp;
