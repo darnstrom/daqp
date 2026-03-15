@@ -26,7 +26,6 @@ extern "C" {
 #define DAQP_DEFAULT_REFACTOR_TOL 1e-9
 
 // MACROS
-#define SQUARE(x) ((x)*(x))
 #define ARSUM(x) ((x)*(x+1)/2)
 #define R_OFFSET(X,Y) (((2*Y-X-1)*X)/2)
 

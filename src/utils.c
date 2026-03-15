@@ -67,8 +67,8 @@ int update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
         for(i=0;i<work->m; i++){
             work->d_ls[i]*=work->scaling[i];
             work->d_us[i]*=work->scaling[i];
-            work->rho_ls[i]/=SQUARE(work->scaling[i]);
-            work->rho_us[i]/=SQUARE(work->scaling[i]);
+            work->rho_ls[i]/=work->scaling[i]*work->scaling[i];
+            work->rho_us[i]/=work->scaling[i]*work->scaling[i];
         }
     }
 #endif
@@ -367,7 +367,7 @@ int update_avi(DAQPAVI* avi, DAQPProblem* p){
             avi->Hs_rho[disp] = val;
             avi->H_rho[disp] = p->H[disp];
             avi->LU_H[disp] = p->H[disp];
-            avi->rho += SQUARE(p->H[disp]);
+            avi->rho += p->H[disp] * p->H[disp];
         }
     }
     // Regularization 

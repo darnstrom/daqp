@@ -68,11 +68,11 @@ void compute_primal_and_fval(DAQPWorkspace *work){
         if(DAQP_IS_SOFT(id)){
 #ifdef SOFT_WEIGHTS
             if(DAQP_IS_LOWER(id))
-                fval+=SQUARE(work->lam_star[i])*work->rho_ls[id];
+                fval+= work->lam_star[i]*work->lam_star[i]*work->rho_ls[id];
             else
-                fval+=SQUARE(work->lam_star[i])*work->rho_us[id];
+                fval+= work->lam_star[i]*work->lam_star[i]*work->rho_us[id];
 #else
-            fval+= SQUARE(work->lam_star[i]);
+            fval+= work->lam_star[i]*work->lam_star[i];
 #endif
         }
     }
