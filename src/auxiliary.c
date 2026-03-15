@@ -3,7 +3,7 @@
 void remove_constraint(DAQPWorkspace* work, const int rm_ind){
     int i;
     // Update data structures
-    SET_INACTIVE(work->WS[rm_ind]); 
+    DAQP_SET_INACTIVE(work->WS[rm_ind]); 
     update_LDL_remove(work,rm_ind);
     (work->n_active)--;
 
@@ -26,7 +26,7 @@ void remove_constraint(DAQPWorkspace* work, const int rm_ind){
 }
 void add_constraint(DAQPWorkspace *work, const int add_ind, c_float lam){
     // Update data structures  
-    SET_ACTIVE(add_ind);
+    DAQP_SET_ACTIVE(add_ind);
 #ifdef SOFT_WEIGHTS
     if((IS_LOWER(add_ind) && lam <= -work->d_ls[add_ind])||
             (IS_LOWER(add_ind)==0 && lam >=  work->d_us[add_ind]))
@@ -93,7 +93,7 @@ int add_infeasible(DAQPWorkspace *work){
     // Simple bounds 
     for(j=0, disp=0;j<work->ms;j++){
         // Never activate immutable or already active constraints 
-        if(work->sense[j]&(ACTIVE+IMMUTABLE)){ 
+        if(work->sense[j]&(DAQP_ACTIVE+IMMUTABLE)){ 
             disp+=work->n-j;
             continue;
         }
@@ -120,7 +120,7 @@ int add_infeasible(DAQPWorkspace *work){
     /* General two-sided constraints */
     for(j=work->ms, disp=0;j<work->m;j++){
         // Never activate immutable or already active constraints 
-        if(work->sense[j]&(ACTIVE+IMMUTABLE)){ 
+        if(work->sense[j]&(DAQP_ACTIVE+IMMUTABLE)){ 
             disp+=work->n;// Skip ahead in M
             continue;
         }
@@ -366,7 +366,7 @@ int activate_constraints(DAQPWorkspace *work){
     //TODO prioritize inequalities?
     int i;
     for(i =0;i<work->m;i++){
-        if(IS_ACTIVE(i)){
+        if(DAQP_IS_ACTIVE(i)){
 #ifdef SOFT_WEIGHTS
             if(IS_LOWER(i)){
                 if(IS_SLACK_FREE(i))
@@ -388,7 +388,7 @@ int activate_constraints(DAQPWorkspace *work){
 #endif
         }
         if(work->sing_ind != EMPTY_IND){
-            for(;i<work->m;i++) SET_INACTIVE(i); // correct sense for unadded constraints
+            for(;i<work->m;i++) DAQP_SET_INACTIVE(i); // correct sense
             return DAQP_EXIT_OVERDETERMINED_INITIAL;
         }
     }
@@ -400,6 +400,6 @@ void deactivate_constraints(DAQPWorkspace *work){
     int i;
     for(i =0;i<work->n_active;i++){
         if(IS_IMMUTABLE(work->WS[i])) continue; 
-        SET_INACTIVE(work->WS[i]); 
+        DAQP_SET_INACTIVE(work->WS[i]); 
     }
 }

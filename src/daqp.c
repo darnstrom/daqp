@@ -119,7 +119,7 @@ void warmstart_workspace(DAQPWorkspace* work, int* WS, const int n_active){
         if(work->sing_ind!=EMPTY_IND){
             add_constraint(work,WS[i],1.0); 
         }else{ //Make sure that the unadded constraints are inactive in sense
-            SET_INACTIVE(work->WS[i]);
+            DAQP_SET_INACTIVE(work->WS[i]);
         }
     }
 }

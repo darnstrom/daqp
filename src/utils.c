@@ -263,7 +263,7 @@ int update_d(DAQPWorkspace *work, c_float *bupper, c_float *blower){
         }
         // Check for unmarked equality constraint (blower == bupper)
         else if ( diff < work->settings->zero_tol ){
-            work->sense[i] |= ACTIVE + IMMUTABLE;
+            work->sense[i] |= DAQP_ACTIVE + IMMUTABLE;
             do_activate = 1;
         }
         // TODO: Make innactive here
@@ -460,7 +460,7 @@ void daqp_minrep_work(int* is_redundant, DAQPWorkspace* work){
         exitflag = daqp_ldp(work);
         if(exitflag== DAQP_EXIT_INFEASIBLE){
             is_redundant[i] = 1;
-            work->sense[i] &=~ACTIVE; // deactive (remains immutable, so will be ignored)
+            work->sense[i] &=~DAQP_ACTIVE; // deactive (remains immutable -> ignored)
         }
         else{
             is_redundant[i] = 0;

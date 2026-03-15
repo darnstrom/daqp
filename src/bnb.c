@@ -98,7 +98,7 @@ int get_branch_id(DAQPWorkspace* work){
     int branch_id = EMPTY_IND;
     for(i=0; i < work->bnb->nb; i++){
         // Branch on first inactive constraint 
-        if(IS_ACTIVE(work->bnb->bin_ids[i])) continue;
+        if(DAQP_IS_ACTIVE(work->bnb->bin_ids[i])) continue;
         branch_id = work->bnb->bin_ids[i];
         break;
     }
@@ -144,7 +144,8 @@ void node_cleanup_workspace(int n_clean, DAQPWorkspace* work){
     int i;
     // Cleanup sense 
     for(i=n_clean; i<work->n_active; i++)
-        work->sense[work->WS[i]]&= IS_BINARY(work->WS[i]) ? ~(ACTIVE+IMMUTABLE): ~ACTIVE;
+        work->sense[work->WS[i]]&= IS_BINARY(work->WS[i]) ? 
+            ~(DAQP_ACTIVE+IMMUTABLE): ~DAQP_ACTIVE;
     // Reset workspace
     work->sing_ind=EMPTY_IND;
     work->n_active=n_clean;
@@ -165,7 +166,7 @@ void warmstart_node(DAQPNode* node, DAQPWorkspace* work){
         add_upper_lower(work->bnb->tree_WS[i],work);
         if(work->sing_ind != EMPTY_IND) {
             work->n_active--;
-            SET_INACTIVE(work->WS[work->n_active]);
+            DAQP_SET_INACTIVE(work->WS[work->n_active]);
             work->sing_ind = EMPTY_IND;
             break; // Abort warm start if singular basis 
         }

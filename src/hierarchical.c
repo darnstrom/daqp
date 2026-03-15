@@ -26,7 +26,7 @@ int daqp_hiqp(DAQPWorkspace *work, c_float *lambda){
         // Soften constraints and activate 
         for(j =start;j<end;j++){
             SET_SOFT(j);
-            if(IS_ACTIVE(j)){
+            if(DAQP_IS_ACTIVE(j)){
                 if(IS_LOWER(j))
                     add_constraint(work,j, -1.0);
                 else
@@ -74,7 +74,7 @@ int daqp_hiqp(DAQPWorkspace *work, c_float *lambda){
         // TODO: can factorization be directly reused?
         int n_active_old = (work->n_active < work->n) ? work->n_active : work->n;
         for(int jj=n_active_old; jj < work->n_active ;jj++) {
-            work->sense[work->WS[jj]]&=~(ACTIVE+IMMUTABLE); // ensure inactive + mutable
+            work->sense[work->WS[jj]]&=~(DAQP_ACTIVE+IMMUTABLE);
         }
         work->n_active =j;
         work->reuse_ind=j;

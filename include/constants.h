@@ -49,10 +49,10 @@ extern "C" {
 #define DAQP_UPDATE_hierarchy 32
 
 // CONSTRAINT MASKS 
-#define ACTIVE 1
-#define IS_ACTIVE(x) (work->sense[x]&1)
-#define SET_ACTIVE(x) (work->sense[x]|=1)
-#define SET_INACTIVE(x) (work->sense[x]&=~1)
+#define DAQP_ACTIVE 1
+#define DAQP_IS_ACTIVE(x) (work->sense[x]&1)
+#define DAQP_SET_ACTIVE(x) (work->sense[x]|=1)
+#define DAQP_SET_INACTIVE(x) (work->sense[x]&=~1)
 
 // marks if a constraints is active at its lower bound
 #define LOWER 2 
