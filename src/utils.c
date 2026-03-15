@@ -17,7 +17,7 @@ int update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
     work->ms = qp->ms;
 
     /** Update constraint sense **/
-    if(mask&UPDATE_sense){
+    if(mask&DAQP_UPDATE_sense){
         if(work->qp->sense == NULL) // Assume all constraints are "normal" inequality constraints
             for(i=0;i<work->m;i++) work->sense[i] = 0;
         else{
@@ -27,7 +27,7 @@ int update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
     }
 
     /** Update Rinv **/
-    if(mask&UPDATE_Rinv){
+    if(mask&DAQP_UPDATE_Rinv){
         if(work->avi == NULL)
             error_flag = update_Rinv(work, qp->H);
         else{
@@ -38,24 +38,24 @@ int update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
             return error_flag;
     }
     /** Update M **/
-    if(mask&UPDATE_Rinv||mask&UPDATE_M){
+    if(mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M){
         error_flag = update_M(work,qp->A,mask);
         if(error_flag<0)
             return error_flag;
     }
 
     /** Update v **/
-    if(mask&UPDATE_Rinv||mask&UPDATE_v){
+    if(mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_v){
         update_v(qp->f,work,mask);
     }
 
     // Normalize Rinv
-    if(mask&UPDATE_Rinv){
+    if(mask&DAQP_UPDATE_Rinv){
         normalize_Rinv(work);
     }
 
     /** Update d **/
-    if(mask&UPDATE_Rinv||mask&UPDATE_M||mask&UPDATE_v||mask&UPDATE_d){
+    if(mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M||mask&DAQP_UPDATE_v||mask&DAQP_UPDATE_d){
         error_flag = update_d(work,qp->bupper,qp->blower);
         if(error_flag<0) return error_flag;
         if(error_flag==1) do_activate = 1;
@@ -74,7 +74,7 @@ int update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
 #endif
 
     /** Update hierarchy **/
-    if(mask&UPDATE_hierarchy){
+    if(mask&DAQP_UPDATE_hierarchy){
         work->nh = qp->nh;
         work->break_points = qp->break_points;
     }
@@ -187,7 +187,7 @@ int update_M(DAQPWorkspace *work, c_float *A, const int mask){
     int i,j,k,disp,disp2;
     const int n = work->n;
     const int mA = work->m-work->ms;
-    int stop_id =  (UPDATE_Rinv &mask) ? n : n-work->ms;
+    int stop_id =  (mask & DAQP_UPDATE_Rinv) ? n : n-work->ms;
     if(work->Rinv != NULL){
         for(k = 0,disp2=n*mA-1;k<mA;k++,disp2-=n){
             disp=ARSUM(n);
@@ -233,7 +233,7 @@ void update_v(c_float *f, DAQPWorkspace *work, const int mask){
             for(i=0;i<n;++i) work->v[i] = f[i];
         return;
     }
-    int stop_id =  (mask & UPDATE_Rinv) ? 0 : work->ms;
+    int stop_id =  (mask & DAQP_UPDATE_Rinv) ? 0 : work->ms;
     for(j=n-1,disp=ARSUM(n);j>=stop_id;j--){
         for(i=n-1;i>j;i--)
             work->v[i] +=work->Rinv[--disp]*f[j];

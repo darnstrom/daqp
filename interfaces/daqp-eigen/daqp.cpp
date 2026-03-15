@@ -218,7 +218,7 @@ int DAQP::update(Eigen::MatrixXd const& H,
 
     if (update_mask < 0) {
         // Assume that everythig should be updated
-        update_mask = UPDATE_Rinv + UPDATE_M + UPDATE_v + UPDATE_d + UPDATE_sense + UPDATE_hierarchy;
+        update_mask = DAQP_UPDATE_Rinv + DAQP_UPDATE_M + DAQP_UPDATE_v + DAQP_UPDATE_d + DAQP_UPDATE_sense + DAQP_UPDATE_hierarchy;
     }
 
     if (warm_start_){
@@ -232,7 +232,7 @@ int DAQP::update(Eigen::MatrixXd const& H,
             else
                 sense_ptr[i] = 0;
         }
-        update_mask |= UPDATE_sense; // Ensure sense is update
+        update_mask |= DAQP_UPDATE_sense; // Ensure sense is update
 
         // Adjust break points based on feasibility of previous solution
         if(A_ptr != nullptr && n_tasks > 1){
@@ -272,7 +272,7 @@ EigenDAQPResult const& DAQP::solve(Eigen::Matrix<double, Eigen::Dynamic, Eigen::
     Eigen::MatrixXd H(0, 0);
     Eigen::VectorXd f(0);
     Eigen::VectorXi sense(0);
-    update(H, f, A, bu, bl, sense, break_points, UPDATE_M + UPDATE_d + UPDATE_sense + UPDATE_hierarchy);
+    update(H, f, A, bu, bl, sense, break_points, DAQP_UPDATE_M + DAQP_UPDATE_d + DAQP_UPDATE_sense + DAQP_UPDATE_hierarchy);
     return solve();
 }
 

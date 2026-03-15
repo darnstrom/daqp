@@ -41,12 +41,12 @@ extern "C" {
 #define DAQP_EXIT_OVERDETERMINED_INITIAL -6
 
 // UPDATE LDP MASKS 
-#define UPDATE_Rinv 1
-#define UPDATE_M 2
-#define UPDATE_v 4
-#define UPDATE_d 8
-#define UPDATE_sense 16 
-#define UPDATE_hierarchy 32
+#define DAQP_UPDATE_Rinv 1
+#define DAQP_UPDATE_M 2
+#define DAQP_UPDATE_v 4
+#define DAQP_UPDATE_d 8
+#define DAQP_UPDATE_sense 16 
+#define DAQP_UPDATE_hierarchy 32
 
 // CONSTRAINT MASKS 
 #define ACTIVE 1

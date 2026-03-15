@@ -137,7 +137,8 @@ int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time){
 
 //  Setup LDP from QP  
 int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp){
-    int update_mask = UPDATE_M+UPDATE_d+UPDATE_sense; // Always update M, d and sense
+    // Always update M, d and sense
+    int update_mask = DAQP_UPDATE_M+DAQP_UPDATE_d+DAQP_UPDATE_sense; 
     int error_flag;
     int alloc_R=0, alloc_v=0;
 
@@ -145,19 +146,19 @@ int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp){
     // Only allocate Rinv if H is not NULL
     if(qp->H!=NULL){
         alloc_R = 1;
-        update_mask+=UPDATE_Rinv;
+        update_mask+=DAQP_UPDATE_Rinv;
     }
     // Only allocate v if f is not NULL, or if proximal
     if(qp->f!=NULL || work->settings->eps_prox != 0){
         alloc_v = 1;
-        update_mask+=UPDATE_v;
+        update_mask+=DAQP_UPDATE_v;
     }
 
     // Allocate memory for LDP
     allocate_daqp_ldp(work, qp->n, qp->m, qp->ms, alloc_R, alloc_v);
 
     // Update hierarchy if hqp
-    if(qp->nh > 1) update_mask += UPDATE_hierarchy;
+    if(qp->nh > 1) update_mask += DAQP_UPDATE_hierarchy;
 
     // Form LDP
     error_flag = update_ldp(update_mask, work, qp);
