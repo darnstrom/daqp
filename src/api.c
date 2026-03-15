@@ -22,7 +22,7 @@ void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
             if(res->exitflag > 0) ldp2qp_solution(work); // Retrieve qp solution 
         }
         else{ //AVI
-            res->exitflag = solve_avi(work);
+            res->exitflag = daqp_solve_avi(work);
         }
     }
     else{//Prox

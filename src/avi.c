@@ -3,7 +3,7 @@
 #include "utils.h"
 
 // Solve AVI
-int solve_avi(DAQPWorkspace *work) {
+int daqp_solve_avi(DAQPWorkspace *work) {
     DAQPAVI* avi = work->avi;
     int n = work->n;
     int i,j,k,disp;

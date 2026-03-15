@@ -7,7 +7,7 @@ extern "C" {
 
 #include "types.h"
 
-int solve_avi(DAQPWorkspace* work);
+int daqp_solve_avi(DAQPWorkspace* work);
 
 void daqp_solve_avi_kkt(DAQPWorkspace* work);
 int daqp_check_optimal_avi(DAQPWorkspace* work);
