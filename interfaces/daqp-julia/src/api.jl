@@ -46,7 +46,7 @@ is interpreted as
 * `info`        - tuple containing profiling information from the solver. 
 
 """
-function quadprog(H::Matrix{Float64},f::Vector{Float64}, 
+function quadprog(H::Union{Matrix{Float64}, Cholesky},f::Vector{Float64}, 
         A::Matrix{Float64},bupper::Vector{Float64},blower::Vector{Float64}=Float64[],sense::Vector{Cint}=Cint[];A_rowmaj=false,settings=nothing)
     return quadprog(QPj(H,f,A,bupper,blower,sense;A_rowmaj);settings)
 end
@@ -238,7 +238,7 @@ function setup(daqp::DAQPBase.Model, qp::DAQPBase.QPj)
     return exitflag, setup_time
 end
 
-function setup(daqp::DAQPBase.Model, H::Matrix{Cdouble},f::Vector{Cdouble},
+function setup(daqp::DAQPBase.Model, H::Union{Matrix{Cdouble},Cholesky},f::Vector{Cdouble},
         A::Matrix{Cdouble},bupper::Vector{Cdouble},blower::Vector{Cdouble}=Cdouble[],
         sense::Vector{Cint}=Cint[];A_rowmaj=false,break_points = Cint[], is_avi=false)
     return setup(daqp,QPj(H,f,A,bupper,blower,sense;A_rowmaj,break_points,is_avi))

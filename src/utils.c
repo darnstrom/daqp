@@ -29,10 +29,10 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
     /** Update Rinv **/
     if(mask&DAQP_UPDATE_Rinv){
         if(work->avi == NULL)
-            error_flag = daqp_update_Rinv(work, qp->H);
+            error_flag = daqp_update_Rinv(work, qp->H, qp->problem_type==2 ? 1 : 0);
         else{
             daqp_update_avi(work->avi,qp);
-            error_flag = daqp_update_Rinv(work, work->avi->Hs_rho);
+            error_flag = daqp_update_Rinv(work, work->avi->Hs_rho,0);
         }
         if(error_flag<0)
             return error_flag;
@@ -97,87 +97,84 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
     return 0;
 }
 
-int daqp_update_Rinv(DAQPWorkspace *work, c_float *H){
-    int i,j,k,disp,disp2,disp3;
+int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
+    int i, j, k, disp, disp2, disp3;
     const int n = work->n; 
-        // Check if diagonal
+    c_float eps = work->settings->eps_prox;
+
+    // Check if Diagonal
     int is_diagonal = 1;
-    for (i=0,disp=1; i<n; i++, disp+=i+1){
-        for (j=1; j<n-i; j++,disp++) {
+    for (i=0, disp=1; i<n; i++, disp += (is_factored ? 1 : (i+1))){
+        for (j=1; j<n-i; j++, disp++) {
             if(H[disp] > 1e-12 || H[disp] < -1e-12){
-                is_diagonal=0;
-                break;
+                is_diagonal = 0; break;
             }
         }
-        if(is_diagonal == 0) break;
+        if(!is_diagonal) break;
     }
 
-    // If diagonal, just keep track of variable scaling and use Rinv = I
-    if(is_diagonal==1){
-        if(work->Rinv != NULL){
-            work->RinvD = work->Rinv;
-            work->Rinv = NULL;
-        }
-        c_float Hi;
-        i=0; disp=0;
-        if(work->scaling != NULL){
-            for(;i<work->ms;i++,disp+=n){ // Combine with settings scaling
-                Hi = H[disp++]+work->settings->eps_prox;
+    // Diagonal Case
+    if(is_diagonal){
+        if(work->Rinv != NULL){ work->RinvD = work->Rinv; work->Rinv = NULL; }
+
+        disp = 0;
+        for(i=0; i<n; i++){
+            c_float Hi = H[disp];
+            // If factored, skip eps and sqrt, else apply them
+            if(!is_factored){
+                Hi += eps;
                 if (Hi <= 0) return DAQP_EXIT_NONCONVEX;
                 Hi = sqrt(Hi);
-                work->RinvD[i] = 1/Hi;
-                work->scaling[i] = Hi;
+                disp += n+1;
+            } else {
+                if (eps != 0.0)  Hi = sqrt(Hi*Hi + eps); // Regularization for factors
+                disp += n-i;
             }
-        }
-        for(;i<n;i++,disp+=n){
-            Hi = H[disp++] + work->settings->eps_prox;
-            if (Hi <= 0) return DAQP_EXIT_NONCONVEX;
-            Hi = sqrt(Hi);
+
             work->RinvD[i] = 1/Hi;
+            if(work->scaling != NULL && i < work->ms) work->scaling[i] = Hi;
         }
         return 1;
     }
-    // Make sure Rinv can be assinged if not diagonal
-    //(necessary if H change from diagonal to non-diagonal)
-    if(work->RinvD != NULL && work->Rinv ==NULL){
-        work->Rinv= work->RinvD;
-        work->RinvD = NULL;
-    }
 
+    // Prepare Rinv for dense data
+    if(work->RinvD != NULL){ work->Rinv = work->RinvD; work->RinvD = NULL; }
 
-    // Cholesky
-    for (i=0,disp=0,disp3=0; i<n; disp+=n-i,i++,disp3+=i) {
-        // Diagonal element
-        work->Rinv[disp] = H[disp3++]+work->settings->eps_prox;// Add regularization
-        for (k=0,disp2=i; k<i; k++,disp2+=n-k) 
-            work->Rinv[disp] -= work->Rinv[disp2]*work->Rinv[disp2];
-        if (work->Rinv[disp] <= 0) return DAQP_EXIT_NONCONVEX; // Not positive definite 
-
-        work->Rinv[disp] = sqrt(work->Rinv[disp]);
-
-        // Off-diagonal elements
-        for (j=1; j<n-i; j++) {
-            work->Rinv[disp+j]=H[disp3++];
-            for (k=0,disp2=i; k<i; k++,disp2+=n-k)
-                work->Rinv[disp+j] -= work->Rinv[disp2]*work->Rinv[disp2+j];
-            work->Rinv[disp+j] /= work->Rinv[disp];
+    // Cholesky 
+    if (is_factored) {
+        for(i=0, disp=0; i<n; i++){
+            work->Rinv[disp] = 1/H[disp]; // Store 1/rii
+            for (j=1, disp++; j<n-i; j++, disp++) 
+                work->Rinv[disp] = H[disp];
         }
-        // Store 1/r_ii instead of r_ii 
-        // to get multiplication instead division when forward/backward substituting
-        work->Rinv[disp] = 1/work->Rinv[disp]; 
+    } else {
+        // Standard Cholesky (H -> R)
+        for (i=0, disp=0, disp3=0; i<n; disp+=n-i, i++, disp3+=i) {
+            work->Rinv[disp] = H[disp3++] + eps;
+            for (k=0, disp2=i; k<i; k++, disp2+=n-k)
+                work->Rinv[disp] -= work->Rinv[disp2] * work->Rinv[disp2];
+
+            if (work->Rinv[disp] <= 0) return DAQP_EXIT_NONCONVEX;
+            work->Rinv[disp] = sqrt(work->Rinv[disp]);
+
+            for (j=1; j<n-i; j++) {
+                work->Rinv[disp+j] = H[disp3++];
+                for (k=0, disp2=i; k<i; k++, disp2+=n-k)
+                    work->Rinv[disp+j] -= work->Rinv[disp2] * work->Rinv[disp2+j];
+                work->Rinv[disp+j] /= work->Rinv[disp];
+            }
+            work->Rinv[disp] = 1/work->Rinv[disp];
+        }
     }
 
-    // Compute Rinv (store in R) by Rinv = R\I 
-    for(k=0,disp=0;k<n;k++){
-        disp2=disp;
-        work->Rinv[disp]=work->Rinv[disp2++]; // Break out first iteration to get rhs
-        for(j=k+1;j<n;j++)
-            work->Rinv[disp2++]*=-work->Rinv[disp];
-        disp++;
-        for(i=k+1;i<n;i++,disp++){
-            work->Rinv[disp]*=work->Rinv[disp2++];
-            for(j=1;j<n-i;j++)
-                work->Rinv[disp+j]-=work->Rinv[disp2++]*work->Rinv[disp];
+    // R -> Rinv
+    for(k=0, disp=0; k<n; k++){
+        disp2 = disp;
+        work->Rinv[disp] = work->Rinv[disp2++];
+        for(j=k+1; j<n; j++) work->Rinv[disp2++] *= -work->Rinv[disp];
+        for(i=k+1, disp++; i<n; i++, disp++){
+            work->Rinv[disp] *= work->Rinv[disp2++];
+            for(j=1; j<n-i; j++) work->Rinv[disp+j] -= work->Rinv[disp2++] * work->Rinv[disp];
         }
     }
     return 1;

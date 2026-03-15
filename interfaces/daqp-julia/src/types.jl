@@ -12,13 +12,14 @@ struct QPj
     break_points::Vector{Cint}
     nh::Cint
     is_avi::Bool
+    is_factorized::Bool
 end
 function QPj() 
-    return QPj(0,0,0,Matrix{Cdouble}(undef,0,0),Vector{Cdouble}(undef,0),Matrix{Cdouble}(undef,0,0), Vector{Cdouble}(undef,0), Vector{Cdouble}(undef,0), Vector{Cint}(undef,0),Vector{Cint}(undef,0),0,false)
+    return QPj(0,0,0,Matrix{Cdouble}(undef,0,0),Vector{Cdouble}(undef,0),Matrix{Cdouble}(undef,0,0), Vector{Cdouble}(undef,0), Vector{Cdouble}(undef,0), Vector{Cint}(undef,0),Vector{Cint}(undef,0),0,false,false)
 end
 function QPj(H::Matrix{Float64},f::Vector{Float64},
         A::Matrix{Float64},bupper::Vector{Float64}, blower::Vector{Float64},
-        sense::Vector{Cint};A_rowmaj=false,break_points=Cint[],is_avi=false)
+        sense::Vector{Cint};A_rowmaj=false,break_points=Cint[],is_avi=false, is_factorized=false)
     # TODO: check consistency of dimensions
     if(A_rowmaj)
         (n,mA) = size(A);
@@ -31,7 +32,15 @@ function QPj(H::Matrix{Float64},f::Vector{Float64},
     ms = m-mA;
     !A_rowmaj && (A = A') # Transpose A for col => row major
     is_avi && (H = copy(H')) # Need to be row major
-    return QPj(n,m,ms,H,f,A,bupper,blower,sense,break_points,length(break_points),is_avi)
+    return QPj(n,m,ms,H,f,A,bupper,blower,sense,break_points,length(break_points),is_avi, is_factorized)
+end
+
+function QPj(C::Cholesky,f::Vector{Float64},
+        A::Matrix{Float64},bupper::Vector{Float64}, blower::Vector{Float64},
+        sense::Vector{Cint};A_rowmaj=false,break_points=Cint[],is_avi=false)
+    n = size(C.U,2);
+    chol_packed = reshape([C.U[i,j] for i in 1:n for j in i:n],Int(n*(n+1)/2),1)
+    QPj(chol_packed,f,A,bupper,blower,sense;A_rowmaj,break_points,is_avi,is_factorized=true);
 end
 
 struct QPc 
@@ -54,7 +63,15 @@ function QPc(qpj::QPj)
     f_ptr = isempty(qpj.f) ? C_NULL : pointer(qpj.f)
 
 
-    problem_type = qpj.is_avi ? 1 : 0;
+    # Find the problem type
+    if qpj.is_avi
+        problem_type = 1;
+    elseif qpj.is_factorized 
+        problem_type = 2;
+    else
+        problem_type = 0;
+    end
+
     return QPc(qpj.n,qpj.m,qpj.ms,
                H_ptr,f_ptr,
                pointer(qpj.A),pointer(qpj.bupper),pointer(qpj.blower),pointer(qpj.sense),
