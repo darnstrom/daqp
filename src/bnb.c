@@ -27,7 +27,7 @@ int daqp_bnb(DAQPWorkspace* work){
         node = work->bnb->tree+(--work->bnb->n_nodes);
         exitflag = process_node(node,work); // Solve relaxation
         // Cut conditions
-        if(exitflag==EXIT_INFEASIBLE) continue; // Dominance cut
+        if(exitflag==DAQP_EXIT_INFEASIBLE) continue; // Dominance cut
         if(exitflag<0) return exitflag; // Inner solver failed => abort
 
         // Find index to branch over 
@@ -47,11 +47,11 @@ int daqp_bnb(DAQPWorkspace* work){
     work->fval = 2*work->settings->fval_bound/eps_r+work->settings->abs_subopt;
     work->settings->fval_bound = fval_bound0;
     if(swp_ptr==NULL)
-        return EXIT_INFEASIBLE;
+        return DAQP_EXIT_INFEASIBLE;
     else{
         // Let work->u point to the best feasible solution 
         swp_ptr=work->u; work->u= work->xold; work->xold=swp_ptr;
-        return EXIT_OPTIMAL;
+        return DAQP_EXIT_OPTIMAL;
     }
 }
 
@@ -84,7 +84,7 @@ int process_node(DAQPNode* node, DAQPWorkspace* work){
     exitflag = daqp_ldp(work);
     work->bnb->itercount += work->iterations;
     
-    if(exitflag == EXIT_CYCLE){// Try to repair (cold start)
+    if(exitflag == DAQP_EXIT_CYCLE){// Try to repair (cold start)
         setup_cold_bnb(node,work);
         exitflag = daqp_ldp(work);
         work->bnb->itercount += work->iterations;

@@ -178,7 +178,7 @@ void setup_daqp_hiqp(DAQPWorkspace* work, int* break_points, int nh){
 
 int setup_daqp_bnb(DAQPWorkspace* work, int nb, int ns){
     int i, nadded;
-    if(nb > work->n) return EXIT_OVERDETERMINED_INITIAL;
+    if(nb > work->n) return DAQP_EXIT_OVERDETERMINED_INITIAL;
     if((work->bnb == NULL) && (nb >0)){
         work->bnb= malloc(sizeof(DAQPBnB));
 

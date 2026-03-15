@@ -123,7 +123,7 @@ int update_Rinv(DAQPWorkspace *work, c_float *H){
         if(work->scaling != NULL){
             for(;i<work->ms;i++,disp+=n){ // Combine with settings scaling
                 Hi = H[disp++]+work->settings->eps_prox;
-                if (Hi <= 0) return EXIT_NONCONVEX;
+                if (Hi <= 0) return DAQP_EXIT_NONCONVEX;
                 Hi = sqrt(Hi);
                 work->RinvD[i] = 1/Hi;
                 work->scaling[i] = Hi;
@@ -131,7 +131,7 @@ int update_Rinv(DAQPWorkspace *work, c_float *H){
         }
         for(;i<n;i++,disp+=n){
             Hi = H[disp++] + work->settings->eps_prox;
-            if (Hi <= 0) return EXIT_NONCONVEX;
+            if (Hi <= 0) return DAQP_EXIT_NONCONVEX;
             Hi = sqrt(Hi);
             work->RinvD[i] = 1/Hi;
         }
@@ -151,7 +151,7 @@ int update_Rinv(DAQPWorkspace *work, c_float *H){
         work->Rinv[disp] = H[disp3++]+work->settings->eps_prox;// Add regularization
         for (k=0,disp2=i; k<i; k++,disp2+=n-k) 
             work->Rinv[disp] -= work->Rinv[disp2]*work->Rinv[disp2];
-        if (work->Rinv[disp] <= 0) return EXIT_NONCONVEX; // Not positive definite 
+        if (work->Rinv[disp] <= 0) return DAQP_EXIT_NONCONVEX; // Not positive definite 
 
         work->Rinv[disp] = sqrt(work->Rinv[disp]);
 
@@ -259,7 +259,7 @@ int update_d(DAQPWorkspace *work, c_float *bupper, c_float *blower){
         diff = bupper[i] - blower[i];
         // Check for trivial infeasibility
         if ( diff < -work->settings->primal_tol ){
-            return EXIT_INFEASIBLE;
+            return DAQP_EXIT_INFEASIBLE;
         }
         // Check for unmarked equality constraint (blower == bupper)
         else if ( diff < work->settings->zero_tol ){
@@ -341,7 +341,7 @@ int normalize_M(DAQPWorkspace* work){
 #ifndef DAQP_ASSUME_VALID
             if(work->qp->bupper[i] < -zero_tol || work->qp->blower[i] > zero_tol)
                 if(work->sense[i] != IMMUTABLE)
-                    return EXIT_INFEASIBLE;
+                    return DAQP_EXIT_INFEASIBLE;
 #endif
             work->sense[i] = IMMUTABLE; // ignore zero-row constraint
             continue; // TODO: mark infeasibility if dupper & dlower are nonzero
@@ -458,14 +458,14 @@ void daqp_minrep_work(int* is_redundant, DAQPWorkspace* work){
         add_constraint(work,i,1.0);
         //work->dupper[i] += tol_weak; TODO support weaky infeasible constraints
         exitflag = daqp_ldp(work);
-        if(exitflag== EXIT_INFEASIBLE){
+        if(exitflag== DAQP_EXIT_INFEASIBLE){
             is_redundant[i] = 1;
             work->sense[i] &=~ACTIVE; // deactive (remains immutable, so will be ignored)
         }
         else{
             is_redundant[i] = 0;
             work->sense[i] &=~IMMUTABLE;
-            if(exitflag==EXIT_OPTIMAL)
+            if(exitflag==DAQP_EXIT_OPTIMAL)
                 for(j=0; j < work->n_active; j++) // all active constraint must also be nonredundant
                     is_redundant[work->WS[j]] = 0;
         }

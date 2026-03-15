@@ -389,7 +389,7 @@ int activate_constraints(DAQPWorkspace *work){
         }
         if(work->sing_ind != EMPTY_IND){
             for(;i<work->m;i++) SET_INACTIVE(i); // correct sense for unadded constraints
-            return EXIT_OVERDETERMINED_INITIAL;
+            return DAQP_EXIT_OVERDETERMINED_INITIAL;
         }
     }
     return 1;

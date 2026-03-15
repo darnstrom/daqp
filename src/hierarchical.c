@@ -31,7 +31,7 @@ int daqp_hiqp(DAQPWorkspace *work, c_float *lambda){
                     add_constraint(work,j, -1.0);
                 else
                     add_constraint(work,j, 1.0);
-                if(work->sing_ind != EMPTY_IND) return EXIT_OVERDETERMINED_INITIAL;
+                if(work->sing_ind != EMPTY_IND) return DAQP_EXIT_OVERDETERMINED_INITIAL;
                 }
         }
 
@@ -43,7 +43,7 @@ int daqp_hiqp(DAQPWorkspace *work, c_float *lambda){
         if(exitflag < 0) break;
 
         if(iterations >= work->settings->iter_limit){
-            exitflag = EXIT_ITERLIMIT;
+            exitflag = DAQP_EXIT_ITERLIMIT;
             break;
         }
 

@@ -1,7 +1,7 @@
 #include "daqp.h" 
 
 int daqp_ldp(DAQPWorkspace *work){
-    int exitflag=EXIT_ITERLIMIT,iter,i;
+    int exitflag=DAQP_EXIT_ITERLIMIT,iter,i;
     int tried_repair=0, cycle_counter=0;
     c_float best_fval = -1;
     c_float fval_bound = 2*work->settings->fval_bound; // Internal objective is twice the nomninal
@@ -14,7 +14,7 @@ int daqp_ldp(DAQPWorkspace *work){
                 compute_primal_and_fval(work);
                 // fval termination criterion
                 if(work->fval > fval_bound){
-                    exitflag = EXIT_INFEASIBLE;
+                    exitflag = DAQP_EXIT_INFEASIBLE;
                     break;
                 }
                 // Try to add infeasible constraint 
@@ -38,9 +38,9 @@ int daqp_ldp(DAQPWorkspace *work){
                     }
 
                     if(work->soft_slack > work->settings->primal_tol)
-                        exitflag = EXIT_SOFT_OPTIMAL; 
+                        exitflag = DAQP_EXIT_SOFT_OPTIMAL; 
                     else
-                        exitflag = EXIT_OPTIMAL;
+                        exitflag = DAQP_EXIT_OPTIMAL;
                     break;
                 }
 
@@ -48,7 +48,7 @@ int daqp_ldp(DAQPWorkspace *work){
                 if(work->fval-best_fval < work->settings->progress_tol){
                     if(cycle_counter++ > work->settings->cycle_tol){
                         if(tried_repair == 1 || work->bnb != NULL){
-                            exitflag = EXIT_CYCLE;
+                            exitflag = DAQP_EXIT_CYCLE;
                             break;
                         }
                         else{// Cycling -> Try to reorder and refactorize LDL
@@ -69,7 +69,7 @@ int daqp_ldp(DAQPWorkspace *work){
         else{// Singular case
             compute_singular_direction(work);
             if(!remove_blocking(work)){ 
-                exitflag = EXIT_INFEASIBLE;
+                exitflag = DAQP_EXIT_INFEASIBLE;
                 break;
             }
         }

@@ -38,13 +38,13 @@ int daqp_prox(DAQPWorkspace *work){
                 if((diff> tol_stat) || (diff< -tol_stat)) break;
             }
             if(i==nx){
-                exitflag = EXIT_OPTIMAL; // Fix point reached
+                exitflag = DAQP_EXIT_OPTIMAL; // Fix point reached
                 break;
             }
             // Take gradient step if LP (and the iterate is not constrained to a vertex)
             if((work->Rinv == NULL && work->RinvD ==NULL )&&(work->n_active != work->n)){
                 if(gradient_step(work)==EMPTY_IND){
-                    exitflag= EXIT_UNBOUNDED;
+                    exitflag= DAQP_EXIT_UNBOUNDED;
                     break;
                 }
             }
@@ -55,7 +55,7 @@ int daqp_prox(DAQPWorkspace *work){
             for(i=0, diff=best_fval;i<nx;i++)
                 diff-=work->qp->f[i]*work->x[i];
             if(diff<1e-10){
-                if(cycle_counter++ > 10) return EXIT_OPTIMAL; // assume fix point
+                if(cycle_counter++ > 10) return DAQP_EXIT_OPTIMAL; // assume fix point
             }
             else{ // Progress -> update objective function value
                 best_fval -=diff ;
@@ -80,7 +80,7 @@ int daqp_prox(DAQPWorkspace *work){
         update_d(work, work->qp->bupper,work->qp->blower);
     }
     // Finalize results
-    if(total_iter >= work->settings->iter_limit) exitflag = EXIT_ITERLIMIT; 
+    if(total_iter >= work->settings->iter_limit) exitflag = DAQP_EXIT_ITERLIMIT; 
     if(work->Rinv == NULL && work->RinvD == NULL){
         for(i = 0; i<work->n_active;i++) 
             work->lam_star[i]/=eps;// Rescale dual variables
