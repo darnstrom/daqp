@@ -94,7 +94,7 @@ static int gradient_step(DAQPWorkspace* work){
     int j,k,disp,add_ind=EMPTY_IND;
     const int nx=work->n;
     const int m=work->m;
-    const int ms=N_SIMPLE;
+    const int ms=work->ms;
     c_float Ax,delta_s, min_alpha=DAQP_INF;
     // Find constraint j to add: j =  argmin_j s_j
     // Simple bounds

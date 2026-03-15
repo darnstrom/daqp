@@ -121,7 +121,7 @@ int update_Rinv(DAQPWorkspace *work, c_float *H){
         c_float Hi;
         i=0; disp=0;
         if(work->scaling != NULL){
-            for(;i<N_SIMPLE;i++,disp+=n){ // Combine with settings scaling
+            for(;i<work->ms;i++,disp+=n){ // Combine with settings scaling
                 Hi = H[disp++]+work->settings->eps_prox;
                 if (Hi <= 0) return EXIT_NONCONVEX;
                 Hi = sqrt(Hi);
@@ -186,8 +186,8 @@ int update_Rinv(DAQPWorkspace *work, c_float *H){
 int update_M(DAQPWorkspace *work, c_float *A, const int mask){
     int i,j,k,disp,disp2;
     const int n = work->n;
-    const int mA = work->m-N_SIMPLE;
-    int stop_id =  (UPDATE_Rinv &mask) ? n : n-N_SIMPLE;
+    const int mA = work->m-work->ms;
+    int stop_id =  (UPDATE_Rinv &mask) ? n : n-work->ms;
     if(work->Rinv != NULL){
         for(k = 0,disp2=n*mA-1;k<mA;k++,disp2-=n){
             disp=ARSUM(n);
@@ -233,7 +233,7 @@ void update_v(c_float *f, DAQPWorkspace *work, const int mask){
             for(i=0;i<n;++i) work->v[i] = f[i];
         return;
     }
-    int stop_id =  (mask & UPDATE_Rinv) ? 0 : N_SIMPLE;
+    int stop_id =  (mask & UPDATE_Rinv) ? 0 : work->ms;
     for(j=n-1,disp=ARSUM(n);j>=stop_id;j--){
         for(i=n-1;i>j;i--)
             work->v[i] +=work->Rinv[--disp]*f[j];
@@ -289,20 +289,20 @@ int update_d(DAQPWorkspace *work, c_float *bupper, c_float *blower){
     if(work->v == NULL) return do_activate;
     // Simple bounds 
     if(work->Rinv !=NULL){
-        for(i = 0,disp=0;i<N_SIMPLE;i++){
+        for(i = 0,disp=0;i<work->ms;i++){
             for(j=i, sum=0;j<n;j++)
                 sum+=work->Rinv[disp++]*work->v[j];
             work->dupper[i]+=sum;
             work->dlower[i]+=sum;
         }
     }else{
-        for(i = 0,disp=0;i<N_SIMPLE;i++){
+        for(i = 0,disp=0;i<work->ms;i++){
             work->dupper[i]+=work->v[i];
             work->dlower[i]+=work->v[i];
         }
     }
     //General bounds
-    for(i = N_SIMPLE, disp=0;i<work->m;i++){
+    for(i = work->ms, disp=0;i<work->m;i++){
         for(j=0, sum=0;j<n;j++)
             sum+=work->M[disp++]*work->v[j];
         work->dupper[i]+=sum;
@@ -316,7 +316,7 @@ void normalize_Rinv(DAQPWorkspace* work){
     c_float scaling_i;
     // Normalize simple constraints
     if(work->Rinv !=NULL){
-        for(i=0, disp=0; i < N_SIMPLE;i++){
+        for(i=0, disp=0; i < work->ms;i++){
             scaling_i = 0;
             for(j=i; j < work->n; j++,disp++){
                 scaling_i+=work->Rinv[disp]*work->Rinv[disp];
@@ -333,7 +333,7 @@ int normalize_M(DAQPWorkspace* work){
     c_float scaling_i;
     c_float zero_tol = work->settings->zero_tol;
     // Normalize general constraints 
-    for(i=N_SIMPLE, disp=0;i<work->m;i++){
+    for(i=work->ms, disp=0;i<work->m;i++){
         scaling_i = 0;
         for(j=0;j<work->n;disp++,j++)
             scaling_i+=work->M[disp]*work->M[disp];

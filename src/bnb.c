@@ -116,7 +116,7 @@ int get_branch_id(DAQPWorkspace* work){
         }
     }
     else{//General bound
-        for(i=0,disp=work->n*(branch_id-N_SIMPLE);i<work->n;i++) 
+        for(i=0,disp=work->n*(branch_id-work->ms);i<work->n;i++) 
             diff-=work->M[disp++]*work->u[i];
     }
     branch_id = diff<0 ? branch_id : ADD_LOWER_FLAG(branch_id);

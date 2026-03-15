@@ -95,7 +95,7 @@ void ldp2qp_solution(DAQPWorkspace *work){
                 work->x[i]+=work->Rinv[disp++]*work->x[j];
         }
         if(work->scaling != NULL){
-            for(i=0;i<N_SIMPLE;i++)
+            for(i=0;i<work->ms;i++)
                 work->x[i]/=work->scaling[i];
         }
     }

@@ -23,7 +23,7 @@ void update_LDL_add(DAQPWorkspace *work, const int add_ind){
         start_col = add_ind;
     }
     else{
-        Mi = work->M+work->n*(add_ind-N_SIMPLE);
+        Mi = work->M+work->n*(add_ind-work->ms);
         start_col = 0;
     }
     if(Mi==NULL) sum = 1;
@@ -54,7 +54,7 @@ void update_LDL_add(DAQPWorkspace *work, const int add_ind){
             j= (start_col > id) ? start_col : id;
         }
         else{
-            Mk = work->M+work->n*(id-N_SIMPLE);
+            Mk = work->M+work->n*(id-work->ms);
             j= start_col;
         }
         // Multiply Mk*Mi (NULL signify unity)

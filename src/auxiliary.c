@@ -61,7 +61,7 @@ void compute_primal_and_fval(DAQPWorkspace *work){
             else work->u[work->WS[i]]-=work->lam_star[i]; // Hessian is identity
         }
         else{ // General constraint
-            for(j=0,disp=work->n*(work->WS[i]-N_SIMPLE);j<work->n;j++)
+            for(j=0,disp=work->n*(work->WS[i]-work->ms);j<work->n;j++)
                 work->u[j]-=work->M[disp++]*work->lam_star[i];
         }
         if(IS_SOFT(work->WS[i])){
@@ -91,7 +91,7 @@ int add_infeasible(DAQPWorkspace *work){
     c_float Mu,min_cand;
     int isupper=0, add_ind=EMPTY_IND;
     // Simple bounds 
-    for(j=0, disp=0;j<N_SIMPLE;j++){
+    for(j=0, disp=0;j<work->ms;j++){
         // Never activate immutable or already active constraints 
         if(work->sense[j]&(ACTIVE+IMMUTABLE)){ 
             disp+=work->n-j;
@@ -118,7 +118,7 @@ int add_infeasible(DAQPWorkspace *work){
         }
     }
     /* General two-sided constraints */
-    for(j=N_SIMPLE, disp=0;j<work->m;j++){
+    for(j=work->ms, disp=0;j<work->m;j++){
         // Never activate immutable or already active constraints 
         if(work->sense[j]&(ACTIVE+IMMUTABLE)){ 
             disp+=work->n;// Skip ahead in M
