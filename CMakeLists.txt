@@ -90,3 +90,25 @@ if(JULIA)
 
     add_test(NAME Julia COMMAND sh -c "julia --color=yes --project=${CMAKE_CURRENT_BINARY_DIR}/interfaces/daqp-julia -e \"using Pkg; Pkg.test()\"")
 endif()
+
+if(PYTHON)
+    set(PYTHON_INTERFACE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/interfaces/daqp-python")
+    set(PYTHON_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/interfaces/daqp-python")
+    set(PYTHON_VENV_DIR "${PYTHON_BINARY_DIR}/venv")
+
+    add_custom_target(sync_python_interface ALL
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${PYTHON_INTERFACE_DIR}" "${PYTHON_BINARY_DIR}"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/src" "${PYTHON_BINARY_DIR}/csrc/src"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/include" "${PYTHON_BINARY_DIR}/csrc/include"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/codegen" "${PYTHON_BINARY_DIR}/csrc/codegen"
+        COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt" "${PYTHON_BINARY_DIR}/csrc/"
+        COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE" "${PYTHON_BINARY_DIR}/"
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:daqp> "${PYTHON_BINARY_DIR}"
+        DEPENDS daqp
+        COMMENT "Syncing Python files and library..."
+    )
+
+    add_dependencies(sync_python_interface daqp)
+
+    add_test(NAME Python COMMAND sh -c "cd ${PYTHON_BINARY_DIR} && python -m venv venv && ${PYTHON_VENV_DIR}/bin/pip install -e . && ${PYTHON_VENV_DIR}/bin/python -m unittest discover -s test -p '*_test.py' -v")
+endif()
