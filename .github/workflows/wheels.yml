@@ -58,7 +58,7 @@ jobs:
         TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN}}
       run: |
         cd interfaces/daqp-python
-        pipx run twine upload wheelhouse/*
+        pipx run twine upload wheelhouse/* --skip-existing
 
     - name: Upload artifacts to github
       uses: actions/upload-artifact@v4
