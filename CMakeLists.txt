@@ -30,6 +30,13 @@ if(FASTER_MATH)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fassociative-math -fno-signed-zeros -fno-trapping-math")
 endif()
 
+option (BENCHMARK "Enable performance benchmark tests (compares current version with git tag)" OFF)
+if(BENCHMARK)
+  if(NOT JULIA)
+    message(WARNING "BENCHMARK requires Julia interface (-DJULIA=ON), but JULIA is not enabled")
+  endif()
+endif()
+
 
 add_library(daqpstat STATIC ${daqp_src} ${daqp_headers} ${daqp_codegen_src} ${daqp_codegen_headers})
 target_include_directories(daqpstat PUBLIC
@@ -89,6 +96,24 @@ if(JULIA)
     add_dependencies(sync_julia_interface daqp)
 
     add_test(NAME Julia COMMAND sh -c "julia --color=yes --project=${CMAKE_CURRENT_BINARY_DIR}/interfaces/daqp-julia -e \"using Pkg; Pkg.test()\"")
+    
+    if(BENCHMARK)
+        # Add benchmark comparison test (git-based)
+        add_test(
+            NAME JuliaBenchmark
+            COMMAND bash "${JULIA_INTERFACE_DIR}/test/benchmark_comparison_git.sh"
+                "${JULIA_BINARY_DIR}"
+                "v0.7.2"
+                "medium"
+                "5"
+                "${CMAKE_CURRENT_BINARY_DIR}/benchmark_results"
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        )
+        set_tests_properties(JuliaBenchmark PROPERTIES
+            TIMEOUT 600
+            LABELS "benchmark"
+        )
+    endif()
 endif()
 
 if(PYTHON)
