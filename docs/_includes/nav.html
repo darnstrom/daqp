@@ -77,9 +77,9 @@
               <a href="{{ child.url | absolute_url }}" class="nav-list-link{% if page.url == child.url %} active{% endif %}">
                 {%- if child.nav_icon -%}
                   {%- if child.nav_icon contains '.' -%}
-                    <img src="{{ '/assets/icons/' | append: child.nav_icon | relative_url }}" class="nav-icon" alt="{{ child.title }} icon">
+                    <img src="{{ '/assets/icons/' | append: child.nav_icon | relative_url }}" class="nav-icon" height="16" alt="{{ child.title }} icon">
                   {%- else -%}
-                    <img src="{{ '/assets/icons/' | append: child.nav_icon | append: '.svg' | relative_url }}" class="nav-icon" alt="{{ child.title }} icon">
+                    <img src="{{ '/assets/icons/' | append: child.nav_icon | append: '.svg' | relative_url }}" class="nav-icon" height="16" alt="{{ child.title }} icon">
                   {%- endif -%}
                 {%- endif -%}
                 {{ child.title }}
