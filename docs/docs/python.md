@@ -2,9 +2,9 @@
 layout: page
 title: Python 
 permalink: /start/python
-nav: 3 
+nav_order: 4
+nav_icon: python
 parent: Interfaces 
-grand_parent: Getting started 
 math: mathjax3
 ---
 

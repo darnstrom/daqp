@@ -2,9 +2,9 @@
 layout: page
 title: MATLAB 
 permalink: /start/matlab
-nav: 3 
+nav_order: 3
+nav_icon: matlab
 parent: Interfaces 
-grand_parent: Getting started 
 math: mathjax3
 ---
 
@@ -35,7 +35,19 @@ d = daqp();
 d.setup(H,f,A,bupper,blower,sense);
 [x,fval,exitflag,info] = d.solve();
 ```
-This allows us to reuse internal matrix factorization if we want to solve a perturbed problem. 
+Using the `daqp` object is the recommended approach for embedded or real-time applications because
+it allocates memory only once during `setup` and reuses it across all subsequent `solve` calls —
+no heap allocations occur during solving.
+
+If the problem data changes between solves (e.g., updated cost vector or bounds in an MPC loop),
+call `setup` again on the same object to update the internal workspace:
+```matlab
+% Update bounds and re-solve (workspace is reused)
+bupper_new = [1; 2; 2; 4];
+blower_new = -bupper_new;
+d.setup(H, f, A, bupper_new, blower_new, sense);
+[x, fval, exitflag, info] = d.solve();
+```
 
 ## Changing settings
 If we, for example, want to change the maximum number of iterations to 2000 we can do so by
