@@ -61,16 +61,16 @@ cdef extern from "api.h":
 
 cdef extern from "constants.h":
     cdef double DAQP_INF
-    cdef double DEFAULT_PRIM_TOL
-    cdef double DEFAULT_DUAL_TOL
-    cdef double  DEFAULT_ZERO_TOL
-    cdef double  DEFAULT_PROG_TOL
-    cdef double  DEFAULT_PIVOT_TOL
-    cdef int DEFAULT_CYCLE_TOL
-    cdef double DEFAULT_ETA
-    cdef int DEFAULT_ITER_LIMIT
-    cdef double DEFAULT_RHO_SOFT
-    cdef double  DEFAULT_REL_SUBOPT
-    cdef double  DEFAULT_ABS_SUBOPT
-    cdef double  DEFAULT_SING_TOL
-    cdef double  DEFAULT_REFACTOR_TOL
+    cdef double DAQP_DEFAULT_PRIM_TOL
+    cdef double DAQP_DEFAULT_DUAL_TOL
+    cdef double  DAQP_DEFAULT_ZERO_TOL
+    cdef double  DAQP_DEFAULT_PROG_TOL
+    cdef double  DAQP_DEFAULT_PIVOT_TOL
+    cdef int DAQP_DEFAULT_CYCLE_TOL
+    cdef double DAQP_DEFAULT_ETA
+    cdef int DAQP_DEFAULT_ITER_LIMIT
+    cdef double DAQP_DEFAULT_RHO_SOFT
+    cdef double  DAQP_DEFAULT_REL_SUBOPT
+    cdef double  DAQP_DEFAULT_ABS_SUBOPT
+    cdef double  DAQP_DEFAULT_SING_TOL
+    cdef double  DAQP_DEFAULT_REFACTOR_TOL

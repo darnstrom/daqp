@@ -10,21 +10,21 @@ extern "C" {
 #include "daqp.h"
 
 int daqp_bnb(DAQPWorkspace* work);
-int process_node(DAQPNode* node, DAQPWorkspace* work);
-int get_branch_id(DAQPWorkspace* work);
-void spawn_children(DAQPNode* node, const int branch_id, DAQPWorkspace* work);
+int daqp_process_node(DAQPNode* node, DAQPWorkspace* work);
+int daqp_get_branch_id(DAQPWorkspace* work);
+void daqp_spawn_children(DAQPNode* node, const int branch_id, DAQPWorkspace* work);
 
-void node_cleanup_workspace(int n_clean, DAQPWorkspace* work);
-void warmstart_node(DAQPNode* node, DAQPWorkspace* work); 
-void save_warmstart(DAQPNode* node, DAQPWorkspace* work);
-int add_upper_lower(const int add_id, DAQPWorkspace* work); 
-void setup_cold_bnb(DAQPNode* node, DAQPWorkspace* work);
+void daqp_node_cleanup_workspace(int n_clean, DAQPWorkspace* work);
+void daqp_warmstart_node(DAQPNode* node, DAQPWorkspace* work); 
+void daqp_save_warmstart(DAQPNode* node, DAQPWorkspace* work);
+int daqp_add_upper_lower(const int add_id, DAQPWorkspace* work); 
+void daqp_setup_cold_bnb(DAQPNode* node, DAQPWorkspace* work);
 
-#define LOWER_BIT 16
-#define EXTRACT_LOWER_FLAG(x) (x>>(LOWER_BIT-1))
-#define REMOVE_LOWER_FLAG(x) (x&~(1<<LOWER_BIT))
-#define ADD_LOWER_FLAG(x) (x|(1<<LOWER_BIT))
-#define TOGGLE_LOWER_FLAG(x) (x^(1<<LOWER_BIT))
+#define DAQP_LOWER_BIT 16
+#define DAQP_EXTRACT_LOWER_FLAG(x) (x>>(DAQP_LOWER_BIT-1))
+#define DAQP_REMOVE_LOWER_FLAG(x) (x&~(1<<DAQP_LOWER_BIT))
+#define DAQP_ADD_LOWER_FLAG(x) (x|(1<<DAQP_LOWER_BIT))
+#define DAQP_TOGGLE_LOWER_FLAG(x) (x^(1<<DAQP_LOWER_BIT))
 
 # ifdef __cplusplus
 }

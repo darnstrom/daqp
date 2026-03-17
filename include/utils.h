@@ -7,15 +7,15 @@ extern "C" {
 
 #include "daqp.h"
 // Utils for transforming QP to LDP
-int update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem *qp);
-int update_Rinv(DAQPWorkspace *work, c_float *H);
-int update_M(DAQPWorkspace *work, c_float *A, const int mask);
-void update_v(c_float *f, DAQPWorkspace *work, const int mask);
-int update_d(DAQPWorkspace *work, c_float *bupper, c_float *blower);
-void normalize_Rinv(DAQPWorkspace *work);
-int normalize_M(DAQPWorkspace *work);
+int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem *qp);
+int daqp_update_Rinv(DAQPWorkspace *work, c_float *H, int is_factored);
+int daqp_update_M(DAQPWorkspace *work, c_float *A, const int mask);
+void daqp_update_v(c_float *f, DAQPWorkspace *work, const int mask);
+int daqp_update_d(DAQPWorkspace *work, c_float *bupper, c_float *blower);
+void daqp_normalize_Rinv(DAQPWorkspace *work);
+int daqp_normalize_M(DAQPWorkspace *work);
 
-int update_avi(DAQPAVI *avi, DAQPProblem *problem);
+int daqp_update_avi(DAQPAVI *avi, DAQPProblem *problem);
 int daqp_lu(c_float* A, int* P, int n);
 void daqp_lu_solve(c_float* LU, int* P, c_float* b, c_float* x, int n);
 

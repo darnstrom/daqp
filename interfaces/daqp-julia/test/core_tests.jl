@@ -309,3 +309,25 @@ end
         @test norm(xref-x) < tol;
     end
 end
+
+@testset "Prefactorized Hessian" begin
+    xref,H,f,A,bupper,blower,sense = generate_test_QP(n,m,ms,nAct,kappa);
+    C = cholesky(H)
+    # Quadprog API
+    x,fval,exitflag,info = quadprog(C,f,A,bupper,blower,sense)
+    @test norm(xref-x) < tol;
+
+    # Test Model API 
+    d = DAQPBase.Model()
+    setup(d,C,f,A,bupper,blower,sense)
+    x,fval,exitflag,info = solve(d)
+    @test norm(xref-x) < tol;
+
+    # Test diagonal
+    H = diagm(rand(n))
+    C = cholesky(H)
+    xref,fval,exitflag,info = quadprog(H,f,A,bupper,blower,sense)
+    x,fval,exitflag,info = quadprog(C,f,A,bupper,blower,sense)
+    @test norm(xref-x) < tol;
+
+end

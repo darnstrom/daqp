@@ -5,14 +5,14 @@ static int gradient_step(DAQPWorkspace* work);
 
 int daqp_prox(DAQPWorkspace *work){
     int i,total_iter=0;
-    const int nx=NX;
+    const int nx=work->n;
     int exitflag;
     c_float *swp_ptr;
     c_float diff,eps=work->settings->eps_prox;
     c_float tol_stat, eta=work->settings->eta_prox;
     int cycle_counter = 0;
     c_float best_fval = DAQP_INF;
-    for(i=0;i < NX;i++) work->x[i] = 0; // TODO add option for user to set x0
+    for(i=0;i < work->n;i++) work->x[i] = 0; // TODO add option for user to set x0
 
     while(total_iter  <  work->settings->iter_limit){
         // xold <-- x
@@ -38,13 +38,13 @@ int daqp_prox(DAQPWorkspace *work){
                 if((diff> tol_stat) || (diff< -tol_stat)) break;
             }
             if(i==nx){
-                exitflag = EXIT_OPTIMAL; // Fix point reached
+                exitflag = DAQP_EXIT_OPTIMAL; // Fix point reached
                 break;
             }
             // Take gradient step if LP (and the iterate is not constrained to a vertex)
-            if((work->Rinv == NULL && work->RinvD ==NULL )&&(work->n_active != NX)){
-                if(gradient_step(work)==EMPTY_IND){
-                    exitflag= EXIT_UNBOUNDED;
+            if((work->Rinv == NULL && work->RinvD ==NULL )&&(work->n_active != work->n)){
+                if(gradient_step(work)==DAQP_EMPTY_IND){
+                    exitflag= DAQP_EXIT_UNBOUNDED;
                     break;
                 }
             }
@@ -55,7 +55,7 @@ int daqp_prox(DAQPWorkspace *work){
             for(i=0, diff=best_fval;i<nx;i++)
                 diff-=work->qp->f[i]*work->x[i];
             if(diff<1e-10){
-                if(cycle_counter++ > 10) return EXIT_OPTIMAL; // assume fix point
+                if(cycle_counter++ > 10) return DAQP_EXIT_OPTIMAL; // assume fix point
             }
             else{ // Progress -> update objective function value
                 best_fval -=diff ;
@@ -74,13 +74,13 @@ int daqp_prox(DAQPWorkspace *work){
         else{
             for(i = 0; i<nx;i++) 
                 work->v[i] = work->qp->f[i]-eps*work->x[i];
-            update_v(work->v,work,0);
+            daqp_update_v(work->v,work,0);
         }
         // Perturb RHS of constraints 
-        update_d(work, work->qp->bupper,work->qp->blower);
+        daqp_update_d(work, work->qp->bupper,work->qp->blower);
     }
     // Finalize results
-    if(total_iter >= work->settings->iter_limit) exitflag = EXIT_ITERLIMIT; 
+    if(total_iter >= work->settings->iter_limit) exitflag = DAQP_EXIT_ITERLIMIT; 
     if(work->Rinv == NULL && work->RinvD == NULL){
         for(i = 0; i<work->n_active;i++) 
             work->lam_star[i]/=eps;// Rescale dual variables
@@ -91,15 +91,15 @@ int daqp_prox(DAQPWorkspace *work){
 // Gradient step
 // TODO: could probably reuse code from daqp
 static int gradient_step(DAQPWorkspace* work){
-    int j,k,disp,add_ind=EMPTY_IND;
-    const int nx=NX;
-    const int m=N_CONSTR;
-    const int ms=N_SIMPLE;
+    int j,k,disp,add_ind=DAQP_EMPTY_IND;
+    const int nx=work->n;
+    const int m=work->m;
+    const int ms=work->ms;
     c_float Ax,delta_s, min_alpha=DAQP_INF;
     // Find constraint j to add: j =  argmin_j s_j
     // Simple bounds
     for(j=0, disp=0;j<ms;j++){
-        if(work->sense[j]&(ACTIVE+IMMUTABLE)) continue;
+        if(work->sense[j]&(DAQP_ACTIVE+DAQP_IMMUTABLE)) continue;
         delta_s = work->x[j]-work->xold[j];
         if(delta_s>0 && //Feasible descent direction
                 work->qp->bupper[j]<DAQP_INF && // Not single-sided
@@ -116,7 +116,7 @@ static int gradient_step(DAQPWorkspace* work){
     }
     //General bounds
     for(j=ms, disp=0;j<m;j++){
-        if(work->sense[j]&(ACTIVE+IMMUTABLE)){
+        if(work->sense[j]&(DAQP_ACTIVE+DAQP_IMMUTABLE)){
             disp+=nx;// Skip ahead in A
             continue;
         }
@@ -145,7 +145,7 @@ static int gradient_step(DAQPWorkspace* work){
         }
     }
     // update iterate
-    if(add_ind != EMPTY_IND)
+    if(add_ind != DAQP_EMPTY_IND)
         for(k=0;k<nx;k++) // x <-- x+alpha deltax
             work->x[k]+=min_alpha*(work->x[k]-work->xold[k]);
 

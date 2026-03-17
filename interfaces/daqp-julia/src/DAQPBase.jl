@@ -1,6 +1,7 @@
 module DAQPBase
 
 using DAQP_jll
+using LinearAlgebra 
 
 include("types.jl")
 include("constants.jl")

@@ -3,7 +3,7 @@
 #include "utils.h"
 
 // Solve AVI
-int solve_avi(DAQPWorkspace *work) {
+int daqp_solve_avi(DAQPWorkspace *work) {
     DAQPAVI* avi = work->avi;
     int n = work->n;
     int i,j,k,disp;
@@ -29,8 +29,8 @@ int solve_avi(DAQPWorkspace *work) {
         } 
 
         // Update linear term 
-        update_v(avi->xtemp,work,0);
-        update_d(work, work->qp->bupper,work->qp->blower);
+        daqp_update_v(avi->xtemp,work,0);
+        daqp_update_d(work, work->qp->bupper,work->qp->blower);
 
         exitflag = daqp_ldp(work);
 
@@ -142,7 +142,8 @@ void daqp_solve_avi_kkt(DAQPWorkspace* work) {
 
     for (i = 0; i < nAS; i++) {
         row_idx = WS[i];
-        sum = IS_LOWER(row_idx) ? work->qp->blower[row_idx] : work->qp->bupper[row_idx];
+        sum = DAQP_IS_LOWER(row_idx) ? 
+            work->qp->blower[row_idx] : work->qp->bupper[row_idx];
         if(row_idx < work->ms) // Simple bound
             sum += temp[row_idx];
         else{ // General constraint
@@ -154,8 +155,8 @@ void daqp_solve_avi_kkt(DAQPWorkspace* work) {
         rhs[i] = -sum;
 
         // Soft constraints -> diagonal of S gets regularized
-        if(IS_SOFT(row_idx))
-            S[i*(nAS+1)]+=work->settings->rho_soft/SQUARE(work->scaling[row_idx]);
+        if(DAQP_IS_SOFT(row_idx))
+            S[i*(nAS+1)]+=work->settings->rho_soft/(work->scaling[row_idx] * work->scaling[row_idx]);
     }
 
     // Get lambda by solving S * lambda = rhs
@@ -186,7 +187,7 @@ int daqp_check_optimal_avi(DAQPWorkspace* work){
     c_float primal_tol = work->settings->primal_tol;
     // First check dual variables
     for(i=0; i < work->n_active; i++){
-        if(IS_LOWER(work->WS[i])){
+        if(DAQP_IS_LOWER(work->WS[i])){
             if(work->lam_star[i] > dual_tol) return 0;
         }
         else{
@@ -195,14 +196,14 @@ int daqp_check_optimal_avi(DAQPWorkspace* work){
     }
     // Simple constraints
     for(i=0; i < work->ms; i++){
-        if(IS_ACTIVE(i)) continue;
+        if(DAQP_IS_ACTIVE(i)) continue;
         if(work->avi->x[i] > work->qp->bupper[i] + primal_tol) return 0; 
         if(work->avi->x[i] < work->qp->blower[i] - primal_tol) return 0;
     }
 
     // General constraints
     for(disp=0; i < work->m; i++){
-        if(IS_ACTIVE(i)){
+        if(DAQP_IS_ACTIVE(i)){
             disp += work->n;
             continue;
         }

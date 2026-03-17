@@ -1,5 +1,3 @@
-using LinearAlgebra 
-
 function daqp_ldp_jl(M,d,AS0,senses;settings=DAQPSettings(),selection_rule=DANTZIG)
     # Initial AS is union AS0 and equality constraints  
     AS = findall((senses.&IMMUTABLE).!=0);

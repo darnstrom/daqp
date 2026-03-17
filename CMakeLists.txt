@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(daqp VERSION 0.7.2)
+project(daqp VERSION 0.8.0)
 
 
 include(GNUInstallDirs)
@@ -28,6 +28,13 @@ endif()
 option (FASTER_MATH "Enable some faster math" ON)
 if(FASTER_MATH)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fassociative-math -fno-signed-zeros -fno-trapping-math")
+endif()
+
+option (BENCHMARK "Enable performance benchmark tests (compares current version with git tag)" OFF)
+if(BENCHMARK)
+  if(NOT JULIA)
+    message(WARNING "BENCHMARK requires Julia interface (-DJULIA=ON), but JULIA is not enabled")
+  endif()
 endif()
 
 
@@ -89,4 +96,44 @@ if(JULIA)
     add_dependencies(sync_julia_interface daqp)
 
     add_test(NAME Julia COMMAND sh -c "julia --color=yes --project=${CMAKE_CURRENT_BINARY_DIR}/interfaces/daqp-julia -e \"using Pkg; Pkg.test()\"")
+    
+    if(BENCHMARK)
+        # Add benchmark comparison test (git-based)
+        add_test(
+            NAME JuliaBenchmark
+            COMMAND bash "${JULIA_INTERFACE_DIR}/test/benchmark_comparison_git.sh"
+                "${JULIA_BINARY_DIR}"
+                "v0.7.2"
+                "medium"
+                "5"
+                "${CMAKE_CURRENT_BINARY_DIR}/benchmark_results"
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        )
+        set_tests_properties(JuliaBenchmark PROPERTIES
+            TIMEOUT 600
+            LABELS "benchmark"
+        )
+    endif()
+endif()
+
+if(PYTHON)
+    set(PYTHON_INTERFACE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/interfaces/daqp-python")
+    set(PYTHON_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/interfaces/daqp-python")
+    set(PYTHON_VENV_DIR "${PYTHON_BINARY_DIR}/venv")
+
+    add_custom_target(sync_python_interface ALL
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${PYTHON_INTERFACE_DIR}" "${PYTHON_BINARY_DIR}"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/src" "${PYTHON_BINARY_DIR}/csrc/src"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/include" "${PYTHON_BINARY_DIR}/csrc/include"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/codegen" "${PYTHON_BINARY_DIR}/csrc/codegen"
+        COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt" "${PYTHON_BINARY_DIR}/csrc/"
+        COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE" "${PYTHON_BINARY_DIR}/"
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:daqp> "${PYTHON_BINARY_DIR}"
+        DEPENDS daqp
+        COMMENT "Syncing Python files and library..."
+    )
+
+    add_dependencies(sync_python_interface daqp)
+
+    add_test(NAME Python COMMAND sh -c "cd ${PYTHON_BINARY_DIR} && python -m venv venv && ${PYTHON_VENV_DIR}/bin/pip install -e . && ${PYTHON_VENV_DIR}/bin/python -m unittest discover -s test -p '*_test.py' -v")
 endif()

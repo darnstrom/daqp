@@ -7,10 +7,10 @@ c_float daqp_dot(const c_float* v1, const c_float* v2, const int n) {
 }
 
 
-void update_LDL_add(DAQPWorkspace *work, const int add_ind){
-    work->sing_ind = EMPTY_IND;
+void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind){
+    work->sing_ind = DAQP_EMPTY_IND;
     int i,j,disp,id;
-    int new_L_start= ARSUM(work->n_active);
+    int new_L_start= DAQP_ARSUM(work->n_active);
     int start_col;
     int ns_active=0;
     c_float sum;
@@ -18,22 +18,22 @@ void update_LDL_add(DAQPWorkspace *work, const int add_ind){
 
     // di <-- Mi' Mi
     // If normalized this will always be 1...
-    if(IS_SIMPLE(add_ind)){
-        Mi = (work->Rinv)? work->Rinv+R_OFFSET(add_ind,NX): NULL;
+    if(add_ind < work->ms){
+        Mi = (work->Rinv)? work->Rinv+DAQP_R_OFFSET(add_ind,work->n): NULL;
         start_col = add_ind;
     }
     else{
-        Mi = work->M+NX*(add_ind-N_SIMPLE);
+        Mi = work->M+work->n*(add_ind-work->ms);
         start_col = 0;
     }
     if(Mi==NULL) sum = 1;
     else
-        for(i=start_col,sum=0;i<NX;i++)
+        for(i=start_col,sum=0;i<work->n;i++)
             sum+=Mi[i]*Mi[i];
 
-    if(IS_SOFT(add_ind) && IS_SLACK_FREE(add_ind)){
+    if(DAQP_IS_SOFT(add_ind) && DAQP_IS_SLACK_FREE(add_ind)){
 #ifdef SOFT_WEIGHTS
-        sum+= IS_LOWER(add_ind) ? work->rho_ls[add_ind] : work->rho_us[add_ind];
+        sum+= DAQP_IS_LOWER(add_ind) ? work->rho_ls[add_ind] : work->rho_us[add_ind];
 #else
         sum+=work->settings->rho_soft;
 #endif
@@ -47,14 +47,14 @@ void update_LDL_add(DAQPWorkspace *work, const int add_ind){
     // store l <-- Mk* m
     for(i=0;i<work->n_active;i++){
         id = work->WS[i];
-        if(IS_SOFT(id) && IS_SLACK_FREE(id)) ns_active++;
+        if(DAQP_IS_SOFT(id) && DAQP_IS_SLACK_FREE(id)) ns_active++;
         // Use Rinv or M for Mk depending on if k is simple bound or not 
-        if(IS_SIMPLE(id)){ 
-            Mk = (work->Rinv) ? work->Rinv+R_OFFSET(id,NX): NULL;
+        if(id < work->ms){ 
+            Mk = (work->Rinv) ? work->Rinv+DAQP_R_OFFSET(id,work->n): NULL;
             j= (start_col > id) ? start_col : id;
         }
         else{
-            Mk = work->M+NX*(id-N_SIMPLE);
+            Mk = work->M+work->n*(id-work->ms);
             j= start_col;
         }
         // Multiply Mk*Mi (NULL signify unity)
@@ -63,7 +63,7 @@ void update_LDL_add(DAQPWorkspace *work, const int add_ind){
         else if(Mi == NULL)
             sum = Mk[j];
         else
-            sum = daqp_dot(Mk+j,Mi+j,NX-j);
+            sum = daqp_dot(Mk+j,Mi+j,work->n-j);
 
         work->L[new_L_start+i] = sum;
     }
@@ -94,13 +94,13 @@ void update_LDL_add(DAQPWorkspace *work, const int add_ind){
         work->D[work->n_active]=0;
     }
 }
-void update_LDL_remove(DAQPWorkspace *work, const int rm_ind){
+void daqp_update_LDL_remove(DAQPWorkspace *work, const int rm_ind){
     if(work->n_active==rm_ind+1)
         return;
     int i, j, r, old_disp, new_disp, w_count, n_update=work->n_active-rm_ind-1;
     c_float* w = &work->zldl[rm_ind]; // zldl will be obsolete => use to allocations
     // Extract parts to keep/update in L & D
-    new_disp=ARSUM(rm_ind);
+    new_disp=DAQP_ARSUM(rm_ind);
     old_disp=new_disp+(rm_ind+1);
     w_count= 0;
     // Remove column rm_ind (and add parts of L in its new place)
@@ -116,7 +116,7 @@ void update_LDL_remove(DAQPWorkspace *work, const int rm_ind){
     // L2 block
     c_float p,beta,dbar,alpha=work->D[rm_ind];
     // i - Element/row to update|j - Column which is looped over|r - Row to loop over
-    old_disp=ARSUM(rm_ind)+rm_ind;
+    old_disp=DAQP_ARSUM(rm_ind)+rm_ind;
     for(j = 0, i=rm_ind+1;j<n_update;j++,i++){
         p=w[j];
         dbar = work->D[i]+alpha*p*p;

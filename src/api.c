@@ -22,7 +22,7 @@ void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
             if(res->exitflag > 0) ldp2qp_solution(work); // Retrieve qp solution 
         }
         else{ //AVI
-            res->exitflag = solve_avi(work);
+            res->exitflag = daqp_solve_avi(work);
         }
     }
     else{//Prox
@@ -87,8 +87,8 @@ int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time){
     int i;
     if(qp->sense != NULL){
         for(i = 0; i < qp->m ; i++){
-            if(qp->sense[i] & SOFT) ns++;
-            if(qp->sense[i] & BINARY) nb++;
+            if(qp->sense[i] & DAQP_SOFT) ns++;
+            if(qp->sense[i] & DAQP_BINARY) nb++;
         }
     }
     // Correct number of soft constraints if several hierarchies
@@ -137,7 +137,8 @@ int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time){
 
 //  Setup LDP from QP  
 int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp){
-    int update_mask = UPDATE_M+UPDATE_d+UPDATE_sense; // Always update M, d and sense
+    // Always update M, d and sense
+    int update_mask = DAQP_UPDATE_M+DAQP_UPDATE_d+DAQP_UPDATE_sense; 
     int error_flag;
     int alloc_R=0, alloc_v=0;
 
@@ -145,22 +146,22 @@ int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp){
     // Only allocate Rinv if H is not NULL
     if(qp->H!=NULL){
         alloc_R = 1;
-        update_mask+=UPDATE_Rinv;
+        update_mask+=DAQP_UPDATE_Rinv;
     }
     // Only allocate v if f is not NULL, or if proximal
     if(qp->f!=NULL || work->settings->eps_prox != 0){
         alloc_v = 1;
-        update_mask+=UPDATE_v;
+        update_mask+=DAQP_UPDATE_v;
     }
 
     // Allocate memory for LDP
     allocate_daqp_ldp(work, qp->n, qp->m, qp->ms, alloc_R, alloc_v);
 
     // Update hierarchy if hqp
-    if(qp->nh > 1) update_mask += UPDATE_hierarchy;
+    if(qp->nh > 1) update_mask += DAQP_UPDATE_hierarchy;
 
     // Form LDP
-    error_flag = update_ldp(update_mask, work, qp);
+    error_flag = daqp_update_ldp(update_mask, work, qp);
     if(error_flag<0){
         free_daqp_ldp(work);
         return error_flag;
@@ -178,7 +179,7 @@ void setup_daqp_hiqp(DAQPWorkspace* work, int* break_points, int nh){
 
 int setup_daqp_bnb(DAQPWorkspace* work, int nb, int ns){
     int i, nadded;
-    if(nb > work->n) return EXIT_OVERDETERMINED_INITIAL;
+    if(nb > work->n) return DAQP_EXIT_OVERDETERMINED_INITIAL;
     if((work->bnb == NULL) && (nb >0)){
         work->bnb= malloc(sizeof(DAQPBnB));
 
@@ -186,7 +187,7 @@ int setup_daqp_bnb(DAQPWorkspace* work, int nb, int ns){
         // Detect which constraints are binary
         work->bnb->bin_ids = malloc(nb*sizeof(int));
         for(i = 0, nadded = 0; nadded < nb; i++){
-            if(work->qp->sense[i] & BINARY)
+            if(work->qp->sense[i] & DAQP_BINARY)
                 work->bnb->bin_ids[nadded++] = i;
         }
 
@@ -314,8 +315,8 @@ void allocate_daqp_ldp(DAQPWorkspace *work, int n, int m, int ms, int alloc_R, i
     for(i = 0; i< m; i++){
         work->d_ls[i] = 0;
         work->d_us[i] = 0;
-        work->rho_ls[i] = DEFAULT_RHO_SOFT;
-        work->rho_us[i] = DEFAULT_RHO_SOFT;
+        work->rho_ls[i] = DAQP_DEFAULT_RHO_SOFT;
+        work->rho_us[i] = DAQP_DEFAULT_RHO_SOFT;
     }
 #endif
 }
@@ -430,26 +431,26 @@ void daqp_extract_result(DAQPResult* res, DAQPWorkspace* work){
 }
 
 void daqp_default_settings(DAQPSettings* settings){
-    settings->primal_tol = DEFAULT_PRIM_TOL;
-    settings->dual_tol = DEFAULT_DUAL_TOL; 
-    settings->zero_tol = DEFAULT_ZERO_TOL;
-    settings->pivot_tol = DEFAULT_PIVOT_TOL;
-    settings->progress_tol= DEFAULT_PROG_TOL;
+    settings->primal_tol = DAQP_DEFAULT_PRIM_TOL;
+    settings->dual_tol = DAQP_DEFAULT_DUAL_TOL; 
+    settings->zero_tol = DAQP_DEFAULT_ZERO_TOL;
+    settings->pivot_tol = DAQP_DEFAULT_PIVOT_TOL;
+    settings->progress_tol= DAQP_DEFAULT_PROG_TOL;
 
-    settings->cycle_tol = DEFAULT_CYCLE_TOL;
-    settings->iter_limit = DEFAULT_ITER_LIMIT;
+    settings->cycle_tol = DAQP_DEFAULT_CYCLE_TOL;
+    settings->iter_limit = DAQP_DEFAULT_ITER_LIMIT;
     settings->fval_bound = DAQP_INF; 
 
     settings->eps_prox = 0;
-    settings->eta_prox = DEFAULT_ETA;
+    settings->eta_prox = DAQP_DEFAULT_ETA;
 
-    settings->rho_soft = DEFAULT_RHO_SOFT; 
+    settings->rho_soft = DAQP_DEFAULT_RHO_SOFT; 
 
-    settings->rel_subopt = DEFAULT_REL_SUBOPT;
-    settings->abs_subopt = DEFAULT_ABS_SUBOPT;
+    settings->rel_subopt = DAQP_DEFAULT_REL_SUBOPT;
+    settings->abs_subopt = DAQP_DEFAULT_ABS_SUBOPT;
 
-    settings->sing_tol = DEFAULT_SING_TOL;
-    settings->refactor_tol = DEFAULT_REFACTOR_TOL;
+    settings->sing_tol = DAQP_DEFAULT_SING_TOL;
+    settings->refactor_tol = DAQP_DEFAULT_REFACTOR_TOL;
 }
 
 /* Remove redundant constraints*/

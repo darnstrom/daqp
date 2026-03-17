@@ -25,13 +25,14 @@ int daqp_hiqp(DAQPWorkspace *work, c_float *lambda){
         work->m = end;
         // Soften constraints and activate 
         for(j =start;j<end;j++){
-            SET_SOFT(j);
-            if(IS_ACTIVE(j)){
-                if(IS_LOWER(j))
-                    add_constraint(work,j, -1.0);
+            DAQP_SET_SOFT(j);
+            if(DAQP_IS_ACTIVE(j)){
+                if(DAQP_IS_LOWER(j))
+                    daqp_add_constraint(work,j, -1.0);
                 else
-                    add_constraint(work,j, 1.0);
-                if(work->sing_ind != EMPTY_IND) return EXIT_OVERDETERMINED_INITIAL;
+                    daqp_add_constraint(work,j, 1.0);
+                if(work->sing_ind != DAQP_EMPTY_IND) 
+                    return DAQP_EXIT_OVERDETERMINED_INITIAL;
                 }
         }
 
@@ -43,21 +44,21 @@ int daqp_hiqp(DAQPWorkspace *work, c_float *lambda){
         if(exitflag < 0) break;
 
         if(iterations >= work->settings->iter_limit){
-            exitflag = EXIT_ITERLIMIT;
+            exitflag = DAQP_EXIT_ITERLIMIT;
             break;
         }
 
         // Perturb rhs with slacks in level 
         for(j=0; j<work->n_active;j++){
             id=work->WS[j];
-            if(IS_SOFT(id)){ 
+            if(DAQP_IS_SOFT(id)){ 
                 w = work->lam_star[j]*work->settings->rho_soft;
                 if(w < -work->settings->primal_tol)
                     work->dlower[id]+=w;
                 else if(w > work->settings->primal_tol)
                     work->dupper[id]+=w;
                 if(lambda != NULL){
-                    w += IS_LOWER(id) ? -1e-14 : 1e-14; // For weakly active
+                    w += DAQP_IS_LOWER(id) ? -1e-14 : 1e-14; // For weakly active
                     lambda[id] = w;
                 }
 
@@ -65,7 +66,7 @@ int daqp_hiqp(DAQPWorkspace *work, c_float *lambda){
         }
 
         // Make constraints in current level hard
-        for(j=start; j<end;j++) SET_HARD(j);
+        for(j=start; j<end;j++) DAQP_SET_HARD(j);
         
         // find first active constraint in current level 
         for(j=0;j < work->n_active; j++) if(work->WS[j]>=start) break;
@@ -74,21 +75,21 @@ int daqp_hiqp(DAQPWorkspace *work, c_float *lambda){
         // TODO: can factorization be directly reused?
         int n_active_old = (work->n_active < work->n) ? work->n_active : work->n;
         for(int jj=n_active_old; jj < work->n_active ;jj++) {
-            work->sense[work->WS[jj]]&=~(ACTIVE+IMMUTABLE); // ensure inactive + mutable
+            work->sense[work->WS[jj]]&=~(DAQP_ACTIVE+DAQP_IMMUTABLE);
         }
         work->n_active =j;
         work->reuse_ind=j;
-        work->sing_ind = EMPTY_IND;
+        work->sing_ind = DAQP_EMPTY_IND;
         for(; j<n_active_old ;j++){
-            add_constraint(work,work->WS[j],work->lam_star[j]);
+            daqp_add_constraint(work,work->WS[j],work->lam_star[j]);
             // Skip if WS becomes overdtermined
-            if(work->sing_ind != EMPTY_IND){
-                remove_constraint(work,j);
-                work->sing_ind = EMPTY_IND;
-                SET_MUTABLE(work->WS[j]);
+            if(work->sing_ind != DAQP_EMPTY_IND){
+                daqp_remove_constraint(work,j);
+                work->sing_ind = DAQP_EMPTY_IND;
+                DAQP_SET_MUTABLE(work->WS[j]);
             }
             else{
-                if(IS_IMMUTABLE(work->WS[j])) nfree--;
+                if(DAQP_IS_IMMUTABLE(work->WS[j])) nfree--;
             }
         }
 
