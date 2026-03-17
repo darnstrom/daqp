@@ -2,9 +2,9 @@
 layout: page
 title: C/C++
 permalink: /start/c
-nav: 3 
+nav_order: 1
+nav_icon: c
 parent: Interfaces 
-grand_parent: Getting started 
 math: mathjax3
 ---
 
@@ -40,6 +40,41 @@ daqp_quadprog(&result,&qp,NULL);
 The last argument is a pointer to a `DAQPSettings` struct, but passing a null-pointer will result in the default settings being used. The first argument is a pointer to a `DAQPResults` struct in which solution information will be populated. 
 
 The optimal solution can be found in `result.x`, the optimal function value in `result.fval`, and the exit flag in `result.exitflag`. The struct `result` also contains some profiling information such as solve time and number of iterations.
+
+## Using a Workspace
+The `daqp_quadprog` function above allocates memory on every call, which may be undesirable in
+real-time or embedded applications. To avoid this, DAQP provides a workspace-based interface where
+memory is allocated once and reused across multiple solves.
+
+```c
+// Allocate and set up the workspace once
+DAQPWorkspace work = {0};
+setup_daqp(&qp, &work, NULL);   // allocates internal memory and factorizes H
+
+// Solve
+double x[2], lam[4];
+DAQPResult result;
+result.x   = x;
+result.lam = lam;
+daqp_solve(&result, &work);
+```
+
+Once the workspace is set up, problem data (such as the cost vector or bounds) can be modified and
+the problem re-solved without any additional allocation:
+
+```c
+// Update the cost vector and re-solve
+double f_new[2] = {-1, 0};
+qp.f = f_new;
+daqp_update_ldp(DAQP_UPDATE_v, &work, &qp);  // DAQP_UPDATE_v recomputes v = R'\f
+daqp_solve(&result, &work);
+```
+
+When the workspace is no longer needed, free it with:
+```c
+free_daqp_workspace(&work);
+free_daqp_ldp(&work);
+```
 
 ## Changing settings
 If we, for example, want to change the maximum number of iterations to 2000 we can do so by

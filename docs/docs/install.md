@@ -2,8 +2,7 @@
 layout: page
 title: Installation
 permalink: /install/
-nav: 2 
-parent: Getting started 
+nav_order: 2
 ---
 <details open markdown="block">
 <summary>

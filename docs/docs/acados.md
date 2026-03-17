@@ -2,9 +2,9 @@
 layout: page
 title: acados 
 permalink: /start/acados
-nav: 3 
+nav_order: 6
+nav_icon: acados
 parent: Interfaces 
-grand_parent: Getting started 
 math: mathjax3
 ---
 DAQP can be used as a solver in [acados](https://docs.acados.org/), a modular framework for fast embedded optimal control.

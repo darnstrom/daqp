@@ -2,6 +2,6 @@
 layout: page
 title: Getting started 
 permalink: /start/
-nav: 3 
-has_children: true
+nav_exclude: true
+has_children: false
 ---

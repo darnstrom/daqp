@@ -2,9 +2,9 @@
 layout: page
 title: Simulink 
 permalink: /start/simulink
-nav: 3 
+nav_order: 5
+nav_icon: simulink
 parent: Interfaces 
-grand_parent: Getting started 
 math: mathjax3
 ---
 

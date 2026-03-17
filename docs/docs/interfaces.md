@@ -1,10 +1,10 @@
 ---
 layout: page
 title: Interfaces 
-permalink: /start/interface
-nav: 3 
-parent: Getting started 
+permalink: /interfaces/
+nav_order: 3
 has_children: true
+nav_always_open: true
 math: mathjax3
 has_toc: true 
 ---

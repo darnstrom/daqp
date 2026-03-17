@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-label="Simulink">
+  <!-- Blue triangle block (top-left) -->
+  <polygon points="1,1 1,12 10,6.5" fill="#0076A8"/>
+  <!-- Orthogonal connection: right then down (L-shaped wire) -->
+  <polyline points="10,6.5 17,6.5 17,13"
+            fill="none" stroke="#444" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Arrowhead pointing down into square -->
+  <polygon points="15.5,11.5 18.5,11.5 17,13.5" fill="#444"/>
+  <!-- Orange square block (bottom-right) -->
+  <rect x="13" y="13" width="10" height="10" rx="1" fill="#E16737"/>
+</svg>

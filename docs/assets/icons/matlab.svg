@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-label="MATLAB">
+  <!-- Peaks surface in MATLAB orange colormap, transparent background -->
+  <polygon points="1,23 3,19 6,21 9,16 13,21 17,17 21,20 23,17 23,23" fill="#5C2000"/>
+  <polygon points="2,22 4,17 6,19 9,14 13,19 17,15 20,18 22,15 22,22" fill="#8B3500"/>
+  <polygon points="3,21 5,16 7,17 9,12 13,17 16,13 19,16 22,13 22,21" fill="#B34D00"/>
+  <polygon points="4,20 6,14 8,16 10,10 13,15 16,11 18,14 21,11 21,20" fill="#CC5C00"/>
+  <polygon points="6,18 7,13 9,14 11,8 13,13 15,10 17,13 20,10 20,18" fill="#E16737"/>
+  <polygon points="8,16 9,12 10,13 12,6 13,11 15,8 16,11 18,9 18,16" fill="#F0882A"/>
+  <polygon points="9,15 10,11 11,12 12,5 13,9 14,7 15,10 17,8 17,15" fill="#FFAA44"/>
+  <polygon points="10,14 11,10 12,11 12.5,4.5 13,8 14,6.5 15,9" fill="#FFC86A"/>
+  <polygon points="11,13 12,9 12.5,4 13,7.5" fill="#FFE090"/>
+  <circle cx="12.5" cy="4" r="1" fill="white" opacity="0.9"/>
+</svg>
