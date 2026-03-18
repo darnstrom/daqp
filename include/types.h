@@ -70,9 +70,7 @@ typedef struct{
 
     c_float sing_tol;
     c_float refactor_tol;
-#ifdef PROFILING
     c_float time_limit;
-#endif
 }DAQPSettings;
 
 
@@ -188,6 +186,8 @@ typedef struct{
     int* break_points;
     // AVI
     DAQPAVI* avi;
+    // Timer (used for time limit checking, set externally by daqp_solve)
+    void *timer;
 }DAQPWorkspace;
 
 # ifdef __cplusplus
