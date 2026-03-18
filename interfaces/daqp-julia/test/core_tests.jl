@@ -333,7 +333,7 @@ end
 end
 
 @testset "Setting Warm Start" begin
-    # Setup model and solve problem
+    # Test primal start 
     d = DAQPBase.Model()
     xref,H,f,A,bupper,blower,sense = generate_test_QP(n,m,ms,nAct,kappa)
     setup(d,H,f,A,bupper,blower,sense;primal_start=xref)
@@ -341,11 +341,22 @@ end
     @test norm(xref-x) < tol
     @test info.iterations==1
 
+    # Test dual start
     λstar = info.λ
     d = DAQPBase.Model()
     setup(d,H,f,A,bupper,blower,sense;dual_start=λstar)
     x,fval,exitflag,info = solve(d)
     @test norm(xref-x) < tol
     @test info.iterations==1
+
+    # Ensure solver recovers from degenerate starting point
+    d = DAQPBase.Model()
+    H,f = [1.0 0; 0 1.0], zeros(2);
+    b = [1.0;1.0;2]
+    A = ones(1,2);
+    setup(d,H,f,A,b;primal_start=[1.0;1.0])
+    x,fval,exitflag,info = solve(d)
+    @test norm(x-zeros(2)) < tol;
+    @test info.iterations > 1;
 end
 
