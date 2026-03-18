@@ -150,12 +150,15 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
             sense_copy = np.array(sense, dtype=np.intc, copy=True)
             problem.sense = &sense_copy[0]
 
+        if primal_start is not None:
+            primal_start_c = np.ascontiguousarray(primal_start, dtype=np.double)
+
         if dual_start is not None:
             dual_start_c = np.ascontiguousarray(dual_start, dtype=np.double)
             with nogil:
                 daqp_dual_init_active(&problem, &dual_start_c[0])
         else:
-            primal_start_c = np.ascontiguousarray(primal_start, dtype=np.double)
+            # primal_start is not None (from the outer condition)
             with nogil:
                 daqp_primal_init_active(&problem, &primal_start_c[0])
 
