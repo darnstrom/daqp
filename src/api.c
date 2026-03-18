@@ -271,7 +271,7 @@ void allocate_daqp_workspace(DAQPWorkspace *work, int n, int ns){
 
 
 
-    work->u= malloc(work->n*sizeof(c_float));
+    work->u= calloc(work->n,sizeof(c_float)); // calloc -> uninitialized itearte is 0
     work->x = work->u; 
 
     work->xold= malloc(work->n*sizeof(c_float));
@@ -498,4 +498,69 @@ int daqp_first_violating(c_float* x, c_float* A, c_float* bu, c_float* bl, int n
         if(Ax > bu[i]+tol || Ax < bl[i]-tol) return i;
     }
     return m; // No constraint is violating
+}
+
+
+// Sets the starting active-set (by modifying sense) 
+// based on a primal iterate 
+void daqp_primal_init_active(DAQPProblem* qp, c_float* x){
+    int i,disp;
+    c_float Ax, slack;
+    c_float tol= 1e-9;
+    
+    // Simple constraints
+    for(i=0; i < qp->ms; i++){
+        if(qp->sense[i] & DAQP_IMMUTABLE) continue;
+        slack = x[i]- qp->bupper[i];
+        if (slack < tol && slack > -tol){
+            qp->sense[i] |= DAQP_ACTIVE;
+            qp->sense[i] &= ~DAQP_LOWER;
+        }
+        else{
+            slack = x[i] - qp->blower[i];
+            if (slack < tol && slack > -tol){
+                qp->sense[i] |= DAQP_ACTIVE+DAQP_LOWER;
+            }
+        }
+    }
+
+    // General constraints
+    for(i=qp->ms, disp=0; i < qp->m; i++, disp+=qp->n){
+        if(qp->sense[i] & DAQP_IMMUTABLE) continue;
+        Ax = daqp_dot(x,qp->A+disp,qp->n);
+        slack = Ax - qp->bupper[i];
+        if (slack < tol && slack > -tol){
+            qp->sense[i] |= DAQP_ACTIVE;
+            qp->sense[i] &= ~DAQP_LOWER;
+        }
+        else{
+            slack = Ax - qp->blower[i];
+            if (slack < tol && slack > -tol){
+                qp->sense[i] |= DAQP_ACTIVE+DAQP_LOWER;
+            }
+        }
+    }
+}
+
+// Sets the starting active-set (by modifying sense)
+// based on a dual iterate
+void daqp_dual_init_active(DAQPProblem* qp, c_float* lam){
+    int i;
+    c_float tol = 1e-12;
+    for(i=0; i < qp->m; i++){
+        if(qp->sense[i] & DAQP_IMMUTABLE) continue;
+        if(lam[i] > tol){
+            qp->sense[i] |= DAQP_ACTIVE;
+            qp->sense[i] &= ~DAQP_LOWER;
+        }
+        else if(lam[i] < -tol){
+            qp->sense[i] |= DAQP_ACTIVE+DAQP_LOWER;
+        }
+    }
+}
+
+// Set the starting iterate
+void daqp_set_primal_start(DAQPWorkspace* work, c_float* x){
+    int i;
+    for(i = 0; i < work->n; i++) work->x[i] = x[i];
 }

@@ -43,6 +43,13 @@ end
         @test norm(xref-x) < tol;
     end
 end
+@testset "Quadprog (C)" begin
+    for nQP in 1:10
+        xref,H,f,A,bupper,blower,sense = generate_test_QP(n,m,ms,nAct,kappa);
+        x,fval,exitflag,info = DAQPBase.quadprog_c(DAQPBase.QPj(H,f,A,bupper,blower,sense));
+        @test norm(xref-x) < tol;
+    end
+end
 
 @testset "Linprog (C)" begin
     for nQP in 1:nQPs
@@ -331,3 +338,56 @@ end
     @test norm(xref-x) < tol;
 
 end
+
+@testset "Setting Warm Start" begin
+    # Test primal start 
+    d = DAQPBase.Model()
+    xref,H,f,A,bupper,blower,sense = generate_test_QP(n,m,ms,nAct,kappa)
+    setup(d,H,f,A,bupper,blower,sense;primal_start=xref)
+    x,fval,exitflag,info = solve(d)
+    @test norm(xref-x) < tol
+    @test info.iterations==1
+
+    x,fval,exitflag,info = quadprog(H,f,A,bupper,blower,sense;primal_start=xref)
+    @test norm(xref-x) < tol
+    @test info.iterations==1
+
+    # Test dual start
+    λstar = info.λ
+    d = DAQPBase.Model()
+    setup(d,H,f,A,bupper,blower,sense;dual_start=λstar)
+    x,fval,exitflag,info = solve(d)
+    @test norm(xref-x) < tol
+    @test info.iterations==1
+
+    x,fval,exitflag,info = quadprog(H,f,A,bupper,blower,sense;dual_start=λstar)
+    @test norm(xref-x) < tol
+    @test info.iterations==1
+
+    # Ensure solver recovers from degenerate starting point
+    d = DAQPBase.Model()
+    H,f = [1.0 0; 0 1.0], zeros(2);
+    b = [1.0;1.0;2]
+    A = ones(1,2);
+    setup(d,H,f,A,b;primal_start=[1.0;1.0])
+    x,fval,exitflag,info = solve(d)
+    @test norm(x-zeros(2)) < tol;
+    @test info.iterations > 1;
+
+    # Test warm start for LPs (prox iters...)
+    xref,f,A,bupper,blower,sense = generate_test_LP(n,m,ms);
+    xcold,fval,exitflag,info_cold = linprog(f,A,bupper,blower,sense)
+    xwarm,fval,exitflag,info_warm = linprog(f,A,bupper,blower,sense;primal_start = 0.95*xref)
+    println(info_cold.iterations)
+    println(info_warm.iterations)
+    @test info_cold.iterations > info_warm.iterations 
+    @test norm(xwarm-xref) < tol
+
+    # Test warm start for AVIs
+    xref,H,f,A,b = generate_test_avi(n,m);
+    xcold,fval,exitflag,info_cold = DAQPBase.avi(H,f,A,b)
+    xwarm,fval,exitflag,info_warm = DAQPBase.avi(H,f,A,b;primal_start = 0.95*xref)
+    @test norm(xwarm-xref) < tol
+
+end
+

@@ -389,8 +389,21 @@ int daqp_activate_constraints(DAQPWorkspace *work){
 #endif
         }
         if(work->sing_ind != DAQP_EMPTY_IND){
-            for(;i<work->m;i++) DAQP_SET_INACTIVE(i); // correct sense
-            return DAQP_EXIT_OVERDETERMINED_INITIAL;
+            int exitflag = 1;
+            for(;i<work->m;i++){ 
+                // 1. Check if there are equalities that couldn't be activated
+                // 2. Make sure that sense is clean for unactivated constraints 
+                if(DAQP_IS_ACTIVE(i)){
+                    if(DAQP_IS_IMMUTABLE(i)) 
+                        exitflag = DAQP_EXIT_OVERDETERMINED_INITIAL;
+                    else
+                        DAQP_SET_INACTIVE(i);
+                }
+            }
+            // Remove the last constraint that lead to singularity
+            work->n_active--;
+            work->sing_ind = DAQP_EMPTY_IND;
+            return exitflag;
         }
     }
     return 1;
