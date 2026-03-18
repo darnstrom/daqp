@@ -420,7 +420,9 @@ classdef core_test < matlab.unittest.TestCase
             % Dual warm start
             sense_before = sense;
             d2 = daqp();
-            d2.setup(H, f, A, bupper, blower, sense, [], 0, [], info_cold.lambda);
+            d2.setup(H, f, A, bupper, blower, sense, ...  % problem data
+                [], 0, ...                                  % break_points, problem_type
+                [], info_cold.lambda);                      % primal_start=[], dual_start
             [x_dual, fval_dual, ef_dual, info_dual] = d2.solve();
             testCase.verifyEqual(ef_dual, int32(1));
             testCase.verifyLessThan(norm(x_dual - x_cold), tol);
@@ -432,7 +434,9 @@ classdef core_test < matlab.unittest.TestCase
 
             % Primal warm start
             d3 = daqp();
-            d3.setup(H, f, A, bupper, blower, sense, [], 0, x_cold, []);
+            d3.setup(H, f, A, bupper, blower, sense, ...  % problem data
+                [], 0, ...                                  % break_points, problem_type
+                x_cold, []);                                % primal_start, dual_start=[]
             [x_prim, fval_prim, ef_prim, info_prim] = d3.solve();
             testCase.verifyEqual(ef_prim, int32(1));
             testCase.verifyLessThan(norm(x_prim - x_cold), tol);
