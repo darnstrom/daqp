@@ -1,7 +1,7 @@
 """
 # Example calls
     xstar, fval, exitflag, info = DAQPBase.quadprog(H,f,A,bupper)
-    xstar, fval, exitflag, info = DAQPBase.quadprog(H,f,A,bupper,blower,sense) 
+    xstar, fval, exitflag, info = DAQPBase.quadprog(H,f,A,bupper,blower,sense;primal_start,dual_start) 
 
 finds the solution `xstar` to the quadratic program
 
@@ -38,6 +38,8 @@ is interpreted as
   * `5 ` : equality
   * `8 ` : soft (allowed to be violated if necessary)
   * `16` : binary (either upper or lower bound should hold with equality)
+* `primal_start` - Initial guess of primal iterate
+* `dual_start`   - Initial guess of dual iterate
 
 # Output
 * `xstar`       - solution
@@ -47,11 +49,18 @@ is interpreted as
 
 """
 function quadprog(H::Union{Matrix{Float64}, Cholesky},f::Vector{Float64}, 
-        A::Matrix{Float64},bupper::Vector{Float64},blower::Vector{Float64}=Float64[],sense::Vector{Cint}=Cint[];A_rowmaj=false,settings=nothing)
-    return quadprog(QPj(H,f,A,bupper,blower,sense;A_rowmaj);settings)
+        A::Matrix{Float64},bupper::Vector{Float64},blower::Vector{Float64}=Float64[],
+        sense::Vector{Cint}=Cint[];A_rowmaj=false,settings=nothing, 
+        primal_start::Vector{Cdouble}=Cdouble[], dual_start::Vector{Cdouble}=Cdouble[])
+    d = DAQPBase.Model() 
+    !isnothing(settings) && DAQPBase.settings(d,settings)
+    exitflag,setup_time = DAQPBase.setup(d,QPj(H,f,A,bupper,blower,sense;A_rowmaj);
+                                         primal_start,dual_start)
+    return DAQPBase.solve(d;setup_time);
 end
-function quadprog(qpj::QPj;settings=nothing)
-    # TODO: check validity of dimensions
+
+# XXX Just kept for test for now  
+function quadprog_c(qpj::QPj;settings=nothing)
     # Setup QP
     qp = QPc(qpj);
 
