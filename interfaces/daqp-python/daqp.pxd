@@ -38,6 +38,7 @@ cdef extern from "types.h":
 
         double sing_tol;
         double refactor_tol;
+        double time_limit;
 
     ctypedef struct DAQPWorkspace:
         DAQPSettings* settings
