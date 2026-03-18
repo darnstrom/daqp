@@ -40,6 +40,10 @@ cdef extern from "types.h":
         double refactor_tol;
 
     ctypedef struct DAQPWorkspace:
+        int n
+        int m
+        int ms
+        int nh
         DAQPSettings* settings
 
 cdef extern from "api.h":
@@ -77,6 +81,10 @@ cdef extern from "api.h":
         void free_daqp_ldp(DAQPWorkspace *work)
     cdef extern nogil:
         void allocate_daqp_settings(DAQPWorkspace *work)
+
+cdef extern from "utils.h":
+    cdef extern nogil:
+        int daqp_update_ldp(int mask, DAQPWorkspace *work, DAQPProblem *qp)
 
 cdef extern from "constants.h":
     cdef double DAQP_INF
