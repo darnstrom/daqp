@@ -11,9 +11,11 @@ classdef daqp< handle
     end
 
     methods(Static)
-        function [x,fval,exitflag,info] = quadprog(H,f,A,bupper,blower,sense)
+        function [x,fval,exitflag,info] = quadprog(H,f,A,bupper,blower,sense,primal_start,dual_start)
+            if nargin < 7, primal_start = []; end
+            if nargin < 8, dual_start = []; end
             d = daqp();
-            [exitflag,setup_time] = d.setup(H,f,A,bupper,blower,sense);
+            [exitflag,setup_time] = d.setup(H,f,A,bupper,blower,sense,[],0,primal_start,dual_start);
             if(exitflag <0)
                 x = [];fval=[];info=[];
                 return; 
@@ -22,9 +24,11 @@ classdef daqp< handle
             info.setup_time = setup_time;
         end
 
-        function [x,fval,exitflag,info] = linprog(f,A,bupper,blower,sense)
+        function [x,fval,exitflag,info] = linprog(f,A,bupper,blower,sense,primal_start,dual_start)
+            if nargin < 6, primal_start = []; end
+            if nargin < 7, dual_start = []; end
             d = daqp();
-            [exitflag,setup_time] = d.setup([],f,A,bupper,blower,sense);
+            [exitflag,setup_time] = d.setup([],f,A,bupper,blower,sense,[],0,primal_start,dual_start);
             if(exitflag <0)
                 x = [];fval=[];info=[];
                 return; 
@@ -37,9 +41,11 @@ classdef daqp< handle
             info.setup_time = setup_time;
         end
 
-        function [x,fval,exitflag,info] = avi(H,f,A,bupper,blower,sense)
+        function [x,fval,exitflag,info] = avi(H,f,A,bupper,blower,sense,primal_start,dual_start)
+            if nargin < 7, primal_start = []; end
+            if nargin < 8, dual_start = []; end
             d = daqp();
-            [exitflag,setup_time] = d.setup(H,f,A,bupper,blower,sense,[],1);
+            [exitflag,setup_time] = d.setup(H,f,A,bupper,blower,sense,[],1,primal_start,dual_start);
             if(exitflag <0)
                 x = [];fval=[];info=[];
                 return; 
@@ -98,12 +104,18 @@ classdef daqp< handle
             [x,fval,exitflag,info] = daqpmex('solve', this.work_ptr,...
                 this.H,this.f,this.A,this.bupper,this.blower,this.sense,this.break_points);
         end
-        function [exitflag,setup_time] = setup(this,H,f,A,bupper,blower,sense,break_points,problem_type)
+        function [exitflag,setup_time] = setup(this,H,f,A,bupper,blower,sense,break_points,problem_type,primal_start,dual_start)
             if(nargin < 8)
                 break_points = [];
             end
             if(nargin < 9)
                 problem_type = 0;
+            end
+            if(nargin < 10)
+                primal_start = [];
+            end
+            if(nargin < 11)
+                dual_start = [];
             end
 
             % TODO Check validity
@@ -130,7 +142,8 @@ classdef daqp< handle
             this.sense = int32(sense);
             this.break_points= int32(break_points);
             [exitflag,setup_time] = daqpmex('setup', this.work_ptr,this.H,this.f,...
-                this.A,this.bupper,this.blower,this.sense,this.break_points,int32(problem_type));
+                this.A,this.bupper,this.blower,this.sense,this.break_points,int32(problem_type),...
+                primal_start,dual_start);
         end
 
         function settings = settings(this,varargin)
