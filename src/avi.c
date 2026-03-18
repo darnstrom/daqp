@@ -14,6 +14,9 @@ int daqp_solve_avi(DAQPWorkspace *work) {
     int terminate_limit = 5;
     c_float minimum_newton_residual = DAQP_INF;
 
+    // Initial avi iterate
+    for(i=0; i < work->n; i++) work->avi->x[i] = work->x[i];
+
     // Start the iterations
     // TODO iter_limit should be the for tot_iter...
     for (k = 0; k < work->settings->iter_limit; k++) {

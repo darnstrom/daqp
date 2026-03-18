@@ -271,7 +271,7 @@ void allocate_daqp_workspace(DAQPWorkspace *work, int n, int ns){
 
 
 
-    work->u= malloc(work->n*sizeof(c_float));
+    work->u= calloc(work->n,sizeof(c_float)); // calloc -> uninitialized itearte is 0
     work->x = work->u; 
 
     work->xold= malloc(work->n*sizeof(c_float));

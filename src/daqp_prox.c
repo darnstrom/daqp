@@ -12,9 +12,24 @@ int daqp_prox(DAQPWorkspace *work){
     c_float tol_stat, eta=work->settings->eta_prox;
     int cycle_counter = 0;
     c_float best_fval = DAQP_INF;
-    for(i=0;i < work->n;i++) work->x[i] = 0; // TODO add option for user to set x0
 
     while(total_iter  <  work->settings->iter_limit){
+        // ** Perturb problem **
+        // Compute v = R'\(f-eps*x) (FWS Skipped if LP since R = I)
+        if(work->Rinv== NULL && work->RinvD == NULL){
+            eps*= (work->iterations==1) ? 10 : 0.9; // Adapt epsilon TODO: add to settings
+            eps = (eps > 1e3) ? 1e3 : eps; // TODO: add saturation option to settings
+            for(i = 0; i<nx;i++)
+                work->v[i] = work->qp->f[i]*eps-work->x[i];
+        }
+        else{
+            for(i = 0; i<nx;i++)
+                work->v[i] = work->qp->f[i]-eps*work->x[i];
+            daqp_update_v(work->v,work,0);
+        }
+        // Perturb RHS of constraints
+        daqp_update_d(work, work->qp->bupper,work->qp->blower);
+
         // xold <-- x
         swp_ptr = work->xold; work->xold = work->x; work->x = swp_ptr;
 
@@ -63,21 +78,6 @@ int daqp_prox(DAQPWorkspace *work){
             }
         }
 
-        // ** Perturb problem **
-        // Compute v = R'\(f-eps*x) (FWS Skipped if LP since R = I) 
-        if(work->Rinv== NULL && work->RinvD == NULL){ 
-            eps*= (work->iterations==1) ? 10 : 0.9; // Adapt epsilon TODO: add to settings 
-            eps = (eps > 1e3) ? 1e3 : eps; // TODO: add saturation option to settings
-            for(i = 0; i<nx;i++) 
-                work->v[i] = work->qp->f[i]*eps-work->x[i];
-        }
-        else{
-            for(i = 0; i<nx;i++) 
-                work->v[i] = work->qp->f[i]-eps*work->x[i];
-            daqp_update_v(work->v,work,0);
-        }
-        // Perturb RHS of constraints 
-        daqp_update_d(work, work->qp->bupper,work->qp->blower);
     }
     // Finalize results
     if(total_iter >= work->settings->iter_limit) exitflag = DAQP_EXIT_ITERLIMIT; 

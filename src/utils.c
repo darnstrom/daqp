@@ -375,8 +375,6 @@ int daqp_update_avi(DAQPAVI* avi, DAQPProblem* p){
         disp += n+1;
     }
 
-    // Set x0 to zero 
-    for(i=0;i<n;i++) avi->x[i] = 0; // TODO separate from setup...
     // Factorize H and H_rho 
     daqp_lu(avi->LU_H, avi->P_H, n);
     daqp_lu(avi->H_rho, avi->P_H2, n);
