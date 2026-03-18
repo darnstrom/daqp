@@ -170,7 +170,7 @@ creates an empty optimization model `d`.
 
 The following functions acts on such models: 
 
-* `setup(d,H,f,A,bupper,blower,sense)`: setup a problem (see `DAQPBase.quadprog` or DAQPBase.avi for details)
+* `setup(d,H,f,A,bupper,blower,sense;primal_start, dual_start)`: setup a problem (see `DAQPBase.quadprog` or DAQPBase.avi for details)
 * `solve(d)`: solve a populated model
 * `update(d,H,f,A,bupper,blower,sense)`: update an existing model 
 * `dict = DAQPBase.settings(d)`: return a Dictionary with the current settings for the model `d` 
@@ -208,12 +208,22 @@ function delete!(daqp::DAQPBase.Model)
     end
 end
 
-function setup(daqp::DAQPBase.Model, qp::DAQPBase.QPj)
+function setup(daqp::DAQPBase.Model, qp::DAQPBase.QPj;
+        primal_start::Vector{Cdouble}=Cdouble[],dual_start::Vector{Cdouble}=Cdouble[])
     daqp.qpj = qp
     daqp.qpc = DAQPBase.QPc(daqp.qpj)
     old_settings = settings(daqp); # in case setup fails
     unsafe_store!(daqp.qpc_ptr,daqp.qpc)
     setup_time = Cdouble(0);
+
+    # Set starting AS if dual or primal iterate provided
+    if !isempty(dual_start)
+        ccall((:daqp_dual_init_active,DAQPBase.libdaqp),Nothing,
+              (Ptr{DAQPBase.QPc},Ptr{Cdouble}),daqp.qpc_ptr,dual_start)
+    elseif !isempty(primal_start)
+        ccall((:daqp_primal_init_active,DAQPBase.libdaqp),Nothing,
+              (Ptr{DAQPBase.QPc},Ptr{Cdouble}),daqp.qpc_ptr,primal_start)
+    end
 
     if(isempty(qp.H) && !isempty(qp.f))# LP
         # ensure their is no binary constraint
@@ -233,6 +243,10 @@ function setup(daqp::DAQPBase.Model, qp::DAQPBase.QPj)
         daqp.has_model = true
         daqp.x = Vector{Float64}(undef, qp.n)
         daqp.λ = Vector{Float64}(undef, qp.m)
+        if !isempty(primal_start) 
+            ccall((:daqp_set_primal_start,DAQPBase.libdaqp),Nothing,(Ptr{DAQPBase.Workspace},Ptr{Cdouble}),
+                  daqp.work,primal_start)
+        end
     end
 
     return exitflag, setup_time
@@ -240,8 +254,9 @@ end
 
 function setup(daqp::DAQPBase.Model, H::Union{Matrix{Cdouble},Cholesky},f::Vector{Cdouble},
         A::Matrix{Cdouble},bupper::Vector{Cdouble},blower::Vector{Cdouble}=Cdouble[],
-        sense::Vector{Cint}=Cint[];A_rowmaj=false,break_points = Cint[], is_avi=false)
-    return setup(daqp,QPj(H,f,A,bupper,blower,sense;A_rowmaj,break_points,is_avi))
+        sense::Vector{Cint}=Cint[];A_rowmaj=false,break_points = Cint[], is_avi=false, 
+        primal_start::Vector{Cdouble}=Cdouble[],dual_start::Vector{Cdouble}=Cdouble[])
+    return setup(daqp,QPj(H,f,A,bupper,blower,sense;A_rowmaj,break_points,is_avi);primal_start,dual_start)
 end
 
 function solve(daqp::DAQPBase.Model)

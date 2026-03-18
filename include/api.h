@@ -50,6 +50,10 @@ void daqp_default_settings(DAQPSettings *settings);
 void daqp_minrep(int* is_redundant, c_float* A, c_float* b, int n, int m, int ms);
 int  daqp_first_violating(c_float* x, c_float* A, c_float* bu, c_float* bl, int n, int m, int ms, c_float tol);
 
+void daqp_primal_init_active(DAQPProblem* qp, c_float* x);
+void daqp_dual_init_active(DAQPProblem* qp, c_float* lam);
+void daqp_set_primal_start(DAQPWorkspace* work, c_float* x);
+
 # ifdef __cplusplus
 }
 # endif // ifdef __cplusplus

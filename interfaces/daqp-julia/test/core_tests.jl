@@ -331,3 +331,21 @@ end
     @test norm(xref-x) < tol;
 
 end
+
+@testset "Setting Warm Start" begin
+    # Setup model and solve problem
+    d = DAQPBase.Model()
+    xref,H,f,A,bupper,blower,sense = generate_test_QP(n,m,ms,nAct,kappa)
+    setup(d,H,f,A,bupper,blower,sense;primal_start=xref)
+    x,fval,exitflag,info = solve(d)
+    @test norm(xref-x) < tol
+    @test info.iterations==1
+
+    λstar = info.λ
+    d = DAQPBase.Model()
+    setup(d,H,f,A,bupper,blower,sense;dual_start=λstar)
+    x,fval,exitflag,info = solve(d)
+    @test norm(xref-x) < tol
+    @test info.iterations==1
+end
+
