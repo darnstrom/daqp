@@ -451,6 +451,9 @@ void daqp_default_settings(DAQPSettings* settings){
 
     settings->sing_tol = DAQP_DEFAULT_SING_TOL;
     settings->refactor_tol = DAQP_DEFAULT_REFACTOR_TOL;
+#ifdef PROFILING
+    settings->time_limit = 0;
+#endif
 }
 
 /* Remove redundant constraints*/

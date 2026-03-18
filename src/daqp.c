@@ -1,10 +1,17 @@
 #include "daqp.h" 
+#ifdef PROFILING
+#include "utils.h"
+#endif
 
 int daqp_ldp(DAQPWorkspace *work){
     int exitflag=DAQP_EXIT_ITERLIMIT,iter,i;
     int tried_repair=0, cycle_counter=0;
     c_float best_fval = -1;
     c_float fval_bound = 2*work->settings->fval_bound; // Internal objective is twice the nomninal
+#ifdef PROFILING
+    DAQPtimer ldp_timer;
+    tic(&ldp_timer);
+#endif
 
     for(iter=1; iter < work->settings->iter_limit; ++iter){
         if(work->sing_ind==DAQP_EMPTY_IND){ 
@@ -73,6 +80,15 @@ int daqp_ldp(DAQPWorkspace *work){
                 break;
             }
         }
+#ifdef PROFILING
+        if(work->settings->time_limit > 0 && iter % 25 == 0){
+            toc(&ldp_timer);
+            if(get_time(&ldp_timer) > work->settings->time_limit){
+                exitflag = DAQP_EXIT_TIMELIMIT;
+                break;
+            }
+        }
+#endif
     }
     // Finalize result before returning
     work->iterations = iter;
