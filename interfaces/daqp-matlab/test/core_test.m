@@ -399,5 +399,52 @@ classdef core_test < matlab.unittest.TestCase
             testCase.verifyLessThan(norm(ref_slacks_hier,2),norm(slacks_hier,2));
 
         end
+
+        function warm_start_QP(testCase)
+            % Verify that primal and dual warm starts give the same optimal
+            % solution as a cold start and do not require more iterations.
+            tol = 1e-8;
+            H = eye(2);
+            f = [1; 1];
+            A = [1 1];
+            bupper = [2; 2; 10];
+            blower = [-2; -2; -1];
+            sense = zeros(3, 1, 'int32');
+
+            % Cold start – reference
+            d = daqp();
+            d.setup(H, f, A, bupper, blower, sense);
+            [x_cold, fval_cold, ef_cold, info_cold] = d.solve();
+            testCase.verifyEqual(ef_cold, int32(1));
+
+            % Dual warm start
+            sense_before = sense;
+            d2 = daqp();
+            d2.setup(H, f, A, bupper, blower, sense, ...  % problem data
+                [], 0, ...                                  % break_points, problem_type
+                [], info_cold.lambda);                      % primal_start=[], dual_start
+            [x_dual, fval_dual, ef_dual, info_dual] = d2.solve();
+            testCase.verifyEqual(ef_dual, int32(1));
+            testCase.verifyLessThan(norm(x_dual - x_cold), tol);
+            testCase.verifyLessThan(abs(fval_dual - fval_cold), tol);
+            % Warm start must not increase iteration count
+            testCase.verifyLessThanOrEqual(info_dual.iter, info_cold.iter);
+            % sense must be unchanged
+            testCase.verifyEqual(sense, sense_before);
+
+            % Primal warm start
+            d3 = daqp();
+            d3.setup(H, f, A, bupper, blower, sense, ...  % problem data
+                [], 0, ...                                  % break_points, problem_type
+                x_cold, []);                                % primal_start, dual_start=[]
+            [x_prim, fval_prim, ef_prim, info_prim] = d3.solve();
+            testCase.verifyEqual(ef_prim, int32(1));
+            testCase.verifyLessThan(norm(x_prim - x_cold), tol);
+            testCase.verifyLessThan(abs(fval_prim - fval_cold), tol);
+            % Warm start must not increase iteration count
+            testCase.verifyLessThanOrEqual(info_prim.iter, info_cold.iter);
+            % sense must be unchanged
+            testCase.verifyEqual(sense, sense_before);
+        end
     end
 end

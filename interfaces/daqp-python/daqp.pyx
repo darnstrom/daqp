@@ -1,5 +1,6 @@
 import numpy as np
 cimport daqp
+from libc.stdlib cimport calloc, free
 
 def solve(double[:, :] H, double[:] f, double[:, :] A,
           double[:] bupper, double[:] blower=None,
@@ -11,7 +12,8 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
           iter_limit =  DAQP_DEFAULT_ITER_LIMIT, fval_bound = DAQP_INF,
           eps_prox= 0, eta_prox = DAQP_DEFAULT_ETA, rho_soft = DAQP_DEFAULT_RHO_SOFT,
           rel_subopt = DAQP_DEFAULT_REL_SUBOPT, abs_subopt = DAQP_DEFAULT_ABS_SUBOPT,
-          sing_tol = DAQP_DEFAULT_SING_TOL, refactor_tol = DAQP_DEFAULT_REFACTOR_TOL):
+          sing_tol = DAQP_DEFAULT_SING_TOL, refactor_tol = DAQP_DEFAULT_REFACTOR_TOL,
+          primal_start=None, dual_start=None):
     """
     Solve the quadratic program      minimize       0.5 x'*H*x + f' x
                                     subject to   blower <= A x <= bupper
@@ -58,6 +60,13 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
         Break points that define prioritized constraints
     is_avi:
         flag for interpreting the problem as an AVI (relevant for asymmetric H) 
+    primal_start:
+        Initial guess of primal iterate (used for warm starting). Sets the initial
+        active set based on which constraints are nearly active at this iterate, and
+        also sets the initial primal iterate in the workspace.
+    dual_start:
+        Initial guess of dual iterate / Lagrange multipliers (used for warm starting).
+        Sets the initial active set based on the sign of the multipliers.
 
     Keyword arguments are used for settings. For example:
        daqp.solve(H, f, A, bupper, blower, sense, primal_tol=1e-6, iter_limit=1000)
@@ -103,9 +112,6 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
         sense = np.zeros(m, dtype=np.intc)
     problem_type = 1 if is_avi else 0
 
-        
-
-    
     H_ptr = NULL if H is None else &H[0,0]
     f_ptr = NULL if f is None else &f[0]
     A_ptr = NULL if mA == 0 else &A[0,0]
@@ -131,9 +137,55 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
     lam_ptr = NULL if m == 0 else &lam[0]
     cdef DAQPResult res  = [&x[0],lam_ptr,0,0,0,0,0,0,0]
 
-    # Solve 
-    with nogil:
-        daqp_quadprog(&res, &problem, &settings)
+    # Warm starting: initialize active set from primal or dual iterate
+    cdef int[::1] sense_copy
+    cdef double[::1] primal_start_c, dual_start_c
+    cdef DAQPWorkspace* work
+    cdef int setup_flag
+    cdef double setup_time_c
+
+    if dual_start is not None or primal_start is not None:
+        # Copy sense to avoid modifying the user's array when init functions mark constraints active
+        if m > 0:
+            sense_copy = np.array(sense, dtype=np.intc, copy=True)
+            problem.sense = &sense_copy[0]
+
+        if primal_start is not None:
+            primal_start_c = np.ascontiguousarray(primal_start, dtype=np.double)
+
+        if dual_start is not None:
+            dual_start_c = np.ascontiguousarray(dual_start, dtype=np.double)
+            with nogil:
+                daqp_dual_init_active(&problem, &dual_start_c[0])
+        else:
+            # primal_start is not None (from the outer condition)
+            with nogil:
+                daqp_primal_init_active(&problem, &primal_start_c[0])
+
+    if primal_start is not None:
+        # Use separate setup/solve to allow setting the initial primal iterate
+        work = <DAQPWorkspace*>calloc(1, sizeof(DAQPWorkspace))
+        # Point workspace settings to stack-allocated settings struct
+        work.settings = &settings
+        setup_time_c = 0.0
+        with nogil:
+            setup_flag = setup_daqp(&problem, work, &setup_time_c)
+        res.setup_time = setup_time_c
+        res.exitflag = setup_flag
+        if setup_flag >= 0:
+            with nogil:
+                daqp_set_primal_start(work, &primal_start_c[0])
+                daqp_solve(&res, work)
+        # Nullify settings pointer before freeing to prevent free of stack memory
+        work.settings = NULL
+        with nogil:
+            free_daqp_workspace(work)
+            free_daqp_ldp(work)
+        free(work)
+    else:
+        # Solve (active set already initialized above if dual_start was given)
+        with nogil:
+            daqp_quadprog(&res, &problem, &settings)
     info = {'solve_time':res.solve_time,
             'setup_time': res.setup_time,
             'iterations': res.iter,

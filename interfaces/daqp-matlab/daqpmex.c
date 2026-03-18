@@ -94,12 +94,22 @@ void mexFunction( int nlhs, mxArray *plhs[],
       qp->nh=nh;
       qp->problem_type= (int)prhs[9];
 
-	  
+	  // Initialize active set from dual or primal iterate if provided
+	  if (nrhs > 11 && !mxIsEmpty(prhs[11])) {
+		daqp_dual_init_active(qp, (c_float *)mxGetPr(prhs[11]));
+	  } else if (nrhs > 10 && !mxIsEmpty(prhs[10])) {
+		daqp_primal_init_active(qp, (c_float *)mxGetPr(prhs[10]));
+	  }
+
 	  c_float solve_time;
 	  error_flag = setup_daqp(qp,work,&solve_time);
 	  if(error_flag < 0){
 		free(work->qp);
 		work->qp = NULL;
+	  }
+	  // Set initial primal iterate if provided and setup succeeded
+	  else if (nrhs > 10 && !mxIsEmpty(prhs[10])) {
+		daqp_set_primal_start(work, (c_float *)mxGetPr(prhs[10]));
 	  }
 
 
