@@ -33,7 +33,7 @@ Table of contents
 | `abs_subopt` | Allowed absolute suboptimality in branch and bound | 0 |
 | `sing_tol` | Tolerance for checking if the LDL' factorization is singular| 3.7e-11 |
 | `refactor_tol` | Tolerance for refactoring the LDL' factorization before terminating | 1e-9 |
-| `time_limit` | Maximum allowed wall-clock time in seconds before terminating (0 means no limit; requires building with `PROFILING` enabled) | 0 |
+| `time_limit` | Maximum allowed wall-clock time in seconds before terminating (0 means no limit) | 0 |
 
 
 ## Exit flags 

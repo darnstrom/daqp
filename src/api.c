@@ -9,7 +9,7 @@ void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
 #ifdef PROFILING
     DAQPtimer timer;
     tic(&timer);
-    work->timer = &timer;
+    if(work->settings->time_limit > 0)  work->timer = &timer;
 #endif
     // Select algorithm
     if(work->settings->eps_prox==0){
