@@ -391,3 +391,19 @@ end
 
 end
 
+@testset "Time limit" begin
+    # Use a large problem so the solver takes multiple iterations
+    xref,H,f,A,bupper,blower,sense = generate_test_QP(n,m,ms,nAct,kappa)
+
+    # Setting a tiny time limit (1 nanosecond) should trigger TIMELIMIT exit
+    s = settings(DAQPBase.Model(), Dict(:time_limit => 1e-9))
+    x,fval,exitflag,info = quadprog(H,f,A,bupper,blower,sense; settings=s)
+    @test exitflag == DAQPBase.TIMELIMIT
+
+    # Setting a generous time limit should allow the solver to find the optimum
+    s = settings(DAQPBase.Model(), Dict(:time_limit => 100.0))
+    x,fval,exitflag,info = quadprog(H,f,A,bupper,blower,sense; settings=s)
+    @test exitflag == DAQPBase.OPTIMAL
+    @test norm(xref-x) < tol
+end
+

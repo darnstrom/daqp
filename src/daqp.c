@@ -1,4 +1,7 @@
 #include "daqp.h" 
+#ifdef PROFILING
+#include "utils.h"
+#endif
 
 int daqp_ldp(DAQPWorkspace *work){
     int exitflag=DAQP_EXIT_ITERLIMIT,iter,i;
@@ -73,6 +76,15 @@ int daqp_ldp(DAQPWorkspace *work){
                 break;
             }
         }
+#ifdef PROFILING
+        if(work->timer != NULL && iter % 32 == 0){
+            toc((DAQPtimer*)work->timer);
+            if(get_time((DAQPtimer*)work->timer) > work->settings->time_limit){
+                exitflag = DAQP_EXIT_TIMELIMIT;
+                break;
+            }
+        }
+#endif
     }
     // Finalize result before returning
     work->iterations = iter;

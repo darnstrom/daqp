@@ -27,7 +27,8 @@ const char* SETTINGS_FIELDS[] = {
   "abs_subopt",
   "rel_subopt",
   "sing_tol",
-  "refactor_tol"
+  "refactor_tol",
+  "time_limit"
 };
 
 
@@ -181,6 +182,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		mxSetField(s, 0, "rho_soft", mxCreateDoubleScalar(work->settings->rho_soft));
 		mxSetField(s, 0, "abs_subopt", mxCreateDoubleScalar(work->settings->abs_subopt));
 		mxSetField(s, 0, "rel_subopt", mxCreateDoubleScalar(work->settings->rel_subopt));
+		mxSetField(s, 0, "time_limit", mxCreateDoubleScalar(work->settings->time_limit));
 		plhs[0] = s;
 	  }
 	}
@@ -199,6 +201,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  work->settings->rho_soft= (c_float)mxGetScalar(mxGetField(s, 0, "rho_soft"));
 	  work->settings->abs_subopt= (c_float)mxGetScalar(mxGetField(s, 0, "abs_subopt"));
 	  work->settings->rel_subopt= (c_float)mxGetScalar(mxGetField(s, 0, "rel_subopt"));
+	  work->settings->time_limit= (c_float)mxGetScalar(mxGetField(s, 0, "time_limit"));
 	}
 	else if (!strcmp("update", cmd)) {
 	  if(work->qp == NULL) mexErrMsgTxt("No problem to update");
