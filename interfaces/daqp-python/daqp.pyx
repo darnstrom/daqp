@@ -96,104 +96,30 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
            * lam        : Optimal dual solution
     """
 
-    # Setup problem
-    cdef int n,m,ms,nb,problem_type
-    cdef int* bin_ids_cand 
-    cdef double *A_ptr, *bu_ptr, *bl_ptr
-    cdef int* sense_ptr
-    A = np.ascontiguousarray(A)
-    mA, n = np.shape(A)
-    m = np.size(bupper)
-    nh = np.size(break_points)
-
-    # By default, set lower bounds to -inf and interpret constraints as inequalities 
-    if blower is None:
-        blower = np.full(m, -DAQP_INF)
-    if sense is None:
-        sense = np.zeros(m, dtype=np.intc)
-    problem_type = 1 if is_avi else 0
-
-    H_ptr = NULL if H is None else &H[0,0]
-    f_ptr = NULL if f is None else &f[0]
-    A_ptr = NULL if mA == 0 else &A[0,0]
-    bp_ptr = NULL if nh == 0 else &break_points[0]
-
-    if m == 0:
-        bu_ptr, bl_ptr, sense_ptr = NULL, NULL, NULL
-    else:
-        bu_ptr, bl_ptr, sense_ptr  = &bupper[0], &blower[0], &sense[0]
-
-
-    cdef DAQPProblem problem = [n,m,m-mA, H_ptr, f_ptr, A_ptr, bu_ptr, bl_ptr, sense_ptr, bp_ptr, nh, problem_type]
-
-    # Setup settings
-    cdef DAQPSettings settings = [primal_tol, dual_tol, zero_tol, pivot_tol,
-            progress_tol, cycle_tol, iter_limit, fval_bound,
-            eps_prox, eta_prox, rho_soft, rel_subopt, abs_subopt, sing_tol, refactor_tol,
-            time_limit]
-        
-    # Setup output
-    cdef double[::1] x = np.zeros(n)
-    cdef double[::1] lam = np.zeros(m)
-    cdef double *lam_ptr
-    lam_ptr = NULL if m == 0 else &lam[0]
-    cdef DAQPResult res  = [&x[0],lam_ptr,0,0,0,0,0,0,0]
-
-    # Warm starting: initialize active set from primal or dual iterate
-    cdef int[::1] sense_copy
-    cdef double[::1] primal_start_c, dual_start_c
-    cdef DAQPWorkspace* work
-    cdef int setup_flag
-    cdef double setup_time_c
-
-    if dual_start is not None or primal_start is not None:
-        # Copy sense to avoid modifying the user's array when init functions mark constraints active
-        if m > 0:
-            sense_copy = np.array(sense, dtype=np.intc, copy=True)
-            problem.sense = &sense_copy[0]
-
-        if primal_start is not None:
-            primal_start_c = np.ascontiguousarray(primal_start, dtype=np.double)
-
-        if dual_start is not None:
-            dual_start_c = np.ascontiguousarray(dual_start, dtype=np.double)
-            with nogil:
-                daqp_dual_init_active(&problem, &dual_start_c[0])
-        else:
-            # primal_start is not None (from the outer condition)
-            with nogil:
-                daqp_primal_init_active(&problem, &primal_start_c[0])
-
-    if primal_start is not None:
-        # Use separate setup/solve to allow setting the initial primal iterate
-        work = <DAQPWorkspace*>calloc(1, sizeof(DAQPWorkspace))
-        # Point workspace settings to stack-allocated settings struct
-        work.settings = &settings
-        setup_time_c = 0.0
-        with nogil:
-            setup_flag = setup_daqp(&problem, work, &setup_time_c)
-        res.setup_time = setup_time_c
-        res.exitflag = setup_flag
-        if setup_flag >= 0:
-            with nogil:
-                daqp_set_primal_start(work, &primal_start_c[0])
-                daqp_solve(&res, work)
-        # Nullify settings pointer before freeing to prevent free of stack memory
-        work.settings = NULL
-        with nogil:
-            free_daqp_workspace(work)
-            free_daqp_ldp(work)
-        free(work)
-    else:
-        # Solve (active set already initialized above if dual_start was given)
-        with nogil:
-            daqp_quadprog(&res, &problem, &settings)
-    info = {'solve_time':res.solve_time,
-            'setup_time': res.setup_time,
-            'iterations': res.iter,
-            'nodes': res.nodes,
-            'lam': np.asarray(lam)}
-    return np.asarray(x), res.fval, res.exitflag, info
+    m_model = Model()
+    m_model.settings = {
+        'primal_tol':   primal_tol,   'dual_tol':     dual_tol,
+        'zero_tol':     zero_tol,     'pivot_tol':    pivot_tol,
+        'progress_tol': progress_tol, 'cycle_tol':    cycle_tol,
+        'iter_limit':   iter_limit,   'fval_bound':   fval_bound,
+        'eps_prox':     eps_prox,     'eta_prox':     eta_prox,
+        'rho_soft':     rho_soft,     'rel_subopt':   rel_subopt,
+        'abs_subopt':   abs_subopt,   'sing_tol':     sing_tol,
+        'refactor_tol': refactor_tol, 'time_limit':   time_limit,
+    }
+    setup_flag, setup_time = m_model.setup(H, f, A, bupper, blower, sense,
+                                           break_points, primal_start,
+                                           dual_start, is_avi)
+    if setup_flag < 0:
+        mA, n = np.shape(np.asarray(A))
+        m = np.size(bupper)
+        info = {'solve_time': 0.0, 'setup_time': setup_time,
+                'iterations': 0, 'nodes': 0,
+                'lam': np.zeros(m)}
+        return np.zeros(n), 0.0, setup_flag, info
+    x, fval, exitflag, info = m_model.solve()
+    info['setup_time'] = setup_time
+    return x, fval, exitflag, info
 cdef class Model:
     """
     Wraps a DAQP workspace for efficient reuse across similar problems.
@@ -205,7 +131,7 @@ cdef class Model:
     Methods
     -------
     setup(H, f, A, bupper, blower=None, sense=None, break_points=None,
-          primal_start=None, dual_start=None)
+          primal_start=None, dual_start=None, is_avi=False)
         Set up the QP and allocate workspace memory.
     solve()
         Solve the currently set-up problem.
@@ -260,7 +186,7 @@ cdef class Model:
     def setup(self, double[:, :] H, double[:] f, double[:, :] A,
               double[:] bupper, double[:] blower=None,
               int[:] sense=None, int[:] break_points=None,
-              primal_start=None, dual_start=None):
+              primal_start=None, dual_start=None, is_avi=False):
         """
         Set up the QP problem and allocate the solver workspace.
 
@@ -358,7 +284,7 @@ cdef class Model:
         cdef int*    bp_ptr = NULL if nh == 0   else &self._break_points[0]
 
         self._qp = [n, m, ms, H_ptr, f_ptr, A_ptr, bu_ptr, bl_ptr,
-                    s_ptr, bp_ptr, nh, 0]
+                    s_ptr, bp_ptr, nh, 1 if is_avi else 0]
 
         # ---- warm-start active-set initialisation ----
         # Initialising the active set modifies sense, so work on a copy.
@@ -558,7 +484,8 @@ cdef class Model:
         Available keys: ``primal_tol``, ``dual_tol``, ``zero_tol``,
         ``pivot_tol``, ``progress_tol``, ``cycle_tol``, ``iter_limit``,
         ``fval_bound``, ``eps_prox``, ``eta_prox``, ``rho_soft``,
-        ``rel_subopt``, ``abs_subopt``, ``sing_tol``, ``refactor_tol``.
+        ``rel_subopt``, ``abs_subopt``, ``sing_tol``, ``refactor_tol``,
+        ``time_limit``.
         """
         if self._work.settings == NULL:
             return {}
@@ -579,6 +506,7 @@ cdef class Model:
             'abs_subopt':   s.abs_subopt,
             'sing_tol':     s.sing_tol,
             'refactor_tol': s.refactor_tol,
+            'time_limit':   s.time_limit,
         }
 
     @settings.setter
@@ -602,6 +530,7 @@ cdef class Model:
         if 'abs_subopt'   in new_settings: s.abs_subopt   = new_settings['abs_subopt']
         if 'sing_tol'     in new_settings: s.sing_tol     = new_settings['sing_tol']
         if 'refactor_tol' in new_settings: s.refactor_tol = new_settings['refactor_tol']
+        if 'time_limit'   in new_settings: s.time_limit   = new_settings['time_limit']
 
 
 def minrep(double[:,:] A, double[:] b):

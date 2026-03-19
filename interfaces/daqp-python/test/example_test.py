@@ -189,13 +189,16 @@ class TestModel(unittest.TestCase):
         self.assertIn('iter_limit', s)
         self.assertIn('primal_tol', s)
         self.assertIn('eps_prox', s)
+        self.assertIn('time_limit', s)
+        self.assertEqual(s['time_limit'], 0.0)
 
     def test_model_settings_set(self):
         """settings setter updates only the specified keys."""
         d = daqp.Model()
         original_primal_tol = d.settings['primal_tol']
-        d.settings = {'iter_limit': 42}
+        d.settings = {'iter_limit': 42, 'time_limit': 5.0}
         self.assertEqual(d.settings['iter_limit'], 42)
+        self.assertAlmostEqual(d.settings['time_limit'], 5.0)
         # Other settings should be unchanged
         self.assertAlmostEqual(d.settings['primal_tol'], original_primal_tol)
 
