@@ -13,6 +13,7 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
           eps_prox= 0, eta_prox = DAQP_DEFAULT_ETA, rho_soft = DAQP_DEFAULT_RHO_SOFT,
           rel_subopt = DAQP_DEFAULT_REL_SUBOPT, abs_subopt = DAQP_DEFAULT_ABS_SUBOPT,
           sing_tol = DAQP_DEFAULT_SING_TOL, refactor_tol = DAQP_DEFAULT_REFACTOR_TOL,
+          time_limit = 0,
           primal_start=None, dual_start=None):
     """
     Solve the quadratic program      minimize       0.5 x'*H*x + f' x
@@ -128,7 +129,8 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
     # Setup settings
     cdef DAQPSettings settings = [primal_tol, dual_tol, zero_tol, pivot_tol,
             progress_tol, cycle_tol, iter_limit, fval_bound,
-            eps_prox, eta_prox, rho_soft, rel_subopt, abs_subopt, sing_tol, refactor_tol]
+            eps_prox, eta_prox, rho_soft, rel_subopt, abs_subopt, sing_tol, refactor_tol,
+            time_limit]
         
     # Setup output
     cdef double[::1] x = np.zeros(n)

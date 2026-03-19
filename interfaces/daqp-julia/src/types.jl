@@ -99,6 +99,7 @@ struct DAQPSettings
 
     sing_tol::Cdouble
     refactor_tol::Cdouble
+    time_limit::Cdouble
 end
 function DAQPSettings()
     settings = Ref{DAQPBase.DAQPSettings}()
@@ -167,4 +168,5 @@ struct Workspace
     nh::Cint
     break_points::Ptr{Cint}
     avi::Ptr{Cvoid}
+    timer::Ptr{Cvoid}
 end

@@ -9,6 +9,7 @@ void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
 #ifdef PROFILING
     DAQPtimer timer;
     tic(&timer);
+    if(work->settings->time_limit > 0)  work->timer = &timer;
 #endif
     // Select algorithm
     if(work->settings->eps_prox==0){
@@ -29,6 +30,7 @@ void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
         res->exitflag = daqp_prox(work);
     }
 #ifdef PROFILING
+    work->timer = NULL;
     toc(&timer);
 #endif
 
@@ -287,6 +289,7 @@ void allocate_daqp_workspace(DAQPWorkspace *work, int n, int ns){
     work->nh = 0;
     work->break_points = NULL;
     work->avi = NULL;
+    work->timer = NULL;
 
     reset_daqp_workspace(work);
 }
@@ -451,6 +454,7 @@ void daqp_default_settings(DAQPSettings* settings){
 
     settings->sing_tol = DAQP_DEFAULT_SING_TOL;
     settings->refactor_tol = DAQP_DEFAULT_REFACTOR_TOL;
+    settings->time_limit = 0;
 }
 
 /* Remove redundant constraints*/

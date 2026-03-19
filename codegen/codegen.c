@@ -194,7 +194,9 @@ void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work){
     else
         fprintf(f, "0, NULL,\n");
     // AVI
-    fprintf(f, "NULL};\n\n"); // TODO: Generate for avi (also requires problem to be generated) 
+    fprintf(f, "NULL,\n"); // TODO: Generate for avi (also requires problem to be generated)
+    // Timer
+    fprintf(f, "NULL};\n\n");
 }
 
 void write_daqp_settings_src(FILE*  f, DAQPSettings* settings){
@@ -220,7 +222,8 @@ void write_daqp_settings_src(FILE*  f, DAQPSettings* settings){
     fprintf(f, "(c_float)%.20f,", settings->abs_subopt);
 
     fprintf(f, "(c_float)%.20f,",  settings->sing_tol);
-    fprintf(f, "(c_float)%.20f",  settings->refactor_tol);
+    fprintf(f, "(c_float)%.20f,",  settings->refactor_tol);
+    fprintf(f, "(c_float)%.20f",  settings->time_limit);
     fprintf(f, "};\n\n");
 }
 
