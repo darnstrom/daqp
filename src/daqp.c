@@ -77,7 +77,7 @@ int daqp_ldp(DAQPWorkspace *work){
             }
         }
 #ifdef PROFILING
-        if(work->timer != NULL && iter % 25 == 0){
+        if(work->timer != NULL && iter % 32 == 0){
             toc((DAQPtimer*)work->timer);
             if(get_time((DAQPtimer*)work->timer) > work->settings->time_limit){
                 exitflag = DAQP_EXIT_TIMELIMIT;
