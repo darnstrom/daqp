@@ -7,7 +7,7 @@
 #include "api.h"
 
 
-void render_daqp_workspace(DAQPWorkspace* work, const char *fname, const char *dir){
+void render_daqp_workspace(DAQPWorkspace* work, const char *fname, const char *dir, const char *prefix){
     char *hfname= malloc(strlen(dir)+strlen(fname) + 3); // two chars for .h and 1 for terminator
     char *hguard= malloc(strlen(fname) + 3); // two chars for _H and 1 for terminator
     char *cfname= malloc(strlen(dir)+strlen(fname) + 3); // two chars for .c and 1 for terminator
@@ -44,27 +44,29 @@ void render_daqp_workspace(DAQPWorkspace* work, const char *fname, const char *d
 
     //Write settings
     fprintf(fh, "// Settings prototype\n");
-    fprintf(fh, "extern DAQPSettings daqp_settings;\n\n");
-    write_daqp_settings_src(fsrc,work->settings);
+    fprintf(fh, "extern DAQPSettings %ssettings;\n\n", prefix);
+    write_daqp_settings_src(fsrc,work->settings,prefix);
 
     // Write BnB struct
     if(work->bnb != NULL){
-        write_daqp_bnb_h(fh,work->bnb,work->n);
-        write_daqp_bnb_src(fsrc,work->bnb,work->n);
+        write_daqp_bnb_h(fh,work->bnb,work->n,prefix);
+        write_daqp_bnb_src(fsrc,work->bnb,work->n,prefix);
     }
 
     // Write Hierarchical
     if(work->nh > 1 ){
         fprintf(fh, "#define DAQP_HIERARCHICAL\n");
-        fprintf(fh, "extern int daqp_break_points[%d];\n", work->nh);
-        write_int_array(fsrc,work->break_points, work->nh,"daqp_break_points");
+        fprintf(fh, "extern int %sbreak_points[%d];\n", prefix, work->nh);
+        char varname[256];
+        snprintf(varname, sizeof(varname), "%sbreak_points", prefix);
+        write_int_array(fsrc,work->break_points, work->nh,varname);
     }
 
     // TODO Check soft constraints 
 
     //Write workspace
-    write_daqp_workspace_h(fh,work);
-    write_daqp_workspace_src(fsrc,work);
+    write_daqp_workspace_h(fh,work,prefix);
+    write_daqp_workspace_src(fsrc,work,prefix);
 
 
     // Close header guard 
@@ -78,7 +80,7 @@ void render_daqp_workspace(DAQPWorkspace* work, const char *fname, const char *d
     free(hguard);
 }
 
-void write_daqp_workspace_h(FILE *f, DAQPWorkspace* work){
+void write_daqp_workspace_h(FILE *f, DAQPWorkspace* work, const char* prefix){
     int i;
     const int n = work->n;
     const int m = work->m;
@@ -108,32 +110,32 @@ void write_daqp_workspace_h(FILE *f, DAQPWorkspace* work){
 
     fprintf(f, "// Workspace prototypes\n");
 
-    fprintf(f, "extern c_float daqp_M[%d];\n", (m-ms)*n);
-    fprintf(f, "extern c_float daqp_dupper[%d];\n", m);
-    fprintf(f, "extern c_float daqp_dlower[%d];\n", m);
-    fprintf(f, "extern c_float daqp_Rinv[%d];\n", n*(n+1)/2);
-    //fprintf(f, "extern c_float daqp_v[%d];\n", n);
-    fprintf(f, "extern int daqp_sense[%d];\n\n", m);
-    //fprintf(f, "extern c_float daqp_scaling[%d];\n\n", m);
+    fprintf(f, "extern c_float %sM[%d];\n", prefix, (m-ms)*n);
+    fprintf(f, "extern c_float %sdupper[%d];\n", prefix, m);
+    fprintf(f, "extern c_float %sdlower[%d];\n", prefix, m);
+    fprintf(f, "extern c_float %sRinv[%d];\n", prefix, n*(n+1)/2);
+    //fprintf(f, "extern c_float %sv[%d];\n", prefix, n);
+    fprintf(f, "extern int %ssense[%d];\n\n", prefix, m);
+    //fprintf(f, "extern c_float %sscaling[%d];\n\n", prefix, m);
 
-    fprintf(f, "extern c_float daqp_x[%d];\n", n+1);
-    fprintf(f, "extern c_float daqp_xold[%d];\n\n", n+1);
+    fprintf(f, "extern c_float %sx[%d];\n", prefix, n+1);
+    fprintf(f, "extern c_float %sxold[%d];\n\n", prefix, n+1);
 
-    fprintf(f, "extern c_float daqp_lam[%d];\n", ntot+1);
-    fprintf(f, "extern c_float daqp_lam_star[%d];\n", ntot+1);
-    fprintf(f, "extern c_float daqp_u[%d];\n\n", n+1);
+    fprintf(f, "extern c_float %slam[%d];\n", prefix, ntot+1);
+    fprintf(f, "extern c_float %slam_star[%d];\n", prefix, ntot+1);
+    fprintf(f, "extern c_float %su[%d];\n\n", prefix, n+1);
 
-    fprintf(f, "extern c_float daqp_L[%d];\n", (ntot+1)*(ntot+2)/2);
-    fprintf(f, "extern c_float daqp_D[%d];\n", ntot+1);
-    fprintf(f, "extern c_float daqp_xldl[%d];\n", ntot+1);
-    fprintf(f, "extern c_float daqp_zldl[%d];\n\n", ntot+1);
+    fprintf(f, "extern c_float %sL[%d];\n", prefix, (ntot+1)*(ntot+2)/2);
+    fprintf(f, "extern c_float %sD[%d];\n", prefix, ntot+1);
+    fprintf(f, "extern c_float %sxldl[%d];\n", prefix, ntot+1);
+    fprintf(f, "extern c_float %szldl[%d];\n\n", prefix, ntot+1);
 
-    fprintf(f, "extern int daqp_WS[%d];\n\n", ntot+1);
+    fprintf(f, "extern int %sWS[%d];\n\n", prefix, ntot+1);
 
-    fprintf(f, "extern DAQPWorkspace daqp_work;\n\n");
+    fprintf(f, "extern DAQPWorkspace %swork;\n\n", prefix);
 }
 
-void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work){
+void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work, const char* prefix){
     int i;
     int n = work->n;
     int m = work->m;
@@ -142,55 +144,65 @@ void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work){
     for(i = 0; i < m ; i++) 
         if(work->sense[i] & DAQP_SOFT) ntot++;
 
+    char varname[256];
     fprintf(f, "// Workspace\n");
     // LDP data
-    write_float_array(f,work->M,(m-ms)*n,"daqp_M");
-    //write_float_array(f,work->dupper,m,"daqp_dupper");
-    //write_float_array(f,work->dlower,m,"daqp_dlower");
-    fprintf(f, "c_float daqp_dupper[%d];\n", m);
-    fprintf(f, "c_float daqp_dlower[%d];\n", m);
-    write_float_array(f,work->Rinv,n*(n+1)/2,"daqp_Rinv");
-    //write_float_array(f,work->v,n, "daqp_v");
-    write_int_array(f,work->sense, m,"daqp_sense");
-    //write_float_array(f,work->scaling, m,"daqp_scaling");
+    snprintf(varname, sizeof(varname), "%sM", prefix);
+    write_float_array(f,work->M,(m-ms)*n,varname);
+    //snprintf(varname, sizeof(varname), "%sdupper", prefix);
+    //write_float_array(f,work->dupper,m,varname);
+    //snprintf(varname, sizeof(varname), "%sdlower", prefix);
+    //write_float_array(f,work->dlower,m,varname);
+    fprintf(f, "c_float %sdupper[%d];\n", prefix, m);
+    fprintf(f, "c_float %sdlower[%d];\n", prefix, m);
+    snprintf(varname, sizeof(varname), "%sRinv", prefix);
+    write_float_array(f,work->Rinv,n*(n+1)/2,varname);
+    //snprintf(varname, sizeof(varname), "%sv", prefix);
+    //write_float_array(f,work->v,n,varname);
+    snprintf(varname, sizeof(varname), "%ssense", prefix);
+    write_int_array(f,work->sense, m,varname);
+    //snprintf(varname, sizeof(varname), "%sscaling", prefix);
+    //write_float_array(f,work->scaling, m,varname);
 
     // Iteratates
-    fprintf(f, "c_float daqp_x[%d];\n", n+1);
-    fprintf(f, "c_float daqp_xold[%d];\n\n", n+1);
+    fprintf(f, "c_float %sx[%d];\n", prefix, n+1);
+    fprintf(f, "c_float %sxold[%d];\n\n", prefix, n+1);
 
-    fprintf(f, "c_float daqp_lam[%d];\n", ntot+1);
-    fprintf(f, "c_float daqp_lam_star[%d];\n", ntot+1);
-    fprintf(f, "c_float daqp_u[%d];\n\n", n+1);
+    fprintf(f, "c_float %slam[%d];\n", prefix, ntot+1);
+    fprintf(f, "c_float %slam_star[%d];\n", prefix, ntot+1);
+    fprintf(f, "c_float %su[%d];\n\n", prefix, n+1);
 
-    fprintf(f, "c_float daqp_L[%d];\n", (ntot+1)*(ntot+2)/2);
-    fprintf(f, "c_float daqp_D[%d];\n", ntot+1);
-    fprintf(f, "c_float daqp_xldl[%d];\n", ntot+1);
-    fprintf(f, "c_float daqp_zldl[%d];\n\n", ntot+1);
+    fprintf(f, "c_float %sL[%d];\n", prefix, (ntot+1)*(ntot+2)/2);
+    fprintf(f, "c_float %sD[%d];\n", prefix, ntot+1);
+    fprintf(f, "c_float %sxldl[%d];\n", prefix, ntot+1);
+    fprintf(f, "c_float %szldl[%d];\n\n", prefix, ntot+1);
 
-    fprintf(f, "int daqp_WS[%d];\n\n", ntot+1);
+    fprintf(f, "int %sWS[%d];\n\n", prefix, ntot+1);
 
     //Workspace struct
-    fprintf(f, "DAQPWorkspace daqp_work= {\n");
+    fprintf(f, "DAQPWorkspace %swork= {\n", prefix);
     fprintf(f, "NULL,\n"); // DAQPProblem
     fprintf(f, "%d, %d, %d,\n",n,m,ms); // dimensions 
-    fprintf(f, "daqp_M, daqp_dupper, daqp_dlower, daqp_Rinv, NULL, daqp_sense,\n"); //LDP
+    fprintf(f, "%sM, %sdupper, %sdlower, %sRinv, NULL, %ssense,\n",
+            prefix,prefix,prefix,prefix,prefix); //LDP
     fprintf(f, "NULL,\n"); // scaling
     fprintf(f, "NULL,\n"); // RinvD
-    fprintf(f, "daqp_x, daqp_xold,\n");
-    fprintf(f, "daqp_lam, daqp_lam_star, daqp_u, %d,\n",-1); // fval
-    fprintf(f, "daqp_L, daqp_D, daqp_xldl,daqp_zldl,%d,\n",0); // reuse_ind
-    fprintf(f, "daqp_WS, %d,\n",0); //n_active
+    fprintf(f, "%sx, %sxold,\n", prefix, prefix);
+    fprintf(f, "%slam, %slam_star, %su, %d,\n", prefix, prefix, prefix, -1); // fval
+    fprintf(f, "%sL, %sD, %sxldl,%szldl,%d,\n",
+            prefix,prefix,prefix,prefix, 0); // reuse_ind
+    fprintf(f, "%sWS, %d,\n", prefix, 0); //n_active
     fprintf(f, "%d,%d,\n",0,-1); //iterations + sing_id
     fprintf(f, "%f,\n",0.0); // Soft slack
-    fprintf(f, "&daqp_settings, \n");
+    fprintf(f, "&%ssettings, \n", prefix);
     // BnB
     if(work->bnb == NULL)
         fprintf(f, "NULL,\n");
     else
-        fprintf(f, "&daqp_bnb_work,\n");
+        fprintf(f, "&%sbnb_work,\n", prefix);
     // Hierarhical
     if(work->nh > 1)
-        fprintf(f, "%d,daqp_break_points,\n",work->nh);
+        fprintf(f, "%d,%sbreak_points,\n", work->nh, prefix);
     else
         fprintf(f, "0, NULL,\n");
     // AVI
@@ -199,10 +211,10 @@ void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work){
     fprintf(f, "NULL};\n\n");
 }
 
-void write_daqp_settings_src(FILE*  f, DAQPSettings* settings){
+void write_daqp_settings_src(FILE*  f, DAQPSettings* settings, const char* prefix){
 
     fprintf(f, "// Settings\n");
-    fprintf(f, "DAQPSettings daqp_settings = {");
+    fprintf(f, "DAQPSettings %ssettings = {", prefix);
     fprintf(f, "(c_float)%.20f, ", settings->primal_tol);
     fprintf(f, "(c_float)%.20f, ", settings->dual_tol);
     fprintf(f, "(c_float)%.20f, ", settings->zero_tol);
@@ -227,35 +239,37 @@ void write_daqp_settings_src(FILE*  f, DAQPSettings* settings){
     fprintf(f, "};\n\n");
 }
 
-void write_daqp_bnb_h(FILE*  f, DAQPBnB* bnb, const int n){
+void write_daqp_bnb_h(FILE*  f, DAQPBnB* bnb, const int n, const char* prefix){
     fprintf(f, "#define DAQP_BNB\n");
-    fprintf(f, "extern int daqp_bin_ids[%d];\n", bnb->nb);
-    fprintf(f, "extern DAQPNode daqp_tree[%d];\n", bnb->nb+1);
-    fprintf(f, "extern int daqp_tree_WS[%d];\n", (n+1)*(bnb->nb+1));
-    fprintf(f, "extern int daqp_fixed_ids[%d];\n", bnb->nb+1);
-    fprintf(f, "extern DAQPBnB daqp_bnb_work;\n\n");
+    fprintf(f, "extern int %sbin_ids[%d];\n", prefix, bnb->nb);
+    fprintf(f, "extern DAQPNode %stree[%d];\n", prefix, bnb->nb+1);
+    fprintf(f, "extern int %stree_WS[%d];\n", prefix, (n+1)*(bnb->nb+1));
+    fprintf(f, "extern int %sfixed_ids[%d];\n", prefix, bnb->nb+1);
+    fprintf(f, "extern DAQPBnB %sbnb_work;\n\n", prefix);
 }
-void write_daqp_bnb_src(FILE*  f, DAQPBnB* bnb, const int n){
+void write_daqp_bnb_src(FILE*  f, DAQPBnB* bnb, const int n, const char* prefix){
     if(bnb==NULL) return;
+    char varname[256];
     fprintf(f, "// BnB \n");
 
-    write_int_array(f,bnb->bin_ids, bnb->nb,"daqp_bin_ids");
-    fprintf(f, "DAQPNode daqp_tree[%d];\n", bnb->nb+1);
-    fprintf(f, "int daqp_tree_WS[%d];\n", (n+1)*(bnb->nb+1));
-    fprintf(f, "int daqp_fixed_ids[%d];\n", bnb->nb+1);
+    snprintf(varname, sizeof(varname), "%sbin_ids", prefix);
+    write_int_array(f,bnb->bin_ids, bnb->nb,varname);
+    fprintf(f, "DAQPNode %stree[%d];\n", prefix, bnb->nb+1);
+    fprintf(f, "int %stree_WS[%d];\n", prefix, (n+1)*(bnb->nb+1));
+    fprintf(f, "int %sfixed_ids[%d];\n", prefix, bnb->nb+1);
 
-    fprintf(f, "DAQPBnB daqp_bnb_work= {");
-    fprintf(f, "daqp_bin_ids, ");
+    fprintf(f, "DAQPBnB %sbnb_work= {", prefix);
+    fprintf(f, "%sbin_ids, ", prefix);
     fprintf(f, "(int)%d, ", bnb->nb);
     fprintf(f, "(int)%d, ", bnb->neq);
 
-    fprintf(f, "daqp_tree, ");
+    fprintf(f, "%stree, ", prefix);
     fprintf(f, "(int)%d, ", 0); // n_nodes
 
-    fprintf(f, "daqp_tree_WS, ");
+    fprintf(f, "%stree_WS, ", prefix);
     fprintf(f, "(int)%d, ", 0); // nWS
     fprintf(f, "(int)%d, ", 0); // n_clean
-    fprintf(f, "daqp_fixed_ids, "); // n_clean
+    fprintf(f, "%sfixed_ids, ", prefix); // fixed_ids
 
     fprintf(f, "(int)%d, ", 0); // nodecount
     fprintf(f, "(int)%d, ", 0); // itercount

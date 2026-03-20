@@ -219,10 +219,12 @@ void mexFunction( int nlhs, mxArray *plhs[],
     else if (!strcmp("codegen", cmd)) {
         char fname[64];
         char dir[128];
+        char prefix[64];
         mxGetString(prhs[2], fname, sizeof(fname));
         mxGetString(prhs[3], dir, sizeof(dir));
+        mxGetString(prhs[4], prefix, sizeof(prefix));
         if(work->qp == NULL) mexErrMsgTxt("Setup is required before code generation");
-        render_daqp_workspace(work,fname,dir);
+        render_daqp_workspace(work,fname,dir,prefix);
     }
     else if (!strcmp("isdouble", cmd)) {
         plhs[0] = mxCreateNumericMatrix(1, 1, mxINT32_CLASS, mxREAL); // is_double 

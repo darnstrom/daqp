@@ -380,7 +380,7 @@ function reset(d::DAQPBase.Model)
 end
 
 using Downloads
-function codegen(d::DAQPBase.Model; fname="daqp_workspace", dir="codegen", src=false)
+function codegen(d::DAQPBase.Model; fname="daqp_workspace", dir="codegen", prefix="daqp_", src=false)
     @assert(d.has_model, "setup the model before code generation")
 
     dir[end] != '/' && (dir*="/") ## Make sure it is correct directory path
@@ -389,7 +389,7 @@ function codegen(d::DAQPBase.Model; fname="daqp_workspace", dir="codegen", src=f
     reset(d) # Make sure workspace is cleared
 
     exitflag = ccall((:render_daqp_workspace, libdaqp),Cvoid,
-                     (Ptr{DAQPBase.Workspace},Cstring,Cstring,), d.work,fname,dir);
+                     (Ptr{DAQPBase.Workspace},Cstring,Cstring,Cstring), d.work,fname,dir,prefix);
     if src
         cfiles = ["daqp.c","auxiliary.c","factorization.c"]
         hfiles = ["daqp.h","auxiliary.h","factorization.h","constants.h", "types.h"]
