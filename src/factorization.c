@@ -1,7 +1,6 @@
 #include "factorization.h"
-#include <string.h>
 
-c_float daqp_dot(const c_float* __restrict__ v1, const c_float* __restrict__ v2, const int n) {
+c_float daqp_dot(const c_float* v1, const c_float* v2, const int n) {
     c_float sum = 0.0;
     for (int i = 0; i < n; i++) sum += v1[i] * v2[i];
     return sum;
@@ -101,19 +100,14 @@ void daqp_update_LDL_remove(DAQPWorkspace *work, const int rm_ind){
     old_disp=new_disp+(rm_ind+1);
     w_count= 0;
     // Remove column rm_ind (and add parts of L in its new place)
-    // Split the inner loop to avoid branching: copy elements before rm_ind,
-    // extract the rm_ind column, then copy elements after rm_ind.
-    for(i = rm_ind+1;i<work->n_active;old_disp++,new_disp++,i++){
-        // Copy elements in columns 0..rm_ind-1
-        memcpy(&work->L[new_disp], &work->L[old_disp], rm_ind * sizeof(c_float));
-        new_disp += rm_ind; old_disp += rm_ind;
-        // Extract column rm_ind
-        w[w_count++] = work->L[old_disp++];
-        // Copy elements in columns rm_ind+1..i-1
-        int tail = i - rm_ind - 1;
-        memcpy(&work->L[new_disp], &work->L[old_disp], tail * sizeof(c_float));
-        new_disp += tail; old_disp += tail;
-    }
+    // I.e., copy row i into i-1
+    for(i = rm_ind+1;i<work->n_active;old_disp++,new_disp++,i++) //(disp++ skips blank element)..
+        for(j=0;j<i;j++){
+            if(j!=rm_ind)
+                work->L[new_disp++]=work->L[old_disp++];
+            else
+                w[w_count++] = work->L[old_disp++];
+        }
     // Algorithm C1 in Gill 1974 for low-rank update of LDL
     // L2 block
     c_float p,beta,dbar,alpha=work->D[rm_ind];

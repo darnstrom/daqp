@@ -102,8 +102,9 @@ void ldp2qp_solution(DAQPWorkspace *work){
 
     if(work->Rinv != NULL){ // (Skip if LP since R = I)
         for(i=0,disp=0;i<work->n;i++){
-            work->x[i] = work->Rinv[disp] * work->x[i]
-                        + daqp_dot(work->Rinv + disp + 1, work->x + i + 1, work->n - i - 1);
+            c_float xi = work->Rinv[disp] * work->x[i]
+                       + daqp_dot(work->Rinv + disp + 1, work->x + i + 1, work->n - i - 1);
+            work->x[i] = xi;
             disp += work->n - i;
         }
         if(work->scaling != NULL){

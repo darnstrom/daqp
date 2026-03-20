@@ -1,6 +1,5 @@
 #include "auxiliary.h"
 #include "factorization.h"
-#include <string.h>
 void daqp_remove_constraint(DAQPWorkspace* work, const int rm_ind){
     int i;
     // Update data structures
@@ -48,7 +47,8 @@ void daqp_compute_primal_and_fval(DAQPWorkspace *work){
     int i,j,disp,id;
     c_float fval=0;
     // Reset u & soft slack
-    memset(work->u, 0, work->n * sizeof(c_float));
+    for(j=0;j<work->n;j++)
+        work->u[j]=0;
     work->soft_slack = 0;
     //u[m] <-- Mk'*lam_star (zero if empty set)
     for(i=0;i<work->n_active;i++){
