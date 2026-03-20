@@ -245,9 +245,8 @@ void daqp_update_v(c_float *f, DAQPWorkspace *work, const int mask){
 
 int daqp_update_d(DAQPWorkspace *work, c_float *bupper, c_float *blower){
     /* Compute d  = b+M*v */
-    int i,j,disp;
+    int i,disp;
     int do_activate = 0;
-    c_float sum;
 
 #ifndef DAQP_ASSUME_VALID
     c_float diff;
@@ -287,21 +286,20 @@ int daqp_update_d(DAQPWorkspace *work, c_float *bupper, c_float *blower){
     // Simple bounds 
     if(work->Rinv !=NULL){
         for(i = 0,disp=0;i<work->ms;i++){
-            for(j=i, sum=0;j<n;j++)
-                sum+=work->Rinv[disp++]*work->v[j];
+            c_float sum = daqp_dot(work->Rinv + disp, work->v + i, n - i);
+            disp += n - i;
             work->dupper[i]+=sum;
             work->dlower[i]+=sum;
         }
     }else{
-        for(i = 0,disp=0;i<work->ms;i++){
+        for(i = 0;i<work->ms;i++){
             work->dupper[i]+=work->v[i];
             work->dlower[i]+=work->v[i];
         }
     }
     //General bounds
-    for(i = work->ms, disp=0;i<work->m;i++){
-        for(j=0, sum=0;j<n;j++)
-            sum+=work->M[disp++]*work->v[j];
+    for(i = work->ms, disp=0;i<work->m;i++, disp+=n){
+        c_float sum = daqp_dot(work->M + disp, work->v, n);
         work->dupper[i]+=sum;
         work->dlower[i]+=sum;
     }

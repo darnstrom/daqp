@@ -1,6 +1,7 @@
 #include "factorization.h"
+#include <string.h>
 
-c_float daqp_dot(const c_float* v1, const c_float* v2, const int n) {
+c_float daqp_dot(const c_float* __restrict__ v1, const c_float* __restrict__ v2, const int n) {
     c_float sum = 0.0;
     for (int i = 0; i < n; i++) sum += v1[i] * v2[i];
     return sum;
@@ -69,21 +70,17 @@ void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind){
     }
     //Forward substitution: l <-- L\(Mk*m)  
     for(i=0,disp=0; i<work->n_active; i++){
-        sum = work->L[new_L_start+i];
-        for(j=0; j<i; j++)
-            sum -= work->L[disp++]*work->L[new_L_start+j]; 
-        work->L[new_L_start+i] = sum;
-        disp++; //Skip diagonal elements (which is 1)
+        work->L[new_L_start+i] -= daqp_dot(work->L + disp, work->L + new_L_start, i);
+        disp += i + 1; // advance past i elements + 1 diagonal skip
     }
 
     // Scale: l_i <-- l_i/d_i
     // Update d_new -= l'Dl
     sum = work->D[work->n_active];
-    c_float tmp;
-    for (i =0,disp=new_L_start; i<work->n_active;i++,disp++){
-        tmp = work->L[disp];
-        work->L[disp] /= work->D[i];  
-        sum -= tmp*work->L[disp];
+    for (i=0,disp=new_L_start; i<work->n_active; i++,disp++){
+        c_float scaled = work->L[disp] / work->D[i];
+        sum -= work->L[disp] * scaled;
+        work->L[disp] = scaled;
     }
     work->D[work->n_active]=sum;
 
@@ -104,14 +101,19 @@ void daqp_update_LDL_remove(DAQPWorkspace *work, const int rm_ind){
     old_disp=new_disp+(rm_ind+1);
     w_count= 0;
     // Remove column rm_ind (and add parts of L in its new place)
-    // I.e., copy row i into i-1
-    for(i = rm_ind+1;i<work->n_active;old_disp++,new_disp++,i++) //(disp++ skips blank element)..
-        for(j=0;j<i;j++){
-            if(j!=rm_ind)
-                work->L[new_disp++]=work->L[old_disp++];
-            else
-                w[w_count++] = work->L[old_disp++];
-        }
+    // Split the inner loop to avoid branching: copy elements before rm_ind,
+    // extract the rm_ind column, then copy elements after rm_ind.
+    for(i = rm_ind+1;i<work->n_active;old_disp++,new_disp++,i++){
+        // Copy elements in columns 0..rm_ind-1
+        memcpy(&work->L[new_disp], &work->L[old_disp], rm_ind * sizeof(c_float));
+        new_disp += rm_ind; old_disp += rm_ind;
+        // Extract column rm_ind
+        w[w_count++] = work->L[old_disp++];
+        // Copy elements in columns rm_ind+1..i-1
+        int tail = i - rm_ind - 1;
+        memcpy(&work->L[new_disp], &work->L[old_disp], tail * sizeof(c_float));
+        new_disp += tail; old_disp += tail;
+    }
     // Algorithm C1 in Gill 1974 for low-rank update of LDL
     // L2 block
     c_float p,beta,dbar,alpha=work->D[rm_ind];

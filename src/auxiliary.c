@@ -1,5 +1,6 @@
 #include "auxiliary.h"
 #include "factorization.h"
+#include <string.h>
 void daqp_remove_constraint(DAQPWorkspace* work, const int rm_ind){
     int i;
     // Update data structures
@@ -47,8 +48,7 @@ void daqp_compute_primal_and_fval(DAQPWorkspace *work){
     int i,j,disp,id;
     c_float fval=0;
     // Reset u & soft slack
-    for(j=0;j<work->n;j++)
-        work->u[j]=0;
+    memset(work->u, 0, work->n * sizeof(c_float));
     work->soft_slack = 0;
     //u[m] <-- Mk'*lam_star (zero if empty set)
     for(i=0;i<work->n_active;i++){
@@ -246,6 +246,7 @@ int daqp_remove_blocking(DAQPWorkspace *work){
     c_float alpha=DAQP_INF;
     c_float alpha_cand;
     const c_float dual_tol = work->settings->dual_tol;
+    const int is_normal = (work->sing_ind == DAQP_EMPTY_IND);
     for(i=0;i<work->n_active;i++){
         if(DAQP_IS_IMMUTABLE(work->WS[i])) continue;
         if(DAQP_IS_LOWER(work->WS[i])){
@@ -253,10 +254,8 @@ int daqp_remove_blocking(DAQPWorkspace *work){
         }
         else if(work->lam_star[i]>-dual_tol) continue; //lam* >= 0 for upper-> dual feasible
 
-        if(work->sing_ind == DAQP_EMPTY_IND)
-            alpha_cand= -work->lam[i]/(work->lam_star[i]-work->lam[i]);
-        else
-            alpha_cand= -work->lam[i]/work->lam_star[i];
+        alpha_cand = is_normal ? -work->lam[i]/(work->lam_star[i]-work->lam[i])
+                               : -work->lam[i]/work->lam_star[i];
         if(alpha_cand < alpha){
             alpha = alpha_cand; 
             rm_ind = i;
@@ -264,7 +263,7 @@ int daqp_remove_blocking(DAQPWorkspace *work){
     }
     if(rm_ind == DAQP_EMPTY_IND) return 0; // Either dual feasible or primal infeasible
     // If blocking constraint -> update lambda
-    if(work->sing_ind == DAQP_EMPTY_IND)
+    if(is_normal)
         for(i=0;i<work->n_active;i++)
             work->lam[i]+=alpha*(work->lam_star[i]-work->lam[i]);
     else
@@ -298,9 +297,8 @@ void daqp_compute_CSP(DAQPWorkspace *work){
                 sum+= work->d_us[work->WS[i]]*work->rho_us[work->WS[i]]; 
 #endif
         }
-        for(j=0; j<i; j++)
-            sum -= work->L[disp++]*work->xldl[j];
-        disp++; //Skip 1 in L 
+        sum -= daqp_dot(work->L + disp, work->xldl, i);
+        disp += i + 1; // advance past i sub-diagonal elements + 1 diagonal skip
         work->xldl[i] = sum;
     }
     // Scale with D  (zi = xi/di)

@@ -93,7 +93,7 @@ int daqp_ldp(DAQPWorkspace *work){
 
 // Compute x = -R\(u+v)
 void ldp2qp_solution(DAQPWorkspace *work){
-    int i,j,disp;
+    int i,disp;
     // x* = Rinv*(u-v)
     if(work->v != NULL)
         for(i=0;i<work->n;i++) work->x[i]=work->u[i]-work->v[i];
@@ -102,9 +102,9 @@ void ldp2qp_solution(DAQPWorkspace *work){
 
     if(work->Rinv != NULL){ // (Skip if LP since R = I)
         for(i=0,disp=0;i<work->n;i++){
-            work->x[i]*=work->Rinv[disp++];
-            for(j=i+1;j<work->n;j++)
-                work->x[i]+=work->Rinv[disp++]*work->x[j];
+            work->x[i] = work->Rinv[disp] * work->x[i]
+                        + daqp_dot(work->Rinv + disp + 1, work->x + i + 1, work->n - i - 1);
+            disp += work->n - i;
         }
         if(work->scaling != NULL){
             for(i=0;i<work->ms;i++)
