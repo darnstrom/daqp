@@ -28,8 +28,7 @@ void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind){
     }
     if(Mi==NULL) sum = 1;
     else
-        for(i=start_col,sum=0;i<work->n;i++)
-            sum+=Mi[i]*Mi[i];
+        sum = daqp_dot(Mi+start_col, Mi+start_col, work->n-start_col);
 
     if(DAQP_IS_SOFT(add_ind) && DAQP_IS_SLACK_FREE(add_ind)){
 #ifdef SOFT_WEIGHTS
@@ -100,14 +99,15 @@ void daqp_update_LDL_remove(DAQPWorkspace *work, const int rm_ind){
     old_disp=new_disp+(rm_ind+1);
     w_count= 0;
     // Remove column rm_ind (and add parts of L in its new place)
-    // I.e., copy row i into i-1
-    for(i = rm_ind+1;i<work->n_active;old_disp++,new_disp++,i++) //(disp++ skips blank element)..
-        for(j=0;j<i;j++){
-            if(j!=rm_ind)
-                work->L[new_disp++]=work->L[old_disp++];
-            else
-                w[w_count++] = work->L[old_disp++];
-        }
+    // Split into three branch-free loops: copy cols 0..rm_ind-1, extract col rm_ind,
+    // copy cols rm_ind+1..i-1. This exposes both copy loops to auto-vectorization.
+    for(i = rm_ind+1;i<work->n_active;old_disp++,new_disp++,i++){
+        for(j=0;j<rm_ind;j++)
+            work->L[new_disp++]=work->L[old_disp++];
+        w[w_count++] = work->L[old_disp++];
+        for(j=rm_ind+1;j<i;j++)
+            work->L[new_disp++]=work->L[old_disp++];
+    }
     // Algorithm C1 in Gill 1974 for low-rank update of LDL
     // L2 block
     c_float p,beta,dbar,alpha=work->D[rm_ind];
@@ -124,8 +124,10 @@ void daqp_update_LDL_remove(DAQPWorkspace *work, const int rm_ind){
 
         old_disp+=i;
         for(r=j+1, new_disp=old_disp+j;r<n_update;r++){
-            w[r] -= p*work->L[new_disp];
-            work->L[new_disp]+=beta*w[r];
+            c_float Lval = work->L[new_disp];
+            c_float w_new = w[r] - p*Lval;
+            work->L[new_disp] = Lval + beta*w_new;
+            w[r] = w_new;
             new_disp+=rm_ind+r+1; //Update to the id which starts the next row in L
         }
     }

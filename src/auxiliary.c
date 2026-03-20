@@ -53,26 +53,27 @@ void daqp_compute_primal_and_fval(DAQPWorkspace *work){
     //u[m] <-- Mk'*lam_star (zero if empty set)
     for(i=0;i<work->n_active;i++){
         id = work->WS[i];
+        c_float lam_i = work->lam_star[i];
         if(id < work->ms){
             // Simple constraint 
             if(work->Rinv!=NULL){ // Hessian is not identity
                 for(j=id, disp=DAQP_R_OFFSET(id,work->n);j<work->n;++j)
-                    work->u[j]-=work->Rinv[disp+j]*work->lam_star[i];
+                    work->u[j]-=work->Rinv[disp+j]*lam_i;
             }
-            else work->u[id]-=work->lam_star[i]; // Hessian is identity
+            else work->u[id]-=lam_i; // Hessian is identity
         }
         else{ // General constraint
             for(j=0,disp=work->n*(id-work->ms);j<work->n;j++)
-                work->u[j]-=work->M[disp++]*work->lam_star[i];
+                work->u[j]-=work->M[disp++]*lam_i;
         }
         if(DAQP_IS_SOFT(id)){
 #ifdef SOFT_WEIGHTS
             if(DAQP_IS_LOWER(id))
-                fval+= work->lam_star[i]*work->lam_star[i]*work->rho_ls[id];
+                fval+= lam_i*lam_i*work->rho_ls[id];
             else
-                fval+= work->lam_star[i]*work->lam_star[i]*work->rho_us[id];
+                fval+= lam_i*lam_i*work->rho_us[id];
 #else
-            fval+= work->lam_star[i]*work->lam_star[i];
+            fval+= lam_i*lam_i;
 #endif
         }
     }
@@ -81,8 +82,7 @@ void daqp_compute_primal_and_fval(DAQPWorkspace *work){
     fval=fval*work->settings->rho_soft;
 #endif
     work->soft_slack=fval;// XXX: keep this for now to return SOFT_OPTIMAL
-    for(j=0;j<work->n;j++)
-        fval+=work->u[j]*work->u[j];
+    fval += daqp_dot(work->u, work->u, work->n);
     work->fval = fval;
 }
 int daqp_add_infeasible(DAQPWorkspace *work){
@@ -246,6 +246,7 @@ int daqp_remove_blocking(DAQPWorkspace *work){
     c_float alpha=DAQP_INF;
     c_float alpha_cand;
     const c_float dual_tol = work->settings->dual_tol;
+    // sing_ind is not mutated inside the search loop below, so it is safe to cache.
     const int is_normal = (work->sing_ind == DAQP_EMPTY_IND);
     for(i=0;i<work->n_active;i++){
         if(DAQP_IS_IMMUTABLE(work->WS[i])) continue;
@@ -278,7 +279,7 @@ int daqp_remove_blocking(DAQPWorkspace *work){
 #endif // SOFT_WEIGHTS
 
 void daqp_compute_CSP(DAQPWorkspace *work){
-    int i,j,disp,start_disp;
+    int i,j,disp;
     c_float sum;
     // Forward substitution (xi <-- L\d)
     for(i=work->reuse_ind,disp=DAQP_ARSUM(work->reuse_ind); i<work->n_active; i++){
@@ -304,16 +305,16 @@ void daqp_compute_CSP(DAQPWorkspace *work){
     // Scale with D  (zi = xi/di)
     for(i=work->reuse_ind; i<work->n_active; i++)
         work->zldl[i] = work->xldl[i]/work->D[i];
-    //Backward substitution  (lam_star <-- L'\z)
-    start_disp = DAQP_ARSUM(work->n_active)-1;
-    for(i = work->n_active-1;i>=0;i--){
-        sum=work->zldl[i];
-        disp = start_disp--;
-        for(j=work->n_active-1;j>i;j--){
-            sum-=work->lam_star[j]*work->L[disp];
-            disp-=j;
-        } 
-        work->lam_star[i] = sum;
+    // Backward substitution (lam_star <-- L'\z): column-sweep for sequential L access.
+    // Each outer iteration i finalizes lam_star[i] then scatters into lam_star[0..i-1],
+    // reading L[ARSUM(i)..ARSUM(i)+i-1] sequentially.
+    for(i=0; i<work->n_active; i++)
+        work->lam_star[i] = work->zldl[i];
+    for(i=work->n_active-1; i>0; i--){
+        c_float li = work->lam_star[i];
+        disp = DAQP_ARSUM(i);
+        for(j=0; j<i; j++)
+            work->lam_star[j] -= li * work->L[disp+j];
     }
     work->reuse_ind = work->n_active; // Save forward substitution information 
 }
@@ -321,19 +322,21 @@ void daqp_compute_CSP(DAQPWorkspace *work){
 //TODO this could probably be directly calculated in L
 void daqp_compute_singular_direction(DAQPWorkspace *work){
     // Step direction is stored in lam_star
-    int i,j,disp,offset_L= DAQP_ARSUM(work->sing_ind);
-    int start_disp= offset_L-1;
+    int i,j,disp;
+    int offset_L = DAQP_ARSUM(work->sing_ind);
 
-    // Backwards substitution (p_tidle <-- L'\(-l))
-    for(i = work->sing_ind-1;i>=0;i--){
+    // Initialize from the sing_ind column of L, then set the sing_ind entry to 1
+    for(i=0; i<work->sing_ind; i++)
         work->lam_star[i] = -work->L[offset_L+i];
-        disp = start_disp--;
-        for(j=work->sing_ind-1;j>i;j--){
-            work->lam_star[i]-=work->lam_star[j]*work->L[disp];
-            disp-=j;
-        } 
+    work->lam_star[work->sing_ind] = 1;
+
+    // Backwards substitution (p_tidle <-- L'\(-l)): column-sweep for sequential L access.
+    for(i=work->sing_ind-1; i>0; i--){
+        c_float li = work->lam_star[i];
+        disp = DAQP_ARSUM(i);
+        for(j=0; j<i; j++)
+            work->lam_star[j] -= li * work->L[disp+j];
     }
-    work->lam_star[work->sing_ind]=1;
 
     if(DAQP_IS_LOWER(work->WS[work->sing_ind])) //Flip to ensure descent direction 
         for(i=0;i<=work->sing_ind;i++)
