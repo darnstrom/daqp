@@ -14,7 +14,7 @@ permitted by the higher-priority solution.
 The hierarchy is specified through a `break_points` vector of length $$n_h + 1$$, where
 `break_points[i]` is the (0-indexed) row of `A` at which priority level $$i$$ begins.
 
-### <img src="/daqp/assets/icons/c.svg" height="18" alt="C"> C
+### <img src="{{ '/assets/icons/c.svg' | relative_url }}" class="nav-icon" alt="C"> C
 ```c
 #include "api.h"
 
@@ -33,7 +33,7 @@ DAQPResult result = {x, lam};
 daqp_quadprog(&result, &qp, NULL);
 ```
 
-### <img src="/daqp/assets/icons/julia.svg" height="18" alt="Julia"> Julia
+### <img src="{{ '/assets/icons/julia.svg' | relative_url }}" class="nav-icon" alt="Julia"> Julia
 ```julia
 using DAQP
 
@@ -52,7 +52,7 @@ DAQP.setup(d, zeros(0,0), zeros(0), A, bupper, blower, sense;
 x, fval, exitflag, info = DAQP.solve(d);
 ```
 
-### <img src="/daqp/assets/icons/matlab.svg" height="18" alt="MATLAB"> MATLAB
+### <img src="{{ '/assets/icons/matlab.svg' | relative_url }}" class="nav-icon" alt="MATLAB"> MATLAB
 ```matlab
 % hidaqp takes cell arrays of A, bu, bl for each priority level
 As  = {[1 1]; [1 -1]};
@@ -63,7 +63,7 @@ bls = {-1; -3};
 % es{i} contains the constraint violation at priority level i
 ```
 
-### <img src="/daqp/assets/icons/python.svg" height="18" alt="Python"> Python
+### <img src="{{ '/assets/icons/python.svg' | relative_url }}" class="nav-icon" alt="Python"> Python
 ```python
 import daqp, numpy as np
 from ctypes import c_double, c_int

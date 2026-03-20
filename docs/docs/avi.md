@@ -13,7 +13,7 @@ $$\text{find } x^\star \in C \text{ such that } \langle Hx^\star + f,\, y - x^\s
 
 where $$C = \lbrace x \mid b_l \leq Ax \leq b_u \rbrace$$. AVI generalizes both QPs and complementarity problems.
 
-### <img src="/daqp/assets/icons/c.svg" height="18" alt="C"> C
+### <img src="{{ '/assets/icons/c.svg' | relative_url }}" class="nav-icon" alt="C"> C
 ```c
 #include "api.h"
 
@@ -33,7 +33,7 @@ DAQPResult result = {x, lam};
 daqp_avi(&result, &qp, NULL);
 ```
 
-### <img src="/daqp/assets/icons/julia.svg" height="18" alt="Julia"> Julia
+### <img src="{{ '/assets/icons/julia.svg' | relative_url }}" class="nav-icon" alt="Julia"> Julia
 ```julia
 using DAQP
 
@@ -46,7 +46,7 @@ blower = [-1.0; -1.0];
 x, _, exitflag, info = DAQP.avi(H, f, A, bupper, blower)
 ```
 
-### <img src="/daqp/assets/icons/matlab.svg" height="18" alt="MATLAB"> MATLAB
+### <img src="{{ '/assets/icons/matlab.svg' | relative_url }}" class="nav-icon" alt="MATLAB"> MATLAB
 ```matlab
 H = [1 1.75; 0 1];
 f = [2; 2];
@@ -58,7 +58,7 @@ sense  = int32(zeros(2, 1));
 [x, fval, exitflag, info] = daqp.avi(H, f, A, bupper, blower, sense);
 ```
 
-### <img src="/daqp/assets/icons/python.svg" height="18" alt="Python"> Python
+### <img src="{{ '/assets/icons/python.svg' | relative_url }}" class="nav-icon" alt="Python"> Python
 ```python
 import daqp, numpy as np
 from ctypes import c_double

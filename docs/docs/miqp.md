@@ -15,7 +15,7 @@ with $$x_i \in \lbrace 0, 1 \rbrace$$ as a special case. Binary variables are de
 corresponding entry in the `sense` vector to `16` (`DAQP_BINARY`). DAQP then applies
 branch-and-bound to find the optimal integer solution.
 
-### <img src="/daqp/assets/icons/c.svg" height="18" alt="C"> C
+### <img src="{{ '/assets/icons/c.svg' | relative_url }}" class="nav-icon" alt="C"> C
 ```c
 #include "api.h"
 
@@ -33,7 +33,7 @@ DAQPResult result = {x, lam};
 daqp_quadprog(&result, &qp, NULL);
 ```
 
-### <img src="/daqp/assets/icons/julia.svg" height="18" alt="Julia"> Julia
+### <img src="{{ '/assets/icons/julia.svg' | relative_url }}" class="nav-icon" alt="Julia"> Julia
 ```julia
 using DAQP
 
@@ -49,7 +49,7 @@ x, fval, exitflag, info = DAQP.quadprog(H, f, A, bupper, blower, sense)
 println("Solution: ", x, "  (nodes explored: ", info.nodes, ")")
 ```
 
-### <img src="/daqp/assets/icons/matlab.svg" height="18" alt="MATLAB"> MATLAB
+### <img src="{{ '/assets/icons/matlab.svg' | relative_url }}" class="nav-icon" alt="MATLAB"> MATLAB
 ```matlab
 H = eye(2);
 f = [-1.5; -2.5];
@@ -61,7 +61,7 @@ sense  = int32([16; 16]);   % binary
 [x, fval, exitflag, info] = daqp.quadprog(H, f, A, bupper, blower, sense);
 ```
 
-### <img src="/daqp/assets/icons/python.svg" height="18" alt="Python"> Python
+### <img src="{{ '/assets/icons/python.svg' | relative_url }}" class="nav-icon" alt="Python"> Python
 ```python
 import daqp, numpy as np
 from ctypes import c_double, c_int

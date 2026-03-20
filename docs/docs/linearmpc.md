@@ -13,7 +13,7 @@ Predictive Control (MPC)**. These tools let you design an MPC controller symboli
 automatically generate a self-contained, library-free C implementation that can be deployed on
 embedded hardware.
 
-## <img src="/daqp/assets/icons/julia.svg" height="18" alt="Julia"> LinearMPC.jl (Julia)
+## <img src="{{ '/assets/icons/julia.svg' | relative_url }}" class="nav-icon" alt="Julia"> LinearMPC.jl (Julia)
 
 [LinearMPC.jl](https://github.com/darnstrom/LinearMPC.jl) is a Julia package for designing and
 deploying linear MPC controllers. It uses DAQP to solve the underlying condensed QP at each
@@ -60,7 +60,7 @@ to be compiled and deployed on embedded targets.
 
 ---
 
-## <img src="/daqp/assets/icons/python.svg" height="18" alt="Python"> lmpc (Python)
+## <img src="{{ '/assets/icons/python.svg' | relative_url }}" class="nav-icon" alt="Python"> lmpc (Python)
 
 [lmpc](https://github.com/darnstrom/lmpc) is the Python counterpart to LinearMPC.jl. It provides
 the same workflow — design an MPC controller in Python, then generate embedded C code powered by
