@@ -329,6 +329,18 @@ end
         @test info.iterations == 5 
         @test norm(xref-x) < tol;
     end
+
+    # Test that update does not cause a segfault for AVIs
+    n = 10; m = 50
+    xref,H,f,A,b = generate_test_avi(n,m);
+    d = DAQPBase.Model()
+    DAQPBase.setup(d,H,f,A,b;is_avi=true)
+    x,fval,exitflag,info = solve(d)
+    @test exitflag > 0
+    update(d,nothing,-f,nothing,nothing,nothing)
+    GC.gc(); GC.gc(); GC.gc() # Force GC to expose stale pointer bugs
+    x2,fval2,exitflag2,info2 = solve(d)
+    @test exitflag2 > 0
 end
 
 @testset "Prefactorized Hessian" begin
