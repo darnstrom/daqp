@@ -1,7 +1,68 @@
 import numpy as np
 cimport daqp
 from libc.stdlib cimport calloc, free
+cimport cython
 
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cdef void _solve_warm_start(DAQPProblem* problem, DAQPSettings* settings,
+                            DAQPResult* res, int[:] sense, int m,
+                            object primal_start, object dual_start) except *:
+    """Handle warm-started solve; called only when a warm start is requested.
+
+    Called from solve() when primal_start or dual_start is not None.
+    All expensive Python work is isolated here so the common (cold-start)
+    path of solve() stays as lean as possible.
+    """
+    cdef int[::1]    sense_copy
+    cdef double[::1] primal_start_c, dual_start_c
+    cdef DAQPWorkspace* work
+    cdef int    setup_flag
+    cdef double setup_time_c
+
+    # Copy sense so the init helpers don't mutate the caller's array
+    if m > 0:
+        sense_copy = np.array(sense, dtype=np.intc, copy=True)
+        problem.sense = &sense_copy[0]
+
+    if primal_start is not None:
+        primal_start_c = np.ascontiguousarray(primal_start, dtype=np.double)
+
+    if dual_start is not None:
+        dual_start_c = np.ascontiguousarray(dual_start, dtype=np.double)
+        with nogil:
+            daqp_dual_init_active(problem, &dual_start_c[0])
+    else:
+        # primal_start is not None (checked by caller)
+        with nogil:
+            daqp_primal_init_active(problem, &primal_start_c[0])
+
+    if primal_start is not None:
+        # Need a workspace to inject the initial primal iterate before solving
+        work = <DAQPWorkspace*>calloc(1, sizeof(DAQPWorkspace))
+        work.settings = settings
+        setup_time_c = 0.0
+        with nogil:
+            setup_flag = setup_daqp(problem, work, &setup_time_c)
+        res.setup_time = setup_time_c
+        res.exitflag  = setup_flag
+        if setup_flag >= 0:
+            with nogil:
+                daqp_set_primal_start(work, &primal_start_c[0])
+                daqp_solve(res, work)
+        # Nullify settings pointer before freeing to prevent free of stack memory
+        work.settings = NULL
+        with nogil:
+            free_daqp_workspace(work)
+            free_daqp_ldp(work)
+        free(work)
+    else:
+        # dual_start only: active set already initialized above
+        with nogil:
+            daqp_quadprog(res, problem, settings)
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
 def solve(double[:, :] H, double[:] f, double[:, :] A,
           double[:] bupper, double[:] blower=None,
           int[:] sense =None, int[:] break_points=np.zeros(0,dtype=np.intc),
@@ -96,104 +157,66 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
            * lam        : Optimal dual solution
     """
 
-    # Setup problem
-    cdef int n,m,ms,nb,problem_type
-    cdef int* bin_ids_cand 
-    cdef double *A_ptr, *bu_ptr, *bl_ptr
-    cdef int* sense_ptr
-    A = np.ascontiguousarray(A)
-    mA, n = np.shape(A)
-    m = np.size(bupper)
-    nh = np.size(break_points)
+    # Setup problem dimensions using fast memoryview shape attributes
+    cdef int mA = A.shape[0]
+    cdef int n = A.shape[1]
+    cdef int m = bupper.shape[0]
+    cdef int nh = break_points.shape[0]
+    cdef int problem_type = 1 if is_avi else 0
 
-    # By default, set lower bounds to -inf and interpret constraints as inequalities 
+    # Ensure A is C-contiguous; only copy if necessary (common case is free)
+    if not A.is_c_contig():
+        A = np.ascontiguousarray(A)
+
+    # By default, set lower bounds to -inf and interpret constraints as inequalities
     if blower is None:
         blower = np.full(m, -DAQP_INF)
     if sense is None:
         sense = np.zeros(m, dtype=np.intc)
-    problem_type = 1 if is_avi else 0
 
-    H_ptr = NULL if H is None else &H[0,0]
-    f_ptr = NULL if f is None else &f[0]
-    A_ptr = NULL if mA == 0 else &A[0,0]
-    bp_ptr = NULL if nh == 0 else &break_points[0]
+    # Setup output buffers (np.empty avoids zeroing; the solver fills all entries)
+    cdef double[::1] x = np.empty(n)
+    cdef double[::1] lam = np.empty(m) if m > 0 else np.empty(0)
 
+    # Build C-level structs — all pointer arithmetic from this point on
+    cdef double *H_ptr = NULL if H is None else &H[0,0]
+    cdef double *f_ptr = NULL if f is None else &f[0]
+    cdef double *A_ptr = NULL if mA == 0 else &A[0,0]
+    cdef int   *bp_ptr = NULL if nh == 0 else &break_points[0]
+    cdef double *bu_ptr
+    cdef double *bl_ptr
+    cdef int   *sense_ptr
+    cdef double *lam_ptr
     if m == 0:
-        bu_ptr, bl_ptr, sense_ptr = NULL, NULL, NULL
+        bu_ptr = bl_ptr = NULL
+        sense_ptr = NULL
+        lam_ptr = NULL
     else:
-        bu_ptr, bl_ptr, sense_ptr  = &bupper[0], &blower[0], &sense[0]
+        bu_ptr = &bupper[0]
+        bl_ptr = &blower[0]
+        sense_ptr = &sense[0]
+        lam_ptr = &lam[0]
 
-
-    cdef DAQPProblem problem = [n,m,m-mA, H_ptr, f_ptr, A_ptr, bu_ptr, bl_ptr, sense_ptr, bp_ptr, nh, problem_type]
-
-    # Setup settings
+    cdef DAQPProblem problem = [n, m, m-mA, H_ptr, f_ptr, A_ptr, bu_ptr, bl_ptr, sense_ptr, bp_ptr, nh, problem_type]
     cdef DAQPSettings settings = [primal_tol, dual_tol, zero_tol, pivot_tol,
             progress_tol, cycle_tol, iter_limit, fval_bound,
             eps_prox, eta_prox, rho_soft, rel_subopt, abs_subopt, sing_tol, refactor_tol,
             time_limit]
-        
-    # Setup output
-    cdef double[::1] x = np.zeros(n)
-    cdef double[::1] lam = np.zeros(m)
-    cdef double *lam_ptr
-    lam_ptr = NULL if m == 0 else &lam[0]
-    cdef DAQPResult res  = [&x[0],lam_ptr,0,0,0,0,0,0,0]
+    cdef DAQPResult res = [&x[0], lam_ptr, 0, 0, 0, 0, 0, 0, 0]
 
-    # Warm starting: initialize active set from primal or dual iterate
-    cdef int[::1] sense_copy
-    cdef double[::1] primal_start_c, dual_start_c
-    cdef DAQPWorkspace* work
-    cdef int setup_flag
-    cdef double setup_time_c
-
-    if dual_start is not None or primal_start is not None:
-        # Copy sense to avoid modifying the user's array when init functions mark constraints active
-        if m > 0:
-            sense_copy = np.array(sense, dtype=np.intc, copy=True)
-            problem.sense = &sense_copy[0]
-
-        if primal_start is not None:
-            primal_start_c = np.ascontiguousarray(primal_start, dtype=np.double)
-
-        if dual_start is not None:
-            dual_start_c = np.ascontiguousarray(dual_start, dtype=np.double)
-            with nogil:
-                daqp_dual_init_active(&problem, &dual_start_c[0])
-        else:
-            # primal_start is not None (from the outer condition)
-            with nogil:
-                daqp_primal_init_active(&problem, &primal_start_c[0])
-
-    if primal_start is not None:
-        # Use separate setup/solve to allow setting the initial primal iterate
-        work = <DAQPWorkspace*>calloc(1, sizeof(DAQPWorkspace))
-        # Point workspace settings to stack-allocated settings struct
-        work.settings = &settings
-        setup_time_c = 0.0
-        with nogil:
-            setup_flag = setup_daqp(&problem, work, &setup_time_c)
-        res.setup_time = setup_time_c
-        res.exitflag = setup_flag
-        if setup_flag >= 0:
-            with nogil:
-                daqp_set_primal_start(work, &primal_start_c[0])
-                daqp_solve(&res, work)
-        # Nullify settings pointer before freeing to prevent free of stack memory
-        work.settings = NULL
-        with nogil:
-            free_daqp_workspace(work)
-            free_daqp_ldp(work)
-        free(work)
-    else:
-        # Solve (active set already initialized above if dual_start was given)
+    if primal_start is None and dual_start is None:
+        # Fast path: no warm start — enter C as quickly as possible
         with nogil:
             daqp_quadprog(&res, &problem, &settings)
-    info = {'solve_time':res.solve_time,
-            'setup_time': res.setup_time,
-            'iterations': res.iter,
-            'nodes': res.nodes,
-            'lam': np.asarray(lam)}
-    return np.asarray(x), res.fval, res.exitflag, info
+    else:
+        # Warm-start path: initialize active set, then solve
+        _solve_warm_start(&problem, &settings, &res, sense, m,
+                          primal_start, dual_start)
+
+    return (np.asarray(x), res.fval, res.exitflag,
+            {'solve_time': res.solve_time, 'setup_time': res.setup_time,
+             'iterations': res.iter, 'nodes': res.nodes,
+             'lam': np.asarray(lam)})
 cdef class Model:
     """
     Wraps a DAQP workspace for efficient reuse across similar problems.
@@ -257,6 +280,8 @@ cdef class Model:
             free(self._work)
             self._work = NULL
 
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     def setup(self, double[:, :] H, double[:] f, double[:, :] A,
               double[:] bupper, double[:] blower=None,
               int[:] sense=None, int[:] break_points=None,
@@ -417,6 +442,8 @@ cdef class Model:
 
         return setup_flag, setup_time_c
 
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     def solve(self):
         """
         Solve the currently set-up problem.
@@ -607,6 +634,8 @@ cdef class Model:
         if 'time_limit'   in new_settings: s.time_limit   = new_settings['time_limit']
 
 
+@cython.boundscheck(False)
+@cython.wraparound(False)
 def minrep(double[:,:] A, double[:] b):
     # Setup problem
     cdef int n,m,ms
