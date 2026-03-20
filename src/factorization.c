@@ -1,11 +1,5 @@
 #include "factorization.h"
 
-c_float daqp_dot(const c_float* v1, const c_float* v2, const int n) {
-    c_float sum = 0.0;
-    for (int i = 0; i < n; i++) sum += v1[i] * v2[i];
-    return sum;
-}
-
 
 void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind){
     work->sing_ind = DAQP_EMPTY_IND;
