@@ -82,8 +82,8 @@ void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind){
     }
     work->D[work->n_active]=sum;
 
-    // Check for singularity
-    if(work->D[work->n_active] < work->settings->sing_tol ||
+    // Check for singularity (use local `sum` to avoid re-reading from array)
+    if(sum < work->settings->sing_tol ||
             (work->n_active >= work->n + ns_active)){
         work->sing_ind=work->n_active;
         work->D[work->n_active]=0;
@@ -115,12 +115,12 @@ void daqp_update_LDL_remove(DAQPWorkspace *work, const int rm_ind){
     old_disp=DAQP_ARSUM(rm_ind)+rm_ind;
     for(j = 0, i=rm_ind+1;j<n_update;j++,i++){
         p=w[j];
-        dbar = work->D[i]+alpha*p*p;
+        c_float Di = work->D[i]; /* cache to avoid reading D[i] twice */
+        dbar = Di + alpha*p*p;
         work->D[i-1] = dbar;
 
-
         beta = p*alpha/dbar;
-        alpha =work->D[i]*alpha/dbar;
+        alpha = Di*alpha/dbar;
 
         old_disp+=i;
         for(r=j+1, new_disp=old_disp+j;r<n_update;r++){

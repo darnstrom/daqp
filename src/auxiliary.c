@@ -263,10 +263,14 @@ int daqp_remove_blocking(DAQPWorkspace *work){
         }
     }
     if(rm_ind == DAQP_EMPTY_IND) return 0; // Either dual feasible or primal infeasible
-    // If blocking constraint -> update lambda
-    if(is_normal)
+    // If blocking constraint -> update lambda.
+    // Rewrite as lam = (1-alpha)*lam + alpha*lam_star to enable vectorization
+    // (two independent scale-and-add ops instead of a data-dependent subtract-then-add).
+    if(is_normal){
+        c_float c = 1.0 - alpha;
         for(i=0;i<work->n_active;i++)
-            work->lam[i]+=alpha*(work->lam_star[i]-work->lam[i]);
+            work->lam[i] = c*work->lam[i] + alpha*work->lam_star[i];
+    }
     else
         for(i=0;i<work->n_active;i++)
             work->lam[i]+=alpha*work->lam_star[i];
@@ -281,7 +285,7 @@ int daqp_remove_blocking(DAQPWorkspace *work){
 void daqp_compute_CSP(DAQPWorkspace *work){
     int i,j,disp;
     c_float sum;
-    // Forward substitution (xi <-- L\d)
+    // Forward substitution (xi <-- L\d) fused with D-scaling (zi = xi/di)
     for(i=work->reuse_ind,disp=DAQP_ARSUM(work->reuse_ind); i<work->n_active; i++){
         // Setup RHS
         if(DAQP_IS_LOWER(work->WS[i])){
@@ -301,10 +305,8 @@ void daqp_compute_CSP(DAQPWorkspace *work){
         sum -= daqp_dot(work->L + disp, work->xldl, i);
         disp += i + 1; // advance past i sub-diagonal elements + 1 diagonal skip
         work->xldl[i] = sum;
+        work->zldl[i] = sum / work->D[i]; // fuse: scale while D[i] is in cache
     }
-    // Scale with D  (zi = xi/di)
-    for(i=work->reuse_ind; i<work->n_active; i++)
-        work->zldl[i] = work->xldl[i]/work->D[i];
     // Backward substitution (lam_star <-- L'\z): column-sweep for sequential L access.
     // Each outer iteration i finalizes lam_star[i] then scatters into lam_star[0..i-1],
     // reading L[ARSUM(i)..ARSUM(i)+i-1] sequentially.
