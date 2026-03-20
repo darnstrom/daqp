@@ -11,7 +11,7 @@ DAQP can find a solution to the **affine variational inequality** (AVI):
 
 $$\text{find } x^\star \in C \text{ such that } \langle Hx^\star + f,\, y - x^\star\rangle \geq 0 \quad \forall\, y \in C,$$
 
-where $$C = \lbrace x \mid b_l \leq Ax \leq b_u \rbrace$$. Unlike a QP, $$H$$ need not be symmetric; AVI generalizes both QPs and complementarity problems.
+where $$C = \lbrace x \mid b_l \leq Ax \leq b_u \rbrace$$. AVI generalizes both QPs and complementarity problems.
 
 ### <img src="/daqp/assets/icons/c.svg" height="18" alt="C"> C
 ```c
