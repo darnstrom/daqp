@@ -62,8 +62,11 @@ void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind){
     }
     //Forward substitution: l <-- L\(Mk*m)  
     for(i=0,disp=0; i<work->n_active; i++){
-        work->L[new_L_start+i] -= daqp_dot(work->L + disp, work->L + new_L_start, i);
-        disp += i + 1; // advance past i elements + 1 diagonal skip
+        sum = work->L[new_L_start+i];
+        for(j=0; j<i; j++)
+            sum -= work->L[disp++]*work->L[new_L_start+j]; 
+        work->L[new_L_start+i] = sum;
+        disp++; //Skip diagonal elements (which is 1)
     }
 
     // Scale: l_i <-- l_i/d_i
@@ -93,15 +96,14 @@ void daqp_update_LDL_remove(DAQPWorkspace *work, const int rm_ind){
     old_disp=new_disp+(rm_ind+1);
     w_count= 0;
     // Remove column rm_ind (and add parts of L in its new place)
-    // Split into three branch-free loops: copy cols 0..rm_ind-1, extract col rm_ind,
-    // copy cols rm_ind+1..i-1. This exposes both copy loops to auto-vectorization.
-    for(i = rm_ind+1;i<work->n_active;old_disp++,new_disp++,i++){
-        for(j=0;j<rm_ind;j++)
-            work->L[new_disp++]=work->L[old_disp++];
-        w[w_count++] = work->L[old_disp++];
-        for(j=rm_ind+1;j<i;j++)
-            work->L[new_disp++]=work->L[old_disp++];
-    }
+    // I.e., copy row i into i-1
+    for(i = rm_ind+1;i<work->n_active;old_disp++,new_disp++,i++) //(disp++ skips blank element)..
+        for(j=0;j<i;j++){
+            if(j!=rm_ind)
+                work->L[new_disp++]=work->L[old_disp++];
+            else
+                w[w_count++] = work->L[old_disp++];
+        }
     // Algorithm C1 in Gill 1974 for low-rank update of LDL
     // L2 block
     c_float p,beta,dbar,alpha=work->D[rm_ind];

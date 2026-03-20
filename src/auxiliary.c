@@ -281,7 +281,7 @@ int daqp_remove_blocking(DAQPWorkspace *work){
 void daqp_compute_CSP(DAQPWorkspace *work){
     int i,j,disp,start_disp;
     c_float sum;
-    // Forward substitution (xi <-- L\d) fused with D-scaling (zi = xi/di)
+    // Forward substitution (xi <-- L\d)
     for(i=work->reuse_ind,disp=DAQP_ARSUM(work->reuse_ind); i<work->n_active; i++){
         // Setup RHS
         if(DAQP_IS_LOWER(work->WS[i])){
@@ -298,13 +298,15 @@ void daqp_compute_CSP(DAQPWorkspace *work){
                 sum+= work->d_us[work->WS[i]]*work->rho_us[work->WS[i]]; 
 #endif
         }
-        sum -= daqp_dot(work->L + disp, work->xldl, i);
-        disp += i + 1; // advance past i sub-diagonal elements + 1 diagonal skip
+        for(j=0; j<i; j++)
+            sum -= work->L[disp++]*work->xldl[j];
+        disp++; //Skip 1 in L
         work->xldl[i] = sum;
-        work->zldl[i] = sum / work->D[i]; // fuse: scale while D[i] is in cache
     }
-    // Backward substitution (lam_star <-- L'\z): row-sweep accumulates into a
-    // register (sum), avoiding scatter-writes to lam_star mid-loop.
+    // Scale with D  (zi = xi/di)
+    for(i=work->reuse_ind; i<work->n_active; i++)
+        work->zldl[i] = work->xldl[i]/work->D[i];
+    // Backward substitution (lam_star <-- L'\z)
     start_disp = DAQP_ARSUM(work->n_active)-1;
     for(i = work->n_active-1;i>=0;i--){
         sum=work->zldl[i];
