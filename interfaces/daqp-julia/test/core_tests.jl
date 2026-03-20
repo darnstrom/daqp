@@ -46,7 +46,7 @@ end
 @testset "Quadprog (C)" begin
     for nQP in 1:10
         xref,H,f,A,bupper,blower,sense = generate_test_QP(n,m,ms,nAct,kappa);
-        x,fval,exitflag,info = DAQPBase.quadprog_c(DAQPBase.QPj(H,f,A,bupper,blower,sense));
+        x,fval,exitflag,info = DAQPBase.quadprog(DAQPBase.QPj(H,f,A,bupper,blower,sense));
         @test norm(xref-x) < tol;
     end
 end

@@ -60,7 +60,7 @@ function quadprog(H::Union{Matrix{Float64}, Cholesky},f::Vector{Float64},
 end
 
 # XXX Just kept for test for now  
-function quadprog_c(qpj::QPj;settings=nothing)
+function quadprog(qpj::QPj;settings=nothing)
     # Setup QP
     qp = QPc(qpj);
 
