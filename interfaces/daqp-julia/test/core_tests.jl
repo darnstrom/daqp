@@ -193,6 +193,20 @@ end
         rm(srcdir,recursive=true)
     catch
     end
+
+    # Test special case with diagonal H 
+    d = DAQPBase.Model()
+    DAQPBase.setup(d,diagm(5*ones(n)),f,A,bupper,blower,sense)
+    srcdir = tempname();
+    DAQPBase.codegen(d,dir=srcdir,src=!local_lib)
+    local_lib && get_local_sources(srcdir)
+    src = [f for f in readdir(srcdir) if last(f,1) == "c"]
+    if(!isnothing(Sys.which("gcc")))
+        testlib = "daqptestlib."* Base.Libc.Libdl.dlext
+        run(Cmd(`gcc -lm -fPIC -O3 -msse3 -xc -shared -o $testlib $src`; dir=srcdir))
+        @test isfile(joinpath(srcdir,testlib))
+    end
+    rm(srcdir,recursive=true)
 end
 
 @testset "Hierarchical QP" begin
@@ -378,8 +392,6 @@ end
     xref,f,A,bupper,blower,sense = generate_test_LP(n,m,ms);
     xcold,fval,exitflag,info_cold = linprog(f,A,bupper,blower,sense)
     xwarm,fval,exitflag,info_warm = linprog(f,A,bupper,blower,sense;primal_start = 0.95*xref)
-    println(info_cold.iterations)
-    println(info_warm.iterations)
     @test info_cold.iterations > info_warm.iterations 
     @test norm(xwarm-xref) < tol
 

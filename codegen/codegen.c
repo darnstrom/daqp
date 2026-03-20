@@ -4,6 +4,7 @@
 #include <string.h>
 #include <ctype.h>
 #include "types.h"
+#include <math.h>
 #include "api.h"
 
 
@@ -113,7 +114,10 @@ void write_daqp_workspace_h(FILE *f, DAQPWorkspace* work, const char* prefix){
     fprintf(f, "extern c_float %sM[%d];\n", prefix, (m-ms)*n);
     fprintf(f, "extern c_float %sdupper[%d];\n", prefix, m);
     fprintf(f, "extern c_float %sdlower[%d];\n", prefix, m);
-    fprintf(f, "extern c_float %sRinv[%d];\n", prefix, n*(n+1)/2);
+    if(work->Rinv != NULL)
+        fprintf(f, "extern c_float %sRinv[%d];\n", prefix, n*(n+1)/2);
+    if(work->RinvD != NULL)
+        fprintf(f, "extern c_float %sRinvD[%d];\n", prefix, n*(n+1)/2);
     //fprintf(f, "extern c_float %sv[%d];\n", prefix, n);
     fprintf(f, "extern int %ssense[%d];\n\n", prefix, m);
     //fprintf(f, "extern c_float %sscaling[%d];\n\n", prefix, m);
@@ -157,6 +161,8 @@ void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work, const char* prefix){
     fprintf(f, "c_float %sdlower[%d];\n", prefix, m);
     snprintf(varname, sizeof(varname), "%sRinv", prefix);
     write_float_array(f,work->Rinv,n*(n+1)/2,varname);
+    snprintf(varname, sizeof(varname), "%sRinvD", prefix);
+    write_float_array(f,work->RinvD,n*(n+1)/2,varname);
     //snprintf(varname, sizeof(varname), "%sv", prefix);
     //write_float_array(f,work->v,n,varname);
     snprintf(varname, sizeof(varname), "%ssense", prefix);
@@ -186,7 +192,7 @@ void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work, const char* prefix){
     fprintf(f, "%sM, %sdupper, %sdlower, %sRinv, NULL, %ssense,\n",
             prefix,prefix,prefix,prefix,prefix); //LDP
     fprintf(f, "NULL,\n"); // scaling
-    fprintf(f, "NULL,\n"); // RinvD
+    fprintf(f, "%sRinvD,\n",prefix); // RinvD
     fprintf(f, "%sx, %sxold,\n", prefix, prefix);
     fprintf(f, "%slam, %slam_star, %su, %d,\n", prefix, prefix, prefix, -1); // fval
     fprintf(f, "%sL, %sD, %sxldl,%szldl,%d,\n",
@@ -285,7 +291,7 @@ void write_float_array(FILE *f, c_float* a, const int N, const char *name){
         int i;
         fprintf(f, "c_float %s[%d] = {\n", name, N);
         for(i = 0; i < N; i++)
-            fprintf(f, "(c_float)%.20f,\n", a[i]);
+            fprintf(f, "(c_float)%.20f,\n", isnan(a[i]) ? 0 : a[i]);
         fprintf(f, "};\n");
     }
 }
