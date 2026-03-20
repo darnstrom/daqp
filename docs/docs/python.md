@@ -36,3 +36,23 @@ DAQP can be called as:
 ```python
 (xstar,fval,exitflag,info) = daqp.solve(H,f,A,bupper,blower,sense)
 ```
+
+## Using a Workspace
+The `daqp.solve` function above allocates memory on every call. For embedded or real-time
+applications where the same problem structure is solved repeatedly (e.g., an MPC loop),
+`daqp.Model` offers a workspace-based interface that allocates memory once during `setup`
+and reuses it across all subsequent `solve` calls — no heap allocations occur during solving.
+
+```python
+d = daqp.Model()
+d.setup(H, f, A, bupper, blower, sense)
+xstar, fval, exitflag, info = d.solve()
+```
+
+If the problem data changes between solves, use `update` to push new data into the existing
+workspace without re-running the full factorisation:
+```python
+# Update cost vector and bounds, then re-solve
+d.update(f=f_new, bupper=bupper_new, blower=blower_new)
+xstar, fval, exitflag, info = d.solve()
+```

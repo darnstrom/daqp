@@ -14,7 +14,26 @@ permitted by the higher-priority solution.
 The hierarchy is specified through a `break_points` vector of length $$n_h + 1$$, where
 `break_points[i]` is the (0-indexed) row of `A` at which priority level $$i$$ begins.
 
-### Julia
+### <img src="/daqp/assets/icons/c.svg" height="18" alt="C"> C
+```c
+#include "api.h"
+
+int n = 2, m = 2, ms = 0;
+double f[2]     = {0.0, 0.0};
+double A[4]     = {1, 1, 1, -1};   // row-major: [1 1; 1 -1]
+double bupper[2]= {1.0, 3.0};
+double blower[2]= {-1.0, -3.0};
+int    sense[2] = {0, 0};
+int    bp[3]    = {0, 1, 2};       // level 1: row 0, level 2: row 1
+
+DAQPProblem qp = {n, m, ms, NULL, f, A, bupper, blower, sense, bp, 2, 0};
+
+double x[2], lam[2];
+DAQPResult result = {x, lam};
+daqp_quadprog(&result, &qp, NULL);
+```
+
+### <img src="/daqp/assets/icons/julia.svg" height="18" alt="Julia"> Julia
 ```julia
 using DAQP
 
@@ -33,7 +52,7 @@ DAQP.setup(d, zeros(0,0), zeros(0), A, bupper, blower, sense;
 x, fval, exitflag, info = DAQP.solve(d);
 ```
 
-### MATLAB
+### <img src="/daqp/assets/icons/matlab.svg" height="18" alt="MATLAB"> MATLAB
 ```matlab
 % hidaqp takes cell arrays of A, bu, bl for each priority level
 As  = {[1 1]; [1 -1]};
@@ -44,7 +63,7 @@ bls = {-1; -3};
 % es{i} contains the constraint violation at priority level i
 ```
 
-### Python
+### <img src="/daqp/assets/icons/python.svg" height="18" alt="Python"> Python
 ```python
 import daqp, numpy as np
 from ctypes import c_double, c_int
