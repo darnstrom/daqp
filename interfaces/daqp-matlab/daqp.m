@@ -220,7 +220,12 @@ classdef daqp< handle
             else
                 dir=varargin{2};
             end
-            daqpmex('codegen', this.work_ptr,fname,dir);
+            if(length(varargin)<3 || ~ischar(varargin{3}))
+                prefix='daqp_';
+            else
+                prefix=varargin{3};
+            end
+            daqpmex('codegen', this.work_ptr,fname,dir,prefix);
         end
     end
 end
