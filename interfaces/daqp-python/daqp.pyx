@@ -413,14 +413,7 @@ cdef class Model:
                 with nogil:
                     daqp_primal_init_active(&self._qp, &primal_start_c[0])
 
-        # ---- enable proximal iterations for pure LPs ----
-        # (mirrors the Julia interface behaviour)
-        if H is None and f is not None:
-            # settings may be NULL at this point; setup_daqp will allocate them
-            pass  # eps_prox handled after successful setup below
-
         # ---- call setup_daqp ----
-        # work->settings is NULL here; setup_daqp will allocate (own_settings=1)
         with nogil:
             setup_flag = setup_daqp(&self._qp, self._work, &setup_time_c)
 
@@ -435,11 +428,6 @@ cdef class Model:
         # ---- restore user-modified settings ----
         if restore_settings:
             self._work.settings[0] = old_settings_val
-
-        # ---- LP: ensure proximal-point iterations are active ----
-        if H is None and f is not None:
-            if self._work.settings.eps_prox == 0:
-                self._work.settings.eps_prox = 1
 
         self._has_model = True
 
