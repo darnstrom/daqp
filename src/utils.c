@@ -138,7 +138,11 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
                 Hi = sqrt(Hi);
                 disp += n+1;
             } else {
-                if (eps != 0.0)  Hi = sqrt(Hi*Hi + eps); // Regularization for factors
+                if(Hi <= 0){
+                    if(work->prox_mask != NULL) work->prox_mask[i] = 1;
+                    work->n_prox++;
+                    Hi = sqrt(Hi*Hi + eps); // Regularization for factors
+                }
                 disp += n-i;
             }
 
