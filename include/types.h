@@ -157,6 +157,11 @@ typedef struct{
     int iterations;
     int sing_ind; // Flag for denoting whether Mk Mk' is singular or not 
 
+    // Semi-proximal support: prox_mask[i] == 1 iff direction i needed eps
+    // regularization to make the Cholesky factor non-singular.
+    int* prox_mask;
+    int  n_prox; // Number of directions that needed regularization
+
 
     // Soft constraint
     c_float soft_slack;

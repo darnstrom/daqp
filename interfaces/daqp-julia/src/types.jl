@@ -159,6 +159,9 @@ struct Workspace
     iterations::Cint
     sing_ind::Cint
 
+    prox_mask::Ptr{Cint}
+    n_prox::Cint
+
     soft_slack::Cdouble
 
     settings::Ptr{DAQPSettings}

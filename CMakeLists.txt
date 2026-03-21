@@ -108,7 +108,7 @@ if(JULIA)
             NAME JuliaBenchmark
             COMMAND bash "${JULIA_INTERFACE_DIR}/test/benchmark_comparison_git.sh"
                 "${JULIA_BINARY_DIR}"
-                "v0.7.2"
+                "v0.8.0"
                 "medium"
                 "5"
                 "${CMAKE_CURRENT_BINARY_DIR}/benchmark_results"

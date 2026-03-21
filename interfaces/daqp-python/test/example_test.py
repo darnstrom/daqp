@@ -277,5 +277,88 @@ class TestModel(unittest.TestCase):
                                       err_msg="setup primal_start must not mutate sense")
 
 
+class TestSemiProximal(unittest.TestCase):
+    """Tests for the semi-proximal method (eps_prox > 0)."""
+
+    def test_pd_hessian_n_prox_zero(self):
+        """PD Hessian with eps_prox > 0: no direction needs regularisation (n_prox=0)."""
+        H = np.array([[1.0, 0.0], [0.0, 1.0]], dtype=c_double)
+        f = np.array([1.0, 1.0], dtype=c_double)
+        A = np.zeros((0, 2), dtype=c_double)
+        bupper = np.array([1.0, 1.0], dtype=c_double)
+        blower = np.array([-1.0, -1.0], dtype=c_double)
+        sense = np.array([0, 0], dtype=c_int)
+
+        d = daqp.Model()
+        d.settings = {'eps_prox': 1e-4}
+        d.setup(H, f, A, bupper, blower, sense)
+        x, fval, ef, info = d.solve()
+
+        self.assertEqual(ef, 1)
+        np.testing.assert_allclose(x, [-1.0, -1.0], atol=1e-4)
+
+    def test_singular_hessian_semi_proximal(self):
+        """Rank-1 Hessian: only the singular direction gets regularised."""
+        # H = diag(1, 0): x2 direction is singular
+        H = np.array([[1.0, 0.0], [0.0, 0.0]], dtype=c_double)
+        f = np.array([1.0, 1.0], dtype=c_double)
+        # Use simple-bound columns as A rows so A is non-empty (ms=0, mA=2)
+        A = np.eye(2, dtype=c_double)
+        bupper = np.array([2.0, 2.0], dtype=c_double)
+        blower = np.array([-2.0, -2.0], dtype=c_double)
+        sense = np.array([0, 0], dtype=c_int)
+
+        d = daqp.Model()
+        d.settings = {'eps_prox': 1e-3}
+        d.setup(H, f, A, bupper, blower, sense)
+        x, fval, ef, info = d.solve()
+
+        self.assertEqual(ef, 1)
+        # x1 minimises 0.5*x1^2 + x1 unconstrained -> x1* = -1
+        # x2 is singular; regularisation + f[1]=1 pushes to lower bound
+        self.assertAlmostEqual(x[0], -1.0, places=3)
+        self.assertAlmostEqual(x[1], -2.0, places=3)
+
+    def test_zero_hessian_all_singular(self):
+        """Zero Hessian: all directions are singular, full proximal applied."""
+        H = np.array([[0.0, 0.0], [0.0, 0.0]], dtype=c_double)
+        f = np.array([1.0, 2.0], dtype=c_double)
+        # Use simple-bound columns as A rows so A is non-empty
+        A = np.eye(2, dtype=c_double)
+        bupper = np.array([3.0, 3.0], dtype=c_double)
+        blower = np.array([-3.0, -3.0], dtype=c_double)
+        sense = np.array([0, 0], dtype=c_int)
+
+        d = daqp.Model()
+        d.settings = {'eps_prox': 1e-2}
+        d.setup(H, f, A, bupper, blower, sense)
+        x, fval, ef, info = d.solve()
+
+        self.assertGreater(ef, 0)
+        # Regularised problem: min eps/2*||x||^2 + f'*x  -> x* = -f/eps (clipped to bounds)
+        np.testing.assert_allclose(x, [-3.0, -3.0], atol=1e-3)
+
+    def test_pd_hessian_matches_no_prox(self):
+        """With a PD Hessian, eps_prox > 0 still gives the correct solution."""
+        H = np.array([[4.0, 1.0], [1.0, 3.0]], dtype=c_double)
+        f = np.array([1.0, 2.0], dtype=c_double)
+        A = np.zeros((0, 2), dtype=c_double)
+        bupper = np.array([5.0, 5.0], dtype=c_double)
+        blower = np.array([-5.0, -5.0], dtype=c_double)
+        sense = np.array([0, 0], dtype=c_int)
+
+        # Reference: solve without proximal
+        x_ref, _, ef_ref, _ = daqp.solve(H, f, A, bupper, blower, sense)
+        self.assertEqual(ef_ref, 1)
+
+        # Solve with proximal on PD H -- should converge to same solution
+        d = daqp.Model()
+        d.settings = {'eps_prox': 1e-4}
+        d.setup(H, f, A, bupper, blower, sense)
+        x_prox, _, ef_prox, _ = d.solve()
+        self.assertEqual(ef_prox, 1)
+        np.testing.assert_allclose(x_prox, x_ref, atol=1e-3)
+
+
 if __name__ == '__main__':
     unittest.main()

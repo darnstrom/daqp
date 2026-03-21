@@ -136,6 +136,8 @@ void write_daqp_workspace_h(FILE *f, DAQPWorkspace* work, const char* prefix){
 
     fprintf(f, "extern int %sWS[%d];\n\n", prefix, ntot+1);
 
+    fprintf(f, "extern int %sprox_mask[%d];\n\n", prefix, n);
+
     fprintf(f, "extern DAQPWorkspace %swork;\n\n", prefix);
 }
 
@@ -185,6 +187,8 @@ void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work, const char* prefix){
 
     fprintf(f, "int %sWS[%d];\n\n", prefix, ntot+1);
 
+    fprintf(f, "int %sprox_mask[%d];\n\n", prefix, n);
+
     //Workspace struct
     fprintf(f, "DAQPWorkspace %swork= {\n", prefix);
     fprintf(f, "NULL,\n"); // DAQPProblem
@@ -199,6 +203,7 @@ void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work, const char* prefix){
             prefix,prefix,prefix,prefix, 0); // reuse_ind
     fprintf(f, "%sWS, %d,\n", prefix, 0); //n_active
     fprintf(f, "%d,%d,\n",0,-1); //iterations + sing_id
+    fprintf(f, "%sprox_mask, %d,\n", prefix, n); // prox_mask
     fprintf(f, "%f,\n",0.0); // Soft slack
     fprintf(f, "&%ssettings, \n", prefix);
     // BnB
