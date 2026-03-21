@@ -67,6 +67,8 @@ class DAQP {
     EigenDAQPResult result_;
     DAQPProblem qp_;
     int resize_result(int n, int m, Eigen::VectorXi const& break_points);
+    c_float* rinv_buf_;
+    c_float* v_buf_;
 
   public:
     DAQP(int max_variables, int max_constraints, int max_constraints_in_level);
@@ -103,6 +105,7 @@ class DAQP {
     void set_abs_subopt(double val);
     void set_sing_tol(double val);
     void set_refactor_tol(double val);
+    void set_time_limit(double val);
 
     // Getters for result
     Eigen::VectorXd get_primal();

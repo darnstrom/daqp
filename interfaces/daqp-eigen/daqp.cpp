@@ -141,12 +141,25 @@ DAQP::DAQP(int max_variables, int max_constraints, int max_constraints_in_level)
   , max_constraints_{max_constraints}
   , max_constraints_in_level_{max_constraints_in_level} {
     allocate_daqp_workspace(&work_, max_variables, max_constraints_in_level);
-    allocate_daqp_ldp(&work_, max_variables, max_constraints, 0, 0, 0);
+    allocate_daqp_ldp(&work_, max_variables, max_constraints, 0, 1, 1);
+    // Save pre-allocated buffers but start in LDP (identity Hessian) mode,
+    // where Rinv must be NULL so the solver skips the Hessian back-transformation.
+    rinv_buf_ = work_.Rinv;
+    work_.Rinv = nullptr;
+    v_buf_ = work_.v;
+    work_.v = nullptr;
     daqp_default_settings(&settings_);
     work_.settings = &settings_;
 }
 
 DAQP::~DAQP() {
+    // Restore pre-allocated buffers so free_daqp_ldp can free them correctly.
+    // After a QP solve the buffer may be in RinvD (diagonal H) or Rinv (dense H);
+    // restore only when neither pointer holds the buffer (i.e. we are in LDP mode).
+    if (work_.Rinv == nullptr && work_.RinvD == nullptr)
+        work_.Rinv = rinv_buf_;
+    if (work_.v == nullptr)
+        work_.v = v_buf_;
     work_.settings = nullptr;
     free_daqp_workspace(&work_);
     free_daqp_ldp(&work_);
@@ -217,8 +230,35 @@ int DAQP::update(Eigen::MatrixXd const& H,
     assert(resize_status == 0);
 
     if (update_mask < 0) {
-        // Assume that everythig should be updated
-        update_mask = DAQP_UPDATE_Rinv + DAQP_UPDATE_M + DAQP_UPDATE_v + DAQP_UPDATE_d + DAQP_UPDATE_sense + DAQP_UPDATE_hierarchy;
+        // Assume that everything should be updated, but only include Rinv/v
+        // updates when H/f are actually provided (avoids null dereference in
+        // daqp_update_Rinv when H is nullptr).
+        update_mask = DAQP_UPDATE_M + DAQP_UPDATE_d + DAQP_UPDATE_sense + DAQP_UPDATE_hierarchy;
+        if (H_ptr != nullptr) update_mask += DAQP_UPDATE_Rinv;
+        if (f_ptr != nullptr) update_mask += DAQP_UPDATE_v;
+    }
+
+    // Manage the pre-allocated Rinv buffer:
+    // - When H is provided, make the buffer visible to daqp_update_Rinv.
+    // - When H is not provided, hide the buffer so the solver treats the
+    //   Hessian as identity (Rinv == nullptr means R = I in daqp.c).
+    if (H_ptr != nullptr) {
+        if (work_.Rinv == nullptr && work_.RinvD == nullptr)
+            work_.Rinv = rinv_buf_;
+    } else {
+        if (work_.Rinv != nullptr) rinv_buf_ = work_.Rinv;
+        else if (work_.RinvD != nullptr) rinv_buf_ = work_.RinvD;
+        work_.Rinv = nullptr;
+        work_.RinvD = nullptr;
+    }
+
+    // Manage the pre-allocated v buffer similarly.
+    if (f_ptr != nullptr) {
+        if (work_.v == nullptr)
+            work_.v = v_buf_;
+    } else {
+        if (work_.v != nullptr) v_buf_ = work_.v;
+        work_.v = nullptr;
     }
 
     if (warm_start_){
@@ -357,6 +397,11 @@ void DAQP::set_sing_tol(double val) {
 
 void DAQP::set_refactor_tol(double val) {
     settings_.refactor_tol = val;
+    is_solved_ = false;
+}
+
+void DAQP::set_time_limit(double val) {
+    settings_.time_limit = val;
     is_solved_ = false;
 }
 
