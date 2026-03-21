@@ -367,11 +367,19 @@ cdef class Model:
             free_daqp_workspace(self._work)   # also frees settings
             free_daqp_ldp(self._work)
         else:
-            # Free the settings allocated in __cinit__ so setup_daqp can
-            # allocate its own (preventing the 'own_settings=0' leak path).
             if self._work.settings != NULL:
                 free(self._work.settings)
                 self._work.settings = NULL
+
+        # ---- pre-allocate settings with user values so setup_daqp sees them ----
+        # This is critical: daqp_update_Rinv (called inside setup_daqp) reads
+        # eps_prox from settings to decide which Cholesky diagonals need
+        # regularisation.  If settings were NULL or held default (eps_prox=0)
+        # when the Cholesky runs, a singular Hessian would be rejected as
+        # non-convex even when the caller supplied a non-zero eps_prox.
+        allocate_daqp_settings(self._work)   # fresh allocation, defaults
+        if restore_settings:
+            self._work.settings[0] = old_settings_val  # apply user values NOW
 
         # ---- build the problem struct ----
         cdef double* H_ptr  = NULL if H is None else &self._H[0, 0]

@@ -431,3 +431,66 @@ end
     @test norm(xref-x) < tol
 end
 
+@testset "Semi-proximal method" begin
+    # --- PD Hessian: n_prox must be 0, result matches eps_prox=0 solve ---
+    n2 = 5; m2 = 20; ms2 = 5; nAct2 = 4
+    xref,H,f,A,bupper,blower,sense = generate_test_QP(n2,m2,ms2,nAct2,1e2)
+
+    # Reference (no proximal)
+    xref2,fval_ref,ef_ref,_ = quadprog(H,f,A,bupper,blower,sense)
+    @test ef_ref == DAQPBase.OPTIMAL
+
+    # With eps_prox > 0 on PD H: solver should still reach the optimum.
+    s_prox = settings(DAQPBase.Model(), Dict(:eps_prox => 1e-4))
+    x_prox,_,ef_prox,_ = quadprog(H,f,A,bupper,blower,sense; settings=s_prox)
+    @test ef_prox == DAQPBase.OPTIMAL
+    @test norm(xref2 - x_prox) < tol
+
+    # Check that the Workspace struct layout is correct by reading n_prox via
+    # unsafe_load -- it must be 0 for a PD Hessian (no regularisation needed).
+    d = DAQPBase.Model()
+    DAQPBase.settings(d, Dict(:eps_prox => 1e-4))
+    DAQPBase.setup(d, H, f, A, bupper, blower, sense)
+    p = d.work  # raw workspace pointer (Ptr{Cvoid})
+    ws = unsafe_load(Ptr{DAQPBase.Workspace}(p))
+    @test ws.n_prox == 0
+
+    # --- Rank-1 Hessian: x2 direction is singular -> n_prox == 1 ---
+    H_sing = [1.0 0.0; 0.0 0.0]
+    f_sing = [1.0; 1.0]
+    A_sing = zeros(0, 2)
+    bu_sing = [2.0; 2.0]
+    bl_sing = [-2.0; -2.0]
+    sense_sing = zeros(Cint, 2)
+
+    d2 = DAQPBase.Model()
+    DAQPBase.settings(d2, Dict(:eps_prox => 1e-3))
+    DAQPBase.setup(d2, H_sing, f_sing, A_sing, bu_sing, bl_sing, sense_sing)
+    ws2 = unsafe_load(Ptr{DAQPBase.Workspace}(d2.work))
+    @test ws2.n_prox == 1   # only x2 direction needed regularisation
+
+    x2,_,ef2,_ = DAQPBase.solve(d2)
+    @test ef2 == DAQPBase.OPTIMAL
+    @test abs(x2[1] - (-1.0)) < tol   # x1* = -1
+    @test abs(x2[2] - (-2.0)) < tol   # x2* = -2 (lower bound)
+
+    # --- Zero Hessian: all directions singular -> n_prox == n ---
+    n3 = 3
+    H_zero = zeros(n3, n3)
+    f_zero = ones(n3)
+    A_zero = zeros(0, n3)
+    bu_zero =  5.0*ones(n3)
+    bl_zero = -5.0*ones(n3)
+    sense_zero = zeros(Cint, n3)
+
+    d3 = DAQPBase.Model()
+    DAQPBase.settings(d3, Dict(:eps_prox => 1e-2))
+    DAQPBase.setup(d3, H_zero, f_zero, A_zero, bu_zero, bl_zero, sense_zero)
+    ws3 = unsafe_load(Ptr{DAQPBase.Workspace}(d3.work))
+    @test ws3.n_prox == n3
+
+    x3,_,ef3,_ = DAQPBase.solve(d3)
+    @test ef3 > 0
+    @test norm(x3 .- (-5.0)) < tol  # all at lower bound
+end
+
