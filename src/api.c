@@ -248,6 +248,7 @@ void allocate_daqp_settings(DAQPWorkspace *work){
 
 void free_daqp_bnb(DAQPWorkspace* work){
     if(work->bnb != NULL){
+        free(work->bnb->bin_ids);
         free(work->bnb->tree);
         free(work->bnb->tree_WS);
         free(work->bnb->fixed_ids);
