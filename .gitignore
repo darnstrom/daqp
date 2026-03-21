@@ -2,3 +2,4 @@ build/
 *.mexa64
 pull_requests
 *.so
+*.csv
