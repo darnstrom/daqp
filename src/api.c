@@ -16,6 +16,9 @@ void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
         if(work->avi == NULL){
             if(work->unconstrained_optimal){
                 work->iterations = 0;
+                work->fval = 0;
+                work->n_active = 0;
+                work->soft_slack = 0;
                 res->exitflag = DAQP_EXIT_OPTIMAL;
             }
             else if(work->bnb != NULL)
