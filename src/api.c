@@ -151,8 +151,6 @@ int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp){
         update_mask+=DAQP_UPDATE_Rinv;
     }
     // Only allocate v if f is not NULL (QP linear term or LP objective).
-    // For proximal iterations v is also needed, but that is always the case
-    // when n_prox > 0, which implies f is present (LP) or H is singular.
     if(qp->f!=NULL){
         alloc_v = 1;
         update_mask+=DAQP_UPDATE_v;
@@ -170,10 +168,6 @@ int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp){
         free_daqp_ldp(work);
         return error_flag;
     }
-    // For LPs (no Hessian), mark all directions as needing proximal regularisation.
-    // This lets daqp_solve dispatch to daqp_prox based on n_prox rather than eps_prox.
-    if(qp->H == NULL && qp->f!=NULL)
-        work->n_prox = work->n;
     return 1;
 }
 

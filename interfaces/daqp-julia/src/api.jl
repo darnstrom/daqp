@@ -249,9 +249,6 @@ function setup(daqp::DAQPBase.Model, qp::DAQPBase.QPj;
         # ensure there is no binary constraint
         @assert(!any((qp.sense.&BINARY).==BINARY),
                 "DAQP requires the objective to be strictly convex to support binary variables")
-        # ensure proximal-point iterations are used for LPs.
-        # This is required for pre-v0.9 C libraries that dispatch on eps_prox rather than n_prox.
-        (old_settings.eps_prox == 0) && settings(daqp,Dict(:eps_prox=>1))
     end
     
     # Handle AVI with other setup 
