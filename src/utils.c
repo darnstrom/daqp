@@ -46,7 +46,7 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
         daqp_update_v(qp->f,work,mask);
     }
 
-    int check_unconstrained =  ((mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M||
+    const int check_unconstrained =  ((mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M||
             mask&DAQP_UPDATE_v||mask&DAQP_UPDATE_d) &&
         work->bnb == NULL && work->nh <= 1 && work->avi == NULL) ? 1 : 0;
     /** Check if unconstrained optimum is primal feasible.
@@ -90,18 +90,15 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
         }
 
         // Check general constraints: blower[i] <= A[i,:]*x_unc <= bupper[i]
-        if(feasible){
-            for(i = work->ms, disp = 0; i < work->m; i++){
-                for(j = 0, sum = 0; j < n; j++)
-                    sum += qp->A[disp++] * work->x[j];
-                work->dupper[i] = qp->bupper[i] - sum;
-                work->dlower[i] = qp->blower[i] - sum;
-                if(work->dupper[i] < -primal_tol || work->dlower[i] > primal_tol)
-                    feasible = 0;
-            }
+        for(i = work->ms, disp = 0; i < work->m; i++){
+            for(j = 0, sum = 0.0; j < n; j++)
+                sum += qp->A[disp++] * work->x[j];
+            work->dupper[i] = qp->bupper[i] - sum;
+            work->dlower[i] = qp->blower[i] - sum;
+            if(work->dupper[i] < -primal_tol || work->dlower[i] > primal_tol)
+                feasible = 0;
         }
         if(feasible){
-            // Reset u to 0 so ldp2qp_solution recovers x = Rinv*(0-v) = x_unc
             reset_daqp_workspace(work);
             work->sing_ind = DAQP_UNCONSTRAINED_OPTIMAL;
             return 0;
@@ -127,33 +124,17 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
         error_flag = daqp_check_bounds(work,qp->bupper,qp->blower);
         if(error_flag<0) return error_flag;
         if(error_flag==1) do_activate = 1;
-        if(check_unconstrained){
-            error_flag = daqp_update_d(work,qp->bupper,qp->blower);
-        }
-        else{// Already computed d, just need to normalize (and add first constraint)
-            c_float max_violation = -DAQP_INF;
-            int violation_id = DAQP_EMPTY_IND;
-            int isupper = 0;
-            for(i = 0; i < work->m; i++){
-                work->dupper[i]*=work->scaling[i];
-                work->dlower[i]*=work->scaling[i];
-                if(max_violation < work->dupper[i]){
-                    violation_id = i;
-                    isupper = 1;
-                    max_violation = work->dupper[i];
+
+        if(check_unconstrained){ // Already compute d, just need to normalize
+            if(work->scaling != NULL){
+                for(i = 0; i < work->m; i++){
+                    work->dupper[i]*=work->scaling[i];
+                    work->dlower[i]*=work->scaling[i];
                 }
-                else if(max_violation < -work->dlower[i]){
-                    violation_id = i;
-                    isupper = 0;
-                    max_violation = work->dlower[i];
-                }
-                DAQP_SET_ACTIVE(violation_id);
-                if(isupper) 
-                    DAQP_SET_UPPER(violation_id);
-                else
-                    DAQP_SET_LOWER(violation_id);
             }
-            do_activate = 1;
+        }
+        else{// Normal update of d
+            error_flag = daqp_update_d(work,qp->bupper,qp->blower);
         }
     }
 
