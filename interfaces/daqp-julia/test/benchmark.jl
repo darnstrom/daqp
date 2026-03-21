@@ -33,91 +33,105 @@ PROBLEM_SIZES = Dict(
 # Tolerance for solution correctness
 CORRECTNESS_TOL = 1e-4
 
-function benchmark_qp(n, m, ms, nAct, kappa; num_runs=11)
+function benchmark_qp(n, m, ms, nAct, kappa; num_problems=10, num_repeats=5)
     """
     Benchmark quadratic programming with given problem size.
-    Tracks setup_time and solve_time separately.
-    Returns statistics for both times and iterations.
+    Generates num_problems distinct problems and solves each num_repeats times.
+    The per-problem timing is the median over num_repeats solves (smoothing out
+    background noise). The reported stats are medians over all per-problem medians.
     """
-    setup_times = Float64[]
-    solve_times = Float64[]
-    iterations = Int[]
-    
-    for run in 1:num_runs
-        # Generate test problem with known solution
+    setup_medians = Float64[]
+    solve_medians = Float64[]
+    iter_medians  = Float64[]
+
+    for _ in 1:num_problems
+        # Generate one test problem with known solution
         xref, H, f, A, bupper, blower, sense = generate_test_QP(n, m, ms, nAct, kappa)
-        
-        # Solve and extract timing from info struct
-        x, fval, exitflag, info = quadprog(H, f, A, bupper, blower, sense)
-        
-        # Verify correctness
-        if norm(xref - x) > CORRECTNESS_TOL
-            @warn "Solution quality issue: norm(xref - x) = $(norm(xref - x))"
+
+        prob_setup = Float64[]
+        prob_solve = Float64[]
+        prob_iters = Int[]
+
+        for _ in 1:num_repeats
+            x, fval, exitflag, info = quadprog(H, f, A, bupper, blower, sense)
+            if norm(xref - x) > CORRECTNESS_TOL
+                @warn "Solution quality issue: norm(xref - x) = $(norm(xref - x))"
+            end
+            push!(prob_setup, info.setup_time)
+            push!(prob_solve, info.solve_time)
+            push!(prob_iters, info.iterations)
         end
-        
-        push!(setup_times, info.setup_time)
-        push!(solve_times, info.solve_time)
-        push!(iterations, info.iterations)
+
+        push!(setup_medians, median(prob_setup))
+        push!(solve_medians, median(prob_solve))
+        push!(iter_medians,  median(prob_iters))
     end
-    
-    total_times = setup_times .+ solve_times
+
+    total_medians = setup_medians .+ solve_medians
     return (
-        setup_median=median(setup_times),
-        setup_min=minimum(setup_times),
-        setup_max=maximum(setup_times),
-        solve_median=median(solve_times),
-        solve_min=minimum(solve_times),
-        solve_max=maximum(solve_times),
-        total_median=median(total_times),
-        iter_median=median(iterations),
-        iter_min=minimum(iterations),
-        iter_max=maximum(iterations),
-        iterations=iterations,
-        num_runs=num_runs
+        setup_median=median(setup_medians),
+        setup_min=minimum(setup_medians),
+        setup_max=maximum(setup_medians),
+        solve_median=median(solve_medians),
+        solve_min=minimum(solve_medians),
+        solve_max=maximum(solve_medians),
+        total_median=median(total_medians),
+        iter_median=median(iter_medians),
+        iter_min=minimum(iter_medians),
+        iter_max=maximum(iter_medians),
+        num_problems=num_problems,
+        num_repeats=num_repeats
     )
 end
 
-function benchmark_lp(n, m, ms; num_runs=11)
+function benchmark_lp(n, m, ms; num_problems=10, num_repeats=5)
     """
     Benchmark linear programming with given problem size.
-    Tracks setup_time and solve_time separately.
-    Returns statistics for both times and iterations.
+    Generates num_problems distinct problems and solves each num_repeats times.
+    The per-problem timing is the median over num_repeats solves (smoothing out
+    background noise). The reported stats are medians over all per-problem medians.
     """
-    setup_times = Float64[]
-    solve_times = Float64[]
-    iterations = Int[]
-    
-    for run in 1:num_runs
-        # Generate test problem with known solution
+    setup_medians = Float64[]
+    solve_medians = Float64[]
+    iter_medians  = Float64[]
+
+    for _ in 1:num_problems
+        # Generate one test problem with known solution
         xref, f, A, bupper, blower, sense = generate_test_LP(n, m, ms)
-        
-        # Solve and extract timing from info struct
-        x, fval, exitflag, info = linprog(f, A, bupper, blower, sense)
-        
-        # Verify correctness
-        if abs(f' * (xref - x)) > CORRECTNESS_TOL
-            @warn "Solution quality issue: |f'*(xref - x)| = $(abs(f' * (xref - x)))"
+
+        prob_setup = Float64[]
+        prob_solve = Float64[]
+        prob_iters = Int[]
+
+        for _ in 1:num_repeats
+            x, fval, exitflag, info = linprog(f, A, bupper, blower, sense)
+            if abs(f' * (xref - x)) > CORRECTNESS_TOL
+                @warn "Solution quality issue: |f'*(xref - x)| = $(abs(f' * (xref - x)))"
+            end
+            push!(prob_setup, info.setup_time)
+            push!(prob_solve, info.solve_time)
+            push!(prob_iters, info.iterations)
         end
-        
-        push!(setup_times, info.setup_time)
-        push!(solve_times, info.solve_time)
-        push!(iterations, info.iterations)
+
+        push!(setup_medians, median(prob_setup))
+        push!(solve_medians, median(prob_solve))
+        push!(iter_medians,  median(prob_iters))
     end
-    
-    total_times = setup_times .+ solve_times
+
+    total_medians = setup_medians .+ solve_medians
     return (
-        setup_median=median(setup_times),
-        setup_min=minimum(setup_times),
-        setup_max=maximum(setup_times),
-        solve_median=median(solve_times),
-        solve_min=minimum(solve_times),
-        solve_max=maximum(solve_times),
-        total_median=median(total_times),
-        iter_median=median(iterations),
-        iter_min=minimum(iterations),
-        iter_max=maximum(iterations),
-        iterations=iterations,
-        num_runs=num_runs
+        setup_median=median(setup_medians),
+        setup_min=minimum(setup_medians),
+        setup_max=maximum(setup_medians),
+        solve_median=median(solve_medians),
+        solve_min=minimum(solve_medians),
+        solve_max=maximum(solve_medians),
+        total_median=median(total_medians),
+        iter_median=median(iter_medians),
+        iter_min=minimum(iter_medians),
+        iter_max=maximum(iter_medians),
+        num_problems=num_problems,
+        num_repeats=num_repeats
     )
 end
 
@@ -152,7 +166,7 @@ function run_benchmarks(; suite="all", output_file="daqp_benchmark_results.csv",
     
     # Prepare CSV header and data
     csv_lines = [
-        "timestamp,daqp_version,problem_type,problem_id,n_variables,n_constraints,n_simple_bounds,condition_number,setup_time_median_s,solve_time_median_s,total_time_median_s,iter_median,iter_min,iter_max,num_runs"
+        "timestamp,daqp_version,problem_type,problem_id,n_variables,n_constraints,n_simple_bounds,condition_number,setup_time_median_s,solve_time_median_s,total_time_median_s,iter_median,iter_min,iter_max,num_problems,num_repeats"
     ]
     
     timestamp = string(now())
@@ -184,7 +198,8 @@ function run_benchmarks(; suite="all", output_file="daqp_benchmark_results.csv",
             stats.iter_median,
             stats.iter_min,
             stats.iter_max,
-            stats.num_runs
+            stats.num_problems,
+            stats.num_repeats
         ], ",")
         push!(csv_lines, csv_row)
         
@@ -214,7 +229,8 @@ function run_benchmarks(; suite="all", output_file="daqp_benchmark_results.csv",
             stats.iter_median,
             stats.iter_min,
             stats.iter_max,
-            stats.num_runs
+            stats.num_problems,
+            stats.num_repeats
         ], ",")
         push!(csv_lines, csv_row)
         
