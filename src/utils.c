@@ -125,13 +125,14 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
         if(error_flag<0) return error_flag;
         if(error_flag==1) do_activate = 1;
 
-        if(check_unconstrained){ // Already compute d, just need to normalize
+        if(check_unconstrained){ // Already computed d, just need to normalize
             if(work->scaling != NULL){
                 for(i = 0; i < work->m; i++){
                     work->dupper[i]*=work->scaling[i];
                     work->dlower[i]*=work->scaling[i];
                 }
             }
+            work->reuse_ind = 0; // d changed => cannot reuse intermediate results
         }
         else{// Normal update of d
             error_flag = daqp_update_d(work,qp->bupper,qp->blower);
