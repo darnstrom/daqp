@@ -101,6 +101,7 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
     int i, j, k, disp, disp2, disp3;
     const int n = work->n; 
     c_float eps = work->settings->eps_prox;
+    c_float zero_tol = work->settings->zero_tol;
 
     // Reset the semi-proximal mask for this factorization
     if(work->prox_mask != NULL){
@@ -129,16 +130,16 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
             // If factored, skip eps and sqrt, else apply them
             if(!is_factored){
                 // Only add eps if this direction would be singular without it
-                if(Hi <= 0){
+                if(Hi <= zero_tol){
                     if(work->prox_mask != NULL) work->prox_mask[i] = 1;
                     work->n_prox++;
                     Hi += eps;
                 }
-                if (Hi <= 0) return DAQP_EXIT_NONCONVEX;
+                if (Hi <= zero_tol) return DAQP_EXIT_NONCONVEX;
                 Hi = sqrt(Hi);
                 disp += n+1;
             } else {
-                if(Hi <= 0){
+                if(Hi <= zero_tol){
                     if(work->prox_mask != NULL) work->prox_mask[i] = 1;
                     work->n_prox++;
                     Hi = sqrt(Hi*Hi + eps); // Regularization for factors
@@ -172,13 +173,13 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
                 diag_i -= work->Rinv[disp2] * work->Rinv[disp2];
 
             // Only regularize if this direction is singular
-            if(diag_i <= 0){
+            if(diag_i <= zero_tol){
                 if(work->prox_mask != NULL) work->prox_mask[i] = 1;
                 work->n_prox++;
                 diag_i += eps;
             }
 
-            if (diag_i <= 0) return DAQP_EXIT_NONCONVEX;
+            if (diag_i <= zero_tol) return DAQP_EXIT_NONCONVEX;
             work->Rinv[disp] = sqrt(diag_i);
 
             for (j=1; j<n-i; j++) {
