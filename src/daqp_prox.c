@@ -126,10 +126,13 @@ int daqp_prox(DAQPWorkspace *work){
         if(is_lp){
             // Track LP objective f'x; no improvement over several
             // consecutive iterations signals a fixed point.
+            // Use DAQP_DEFAULT_LP_PROG_TOL (1e-10) rather than the QP
+            // progress_tol (1e-14): the LP objective is in raw problem
+            // units and a much larger threshold is appropriate.
             c_float lp_obj = 0.0;
             for(i = 0; i < nx; i++) lp_obj += work->qp->f[i] * work->x[i];
             max_diff = best_fval - lp_obj;
-            if(max_diff < work->settings->progress_tol){
+            if(max_diff < DAQP_DEFAULT_LP_PROG_TOL){
                 if(++cycle_counter > work->settings->cycle_tol){
                     exitflag = DAQP_EXIT_OPTIMAL; // Stagnated at fixed point
                     break;

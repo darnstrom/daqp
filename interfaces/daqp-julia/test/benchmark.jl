@@ -196,7 +196,7 @@ function benchmark_prox_comparison(n, m, ms, rank, nAct, kappa; num_runs=10)
         # which applied eps to every direction unconditionally.  The resulting
         # problem is then solved with eps_prox = 0 (direct daqp_ldp), giving the
         # "one-shot" result the old code would have produced. ---
-        η = 1.0  # same eps as the default eps_prox
+        η = 1.0  # regularisation amount added to H (matches the eps used in the old full-proximal approach)
         H_reg = H + η * I
         s_old = settings(DAQPBase.Model(), Dict(:eps_prox => 0.0))
         x_old, _, ef_old, info_old = quadprog(H_reg, f, A, bupper, blower, sense; settings=s_old)
