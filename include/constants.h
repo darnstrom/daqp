@@ -24,7 +24,7 @@ extern "C" {
 #define DAQP_DEFAULT_ABS_SUBOPT 0
 #define DAQP_DEFAULT_SING_TOL (3.7e-11)
 #define DAQP_DEFAULT_REFACTOR_TOL 1e-9
-#define DAQP_DEFAULT_EPS_PROX 1.0
+#define DAQP_DEFAULT_EPS_PROX 1e-6
 
 // MACROS
 #define DAQP_ARSUM(x) ((x)*(x+1)/2)

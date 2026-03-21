@@ -23,12 +23,12 @@ int daqp_prox(DAQPWorkspace *work){
     int exitflag;
     c_float *swp_ptr;
     c_float max_diff, tol_stat;
-    c_float eps     = work->settings->eps_prox;
-    c_float eta     = work->settings->eta_prox;
+    c_float eta = work->settings->eta_prox;
     int  cycle_counter = 0;
     c_float best_fval  = DAQP_INF;
 
     const int is_lp = (work->Rinv == NULL && work->RinvD == NULL);
+    c_float eps = is_lp ? 1.0 : work->settings->eps_prox;
 
     // For a QP whose Hessian is already positive definite (n_prox == 0),
     // no direction needs a proximal shift.  The inner QP equals the
