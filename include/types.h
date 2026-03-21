@@ -156,6 +156,7 @@ typedef struct{
 
     int iterations;
     int sing_ind; // Flag for denoting whether Mk Mk' is singular or not 
+    int unconstrained_optimal; // Flag: unconstrained optimum is primal feasible (skip M computation)
 
 
     // Soft constraint

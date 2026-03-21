@@ -14,7 +14,11 @@ void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
     // Select algorithm
     if(work->settings->eps_prox==0){
         if(work->avi == NULL){
-            if(work->bnb != NULL)
+            if(work->unconstrained_optimal){
+                work->iterations = 0;
+                res->exitflag = DAQP_EXIT_OPTIMAL;
+            }
+            else if(work->bnb != NULL)
                 res->exitflag = daqp_bnb(work);
             else if(work->nh > 1)
                 res->exitflag = daqp_hiqp(work,res->lam);
@@ -290,6 +294,7 @@ void allocate_daqp_workspace(DAQPWorkspace *work, int n, int ns){
     work->break_points = NULL;
     work->avi = NULL;
     work->timer = NULL;
+    work->unconstrained_optimal = 0;
 
     reset_daqp_workspace(work);
 }
