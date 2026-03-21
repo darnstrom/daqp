@@ -33,7 +33,7 @@ PROBLEM_SIZES = Dict(
 # Tolerance for solution correctness
 CORRECTNESS_TOL = 1e-4
 
-function benchmark_qp(n, m, ms, nAct, kappa; num_runs=5)
+function benchmark_qp(n, m, ms, nAct, kappa; num_runs=11)
     """
     Benchmark quadratic programming with given problem size.
     Tracks setup_time and solve_time separately.
@@ -60,26 +60,24 @@ function benchmark_qp(n, m, ms, nAct, kappa; num_runs=5)
         push!(iterations, info.iterations)
     end
     
+    total_times = setup_times .+ solve_times
     return (
-        setup_mean=mean(setup_times),
-        setup_std=std(setup_times),
+        setup_median=median(setup_times),
         setup_min=minimum(setup_times),
         setup_max=maximum(setup_times),
-        solve_mean=mean(solve_times),
-        solve_std=std(solve_times),
+        solve_median=median(solve_times),
         solve_min=minimum(solve_times),
         solve_max=maximum(solve_times),
-        total_mean=mean(setup_times .+ solve_times),
-        total_std=std(setup_times .+ solve_times),
-        iter_mean=mean(iterations),
-        iter_std=std(iterations),
+        total_median=median(total_times),
+        iter_median=median(iterations),
         iter_min=minimum(iterations),
         iter_max=maximum(iterations),
-        iterations=iterations
+        iterations=iterations,
+        num_runs=num_runs
     )
 end
 
-function benchmark_lp(n, m, ms; num_runs=5)
+function benchmark_lp(n, m, ms; num_runs=11)
     """
     Benchmark linear programming with given problem size.
     Tracks setup_time and solve_time separately.
@@ -106,22 +104,20 @@ function benchmark_lp(n, m, ms; num_runs=5)
         push!(iterations, info.iterations)
     end
     
+    total_times = setup_times .+ solve_times
     return (
-        setup_mean=mean(setup_times),
-        setup_std=std(setup_times),
+        setup_median=median(setup_times),
         setup_min=minimum(setup_times),
         setup_max=maximum(setup_times),
-        solve_mean=mean(solve_times),
-        solve_std=std(solve_times),
+        solve_median=median(solve_times),
         solve_min=minimum(solve_times),
         solve_max=maximum(solve_times),
-        total_mean=mean(setup_times .+ solve_times),
-        total_std=std(setup_times .+ solve_times),
-        iter_mean=mean(iterations),
-        iter_std=std(iterations),
+        total_median=median(total_times),
+        iter_median=median(iterations),
         iter_min=minimum(iterations),
         iter_max=maximum(iterations),
-        iterations=iterations
+        iterations=iterations,
+        num_runs=num_runs
     )
 end
 
@@ -156,7 +152,7 @@ function run_benchmarks(; suite="all", output_file="daqp_benchmark_results.csv",
     
     # Prepare CSV header and data
     csv_lines = [
-        "timestamp,daqp_version,problem_type,problem_id,n_variables,n_constraints,n_simple_bounds,condition_number,setup_time_mean_s,setup_time_std_s,solve_time_mean_s,solve_time_std_s,total_time_mean_s,total_time_std_s,iter_mean,iter_std,iter_min,iter_max,num_runs"
+        "timestamp,daqp_version,problem_type,problem_id,n_variables,n_constraints,n_simple_bounds,condition_number,setup_time_median_s,solve_time_median_s,total_time_median_s,iter_median,iter_min,iter_max,num_runs"
     ]
     
     timestamp = string(now())
@@ -182,21 +178,17 @@ function run_benchmarks(; suite="all", output_file="daqp_benchmark_results.csv",
             m,
             ms,
             kappa,
-            stats.setup_mean,
-            stats.setup_std,
-            stats.solve_mean,
-            stats.solve_std,
-            stats.total_mean,
-            stats.total_std,
-            stats.iter_mean,
-            stats.iter_std,
+            stats.setup_median,
+            stats.solve_median,
+            stats.total_median,
+            stats.iter_median,
             stats.iter_min,
             stats.iter_max,
-            5  # num_runs
+            stats.num_runs
         ], ",")
         push!(csv_lines, csv_row)
         
-        println("    Setup: $(round(stats.setup_mean*1e6; digits=2))±$(round(stats.setup_std*1e6; digits=2))µs | Solve: $(round(stats.solve_mean*1e6; digits=2))±$(round(stats.solve_std*1e6; digits=2))µs | Iters: $(round(stats.iter_mean; digits=1))±$(round(stats.iter_std; digits=1))")
+        println("    Setup: $(round(stats.setup_median*1e6; digits=2))µs (median) | Solve: $(round(stats.solve_median*1e6; digits=2))µs (median) | Iters: $(round(stats.iter_median; digits=1)) (median)")
     end
     
     # Run LP benchmarks
@@ -216,21 +208,17 @@ function run_benchmarks(; suite="all", output_file="daqp_benchmark_results.csv",
             m,
             ms,
             "",  # condition_number (N/A for LP)
-            stats.setup_mean,
-            stats.setup_std,
-            stats.solve_mean,
-            stats.solve_std,
-            stats.total_mean,
-            stats.total_std,
-            stats.iter_mean,
-            stats.iter_std,
+            stats.setup_median,
+            stats.solve_median,
+            stats.total_median,
+            stats.iter_median,
             stats.iter_min,
             stats.iter_max,
-            5  # num_runs
+            stats.num_runs
         ], ",")
         push!(csv_lines, csv_row)
         
-        println("    Setup: $(round(stats.setup_mean*1e6; digits=2))±$(round(stats.setup_std*1e6; digits=2))µs | Solve: $(round(stats.solve_mean*1e6; digits=2))±$(round(stats.solve_std*1e6; digits=2))µs | Iters: $(round(stats.iter_mean; digits=1))±$(round(stats.iter_std; digits=1))")
+        println("    Setup: $(round(stats.setup_median*1e6; digits=2))µs (median) | Solve: $(round(stats.solve_median*1e6; digits=2))µs (median) | Iters: $(round(stats.iter_median; digits=1)) (median)")
     end
     
     # Save to CSV
