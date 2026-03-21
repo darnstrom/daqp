@@ -3,10 +3,14 @@ on:
   pull_request:
     branches:
       - master
+    paths-ignore:
+      - "docs/**"
   push:
     branches:
       - master
     tags: "*"
+    paths-ignore:
+      - "docs/**"
 jobs:
   my-job:
     name: Make and run tests in MATLAB
