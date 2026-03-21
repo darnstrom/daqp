@@ -5,7 +5,7 @@ int daqp_bnb(DAQPWorkspace* work){
     DAQPNode* node;
     c_float *swp_ptr = NULL;
 
-    // Modify upper bound based on absolute/relavtive suboptimality tolerance
+    // Modify upper bound based on absolute/relative suboptimality tolerance
     c_float fval_bound0 = work->settings->fval_bound;
     c_float eps_r = 1/(1+work->settings->rel_subopt);
     work->settings->fval_bound = (fval_bound0 - work->settings->abs_subopt)*eps_r;
@@ -21,6 +21,7 @@ int daqp_bnb(DAQPWorkspace* work){
     work->bnb->n_nodes=1;
     work->bnb->n_clean=work->bnb->neq;
 
+    exitflag = DAQP_EXIT_INFEASIBLE;
     // Start tree exploration
     while( work->bnb->n_nodes > 0 ){
 
@@ -28,11 +29,11 @@ int daqp_bnb(DAQPWorkspace* work){
         exitflag = daqp_process_node(node,work); // Solve relaxation
         // Cut conditions
         if(exitflag==DAQP_EXIT_INFEASIBLE) continue; // Dominance cut
-        if(exitflag<0) return exitflag; // Inner solver failed => abort
+        if(exitflag<0) break; // Inner solver failed => exit loop
 
         // Find index to branch over 
         branch_id = daqp_get_branch_id(work); 
-        if(branch_id==-1){// Nothing to branch over => integer feasible
+        if(branch_id==DAQP_EMPTY_IND){// Nothing to branch over => integer feasible
             work->settings->fval_bound = (0.5*work->fval - work->settings->abs_subopt)*eps_r;
             swp_ptr=work->xold; work->xold= work->u; work->u=swp_ptr; // Store feasible sol
         }
@@ -43,12 +44,14 @@ int daqp_bnb(DAQPWorkspace* work){
 
     // Exploration completed 
     work->iterations = work->bnb->itercount;
-    // Correct fval
-    work->fval = 2*work->settings->fval_bound/eps_r+work->settings->abs_subopt;
-    work->settings->fval_bound = fval_bound0;
-    if(swp_ptr==NULL)
-        return DAQP_EXIT_INFEASIBLE;
+    if(swp_ptr==NULL){
+        work->settings->fval_bound = fval_bound0;
+        return exitflag < 0 ? exitflag : DAQP_EXIT_INFEASIBLE;
+    }
     else{
+        // Invert fval_bound = (0.5*fval_best - abs_subopt)*eps_r to recover fval_best
+        work->fval = 2*work->settings->fval_bound/eps_r + 2*work->settings->abs_subopt;
+        work->settings->fval_bound = fval_bound0;
         // Let work->u point to the best feasible solution 
         swp_ptr=work->u; work->u= work->xold; work->xold=swp_ptr;
         return DAQP_EXIT_OPTIMAL;
@@ -69,9 +72,6 @@ int daqp_process_node(DAQPNode* node, DAQPWorkspace* work){
             daqp_warmstart_node(node,work);
         }
         else{
-            //work->bnb->n_clean = node->depth;
-            //node_cleanup_workspace(work->bnb->n_clean,work);
-            //warmstart_node(node,work);
             daqp_add_upper_lower(node->bin_id,work);
             work->sense[DAQP_REMOVE_LOWER_FLAG(node->bin_id)] |= DAQP_IMMUTABLE; //Equality
             if(work->sing_ind != DAQP_EMPTY_IND) // Need to cold start to not miss integer feasible
@@ -94,33 +94,34 @@ int daqp_process_node(DAQPNode* node, DAQPWorkspace* work){
 }
 
 int daqp_get_branch_id(DAQPWorkspace* work){
-    int i,disp;
+    int i, j, disp;
     int branch_id = DAQP_EMPTY_IND;
+    c_float diff;
+
     for(i=0; i < work->bnb->nb; i++){
-        // Branch on first inactive constraint 
-        if(DAQP_IS_ACTIVE(work->bnb->bin_ids[i])) continue;
         branch_id = work->bnb->bin_ids[i];
-        break;
-    }
+        // Skip fixed binary constraints
+        if(DAQP_IS_ACTIVE(branch_id)) continue;
 
-    if(branch_id == DAQP_EMPTY_IND) return DAQP_EMPTY_IND; // Nothing to branch over (=>integer feasible)
-
-    // Determine if upper or lower child should be processed first 
-    // by computing whether the upper or lower bound is closer to be activated
-    c_float diff = 0.5*(work->dupper[branch_id]+work->dlower[branch_id]);
-    if(branch_id < work->ms){//Simple bound
-        if(work->Rinv==NULL) diff-=work->u[branch_id]; //Hessian is identify 
-        else{
-            for(i=branch_id,disp=branch_id+DAQP_R_OFFSET(branch_id,work->n);i<work->n;i++)
-                diff-=work->Rinv[disp++]*work->u[i];
+        // Compute signed distance from midpoint between bounds
+        diff = 0.5*(work->dupper[branch_id]+work->dlower[branch_id]);
+        if(branch_id < work->ms){//Simple bound
+            if(work->Rinv==NULL) diff -= work->u[branch_id]; //Hessian is identity
+            else{
+                for(j=branch_id,disp=branch_id+DAQP_R_OFFSET(branch_id,work->n);j<work->n;j++)
+                    diff -= work->Rinv[disp++]*work->u[j];
+            }
         }
+        else{//General bound
+            for(j=0,disp=work->n*(branch_id-work->ms);j<work->n;j++) 
+                diff -= work->M[disp++]*work->u[j];
+        }
+
+        // Branch on the first infeasible binary variable
+        return diff < 0 ? branch_id : DAQP_ADD_LOWER_FLAG(branch_id);
     }
-    else{//General bound
-        for(i=0,disp=work->n*(branch_id-work->ms);i<work->n;i++) 
-            diff-=work->M[disp++]*work->u[i];
-    }
-    branch_id = diff<0 ? branch_id : DAQP_ADD_LOWER_FLAG(branch_id);
-    return branch_id;
+
+    return DAQP_EMPTY_IND;
 }
 
 void daqp_spawn_children(DAQPNode* node, const int branch_id, DAQPWorkspace* work){
@@ -204,9 +205,6 @@ int daqp_add_upper_lower(const int add_id, DAQPWorkspace* work){
 void daqp_setup_cold_bnb(DAQPNode* node,DAQPWorkspace *work){
     int i;
     daqp_node_cleanup_workspace(work->bnb->n_clean,work);
-    work->sing_ind=DAQP_EMPTY_IND;
-    work->n_active=work->bnb->n_clean;
-    work->reuse_ind=work->bnb->n_clean;
     for(i=work->bnb->n_clean - work->bnb->neq; i< node->depth+1;i++){
         daqp_add_upper_lower(work->bnb->fixed_ids[i],work);
         DAQP_SET_IMMUTABLE(DAQP_REMOVE_LOWER_FLAG(work->bnb->fixed_ids[i]));
