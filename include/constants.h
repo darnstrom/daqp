@@ -8,6 +8,7 @@ extern "C" {
 #include <stddef.h>
 
 #define DAQP_EMPTY_IND -1 
+#define DAQP_UNCONSTRAINED_OPTIMAL -2
 #define DAQP_INF ((c_float)1e30)
 
 // DEFAULT SETTINGS 

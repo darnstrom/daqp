@@ -156,7 +156,6 @@ typedef struct{
 
     int iterations;
     int sing_ind; // Flag for denoting whether Mk Mk' is singular or not 
-    int unconstrained_optimal; // Flag: unconstrained optimum is primal feasible (skip M computation)
 
     // Semi-proximal support: prox_mask[i] == 1 iff direction i needed eps
     // regularization to make the Cholesky factor non-singular.

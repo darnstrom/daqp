@@ -11,30 +11,31 @@ void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
     tic(&timer);
     if(work->settings->time_limit > 0)  work->timer = &timer;
 #endif
-    // Select algorithm
-    if(work->n_prox==0){
-        if(work->avi == NULL){
-            if(work->unconstrained_optimal){
-                work->iterations = 0;
-                work->fval = 0;
-                work->n_active = 0;
-                work->soft_slack = 0;
-                res->exitflag = DAQP_EXIT_OPTIMAL;
+    if(work->sing_ind != DAQP_UNCONSTRAINED_OPTIMAL){
+        // Select algorithm
+        if(work->n_prox==0){
+            if(work->avi == NULL){
+                if(work->bnb != NULL)
+                    res->exitflag = daqp_bnb(work);
+                else if(work->nh > 1)
+                    res->exitflag = daqp_hiqp(work,res->lam);
+                else
+                    res->exitflag = daqp_ldp(work);
+                if(res->exitflag > 0) ldp2qp_solution(work); // Retrieve qp solution 
             }
-            else if(work->bnb != NULL)
-                res->exitflag = daqp_bnb(work);
-            else if(work->nh > 1)
-                res->exitflag = daqp_hiqp(work,res->lam);
-            else
-                res->exitflag = daqp_ldp(work);
-            if(res->exitflag > 0) ldp2qp_solution(work); // Retrieve qp solution 
+            else{ //AVI
+                res->exitflag = daqp_solve_avi(work);
+            }
         }
-        else{ //AVI
-            res->exitflag = daqp_solve_avi(work);
+        else{//Prox
+            res->exitflag = daqp_prox(work);
         }
     }
-    else{//Prox
-        res->exitflag = daqp_prox(work);
+    else{// Unconstrained optimum 
+        work->iterations = 1;
+        work->fval = 0;
+        work->soft_slack = 0;
+        res->exitflag = DAQP_EXIT_OPTIMAL;
     }
 #ifdef PROFILING
     work->timer = NULL;
@@ -304,7 +305,6 @@ void allocate_daqp_workspace(DAQPWorkspace *work, int n, int ns){
     work->break_points = NULL;
     work->avi = NULL;
     work->timer = NULL;
-    work->unconstrained_optimal = 0;
 
     reset_daqp_workspace(work);
 }
