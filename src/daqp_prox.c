@@ -133,7 +133,7 @@ int daqp_prox(DAQPWorkspace *work){
             for(i = 0; i < nx; i++) lp_obj += work->qp->f[i] * work->x[i];
             max_diff = best_fval - lp_obj;
             if(max_diff < DAQP_DEFAULT_LP_PROG_TOL){
-                if(++cycle_counter > work->settings->cycle_tol){
+                if(cycle_counter++ > work->settings->cycle_tol){
                     exitflag = DAQP_EXIT_OPTIMAL; // Stagnated at fixed point
                     break;
                 }

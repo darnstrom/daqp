@@ -168,6 +168,10 @@ int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp){
         free_daqp_ldp(work);
         return error_flag;
     }
+    // For LPs (no Hessian), mark all directions as needing proximal regularisation.
+    // This lets daqp_solve dispatch to daqp_prox based on n_prox rather than eps_prox.
+    if(qp->H == NULL && qp->f!=NULL)
+        work->n_prox = work->n;
     return 1;
 }
 

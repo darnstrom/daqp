@@ -93,13 +93,25 @@ function benchmark_lp(n, m, ms; num_runs=5)
     setup_times = Float64[]
     solve_times = Float64[]
     iterations = Int[]
-    
+
+    # Build an LP settings struct with eps_prox=1.  We use the old-style
+    # quadprog(QPj; settings=...) API so that eps_prox is passed directly to
+    # the C function (daqp_quadprog) rather than through the workspace struct.
+    # This makes the benchmark work correctly with both the current C library
+    # (which dispatches LPs via n_prox) and older libraries (which dispatch via
+    # eps_prox != 0), avoiding a struct-layout mismatch when swapping .so files.
+    _default_s = DAQPBase.DAQPSettings()
+    _lp_settings = DAQPBase.DAQPSettings(
+        [f == :eps_prox ? 1.0 : getfield(_default_s, f)
+         for f in fieldnames(DAQPBase.DAQPSettings)]...)
+
     for run in 1:num_runs
         # Generate test problem with known solution
         xref, f, A, bupper, blower, sense = generate_test_LP(n, m, ms)
-        
+
         # Solve and extract timing from info struct
-        x, fval, exitflag, info = linprog(f, A, bupper, blower, sense)
+        qpj = DAQPBase.QPj(zeros(0,0), f, A, bupper, blower, sense)
+        x, fval, exitflag, info = DAQPBase.quadprog(qpj; settings=_lp_settings)
         
         # Verify correctness
         if abs(f' * (xref - x)) > CORRECTNESS_TOL
