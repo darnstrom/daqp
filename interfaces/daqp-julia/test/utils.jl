@@ -99,14 +99,16 @@ function generate_test_avi(n,m)
 
     # Generate H that is PD but not symmetric
     M,N = rand(n,n),randn(n,n)
-    H = M'*M + (N-N')
+    sym = M'*M
+    asym = N-N'
+    H = sym/norm(sym) + asym/(asym)
 
     # f to satisfy stationarity
     f = -H*x-A[AS,:]'*λ[AS]
 
     # b to make AS active and IS inactive 
     Ax = A*x
-    b = Ax + rand(m) 
+    b = Ax + 5*rand(m) 
     b[AS] = Ax[AS]
 
     return x,H,f,A,b

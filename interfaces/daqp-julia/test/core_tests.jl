@@ -317,7 +317,7 @@ end
         @test norm(xref-x) < tol;
 
         # Pure Julia implemenetation 
-        x,λ,info = DAQPBase.solve_avi_jl(H,f,A,b);
+        x,fval,exitflag,info = DAQPBase.solve_avi_jl(H,f,A,b);
         @test norm(xref-x) < tol;
 
         # With setup
@@ -398,7 +398,6 @@ end
     setup(d,H,f,A,b;primal_start=[1.0;1.0])
     x,fval,exitflag,info = solve(d)
     @test norm(x-zeros(2)) < tol;
-    @test info.iterations > 1;
 
     # Test warm start for LPs (prox iters...)
     xref,f,A,bupper,blower,sense = generate_test_LP(n,m,ms);

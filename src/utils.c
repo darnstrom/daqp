@@ -16,6 +16,9 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
     work->m = qp->m;
     work->ms = qp->ms;
 
+    // Reset sing_ind flag (re-evaluated below whenever relevant data changes)
+    work->sing_ind = DAQP_EMPTY_IND;
+
     /** Update constraint sense **/
     if(mask&DAQP_UPDATE_sense){
         if(work->qp->sense == NULL) // Assume all constraints are "normal" inequality constraints
@@ -37,16 +40,78 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
         if(error_flag<0)
             return error_flag;
     }
+
+    /** Update v (moved before M to enable early-exit check below) **/
+    if(mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_v){
+        daqp_update_v(qp->f,work,mask);
+    }
+
+    const int check_unconstrained =  ((mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M||
+            mask&DAQP_UPDATE_v||mask&DAQP_UPDATE_d) &&
+        work->bnb == NULL && work->nh <= 1 && work->avi == NULL) ? 1 : 0;
+    /** Check if unconstrained optimum is primal feasible.
+     *  Compute x_unc = Rinv * (-v) (using the raw, un-normalized Rinv) and
+     *  verify dupper_unnorm = bupper - A*x_unc >= 0 and
+     *         dlower_unnorm = blower - A*x_unc <= 0 for every constraint.
+     *  If so, x_unc is optimal and we can skip the expensive M = A*Rinv step.
+     *  Only applicable for standard QPs (no BnB, no hierarchy, no AVI, no prox). **/
+    if(check_unconstrained){
+        int j, disp;
+        c_float sum;
+        c_float* swp_ptr;
+        int feasible = 1;
+        const int n = work->n;
+        const c_float primal_tol = work->settings->primal_tol;
+
+        // Compute x_unc = Rinv_unnorm * (-v) stored temporarily in work->x.
+        swp_ptr = work->x; work->u = work->xold; work->x = work->xold; work->xold = swp_ptr;
+        if(work->v != NULL){
+            if(work->Rinv != NULL){
+                // Upper-triangular back-substitution: u[i] = sum_{j>=i} Rinv[i,j]*(-v[j])
+                for(i = 0, disp = 0; i < n; i++){
+                    for(j = i, sum = 0; j < n; j++)
+                        sum += work->Rinv[disp++] * work->v[j];
+                    work->x[i] = -sum;
+                }
+            } else if(work->RinvD != NULL){
+                for(i = 0; i < n; i++) work->x[i] = -work->RinvD[i] * work->v[i];
+            } else {
+                for(i = 0; i < n; i++) work->x[i] = -work->v[i];
+            }
+        }
+        // If v == NULL (f == 0), x_unc = 0 and work->x is already 0.
+
+        // Check simple bounds: blower[i] <= x_unc[i] <= bupper[i]
+        for(i = 0; i < work->ms; i++){
+            work->dupper[i] = qp->bupper[i] - work->x[i];
+            work->dlower[i] = qp->blower[i] - work->x[i];
+            if(work->dupper[i] < -primal_tol || work->dlower[i] > primal_tol)
+                feasible = 0;
+        }
+
+        // Check general constraints: blower[i] <= A[i,:]*x_unc <= bupper[i]
+        for(i = work->ms, disp = 0; i < work->m; i++){
+            for(j = 0, sum = 0.0; j < n; j++)
+                sum += qp->A[disp++] * work->x[j];
+            work->dupper[i] = qp->bupper[i] - sum;
+            work->dlower[i] = qp->blower[i] - sum;
+            if(work->dupper[i] < -primal_tol || work->dlower[i] > primal_tol)
+                feasible = 0;
+        }
+        if(feasible){
+            reset_daqp_workspace(work);
+            work->sing_ind = DAQP_UNCONSTRAINED_OPTIMAL;
+            return 0;
+        }
+        // Switch back such that any warm starts a preserved 
+        swp_ptr = work->x; work->u = work->xold; work->x = work->xold; work->xold = swp_ptr;
+    }
+
     /** Update M **/
     if(mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M){
         error_flag = daqp_update_M(work,qp->A,mask);
         if(error_flag<0)
             return error_flag;
-    }
-
-    /** Update v **/
-    if(mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_v){
-        daqp_update_v(qp->f,work,mask);
     }
 
     // Normalize Rinv
@@ -56,9 +121,22 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
 
     /** Update d **/
     if(mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M||mask&DAQP_UPDATE_v||mask&DAQP_UPDATE_d){
-        error_flag = daqp_update_d(work,qp->bupper,qp->blower);
+        error_flag = daqp_check_bounds(work,qp->bupper,qp->blower);
         if(error_flag<0) return error_flag;
         if(error_flag==1) do_activate = 1;
+
+        if(check_unconstrained){ // Already computed d, just need to normalize
+            if(work->scaling != NULL){
+                for(i = 0; i < work->m; i++){
+                    work->dupper[i]*=work->scaling[i];
+                    work->dlower[i]*=work->scaling[i];
+                }
+            }
+            work->reuse_ind = 0; // d changed => cannot reuse intermediate results
+        }
+        else{// Normal update of d
+            error_flag = daqp_update_d(work,qp->bupper,qp->blower);
+        }
     }
 
 #ifdef SOFT_WEIGHTS
@@ -274,24 +352,6 @@ int daqp_update_d(DAQPWorkspace *work, c_float *bupper, c_float *blower){
     int do_activate = 0;
     c_float sum;
 
-#ifndef DAQP_ASSUME_VALID
-    c_float diff;
-    for(i =0;i<work->m;i++){
-        if(DAQP_IS_IMMUTABLE(i)) continue;
-        diff = bupper[i] - blower[i];
-        // Check for trivial infeasibility
-        if ( diff < -work->settings->primal_tol ){
-            return DAQP_EXIT_INFEASIBLE;
-        }
-        // Check for unmarked equality constraint (blower == bupper)
-        else if ( diff < work->settings->zero_tol ){
-            work->sense[i] |= DAQP_ACTIVE + DAQP_IMMUTABLE;
-            do_activate = 1;
-        }
-        // TODO: Make innactive here
-    }
-#endif
-
     const int n = work->n;
     work->reuse_ind = 0; // RHS of KKT system changed => cannot reuse intermediate results
     // Take into scaling of constraints
@@ -330,6 +390,29 @@ int daqp_update_d(DAQPWorkspace *work, c_float *bupper, c_float *blower){
         work->dupper[i]+=sum;
         work->dlower[i]+=sum;
     }
+    return do_activate;
+}
+
+int daqp_check_bounds(DAQPWorkspace* work, c_float* bupper, c_float* blower){
+    int do_activate = 0;
+#ifndef DAQP_ASSUME_VALID
+    int i;
+    c_float diff;
+    for(i =0;i<work->m;i++){
+        if(DAQP_IS_IMMUTABLE(i)) continue;
+        diff = bupper[i] - blower[i];
+        // Check for trivial infeasibility
+        if ( diff < -work->settings->primal_tol ){
+            return DAQP_EXIT_INFEASIBLE;
+        }
+        // Check for unmarked equality constraint (blower == bupper)
+        else if ( diff < work->settings->zero_tol ){
+            work->sense[i] |= DAQP_ACTIVE + DAQP_IMMUTABLE;
+            do_activate = 1;
+        }
+        // TODO: Make innactive here
+    }
+#endif
     return do_activate;
 }
 

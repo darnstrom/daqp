@@ -11,23 +11,31 @@ void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
     tic(&timer);
     if(work->settings->time_limit > 0)  work->timer = &timer;
 #endif
-    // Select algorithm
-    if(work->n_prox==0){
-        if(work->avi == NULL){
-            if(work->bnb != NULL)
-                res->exitflag = daqp_bnb(work);
-            else if(work->nh > 1)
-                res->exitflag = daqp_hiqp(work,res->lam);
-            else
-                res->exitflag = daqp_ldp(work);
-            if(res->exitflag > 0) ldp2qp_solution(work); // Retrieve qp solution 
+    if(work->sing_ind != DAQP_UNCONSTRAINED_OPTIMAL){
+        // Select algorithm
+        if(work->n_prox==0){
+            if(work->avi == NULL){
+                if(work->bnb != NULL)
+                    res->exitflag = daqp_bnb(work);
+                else if(work->nh > 1)
+                    res->exitflag = daqp_hiqp(work,res->lam);
+                else
+                    res->exitflag = daqp_ldp(work);
+                if(res->exitflag > 0) ldp2qp_solution(work); // Retrieve qp solution 
+            }
+            else{ //AVI
+                res->exitflag = daqp_solve_avi(work);
+            }
         }
-        else{ //AVI
-            res->exitflag = daqp_solve_avi(work);
+        else{//Prox
+            res->exitflag = daqp_prox(work);
         }
     }
-    else{//Prox
-        res->exitflag = daqp_prox(work);
+    else{// Unconstrained optimum 
+        work->iterations = 1;
+        work->fval = 0;
+        work->soft_slack = 0;
+        res->exitflag = DAQP_EXIT_OPTIMAL;
     }
 #ifdef PROFILING
     work->timer = NULL;
@@ -575,6 +583,8 @@ void daqp_dual_init_active(DAQPProblem* qp, c_float* lam){
 
 // Set the starting iterate
 void daqp_set_primal_start(DAQPWorkspace* work, c_float* x){
-    int i;
-    for(i = 0; i < work->n; i++) work->x[i] = x[i];
+    if(work->sing_ind != DAQP_UNCONSTRAINED_OPTIMAL){
+        int i;
+        for(i = 0; i < work->n; i++) work->x[i] = x[i];
+    }
 }
