@@ -36,6 +36,7 @@ void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
         work->fval = 0;
         work->soft_slack = 0;
         res->exitflag = DAQP_EXIT_OPTIMAL;
+        ldp2qp_solution(work); // Recover x = Rinv*(u-v) with u=0
     }
 #ifdef PROFILING
     work->timer = NULL;

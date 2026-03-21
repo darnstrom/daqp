@@ -81,28 +81,37 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
         // If v == NULL (f == 0), x_unc = 0 and work->u is already 0.
 
         // Check simple bounds: blower[i] <= x_unc[i] <= bupper[i]
-        for(i = 0; i < work->ms; i++){
+        // dupper[i] = bupper[i] - x_unc[i] >= 0 means upper bound satisfied
+        // dlower[i] = blower[i] - x_unc[i] <= 0 means lower bound satisfied
+        for(i = 0; i < work->ms && feasible; i++){
             work->dupper[i] = qp->bupper[i] - work->u[i];
             work->dlower[i] = qp->blower[i] - work->u[i];
-            if(work->dupper[i] > primal_tol || work->dlower[i] < primal_tol)
+            if(work->dupper[i] < -primal_tol || work->dlower[i] > primal_tol)
                 feasible = 0;
         }
 
         // Check general constraints: blower[i] <= A[i,:]*x_unc <= bupper[i]
+        // dupper[i] = bupper[i] - A[i,:]*x_unc >= 0 means upper bound satisfied
+        // dlower[i] = blower[i] - A[i,:]*x_unc <= 0 means lower bound satisfied
         if(feasible){
             for(i = work->ms, disp = 0; i < work->m && feasible; i++){
                 for(j = 0, sum = 0; j < n; j++)
                     sum += qp->A[disp++] * work->u[j];
-                work->dupper[i] = qp->bupper[i]+sum;
-                work->dlower[i] = qp->blower[i]+sum;
-                if(work->dupper[i] > primal_tol || work->dlower[i] < primal_tol)
+                work->dupper[i] = qp->bupper[i] - sum;
+                work->dlower[i] = qp->blower[i] - sum;
+                if(work->dupper[i] < -primal_tol || work->dlower[i] > primal_tol)
                     feasible = 0;
             }
         }
         if(feasible){
+            // Reset u to 0 so ldp2qp_solution recovers x = Rinv*(0-v) = x_unc
+            for(i = 0; i < n; i++) work->u[i] = 0;
+            reset_daqp_workspace(work);
             work->sing_ind = DAQP_UNCONSTRAINED_OPTIMAL;
             return 0;
         }
+        // Reset u to 0 for the normal LDP path
+        for(i = 0; i < n; i++) work->u[i] = 0;
     }
 
     /** Update M **/
