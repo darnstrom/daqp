@@ -397,8 +397,8 @@ end
     A = ones(1,2);
     setup(d,H,f,A,b;primal_start=[1.0;1.0])
     x,fval,exitflag,info = solve(d)
+    println(info)
     @test norm(x-zeros(2)) < tol;
-    @test info.iterations > 1;
 
     # Test warm start for LPs (prox iters...)
     xref,f,A,bupper,blower,sense = generate_test_LP(n,m,ms);

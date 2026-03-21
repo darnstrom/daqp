@@ -36,7 +36,6 @@ void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
         work->fval = 0;
         work->soft_slack = 0;
         res->exitflag = DAQP_EXIT_OPTIMAL;
-        ldp2qp_solution(work); // Recover x = Rinv*(u-v) with u=0
     }
 #ifdef PROFILING
     work->timer = NULL;
@@ -584,6 +583,8 @@ void daqp_dual_init_active(DAQPProblem* qp, c_float* lam){
 
 // Set the starting iterate
 void daqp_set_primal_start(DAQPWorkspace* work, c_float* x){
-    int i;
-    for(i = 0; i < work->n; i++) work->x[i] = x[i];
+    if(work->sing_ind != DAQP_UNCONSTRAINED_OPTIMAL){
+        int i;
+        for(i = 0; i < work->n; i++) work->x[i] = x[i];
+    }
 }

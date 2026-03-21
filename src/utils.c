@@ -58,45 +58,42 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
     if(check_unconstrained){
         int j, disp;
         c_float sum;
+        c_float* swp_ptr;
         int feasible = 1;
         const int n = work->n;
         const c_float primal_tol = work->settings->primal_tol;
 
-        // Compute x_unc = Rinv_unnorm * (-v) stored temporarily in work->u.
-        // work->u is calloc'd to 0; after this block it is always reset to 0.
+        // Compute x_unc = Rinv_unnorm * (-v) stored temporarily in work->x.
+        swp_ptr = work->x; work->u = work->xold; work->x = work->xold; work->xold = swp_ptr;
         if(work->v != NULL){
             if(work->Rinv != NULL){
                 // Upper-triangular back-substitution: u[i] = sum_{j>=i} Rinv[i,j]*(-v[j])
                 for(i = 0, disp = 0; i < n; i++){
                     for(j = i, sum = 0; j < n; j++)
                         sum += work->Rinv[disp++] * work->v[j];
-                    work->u[i] = -sum;
+                    work->x[i] = -sum;
                 }
             } else if(work->RinvD != NULL){
-                for(i = 0; i < n; i++) work->u[i] = -work->RinvD[i] * work->v[i];
+                for(i = 0; i < n; i++) work->x[i] = -work->RinvD[i] * work->v[i];
             } else {
-                for(i = 0; i < n; i++) work->u[i] = -work->v[i];
+                for(i = 0; i < n; i++) work->x[i] = -work->v[i];
             }
         }
-        // If v == NULL (f == 0), x_unc = 0 and work->u is already 0.
+        // If v == NULL (f == 0), x_unc = 0 and work->x is already 0.
 
         // Check simple bounds: blower[i] <= x_unc[i] <= bupper[i]
-        // dupper[i] = bupper[i] - x_unc[i] >= 0 means upper bound satisfied
-        // dlower[i] = blower[i] - x_unc[i] <= 0 means lower bound satisfied
-        for(i = 0; i < work->ms && feasible; i++){
-            work->dupper[i] = qp->bupper[i] - work->u[i];
-            work->dlower[i] = qp->blower[i] - work->u[i];
+        for(i = 0; i < work->ms; i++){
+            work->dupper[i] = qp->bupper[i] - work->x[i];
+            work->dlower[i] = qp->blower[i] - work->x[i];
             if(work->dupper[i] < -primal_tol || work->dlower[i] > primal_tol)
                 feasible = 0;
         }
 
         // Check general constraints: blower[i] <= A[i,:]*x_unc <= bupper[i]
-        // dupper[i] = bupper[i] - A[i,:]*x_unc >= 0 means upper bound satisfied
-        // dlower[i] = blower[i] - A[i,:]*x_unc <= 0 means lower bound satisfied
         if(feasible){
-            for(i = work->ms, disp = 0; i < work->m && feasible; i++){
+            for(i = work->ms, disp = 0; i < work->m; i++){
                 for(j = 0, sum = 0; j < n; j++)
-                    sum += qp->A[disp++] * work->u[j];
+                    sum += qp->A[disp++] * work->x[j];
                 work->dupper[i] = qp->bupper[i] - sum;
                 work->dlower[i] = qp->blower[i] - sum;
                 if(work->dupper[i] < -primal_tol || work->dlower[i] > primal_tol)
@@ -105,13 +102,12 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
         }
         if(feasible){
             // Reset u to 0 so ldp2qp_solution recovers x = Rinv*(0-v) = x_unc
-            for(i = 0; i < n; i++) work->u[i] = 0;
             reset_daqp_workspace(work);
             work->sing_ind = DAQP_UNCONSTRAINED_OPTIMAL;
             return 0;
         }
-        // Reset u to 0 for the normal LDP path
-        for(i = 0; i < n; i++) work->u[i] = 0;
+        // Switch back such that any warm starts a preserved 
+        swp_ptr = work->x; work->u = work->xold; work->x = work->xold; work->xold = swp_ptr;
     }
 
     /** Update M **/
