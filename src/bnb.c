@@ -96,37 +96,32 @@ int daqp_process_node(DAQPNode* node, DAQPWorkspace* work){
 int daqp_get_branch_id(DAQPWorkspace* work){
     int i, j, disp;
     int branch_id = DAQP_EMPTY_IND;
-    int cand_id;
-    c_float diff, abs_diff, min_frac = DAQP_INF;
+    c_float diff;
 
     for(i=0; i < work->bnb->nb; i++){
-        cand_id = work->bnb->bin_ids[i];
+        branch_id = work->bnb->bin_ids[i];
         // Skip fixed binary constraints
-        if(DAQP_IS_ACTIVE(cand_id)) continue;
+        if(DAQP_IS_ACTIVE(branch_id)) continue;
 
         // Compute signed distance from midpoint between bounds
-        diff = 0.5*(work->dupper[cand_id]+work->dlower[cand_id]);
-        if(cand_id < work->ms){//Simple bound
-            if(work->Rinv==NULL) diff -= work->u[cand_id]; //Hessian is identity
+        diff = 0.5*(work->dupper[branch_id]+work->dlower[branch_id]);
+        if(branch_id < work->ms){//Simple bound
+            if(work->Rinv==NULL) diff -= work->u[branch_id]; //Hessian is identity
             else{
-                for(j=cand_id,disp=cand_id+DAQP_R_OFFSET(cand_id,work->n);j<work->n;j++)
+                for(j=branch_id,disp=branch_id+DAQP_R_OFFSET(branch_id,work->n);j<work->n;j++)
                     diff -= work->Rinv[disp++]*work->u[j];
             }
         }
         else{//General bound
-            for(j=0,disp=work->n*(cand_id-work->ms);j<work->n;j++) 
+            for(j=0,disp=work->n*(branch_id-work->ms);j<work->n;j++) 
                 diff -= work->M[disp++]*work->u[j];
         }
 
-        // Select the most fractional variable (smallest absolute deviation from midpoint)
-        abs_diff = diff < 0 ? -diff : diff;
-        if(abs_diff < min_frac){
-            min_frac = abs_diff;
-            branch_id = diff < 0 ? cand_id : DAQP_ADD_LOWER_FLAG(cand_id);
-        }
+        // Branch on the first infeasible binary variable
+        return diff < 0 ? branch_id : DAQP_ADD_LOWER_FLAG(branch_id);
     }
 
-    return branch_id;
+    return DAQP_EMPTY_IND;
 }
 
 void daqp_spawn_children(DAQPNode* node, const int branch_id, DAQPWorkspace* work){
