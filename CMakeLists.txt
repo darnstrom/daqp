@@ -13,6 +13,9 @@ add_subdirectory(codegen)
 if(TEST)
   include(CTest)
   enable_testing()
+elseif(BENCHMARK)
+  include(CTest)
+  enable_testing()
 endif()
 
 option (PROFILING "Enable profiling" ON)
@@ -95,7 +98,9 @@ if(JULIA)
 
     add_dependencies(sync_julia_interface daqp)
 
-    add_test(NAME Julia COMMAND sh -c "julia --color=yes --project=${CMAKE_CURRENT_BINARY_DIR}/interfaces/daqp-julia -e \"using Pkg; Pkg.test()\"")
+    if(TEST)
+        add_test(NAME Julia COMMAND sh -c "julia --color=yes --project=${CMAKE_CURRENT_BINARY_DIR}/interfaces/daqp-julia -e \"using Pkg; Pkg.test()\"")
+    endif()
     
     if(BENCHMARK)
         # Add benchmark comparison test (git-based)
@@ -103,7 +108,7 @@ if(JULIA)
             NAME JuliaBenchmark
             COMMAND bash "${JULIA_INTERFACE_DIR}/test/benchmark_comparison_git.sh"
                 "${JULIA_BINARY_DIR}"
-                "v0.7.2"
+                "v0.8.0"
                 "medium"
                 "5"
                 "${CMAKE_CURRENT_BINARY_DIR}/benchmark_results"

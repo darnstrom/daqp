@@ -89,14 +89,14 @@ function compare_benchmarks(baseline_file::String, current_file::String;
         curr_row = current_dict[problem_id]
         
         # Parse values
-        base_setup = parse_float(base_row["setup_time_mean_s"])
-        curr_setup = parse_float(curr_row["setup_time_mean_s"])
-        base_solve = parse_float(base_row["solve_time_mean_s"])
-        curr_solve = parse_float(curr_row["solve_time_mean_s"])
-        base_total = parse_float(base_row["total_time_mean_s"])
-        curr_total = parse_float(curr_row["total_time_mean_s"])
-        base_iters = parse_float(base_row["iter_mean"])
-        curr_iters = parse_float(curr_row["iter_mean"])
+        base_setup = parse_float(base_row["setup_time_median_s"])
+        curr_setup = parse_float(curr_row["setup_time_median_s"])
+        base_solve = parse_float(base_row["solve_time_median_s"])
+        curr_solve = parse_float(curr_row["solve_time_median_s"])
+        base_total = parse_float(base_row["total_time_median_s"])
+        curr_total = parse_float(curr_row["total_time_median_s"])
+        base_iters = parse_float(base_row["iter_median"])
+        curr_iters = parse_float(curr_row["iter_median"])
         
         # Calculate percentage change (positive = slower)
         if base_total === nothing || curr_total === nothing
@@ -298,7 +298,7 @@ function print_benchmark_info(filename::String)
     println("  Benchmarks: $(length(data))")
     
     # Summary stats
-    times = [parse_float(b["total_time_mean_s"]) for b in data]
+    times = [parse_float(b["total_time_median_s"]) for b in data]
     times = filter(x -> x !== nothing, times)
     if !isempty(times)
         println("  Time range: $(round(minimum(times)*1000; digits=3)) - $(round(maximum(times)*1000; digits=3)) ms")

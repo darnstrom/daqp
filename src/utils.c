@@ -171,6 +171,13 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
     int i, j, k, disp, disp2, disp3;
     const int n = work->n; 
     c_float eps = work->settings->eps_prox;
+    c_float zero_tol = work->settings->zero_tol;
+
+    // Reset the semi-proximal mask for this factorization
+    if(work->prox_mask != NULL){
+        for(i = 0; i < n; i++) work->prox_mask[i] = 0;
+    }
+    work->n_prox = 0;
 
     // Check if Diagonal
     int is_diagonal = 1;
@@ -192,12 +199,21 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
             c_float Hi = H[disp];
             // If factored, skip eps and sqrt, else apply them
             if(!is_factored){
-                Hi += eps;
-                if (Hi <= 0) return DAQP_EXIT_NONCONVEX;
+                // Only add eps if this direction would be singular without it
+                if(Hi <= zero_tol){
+                    if(work->prox_mask != NULL) work->prox_mask[i] = 1;
+                    work->n_prox++;
+                    Hi += eps;
+                }
+                if (Hi <= zero_tol) return DAQP_EXIT_NONCONVEX;
                 Hi = sqrt(Hi);
                 disp += n+1;
             } else {
-                if (eps != 0.0)  Hi = sqrt(Hi*Hi + eps); // Regularization for factors
+                if(Hi <= zero_tol){
+                    if(work->prox_mask != NULL) work->prox_mask[i] = 1;
+                    work->n_prox++;
+                    Hi = sqrt(Hi*Hi + eps); // Regularization for factors
+                }
                 disp += n-i;
             }
 
@@ -218,14 +234,23 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
                 work->Rinv[disp] = H[disp];
         }
     } else {
-        // Standard Cholesky (H -> R)
+        // Standard Cholesky (H -> R), adding eps only where the diagonal
+        // of the factor would otherwise be non-positive (semi-proximal).
         for (i=0, disp=0, disp3=0; i<n; disp+=n-i, i++, disp3+=i) {
-            work->Rinv[disp] = H[disp3++] + eps;
+            // Accumulate diagonal contribution without eps first
+            c_float diag_i = H[disp3++];
             for (k=0, disp2=i; k<i; k++, disp2+=n-k)
-                work->Rinv[disp] -= work->Rinv[disp2] * work->Rinv[disp2];
+                diag_i -= work->Rinv[disp2] * work->Rinv[disp2];
 
-            if (work->Rinv[disp] <= 0) return DAQP_EXIT_NONCONVEX;
-            work->Rinv[disp] = sqrt(work->Rinv[disp]);
+            // Only regularize if this direction is singular
+            if(diag_i <= zero_tol){
+                if(work->prox_mask != NULL) work->prox_mask[i] = 1;
+                work->n_prox++;
+                diag_i += eps;
+            }
+
+            if (diag_i <= zero_tol) return DAQP_EXIT_NONCONVEX;
+            work->Rinv[disp] = sqrt(diag_i);
 
             for (j=1; j<n-i; j++) {
                 work->Rinv[disp+j] = H[disp3++];
