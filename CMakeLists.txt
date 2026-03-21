@@ -10,7 +10,10 @@ add_subdirectory(include)
 add_subdirectory(codegen)
 
 
-if(TEST OR BENCHMARK)
+if(TEST)
+  include(CTest)
+  enable_testing()
+elseif(BENCHMARK)
   include(CTest)
   enable_testing()
 endif()
