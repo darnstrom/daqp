@@ -181,6 +181,9 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
     c_float eps = work->settings->eps_prox;
     c_float zero_tol = work->settings->zero_tol;
 
+
+    // Make sure Rinv points to allocated data 
+    if(work->RinvD != NULL){ work->Rinv = work->RinvD; work->RinvD = NULL; }
     // Reset the semi-proximal mask for this factorization
     if(work->prox_mask != NULL){
         for(i = 0; i < n; i++) work->prox_mask[i] = 0;
@@ -213,8 +216,7 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
 
     // Diagonal Case
     if(is_diagonal){
-        if(work->Rinv != NULL){ work->RinvD = work->Rinv; work->Rinv = NULL; }
-
+        work->RinvD = work->Rinv; work->Rinv = NULL;
         disp = 0;
         for(i=0; i<n; i++){
             c_float Hi = H[disp];
@@ -243,9 +245,6 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
         }
         return 1;
     }
-
-    // Prepare Rinv for dense data
-    if(work->RinvD != NULL){ work->Rinv = work->RinvD; work->RinvD = NULL; }
 
     // Cholesky 
     if (is_factored) {
