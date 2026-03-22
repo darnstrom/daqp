@@ -176,10 +176,11 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
 }
 
 int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
-    int i, j, k, disp, disp2, disp3;
+    int i, j, k, disp, disp2;
     const int n = work->n; 
     c_float eps = work->settings->eps_prox;
     c_float zero_tol = work->settings->zero_tol;
+
 
     // Reset the semi-proximal mask for this factorization
     if(work->prox_mask != NULL){
@@ -187,86 +188,91 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
     }
     work->n_prox = 0;
 
-    // Check if Diagonal
+    // Check if Diagonal — for unfactored H scan only the upper-triangle
+    // off-diagonals of the n×n row-major matrix (O(n²/2) reads), skipping
+    // the packing step entirely when H is diagonal.
     int is_diagonal = 1;
-    for (i=0, disp=1; i<n; i++, disp += (is_factored ? 1 : (i+1))){
-        for (j=1; j<n-i; j++, disp++) {
-            if(H[disp] > 1e-12 || H[disp] < -1e-12){
-                is_diagonal = 0; break;
+    if(!is_factored){
+        for(i = 0, disp = 1; i < n && is_diagonal; i++, disp += i+1){
+            for(j = 1; j < n-i; j++, disp++){
+                if(H[disp] > zero_tol || H[disp] < -zero_tol){ is_diagonal = 0; break; }
             }
         }
-        if(!is_diagonal) break;
+    } else {
+        for(i = 0, disp = 0; i < n; disp += n-i, i++){
+            for(j = 1; j < n-i; j++){
+                if(H[disp+j] > zero_tol || H[disp+j] < -zero_tol){
+                    is_diagonal = 0; break;
+                }
+            }
+            if(!is_diagonal) break;
+        }
     }
 
-    // Diagonal Case
+    // Diagonal Case — for unfactored H read diagonals directly (no packing needed).
     if(is_diagonal){
         if(work->Rinv != NULL){ work->RinvD = work->Rinv; work->Rinv = NULL; }
-
-        disp = 0;
-        for(i=0; i<n; i++){
-            c_float Hi = H[disp];
-            // If factored, skip eps and sqrt, else apply them
+        for(i = 0, disp = 0; i < n; i++){
+            c_float Hi;
+            if(is_factored){ Hi = H[disp]; disp += n-i; }
+            else            { Hi = H[i*n+i]; }
             if(!is_factored){
-                // Only add eps if this direction would be singular without it
                 if(Hi <= zero_tol){
                     if(work->prox_mask != NULL) work->prox_mask[i] = 1;
                     work->n_prox++;
                     Hi += eps;
                 }
-                if (Hi <= zero_tol) return DAQP_EXIT_NONCONVEX;
+                if(Hi <= zero_tol) return DAQP_EXIT_NONCONVEX;
                 Hi = sqrt(Hi);
-                disp += n+1;
             } else {
                 if(Hi <= zero_tol){
                     if(work->prox_mask != NULL) work->prox_mask[i] = 1;
                     work->n_prox++;
                     Hi = sqrt(Hi*Hi + eps); // Regularization for factors
                 }
-                disp += n-i;
             }
-
             work->RinvD[i] = 1/Hi;
             if(work->scaling != NULL && i < work->ms) work->scaling[i] = Hi;
         }
         return 1;
     }
 
-    // Prepare Rinv for dense data
+    // Not diagonal: ensure Rinv points to allocated data, then pack
+    // (symmetrize) H into Rinv before Cholesky.
     if(work->RinvD != NULL){ work->Rinv = work->RinvD; work->RinvD = NULL; }
+    if(!is_factored){
+        for(i = 0, disp = 0; i < n; i++){
+            work->Rinv[disp++] = H[i*n+i];
+            for(j = i+1; j < n; j++)
+                work->Rinv[disp++] = (c_float)0.5*(H[i*n+j] + H[j*n+i]);
+        }
+    }
 
-    // Cholesky 
-    if (is_factored) {
+    // Cholesky.
+    if(is_factored){
         for(i=0, disp=0; i<n; i++){
             work->Rinv[disp] = 1/H[disp]; // Store 1/rii
-            for (j=1, disp++; j<n-i; j++, disp++) 
+            for(j=1, disp++; j<n-i; j++, disp++)
                 work->Rinv[disp] = H[disp];
         }
     } else {
-        // Standard Cholesky (H -> R), adding eps only where the diagonal
-        // of the factor would otherwise be non-positive (semi-proximal).
-        for (i=0, disp=0, disp3=0; i<n; disp+=n-i, i++, disp3+=i) {
-            // Accumulate diagonal contribution without eps first
-            c_float diag_i = H[disp3++];
-            for (k=0, disp2=i; k<i; k++, disp2+=n-k)
+        for(i = 0, disp = 0; i < n; disp += n-i, i++){
+            c_float diag_i = work->Rinv[disp];  // read before overwrite
+            for(k = 0, disp2 = i; k < i; k++, disp2 += n-k)
                 diag_i -= work->Rinv[disp2] * work->Rinv[disp2];
-
-            // Only regularize if this direction is singular
             if(diag_i <= zero_tol){
                 if(work->prox_mask != NULL) work->prox_mask[i] = 1;
                 work->n_prox++;
                 diag_i += eps;
             }
-
-            if (diag_i <= zero_tol) return DAQP_EXIT_NONCONVEX;
-            work->Rinv[disp] = sqrt(diag_i);
-
-            for (j=1; j<n-i; j++) {
-                work->Rinv[disp+j] = H[disp3++];
-                for (k=0, disp2=i; k<i; k++, disp2+=n-k)
+            if(diag_i <= zero_tol) return DAQP_EXIT_NONCONVEX;
+            diag_i = 1/sqrt(diag_i);
+            for(j = 1; j < n-i; j++){
+                for(k = 0, disp2 = i; k < i; k++, disp2 += n-k)
                     work->Rinv[disp+j] -= work->Rinv[disp2] * work->Rinv[disp2+j];
-                work->Rinv[disp+j] /= work->Rinv[disp];
+                work->Rinv[disp+j] *= diag_i; 
             }
-            work->Rinv[disp] = 1/work->Rinv[disp];
+            work->Rinv[disp] = diag_i; 
         }
     }
 
@@ -277,7 +283,8 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
         for(j=k+1; j<n; j++) work->Rinv[disp2++] *= -work->Rinv[disp];
         for(i=k+1, disp++; i<n; i++, disp++){
             work->Rinv[disp] *= work->Rinv[disp2++];
-            for(j=1; j<n-i; j++) work->Rinv[disp+j] -= work->Rinv[disp2++] * work->Rinv[disp];
+            for(j=1; j<n-i; j++) 
+                work->Rinv[disp+j] -= work->Rinv[disp2++] * work->Rinv[disp];
         }
     }
     return 1;

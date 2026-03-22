@@ -18,6 +18,7 @@ add_executable(03_update tests/03_update.cpp)
 add_executable(04_slack_sign tests/04_slack_sign.cpp)
 add_executable(05_warmstart tests/05_warmstart.cpp)
 add_executable(06_general_hessian tests/06_general_hessian.cpp)
+add_executable(07_symmetrize_hessian tests/07_symmetrize_hessian.cpp)
 
 set(TARGETS
     00_basic_qp
@@ -27,6 +28,7 @@ set(TARGETS
     04_slack_sign
     05_warmstart
     06_general_hessian
+    07_symmetrize_hessian
 )
 
 foreach(TARGET ${TARGETS})
