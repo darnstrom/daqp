@@ -190,13 +190,7 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
     }
     work->n_prox = 0;
 
-    // When H is not yet factored, always pack its upper triangle — symmetrized
-    // as 0.5*(H[i,j]+H[j,i]) — into the pre-allocated Rinv buffer before
-    // factorization.  This keeps H read-only (H is user-owned), produces a
-    // uniform packed layout that the Cholesky and diagonal checks can read
-    // without further branching, and handles symmetric, upper-triangular, and
-    // lower-triangular inputs identically.  The packing cost is O(n^2/2),
-    // which is negligible compared to the O(n^3/6) Cholesky.
+    // When H is not yet factored, symmetrize 
     if(!is_factored){
         for(i = 0, disp = 0; i < n; i++){
             work->Rinv[disp++] = H[i*n+i];
@@ -206,8 +200,6 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
     }
 
     // Check if Diagonal.
-    // For !is_factored the packed upper triangle is now in Rinv.
-    // For is_factored H is already in packed upper-triangular layout.
     int is_diagonal = 1;
     {
         c_float *src = is_factored ? H : work->Rinv;
@@ -250,11 +242,6 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
     }
 
     // Cholesky.
-    // For is_factored: copy H (already packed R) into Rinv so the R->Rinv
-    // inversion below can work in-place.
-    // For !is_factored: the packed upper triangle is already in Rinv; run
-    // Cholesky in-place.  Each Rinv[disp] (diagonal) is read into a local
-    // before being overwritten, so no aliasing issues arise.
     if(is_factored){
         for(i=0, disp=0; i<n; i++){
             work->Rinv[disp] = 1/H[disp]; // Store 1/rii
@@ -272,13 +259,13 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
                 diag_i += eps;
             }
             if(diag_i <= zero_tol) return DAQP_EXIT_NONCONVEX;
-            work->Rinv[disp] = sqrt(diag_i);
+            diag_i = 1/sqrt(diag_i);
             for(j = 1; j < n-i; j++){
                 for(k = 0, disp2 = i; k < i; k++, disp2 += n-k)
                     work->Rinv[disp+j] -= work->Rinv[disp2] * work->Rinv[disp2+j];
-                work->Rinv[disp+j] /= work->Rinv[disp];
+                work->Rinv[disp+j] *= diag_i; 
             }
-            work->Rinv[disp] = 1/work->Rinv[disp];
+            work->Rinv[disp] = diag_i; 
         }
     }
 
@@ -289,7 +276,8 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
         for(j=k+1; j<n; j++) work->Rinv[disp2++] *= -work->Rinv[disp];
         for(i=k+1, disp++; i<n; i++, disp++){
             work->Rinv[disp] *= work->Rinv[disp2++];
-            for(j=1; j<n-i; j++) work->Rinv[disp+j] -= work->Rinv[disp2++] * work->Rinv[disp];
+            for(j=1; j<n-i; j++) 
+                work->Rinv[disp+j] -= work->Rinv[disp2++] * work->Rinv[disp];
         }
     }
     return 1;
