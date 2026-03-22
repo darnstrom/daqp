@@ -102,3 +102,4 @@ cdef extern from "constants.h":
     cdef double  DAQP_DEFAULT_ABS_SUBOPT
     cdef double  DAQP_DEFAULT_SING_TOL
     cdef double  DAQP_DEFAULT_REFACTOR_TOL
+    cdef double  DAQP_DEFAULT_EPS_PROX
