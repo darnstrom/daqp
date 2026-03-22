@@ -88,7 +88,8 @@ void daqp_compute_primal_and_fval(DAQPWorkspace *work){
 int daqp_add_infeasible(DAQPWorkspace *work){
     int j,disp;
     c_float ep = -work->settings->primal_tol;
-    c_float min_val = ep;
+    c_float min_val = 0.0;
+    c_float bound;
     c_float Mu,min_cand;
     int isupper=0, add_ind=DAQP_EMPTY_IND;
     // Simple bounds 
@@ -105,14 +106,15 @@ int daqp_add_infeasible(DAQPWorkspace *work){
             Mu = daqp_dot(work->Rinv+disp,work->u+j,work->n-j);
         }
         disp+=work->n-j;
+        bound = (work->scaling == NULL) ? ep : ep*work->scaling[j];
         min_cand = work->dupper[j]-Mu;
-        if(min_cand < min_val && (work->scaling == NULL || min_cand < ep*work->scaling[j])){
+        if(min_cand < min_val && min_cand < bound){
             add_ind = j; isupper = 1;
             min_val = min_cand;
         }
         else{
             min_cand = Mu - work->dlower[j];
-            if(min_cand < min_val && (work->scaling == NULL || min_cand < ep*work->scaling[j])){
+            if(min_cand < min_val && min_cand < bound){
                 add_ind = j; isupper = 0;
                 min_val = min_cand;
             }
@@ -127,15 +129,16 @@ int daqp_add_infeasible(DAQPWorkspace *work){
         }
         Mu = daqp_dot(work->M+disp,work->u,work->n);
         disp+=work->n;
+        bound = (work->scaling == NULL) ? ep : ep*work->scaling[j];
 
         min_cand = work->dupper[j]-Mu;
-        if(min_cand < min_val && (work->scaling == NULL || min_cand < ep*work->scaling[j])){
+        if(min_cand < min_val &&  min_cand < bound){
             add_ind = j; isupper = 1;
             min_val = min_cand;
         }
         else{
             min_cand = Mu - work->dlower[j];
-            if(min_cand < min_val && (work->scaling == NULL || min_cand < ep*work->scaling[j])){
+            if(min_cand < min_val && min_cand < bound){
                 add_ind = j; isupper = 0;
                 min_val = min_cand;
             }
@@ -317,7 +320,7 @@ void daqp_compute_CSP(DAQPWorkspace *work){
         } 
         work->lam_star[i] = sum;
     }
-    work->reuse_ind = work->n_active; // Save forward substitution information 
+    work->reuse_ind = work->n_active; // Save forward substitution information
 }
 
 //TODO this could probably be directly calculated in L
@@ -416,4 +419,92 @@ void daqp_deactivate_constraints(DAQPWorkspace *work){
         if(DAQP_IS_IMMUTABLE(work->WS[i])) continue; 
         DAQP_SET_INACTIVE(work->WS[i]); 
     }
+}
+
+// One step of iterative refinement for active constraints.
+// After computing u = -M'*lam_star, numerical errors in the LDL solve cause
+// active constraint residuals r[i] = M_i*u - d_i to be nonzero. These errors
+// are amplified by 1/scaling[j] in the original space, potentially exceeding
+// primal_tol for near-singular factorizations with small scaling values.
+// This function solves (L*D*L') * delta_lam = r using the existing factorization
+// and updates u -= M'*delta_lam to cancel the residual exactly:
+//   M*(u - M'*delta_lam) = M*u - M*M'*delta_lam = M*u - r = d.
+void daqp_refine_active(DAQPWorkspace *work){
+    int i, j, disp, id;
+    c_float sum, Mu, d;
+
+    // Compute -r[i] = -(M_i*u - d_i) and store in xldl[i].
+    for(i = 0; i < work->n_active; i++){
+        id = work->WS[i];
+        if(id < work->ms){
+            if(work->Rinv != NULL){
+                Mu = 0;
+                for(j=id, disp=DAQP_R_OFFSET(id,work->n); j<work->n; j++)
+                    Mu += work->Rinv[disp+j] * work->u[j];
+            } else {
+                Mu = work->u[id];
+            }
+        } else {
+            Mu = 0;
+            for(j=0, disp=work->n*(id-work->ms); j<work->n; j++)
+                Mu += work->M[disp++] * work->u[j];
+        }
+        d = DAQP_IS_LOWER(id) ? work->dlower[id] : work->dupper[id];
+        work->xldl[i] = Mu - d; // RHS: +r[i] (positive, so L*D*L'*dlam=r gives u-=M'*dlam zeroes residual)
+    }
+
+    // Forward substitution L * y = xldl
+    for(i=0, disp=0; i<work->n_active; i++){
+        sum = work->xldl[i];
+        for(j=0; j<i; j++)
+            sum -= work->L[disp++] * work->xldl[j];
+        disp++; // skip stored diagonal (= 1)
+        work->xldl[i] = sum;
+    }
+
+    // Scale by D^{-1}: zldl[i] = xldl[i] / D[i].
+    for(i=0; i<work->n_active; i++)
+        work->zldl[i] = work->xldl[i] / work->D[i];
+
+    // Backward substitution L' * delta_lam = zldl -> stored in xldl.
+    {
+        int start_disp = DAQP_ARSUM(work->n_active) - 1;
+        for(i=work->n_active-1; i>=0; i--){
+            sum = work->zldl[i];
+            disp = start_disp--;
+            for(j=work->n_active-1; j>i; j--){
+                sum -= work->xldl[j] * work->L[disp];
+                disp -= j;
+            }
+            work->xldl[i] = sum; // xldl[i] = delta_lam[i]
+        }
+    }
+
+    // Update lam_star += delta_lam.
+    // The residual r = M*u - d was computed from the exact constraint matrix,
+    for(i=0; i<work->n_active; i++)
+        work->lam_star[i] += work->xldl[i];
+
+    // Update u -= M'*delta_lam and recompute fval.
+    for(i=0; i<work->n_active; i++){
+        c_float dlam = work->xldl[i];
+        id = work->WS[i];
+        if(id < work->ms){
+            if(work->Rinv != NULL){
+                for(j=id, disp=DAQP_R_OFFSET(id,work->n); j<work->n; j++)
+                    work->u[j] -= work->Rinv[disp+j] * dlam;
+            } else {
+                work->u[id] -= dlam;
+            }
+        } else {
+            for(j=0, disp=work->n*(id-work->ms); j<work->n; j++)
+                work->u[j] -= work->M[disp++] * dlam;
+        }
+    }
+
+    // Recompute fval = soft_slack + ||u||^2 since u changed.
+    c_float fval = work->soft_slack;
+    for(j=0; j<work->n; j++)
+        fval += work->u[j] * work->u[j];
+    work->fval = fval;
 }

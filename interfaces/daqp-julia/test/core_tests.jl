@@ -16,6 +16,7 @@ else
 end
 
 # API Tests
+Random.seed!(1234)
 nQPs,nLPs = 100,100;
 n = 100; m = 500; ms = 50;
 nAct = 80

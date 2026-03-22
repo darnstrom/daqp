@@ -14,6 +14,7 @@ void daqp_compute_primal_and_fval(DAQPWorkspace *work);
 int daqp_add_infeasible(DAQPWorkspace *work);
 int daqp_remove_blocking(DAQPWorkspace *work);
 void daqp_compute_CSP(DAQPWorkspace *work);
+void daqp_refine_active(DAQPWorkspace *work);
 void daqp_compute_singular_direction(DAQPWorkspace *work);
 
 void daqp_pivot_last(DAQPWorkspace *work);
