@@ -6,11 +6,13 @@
 //
 // Key properties tested:
 //   1. A fully symmetric H gives the correct reference solution (regression).
-//   2. A lower-triangular H is no longer silently treated as a diagonal matrix
-//      (the pre-fix bug: DAQP read only the upper triangle which was all zero
-//      except the diagonal, so it ignored the off-diagonal structure).
+//   2. A lower-triangular H is no longer silently treated as a diagonal matrix.
+//      DAQP always packs 0.5*(H+H^T) into its internal Rinv buffer before
+//      factorization, so the off-diagonal structure is preserved regardless of
+//      which triangle the caller fills in.
 //   3. A nearly-symmetric H (tiny numerical noise in one triangle) gives the
 //      same solution as the perfectly symmetric reference.
+//   4. H is never mutated — it is user-owned and strictly read-only.
 int main() {
     double precision = 1e-6;
 
@@ -49,10 +51,9 @@ int main() {
     }
 
     // 3. Lower-triangular H (upper triangle set to zero).
-    //    Before the fix: DAQP reads only the upper triangle, sees all-zero
-    //    off-diagonals, and treats the matrix as diagonal → wrong solution.
-    //    After the fix: DAQP symmetrizes first, so the off-diagonal structure
-    //    is preserved (at 0.5× the original value) → solution differs from diagonal.
+    //    DAQP always packs 0.5*(H+H^T) before factorization, so the
+    //    off-diagonal entries (0.5*lower value) are correctly included.
+    //    Result must differ from the diagonal-only solve.
     Eigen::MatrixXd H_lower = H_full.triangularView<Eigen::Lower>();
     Eigen::MatrixXd H_lower_copy = H_lower;   // snapshot to check H is not mutated
     EigenDAQPResult res_lower = daqp_solve(H_lower, f, A, bu, bl, sense, break_points);
