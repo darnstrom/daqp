@@ -187,6 +187,19 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
     }
     work->n_prox = 0;
 
+    // Symmetrize H in-place: H[i,j] <- 0.5*(H[i,j] + H[j,i]) for i < j.
+    // This ensures DAQP produces correct results whether the caller supplies a
+    // full symmetric matrix, only the upper triangle, or only the lower triangle.
+    if(!is_factored){
+        c_float val;
+        for(i = 0; i < n; i++)
+            for(j = i+1; j < n; j++){
+                val = 0.5*(H[i*n+j] + H[j*n+i]);
+                H[i*n+j] = val;
+                H[j*n+i] = val;
+            }
+    }
+
     // Check if Diagonal
     int is_diagonal = 1;
     for (i=0, disp=1; i<n; i++, disp += (is_factored ? 1 : (i+1))){
