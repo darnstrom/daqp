@@ -182,30 +182,26 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
     c_float zero_tol = work->settings->zero_tol;
 
 
-    // Make sure Rinv points to allocated data 
-    if(work->RinvD != NULL){ work->Rinv = work->RinvD; work->RinvD = NULL; }
     // Reset the semi-proximal mask for this factorization
     if(work->prox_mask != NULL){
         for(i = 0; i < n; i++) work->prox_mask[i] = 0;
     }
     work->n_prox = 0;
 
-    // When H is not yet factored, symmetrize 
-    if(!is_factored){
-        for(i = 0, disp = 0; i < n; i++){
-            work->Rinv[disp++] = H[i*n+i];
-            for(j = i+1; j < n; j++)
-                work->Rinv[disp++] = (c_float)0.5*(H[i*n+j] + H[j*n+i]);
-        }
-    }
-
-    // Check if Diagonal.
+    // Check if Diagonal — for unfactored H scan only the upper-triangle
+    // off-diagonals of the n×n row-major matrix (O(n²/2) reads), skipping
+    // the packing step entirely when H is diagonal.
     int is_diagonal = 1;
-    {
-        c_float *src = is_factored ? H : work->Rinv;
+    if(!is_factored){
+        for(i = 0, disp = 1; i < n && is_diagonal; i++, disp += i+1){
+            for(j = 1; j < n-i; j++, disp++){
+                if(H[disp] > zero_tol || H[disp] < -zero_tol){ is_diagonal = 0; break; }
+            }
+        }
+    } else {
         for(i = 0, disp = 0; i < n; disp += n-i, i++){
             for(j = 1; j < n-i; j++){
-                if(src[disp+j] > 1e-12 || src[disp+j] < -1e-12){
+                if(H[disp+j] > zero_tol || H[disp+j] < -zero_tol){
                     is_diagonal = 0; break;
                 }
             }
@@ -213,13 +209,13 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
         }
     }
 
-    // Diagonal Case — read diagonal entries from the same source as above.
+    // Diagonal Case — for unfactored H read diagonals directly (no packing needed).
     if(is_diagonal){
-        work->RinvD = work->Rinv; work->Rinv = NULL;
-        c_float *src = is_factored ? H : work->RinvD;
+        if(work->Rinv != NULL){ work->RinvD = work->Rinv; work->Rinv = NULL; }
         for(i = 0, disp = 0; i < n; i++){
-            c_float Hi = src[disp];
-            disp += n-i;
+            c_float Hi;
+            if(is_factored){ Hi = H[disp]; disp += n-i; }
+            else            { Hi = H[i*n+i]; }
             if(!is_factored){
                 if(Hi <= zero_tol){
                     if(work->prox_mask != NULL) work->prox_mask[i] = 1;
@@ -239,6 +235,17 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
             if(work->scaling != NULL && i < work->ms) work->scaling[i] = Hi;
         }
         return 1;
+    }
+
+    // Not diagonal: ensure Rinv points to allocated data, then pack
+    // (symmetrize) H into Rinv before Cholesky.
+    if(work->RinvD != NULL){ work->Rinv = work->RinvD; work->RinvD = NULL; }
+    if(!is_factored){
+        for(i = 0, disp = 0; i < n; i++){
+            work->Rinv[disp++] = H[i*n+i];
+            for(j = i+1; j < n; j++)
+                work->Rinv[disp++] = (c_float)0.5*(H[i*n+j] + H[j*n+i]);
+        }
     }
 
     // Cholesky.
