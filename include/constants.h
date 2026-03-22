@@ -27,6 +27,9 @@ extern "C" {
 #define DAQP_DEFAULT_SING_TOL (3.7e-11)
 #define DAQP_DEFAULT_REFACTOR_TOL 1e-9
 #define DAQP_DEFAULT_EPS_PROX 1e-6
+// Tolerance for detecting that H is not symmetric: if |H[0,1] - H[1,0]| exceeds
+// this value, DAQP symmetrizes H via its internal buffer before factorization.
+#define DAQP_SYMMETRY_TOL 1e-9
 
 // MACROS
 #define DAQP_ARSUM(x) ((x)*(x+1)/2)

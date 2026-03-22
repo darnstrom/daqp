@@ -54,12 +54,14 @@ int main() {
     //    After the fix: DAQP symmetrizes first, so the off-diagonal structure
     //    is preserved (at 0.5× the original value) → solution differs from diagonal.
     Eigen::MatrixXd H_lower = H_full.triangularView<Eigen::Lower>();
+    Eigen::MatrixXd H_lower_copy = H_lower;   // snapshot to check H is not mutated
     EigenDAQPResult res_lower = daqp_solve(H_lower, f, A, bu, bl, sense, break_points);
     if (res_lower.exitflag <= 0) {
         std::cerr << "Lower-triangle solve failed with exitflag " << res_lower.exitflag
                   << std::endl;
         return 1;
     }
+    bool lower_not_mutated = H_lower.isApprox(H_lower_copy);
 
     // 4. Nearly-symmetric H: full H with tiny noise in one off-diagonal entry.
     //    Symmetrization should average the two triangles and give the same
@@ -83,6 +85,9 @@ int main() {
     bool lower_not_diagonal = !res_lower.get_primal().isApprox(
         res_diag.get_primal(), precision);
 
+    if (!lower_not_mutated)
+        std::cerr << "H was mutated by daqp_solve (should be read-only)!" << std::endl;
+
     // Nearly-symmetric H: symmetrized result matches the reference.
     bool noisy_ok = res_noisy.get_primal().isApprox(ref.get_primal(), 1e-5);
 
@@ -98,5 +103,5 @@ int main() {
                   << "noisy: " << res_noisy.get_primal().transpose() << "\n"
                   << "ref:   " << ref.get_primal().transpose() << std::endl;
 
-    return (ref_ok && lower_not_diagonal && noisy_ok) ? 0 : 1;
+    return (ref_ok && lower_not_diagonal && lower_not_mutated && noisy_ok) ? 0 : 1;
 }
