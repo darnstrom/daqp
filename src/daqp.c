@@ -10,6 +10,7 @@ int daqp_ldp(DAQPWorkspace *work){
     c_float fval_bound = 2*work->settings->fval_bound; // Internal objective is twice the nomninal
 
     for(iter=1; iter < work->settings->iter_limit; ++iter){
+
         if(work->sing_ind==DAQP_EMPTY_IND){ 
             daqp_compute_CSP(work);
             // Check dual feasibility of CSP
@@ -22,11 +23,15 @@ int daqp_ldp(DAQPWorkspace *work){
                 }
                 // Try to add infeasible constraint 
                 if(!daqp_add_infeasible(work)){ //mu >= (i.e., primal feasible)
-                                           // All KKT-conditions satisfied -> optimum found 
+                                           // All KKT-conditions satisfied -> optimum found
 
-                    // If ill-conditioned basis, refactor
+                    c_float min_D = work->D[0];
+                    for(i = 1; i < work->n_active; i++)
+                        if(work->D[i] < min_D) min_D = work->D[i];
+
+                    // If LDL is truly ill-conditioned, refactor for a better pivot ordering
                     if(work->n_active > 2 && tried_repair != 1 &&
-                            work->D[work->n_active-1] < work->settings->refactor_tol){
+                            min_D < work->settings->refactor_tol){
                         tried_repair = 1;
                         // Correct LOWER/UPPER (important for equality constraints)
                         for(i = 0; i < work->n_active; i++){
@@ -39,6 +44,14 @@ int daqp_ldp(DAQPWorkspace *work){
                         daqp_activate_constraints(work);
                         continue; // Try again with new LDL factorization
                     }
+
+                    // If the LDL is near-singular, backward errors in lam_star are
+                    // amplified by 1/scaling in original space.  Apply one step of
+                    // iterative refinement to correct both u and lam_star before
+                    // declaring optimal.
+                    if(work->n_active > 0 && min_D < work->settings->pivot_tol)
+                        daqp_refine_active(work);
+
 
                     if(work->soft_slack > work->settings->primal_tol)
                         exitflag = DAQP_EXIT_SOFT_OPTIMAL; 
