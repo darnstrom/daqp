@@ -7,7 +7,15 @@ int daqp_ldp(DAQPWorkspace *work){
     int exitflag=DAQP_EXIT_ITERLIMIT,iter,i;
     int tried_repair=0, cycle_counter=0;
     c_float best_fval = -1;
-    c_float fval_bound = 2*work->settings->fval_bound; // Internal objective is twice the nomninal
+    // The QP objective is 0.5*(||u||^2 - ||v||^2), so the user's fval_bound is
+    // in QP-objective units.  The internal fval = ||u||^2 can therefore be as
+    // large as ||v||^2 + 2*fval_bound before the QP bound is actually exceeded.
+    // Without this correction, badly scaled problems (large ||v||) can be
+    // falsely declared infeasible.
+    c_float v_norm2 = 0;
+    if(work->v != NULL)
+        for(i = 0; i < work->n; i++) v_norm2 += work->v[i]*work->v[i];
+    c_float fval_bound = 2*work->settings->fval_bound + v_norm2;
 
     for(iter=1; iter < work->settings->iter_limit; ++iter){
 
