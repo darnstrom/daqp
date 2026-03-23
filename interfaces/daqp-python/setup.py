@@ -7,39 +7,39 @@ from Cython.Distutils import build_ext
 from Cython.Build import cythonize
 
 
+# Directory containing this setup.py file (works regardless of where pip is invoked from)
+setup_dir = pathlib.Path(__file__).parent.resolve()
+
 # Copy C source
-try:
-    src_path = pathlib.Path(os.environ["PWD"], "../../../daqp")
-except:
-    src_path = []
-csrc_dir = pathlib.Path('./csrc')
-if src_path and os.path.exists(src_path) and not os.path.exists(csrc_dir):
-    os.mkdir(csrc_dir)
-    copytree(os.path.join(src_path,'src'),os.path.join(csrc_dir,'src'))
-    copytree(os.path.join(src_path,'include'),os.path.join(csrc_dir,'include'))
-    copytree(os.path.join(src_path,'codegen'),os.path.join(csrc_dir,'codegen'))
-    copyfile(os.path.join(src_path,'CMakeLists.txt'),os.path.join(csrc_dir,'CMakeLists.txt'))
-    copyfile(os.path.join(src_path,'LICENSE'),pathlib.Path('./LICENSE'))
-else:
+src_path = (setup_dir / "../..").resolve()
+csrc_dir = setup_dir / 'csrc'
+if not src_path.exists():
     print("Could not find daqp directory")
+elif not csrc_dir.exists():
+    os.mkdir(csrc_dir)
+    copytree(str(src_path / 'src'), str(csrc_dir / 'src'))
+    copytree(str(src_path / 'include'), str(csrc_dir / 'include'))
+    copytree(str(src_path / 'codegen'), str(csrc_dir / 'codegen'))
+    copyfile(str(src_path / 'CMakeLists.txt'), str(csrc_dir / 'CMakeLists.txt'))
+    copyfile(str(src_path / 'LICENSE'), str(setup_dir / 'LICENSE'))
 
 
 cython_ext = Extension('daqp',
-        sources = ['daqp.pyx',
-            'csrc/src/api.c', 
-            'csrc/src/avi.c', 
-            'csrc/src/auxiliary.c', 
-            'csrc/src/bnb.c', 
-            'csrc/src/daqp.c', 
-            'csrc/src/daqp_prox.c', 
-            'csrc/src/factorization.c', 
-            'csrc/src/hierarchical.c', 
-            'csrc/src/utils.c', 
+        sources = [str(setup_dir / 'daqp.pyx'),
+            str(csrc_dir / 'src/api.c'),
+            str(csrc_dir / 'src/avi.c'),
+            str(csrc_dir / 'src/auxiliary.c'),
+            str(csrc_dir / 'src/bnb.c'),
+            str(csrc_dir / 'src/daqp.c'),
+            str(csrc_dir / 'src/daqp_prox.c'),
+            str(csrc_dir / 'src/factorization.c'),
+            str(csrc_dir / 'src/hierarchical.c'),
+            str(csrc_dir / 'src/utils.c'),
             ],
-        library_dirs=['.'],
+        library_dirs=[str(setup_dir)],
         extra_compile_args=["-O3", "-DPROFILING", "-fassociative-math",
                             "-fno-signed-zeros", "-fno-trapping-math"],
-        include_dirs=['csrc/include'])
+        include_dirs=[str(csrc_dir / 'include')])
 
 setup(name='daqp',
         version='0.8.3',
@@ -48,13 +48,13 @@ setup(name='daqp',
         author='Daniel Arnström',
         author_email='daniel.arnstrom@gmail.com',
         license='MIT',
-        long_description=open('README.md','r').read(),
+        long_description=open(str(setup_dir / 'README.md'),'r').read(),
         long_description_content_type='text/markdown',
         ext_modules=cythonize(cython_ext),
         cmdclass={'build_ext': build_ext},
         zip_safe=False)
 
 # Cleanup C-source
-if src_path and os.path.exists(src_path):
-    rmtree(csrc_dir)
-    os.remove(pathlib.Path('./LICENSE'))
+if src_path.exists():
+    rmtree(str(csrc_dir))
+    os.remove(str(setup_dir / 'LICENSE'))
