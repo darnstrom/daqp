@@ -77,13 +77,17 @@ void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind){
     }
 
     // Scale: l_i <-- l_i/d_i
-    // Update d_new -= l'Dl
+    // Update d_new -= l'Dl using Kahan compensated summation to reduce
+    // catastrophic cancellation when constraints are nearly linearly dependent.
     sum = work->D[work->n_active];
-    c_float tmp;
+    c_float tmp, kahan_c = 0.0, kahan_y, kahan_t;
     for (i =0,disp=new_L_start; i<work->n_active;i++,disp++){
         tmp = work->L[disp];
-        work->L[disp] /= work->D[i];  
-        sum -= tmp*work->L[disp];
+        work->L[disp] /= work->D[i];
+        kahan_y = -(tmp * work->L[disp]) - kahan_c;
+        kahan_t = sum + kahan_y;
+        kahan_c = (kahan_t - sum) - kahan_y;
+        sum = kahan_t;
     }
     work->D[work->n_active]=sum;
 
