@@ -423,17 +423,27 @@ void daqp_deactivate_constraints(DAQPWorkspace *work){
 
 // One step of iterative refinement for active constraints.
 // After computing u = -M'*lam_star, numerical errors in the LDL solve cause
-// active constraint residuals r[i] = M_i*u - d_i to be nonzero. These errors
+// active constraint residuals r_p[i] = M_i*u - d_i to be nonzero. These errors
 // are amplified by 1/scaling[j] in the original space, potentially exceeding
 // primal_tol for near-singular factorizations with small scaling values.
-// This function solves (L*D*L') * delta_lam = r using the existing factorization
-// and updates u -= M'*delta_lam to cancel the residual exactly:
-//   M*(u - M'*delta_lam) = M*u - M*M'*delta_lam = M*u - r = d.
+//
+// When the QP Hessian is non-trivial (Rinv or RinvD available), this function
+// incorporates the dual residual r_d = u + M'*lam_star to form a richer RHS:
+//   eps      = Rinv * r_d          (solve R*eps = r_d via Rinv)
+//   rhs_lam  = r_p + M * eps       (projected combined residual)
+//   delta_lam = (L*D*L') \ rhs_lam
+//   u        -= r_d + M'*delta_lam (cancel both primal and dual residuals)
+//
+// For the pure LDP case (Rinv = I), r_d is nominally zero after the LDP solve
+// so only the primal residual correction is applied, recovering the original
+// behaviour:
+//   delta_lam = (L*D*L') \ r_p
+//   u         -= M'*delta_lam
 void daqp_refine_active(DAQPWorkspace *work){
     int i, j, disp, id;
     c_float sum, Mu, d;
 
-    // Compute -r[i] = -(M_i*u - d_i) and store in xldl[i].
+    // Compute r_p[i] = M_i*u - d_i and store in xldl[i].
     for(i = 0; i < work->n_active; i++){
         id = work->WS[i];
         if(id < work->ms){
@@ -450,9 +460,71 @@ void daqp_refine_active(DAQPWorkspace *work){
                 Mu += work->M[disp++] * work->u[j];
         }
         d = DAQP_IS_LOWER(id) ? work->dlower[id] : work->dupper[id];
-        work->xldl[i] = Mu - d; // RHS: +r[i] (positive, so L*D*L'*dlam=r gives u-=M'*dlam zeroes residual)
+        work->xldl[i] = Mu - d;
     }
 
+    // When the QP Hessian is non-trivial, enrich the RHS with QP dual information.
+    // xold (n-vector) is unused during daqp_ldp and borrows r_d.
+    // zldl is allocated as (n+1) elements; the first n are used for eps here
+    // before the LDL D^{-1} step overwrites them with its own intermediate result.
+    if(work->Rinv != NULL || work->RinvD != NULL){
+        c_float* r_d = work->xold; // dual residual r_d = u + M'*lam_star (n-vector)
+        c_float* eps = work->zldl; // eps = Rinv * r_d (first n of n+1 elements)
+
+        // r_d = u + M'*lam_star
+        // The M' multiply mirrors daqp_compute_primal_and_fval's u = -M'*lam_star.
+        for(j = 0; j < work->n; j++) r_d[j] = work->u[j];
+        for(i = 0; i < work->n_active; i++){
+            id = work->WS[i];
+            c_float dlam = work->lam_star[i];
+            if(id < work->ms){
+                if(work->Rinv != NULL){
+                    for(j=id, disp=DAQP_R_OFFSET(id,work->n); j<work->n; j++)
+                        r_d[j] += work->Rinv[disp+j] * dlam;
+                } else { // RinvD: simple-bound rows of M are identity vectors
+                    r_d[id] += dlam;
+                }
+            } else {
+                for(j=0, disp=work->n*(id-work->ms); j<work->n; j++)
+                    r_d[j] += work->M[disp++] * dlam;
+            }
+        }
+
+        // eps = Rinv * r_d  (upper-triangular matrix-vector multiply)
+        // Same packed-upper-triangular layout used in ldp2qp_solution.
+        if(work->Rinv != NULL){
+            for(i=0, disp=0; i<work->n; i++){
+                sum = work->Rinv[disp++] * r_d[i];
+                for(j=i+1; j<work->n; j++)
+                    sum += work->Rinv[disp++] * r_d[j];
+                eps[i] = sum;
+            }
+        } else { // RinvD diagonal case
+            for(i = 0; i < work->n; i++)
+                eps[i] = work->RinvD[i] * r_d[i];
+        }
+
+        // rhs_lam = r_p + M * eps  (update xldl in-place)
+        for(i = 0; i < work->n_active; i++){
+            id = work->WS[i];
+            c_float Meps = 0;
+            if(id < work->ms){
+                if(work->Rinv != NULL){
+                    for(j=id, disp=DAQP_R_OFFSET(id,work->n); j<work->n; j++)
+                        Meps += work->Rinv[disp+j] * eps[j];
+                } else { // RinvD: M_i = e_id^T
+                    Meps = eps[id];
+                }
+            } else {
+                for(j=0, disp=work->n*(id-work->ms); j<work->n; j++)
+                    Meps += work->M[disp++] * eps[j];
+            }
+            work->xldl[i] += Meps;
+        }
+        // eps (zldl) is no longer needed; the LDL solve below will overwrite it.
+    }
+
+    // LDL solve: (L*D*L') * delta_lam = xldl, result stored in xldl.
     // Forward substitution L * y = xldl
     for(i=0, disp=0; i<work->n_active; i++){
         sum = work->xldl[i];
@@ -481,11 +553,17 @@ void daqp_refine_active(DAQPWorkspace *work){
     }
 
     // Update lam_star += delta_lam.
-    // The residual r = M*u - d was computed from the exact constraint matrix,
     for(i=0; i<work->n_active; i++)
         work->lam_star[i] += work->xldl[i];
 
-    // Update u -= M'*delta_lam and recompute fval.
+    // When QP-informed, also subtract r_d to cancel the dual residual.
+    if(work->Rinv != NULL || work->RinvD != NULL){
+        c_float* r_d = work->xold; // still valid; nothing has overwritten xold
+        for(j=0; j<work->n; j++)
+            work->u[j] -= r_d[j];
+    }
+
+    // Update u -= M'*delta_lam.
     for(i=0; i<work->n_active; i++){
         c_float dlam = work->xldl[i];
         id = work->WS[i];
