@@ -29,6 +29,13 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
         }
     }
 
+    // Check bounds early
+    if(mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M||mask&DAQP_UPDATE_v||mask&DAQP_UPDATE_d){
+        error_flag = daqp_check_bounds(work,qp->bupper,qp->blower);
+        if(error_flag<0) return error_flag;
+        if(error_flag==1) do_activate = 1;
+    }
+
     /** Update Rinv **/
     if(mask&DAQP_UPDATE_Rinv){
         if(work->avi == NULL)
@@ -46,31 +53,17 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
         daqp_update_v(qp->f,work,mask);
     }
 
-    /** Check bounds early (moved before unconstrained check below) so that
-     *  equal-bound constraints are already marked IMMUTABLE before we test
-     *  for equality constraints. **/
-    if(mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M||mask&DAQP_UPDATE_v||mask&DAQP_UPDATE_d){
-        error_flag = daqp_check_bounds(work,qp->bupper,qp->blower);
-        if(error_flag<0) return error_flag;
-        if(error_flag==1) do_activate = 1;
-    }
-
     // The unconstrained shortcut is invalid when:
-    //   - Equality constraints are present (IMMUTABLE sense flag; daqp_check_bounds
-    //     above has already marked any equal-bound constraints as IMMUTABLE), because
-    //     equalities must be in the active working set while reset_daqp_workspace
-    //     clears it.
     //   - The problem is an LP (H == NULL, f != NULL): Rinv and RinvD are both NULL
-    //     so the computed x = -v = -f is not the unconstrained minimum.
+    //   - Equality constraints are present
     const int has_hessian = (work->Rinv != NULL || work->RinvD != NULL || work->v == NULL);
-    int has_equalities = 0;
     const int check_unconstrained_base =
         (mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M||mask&DAQP_UPDATE_v||mask&DAQP_UPDATE_d) &&
         work->bnb == NULL && work->nh <= 1 && work->avi == NULL;
+    int has_equalities = 0;
     if(check_unconstrained_base && has_hessian){
-        for(i = 0; i < work->m; i++){
-            if(DAQP_IS_IMMUTABLE(i)){ has_equalities = 1; break; }
-        }
+        for(i = 0; i < work->m; i++)
+            if(work->sense[i]&(DAQP_ACTIVE + DAQP_IMMUTABLE)){ has_equalities = 1; break; }
     }
 
     const int check_unconstrained = check_unconstrained_base && has_hessian && !has_equalities;
