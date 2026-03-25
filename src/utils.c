@@ -29,6 +29,13 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
         }
     }
 
+    // Check bounds early
+    if(mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M||mask&DAQP_UPDATE_v||mask&DAQP_UPDATE_d){
+        error_flag = daqp_check_bounds(work,qp->bupper,qp->blower);
+        if(error_flag<0) return error_flag;
+        if(error_flag==1) do_activate = 1;
+    }
+
     /** Update Rinv **/
     if(mask&DAQP_UPDATE_Rinv){
         if(work->avi == NULL)
@@ -46,15 +53,27 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
         daqp_update_v(qp->f,work,mask);
     }
 
-    const int check_unconstrained =  ((mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M||
-            mask&DAQP_UPDATE_v||mask&DAQP_UPDATE_d) &&
-        work->bnb == NULL && work->nh <= 1 && work->avi == NULL) ? 1 : 0;
+    // The unconstrained shortcut is invalid when:
+    //   - The problem is an LP (H == NULL, f != NULL): Rinv and RinvD are both NULL
+    //   - Equality constraints are present
+    const int has_hessian = (work->Rinv != NULL || work->RinvD != NULL || work->v == NULL);
+    const int check_unconstrained_base =
+        (mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M||mask&DAQP_UPDATE_v||mask&DAQP_UPDATE_d) &&
+        work->bnb == NULL && work->nh <= 1 && work->avi == NULL;
+    int has_equalities = 0;
+    if(check_unconstrained_base && has_hessian){
+        for(i = 0; i < work->m; i++)
+            if(work->sense[i]&(DAQP_ACTIVE + DAQP_IMMUTABLE)){ has_equalities = 1; break; }
+    }
+
+    const int check_unconstrained = check_unconstrained_base && has_hessian && !has_equalities;
     /** Check if unconstrained optimum is primal feasible.
      *  Compute x_unc = Rinv * (-v) (using the raw, un-normalized Rinv) and
      *  verify dupper_unnorm = bupper - A*x_unc >= 0 and
      *         dlower_unnorm = blower - A*x_unc <= 0 for every constraint.
      *  If so, x_unc is optimal and we can skip the expensive M = A*Rinv step.
-     *  Only applicable for standard QPs (no BnB, no hierarchy, no AVI, no prox). **/
+     *  Only applicable for standard QPs (no BnB, no hierarchy, no AVI, no prox,
+     *  no equality constraints, and with a positive-definite Hessian). **/
     if(check_unconstrained){
         int j, disp;
         c_float sum;
@@ -121,10 +140,6 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
 
     /** Update d **/
     if(mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M||mask&DAQP_UPDATE_v||mask&DAQP_UPDATE_d){
-        error_flag = daqp_check_bounds(work,qp->bupper,qp->blower);
-        if(error_flag<0) return error_flag;
-        if(error_flag==1) do_activate = 1;
-
         if(check_unconstrained){ // Already computed d, just need to normalize
             if(work->scaling != NULL){
                 for(i = 0; i < work->m; i++){
