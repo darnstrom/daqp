@@ -13,8 +13,11 @@ setup_dir = pathlib.Path(__file__).parent.resolve()
 # Copy C source
 src_path = (setup_dir / "../..").resolve()
 csrc_dir = setup_dir / 'csrc'
-if not src_path.exists():
-    print("Could not find daqp directory")
+# Check that src_path actually contains the daqp source tree (not just that it exists)
+daqp_src_exists = (src_path / 'src').exists() and (src_path / 'include').exists()
+if not daqp_src_exists:
+    if not csrc_dir.exists():
+        print("Could not find daqp directory")
 elif not csrc_dir.exists():
     os.mkdir(csrc_dir)
     copytree(str(src_path / 'src'), str(csrc_dir / 'src'))
@@ -55,6 +58,6 @@ setup(name='daqp',
         zip_safe=False)
 
 # Cleanup C-source
-if src_path.exists():
+if daqp_src_exists:
     rmtree(str(csrc_dir))
     os.remove(str(setup_dir / 'LICENSE'))
