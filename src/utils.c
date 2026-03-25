@@ -46,15 +46,37 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
         daqp_update_v(qp->f,work,mask);
     }
 
-    const int check_unconstrained =  ((mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M||
-            mask&DAQP_UPDATE_v||mask&DAQP_UPDATE_d) &&
-        work->bnb == NULL && work->nh <= 1 && work->avi == NULL) ? 1 : 0;
+    // Pre-check: the unconstrained shortcut only applies when relevant data has
+    // changed and the problem is a plain QP (no BnB, hierarchy, AVI, or prox).
+    const int check_unconstrained_base =
+        (mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M||mask&DAQP_UPDATE_v||mask&DAQP_UPDATE_d) &&
+        work->bnb == NULL && work->nh <= 1 && work->avi == NULL;
+
+    // The shortcut is additionally invalid for:
+    //   - Equality constraints: equalities must be in the active working set, but
+    //     reset_daqp_workspace clears it; scan for IMMUTABLE sense flags and equal bounds.
+    //   - LP problems (H == NULL, f != NULL): Rinv and RinvD are both NULL so the
+    //     computed x = -v = -f is not the unconstrained minimum.
+    int has_equalities = 0;
+    const int has_hessian = (work->Rinv != NULL || work->RinvD != NULL || work->v == NULL);
+    if(check_unconstrained_base && has_hessian){
+        for(i = 0; i < work->m; i++){
+            if(DAQP_IS_IMMUTABLE(i) ||
+               qp->bupper[i] - qp->blower[i] < work->settings->zero_tol){
+                has_equalities = 1;
+                break;
+            }
+        }
+    }
+
+    const int check_unconstrained = check_unconstrained_base && has_hessian && !has_equalities;
     /** Check if unconstrained optimum is primal feasible.
      *  Compute x_unc = Rinv * (-v) (using the raw, un-normalized Rinv) and
      *  verify dupper_unnorm = bupper - A*x_unc >= 0 and
      *         dlower_unnorm = blower - A*x_unc <= 0 for every constraint.
      *  If so, x_unc is optimal and we can skip the expensive M = A*Rinv step.
-     *  Only applicable for standard QPs (no BnB, no hierarchy, no AVI, no prox). **/
+     *  Only applicable for standard QPs (no BnB, no hierarchy, no AVI, no prox,
+     *  no equality constraints, and with a positive-definite Hessian). **/
     if(check_unconstrained){
         int j, disp;
         c_float sum;
