@@ -122,14 +122,15 @@ int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time){
         work->avi= malloc(sizeof(DAQPAVI));
         allocate_daqp_avi(work->avi,qp->n);
     }
-    errorflag = setup_daqp_ldp(work,qp);
+
+    errorflag = setup_daqp_bnb(work, qp->sense, nb, ns);
     if(errorflag < 0){
         if(own_settings==0) work->settings = NULL;
         free_daqp_workspace(work);
         return errorflag;
     }
 
-    errorflag = setup_daqp_bnb(work, nb, ns);  
+    errorflag = setup_daqp_ldp(work,qp);
     if(errorflag < 0){
         if(own_settings==0) work->settings = NULL;
         free_daqp_workspace(work);
@@ -193,7 +194,7 @@ void setup_daqp_hiqp(DAQPWorkspace* work, int* break_points, int nh){
     }
 }
 
-int setup_daqp_bnb(DAQPWorkspace* work, int nb, int ns){
+int setup_daqp_bnb(DAQPWorkspace* work, int* sense, int nb, int ns){
     int i, nadded;
     if(nb > work->n) return DAQP_EXIT_OVERDETERMINED_INITIAL;
     if((work->bnb == NULL) && (nb >0)){
@@ -203,7 +204,7 @@ int setup_daqp_bnb(DAQPWorkspace* work, int nb, int ns){
         // Detect which constraints are binary
         work->bnb->bin_ids = malloc(nb*sizeof(int));
         for(i = 0, nadded = 0; nadded < nb; i++){
-            if(work->qp->sense[i] & DAQP_BINARY)
+            if(sense[i] & DAQP_BINARY)
                 work->bnb->bin_ids[nadded++] = i;
         }
 
