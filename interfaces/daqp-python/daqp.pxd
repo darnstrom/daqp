@@ -73,7 +73,7 @@ cdef extern from "api.h":
     cdef extern nogil:
         void daqp_set_primal_start(DAQPWorkspace *work, double *x)
     cdef extern nogil:
-        int setup_daqp(DAQPProblem *qp, DAQPWorkspace *work, double *setup_time)
+        int setup_daqp_main(DAQPProblem *qp, DAQPWorkspace *work, double *setup_time, int check_unc)
     cdef extern nogil:
         void daqp_solve(DAQPResult *res, DAQPWorkspace *work)
     cdef extern nogil:

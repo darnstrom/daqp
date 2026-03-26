@@ -15,7 +15,7 @@ classdef daqp< handle
             if nargin < 7, primal_start = []; end
             if nargin < 8, dual_start = []; end
             d = daqp();
-            [exitflag,setup_time] = d.setup(H,f,A,bupper,blower,sense,[],0,primal_start,dual_start);
+            [exitflag,setup_time] = d.setup(H,f,A,bupper,blower,sense,[],0,primal_start,dual_start,1);
             if(exitflag <0)
                 x = [];fval=[];info=[];
                 return; 
@@ -104,7 +104,7 @@ classdef daqp< handle
             [x,fval,exitflag,info] = daqpmex('solve', this.work_ptr,...
                 this.H,this.f,this.A,this.bupper,this.blower,this.sense,this.break_points);
         end
-        function [exitflag,setup_time] = setup(this,H,f,A,bupper,blower,sense,break_points,problem_type,primal_start,dual_start)
+        function [exitflag,setup_time] = setup(this,H,f,A,bupper,blower,sense,break_points,problem_type,primal_start,dual_start,check_unconstrained)
             if(nargin < 8)
                 break_points = [];
             end
@@ -116,6 +116,9 @@ classdef daqp< handle
             end
             if(nargin < 11)
                 dual_start = [];
+            end
+            if(nargin < 11)
+                check_unconstrained = 0;
             end
 
             % TODO Check validity
@@ -143,7 +146,7 @@ classdef daqp< handle
             this.break_points= int32(break_points);
             [exitflag,setup_time] = daqpmex('setup', this.work_ptr,this.H,this.f,...
                 this.A,this.bupper,this.blower,this.sense,this.break_points,int32(problem_type),...
-                primal_start,dual_start);
+                primal_start,dual_start,check_unconstrained);
         end
 
         function settings = settings(this,varargin)

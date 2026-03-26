@@ -51,6 +51,7 @@ extern "C" {
 #define DAQP_UPDATE_d 8
 #define DAQP_UPDATE_sense 16 
 #define DAQP_UPDATE_hierarchy 32
+#define DAQP_UPDATE_unconstrained 64
 
 // CONSTRAINT MASKS 
 #define DAQP_ACTIVE 1

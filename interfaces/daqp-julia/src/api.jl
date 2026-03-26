@@ -55,7 +55,7 @@ function quadprog(H::Union{Matrix{Float64}, Cholesky},f::Vector{Float64},
     d = DAQPBase.Model() 
     !isnothing(settings) && DAQPBase.settings(d,settings)
     exitflag,setup_time = DAQPBase.setup(d,QPj(H,f,A,bupper,blower,sense;A_rowmaj);
-                                         primal_start,dual_start)
+                                         primal_start,dual_start, check_unconstrained=true)
     return DAQPBase.solve(d;setup_time);
 end
 
@@ -177,7 +177,6 @@ is interpreted as
 function avi(H::Matrix{Float64},f::Vector{Float64}, 
         A::Matrix{Float64},bupper::Vector{Float64},blower::Vector{Float64}=Float64[],sense::Vector{Cint}=Cint[];A_rowmaj=false,settings=nothing, primal_start::Vector{Cdouble}=Cdouble[],
         dual_start::Vector{Cdouble}=Cdouble[])
-    #return quadprog(QPj(H,f,A,bupper,blower,sense;A_rowmaj,is_avi=true);settings)
     d = DAQPBase.Model() 
     exitflag,setup_time = DAQPBase.setup(d,QPj(H,f,A,bupper,blower,sense;A_rowmaj,is_avi=true);
                                          primal_start,dual_start)
@@ -228,8 +227,8 @@ function delete!(daqp::DAQPBase.Model)
     end
 end
 
-function setup(daqp::DAQPBase.Model, qp::DAQPBase.QPj;
-        primal_start::Vector{Cdouble}=Cdouble[],dual_start::Vector{Cdouble}=Cdouble[])
+function setup(daqp::DAQPBase.Model, qp::DAQPBase.QPj;primal_start::Vector{Cdouble}=Cdouble[],
+        dual_start::Vector{Cdouble}=Cdouble[],check_unconstrained=false)
     daqp.qpj = qp
     daqp.qpc = DAQPBase.QPc(daqp.qpj)
     old_settings = settings(daqp); # in case setup fails
@@ -252,7 +251,7 @@ function setup(daqp::DAQPBase.Model, qp::DAQPBase.QPj;
     end
     
     # Handle AVI with other setup 
-    exitflag = ccall((:setup_daqp,DAQPBase.libdaqp),Cint,(Ptr{DAQPBase.QPc}, Ptr{DAQPBase.Workspace}, Ptr{Cdouble}), daqp.qpc_ptr, daqp.work, setup_time)
+    exitflag = ccall((:setup_daqp_main,DAQPBase.libdaqp),Cint,(Ptr{DAQPBase.QPc}, Ptr{DAQPBase.Workspace}, Ptr{Cdouble},Cint), daqp.qpc_ptr, daqp.work, setup_time, Cint(check_unconstrained))
     if(exitflag < 0)
         # XXX: if setup fails DAQP currently clears settings
         ccall((:allocate_daqp_settings,DAQPBase.libdaqp),Nothing,(Ptr{DAQPBase.Workspace},),daqp.work)
@@ -329,7 +328,8 @@ function settings(p::Ptr{DAQPBase.Workspace},changes::Dict{Symbol,<:Any})
     return new_settings;
 end
 
-function update(daqp::DAQPBase.Model, H,f,A,bupper,blower,sense=nothing,break_points=nothing) 
+function update(daqp::DAQPBase.Model, H,f,A,bupper,blower,sense=nothing,break_points=nothing,
+        check_unconstrained = true)
     update_mask = Cint(0);
     work = unsafe_load(daqp.work);
     if(!isnothing(H) && work.n == size(H,1) && work.n == size(H,2))
@@ -362,6 +362,7 @@ function update(daqp::DAQPBase.Model, H,f,A,bupper,blower,sense=nothing,break_po
         daqp.qpj.break_points .= break_points
         update_mask+=32
     end
+    #check_unconstrained && (update_mask += 64) # Enable shortcut for unconstrained optimum
     daqp.qpc = QPc(daqp.qpj);
     unsafe_store!(daqp.qpc_ptr, daqp.qpc)
 
