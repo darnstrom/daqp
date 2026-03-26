@@ -416,6 +416,7 @@ int daqp_normalize_M(DAQPWorkspace* work){
 // Returns DAQP_UNCONSTRAINED_OPTIMAL if the unconstrained solution is optimal
 int daqp_check_unconstrained(DAQPWorkspace* work, const int mask){
     int i;
+    if ((mask&DAQP_UPDATE_unconstrained)==0) return 0;
     if ((mask&(DAQP_UPDATE_Rinv+DAQP_UPDATE_M+DAQP_UPDATE_v+DAQP_UPDATE_d)) == 0) return 0; // Nothing to update
     if (work->bnb != NULL || work->nh > 1 || work->avi != NULL || work->n_prox >0) return 0; // Not a QP 
     for(i = 0; i < work->m; i++) if(work->sense[i]&(DAQP_ACTIVE + DAQP_IMMUTABLE)) return 0; // No equalities

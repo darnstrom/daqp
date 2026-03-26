@@ -43,7 +43,7 @@ cdef void _solve_warm_start(DAQPProblem* problem, DAQPSettings* settings,
         work.settings = settings
         setup_time_c = 0.0
         with nogil:
-            setup_flag = setup_daqp(problem, work, &setup_time_c)
+            setup_flag = setup_daqp_main(problem, work, &setup_time_c,1)
         res.setup_time = setup_time_c
         res.exitflag  = setup_flag
         if setup_flag >= 0:
@@ -416,7 +416,7 @@ cdef class Model:
 
         # ---- call setup_daqp ----
         with nogil:
-            setup_flag = setup_daqp(&self._qp, self._work, &setup_time_c)
+            setup_flag = setup_daqp_main(&self._qp, self._work, &setup_time_c,0)
 
         if setup_flag < 0:
             # setup_daqp freed settings on failure; re-allocate and restore.

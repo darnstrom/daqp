@@ -58,7 +58,7 @@ void daqp_quadprog(DAQPResult *res, DAQPProblem* qp, DAQPSettings *settings){
 
     DAQPWorkspace work;
     work.settings = settings;
-    setup_flag = setup_daqp(qp,&work,&(res->setup_time));
+    setup_flag = setup_daqp_main(qp,&work,&(res->setup_time),1);
     res->exitflag = setup_flag;
 
     if(setup_flag >= 0){
@@ -70,14 +70,19 @@ void daqp_quadprog(DAQPResult *res, DAQPProblem* qp, DAQPSettings *settings){
     }
 }
 
-// XXX should be very similar to quadprog now
 void daqp_avi(DAQPResult *res, DAQPProblem* problem, DAQPSettings *settings){
     // Set the flag correctly
+    problem->problem_type = 1;
     daqp_quadprog(res,problem,settings);
 }
 
 // Setup workspace and transform QP to LDP
 int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time){
+    return setup_daqp_main(qp,work,setup_time,0);//  
+}
+
+// Internal function for setting workspace and transform QP to LDP
+int setup_daqp_main(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time, int check_unc){
     int errorflag;
     int own_settings=1;
     (void)setup_time; // avoids warning when compiling without profiling
@@ -130,7 +135,7 @@ int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time){
         return errorflag;
     }
 
-    errorflag = setup_daqp_ldp(work,qp);
+    errorflag = setup_daqp_ldp(work,qp,check_unc);
     if(errorflag < 0){
         if(own_settings==0) work->settings = NULL;
         free_daqp_workspace(work);
@@ -147,7 +152,7 @@ int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time){
 }
 
 //  Setup LDP from QP  
-int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp){
+int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp, const int check_unc){
     // Always update M, d and sense
     int update_mask = DAQP_UPDATE_M+DAQP_UPDATE_d+DAQP_UPDATE_sense; 
     int error_flag;
@@ -175,6 +180,8 @@ int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp){
 
     // Update hierarchy if hqp
     if(qp->nh > 1) update_mask += DAQP_UPDATE_hierarchy;
+
+    if(check_unc) update_mask += DAQP_UPDATE_unconstrained; 
 
     // Form LDP
     error_flag = daqp_update_ldp(update_mask, work, qp);

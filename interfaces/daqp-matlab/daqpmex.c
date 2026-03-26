@@ -101,9 +101,10 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  } else if (nrhs > 10 && !mxIsEmpty(prhs[10])) {
 		daqp_primal_init_active(qp, (c_float *)mxGetPr(prhs[10]));
 	  }
+      int check_unconstrained = mxGetM(prhs[12]);
 
 	  c_float solve_time;
-	  error_flag = setup_daqp(qp,work,&solve_time);
+	  error_flag = setup_daqp_main(qp,work,&solve_time,check_unconstrained);
 	  if(error_flag < 0){
 		free(work->qp);
 		work->qp = NULL;
