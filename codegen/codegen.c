@@ -203,7 +203,7 @@ void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work, const char* prefix){
             prefix,prefix,prefix,prefix, 0); // reuse_ind
     fprintf(f, "%sWS, %d,\n", prefix, 0); //n_active
     fprintf(f, "%d,%d,\n",0,-1); //iterations + sing_id
-    fprintf(f, "%sprox_mask, %d,\n", prefix, n); // prox_mask
+    fprintf(f, "%sprox_mask, %d,\n", prefix, work->n_prox); // prox_mask
     fprintf(f, "%f,\n",0.0); // Soft slack
     fprintf(f, "&%ssettings, \n", prefix);
     // BnB

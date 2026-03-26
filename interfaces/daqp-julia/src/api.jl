@@ -362,7 +362,7 @@ function update(daqp::DAQPBase.Model, H,f,A,bupper,blower,sense=nothing,break_po
         daqp.qpj.break_points .= break_points
         update_mask+=32
     end
-    check_unconstrained && (update_mask += 64) # Enable shortcut for unconstrained optimum
+    #check_unconstrained && (update_mask += 64) # Enable shortcut for unconstrained optimum
     daqp.qpc = QPc(daqp.qpj);
     unsafe_store!(daqp.qpc_ptr, daqp.qpc)
 
