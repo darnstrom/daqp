@@ -15,6 +15,7 @@ int daqp_update_d(DAQPWorkspace *work, c_float *bupper, c_float *blower);
 int daqp_check_bounds(DAQPWorkspace* work, c_float* bupper, c_float* blower);
 void daqp_normalize_Rinv(DAQPWorkspace *work);
 int daqp_normalize_M(DAQPWorkspace *work);
+int daqp_check_unconstrained(DAQPWorkspace* work, const int mask);
 
 int daqp_update_avi(DAQPAVI *avi, DAQPProblem *problem);
 int daqp_lu(c_float* A, int* P, int n);

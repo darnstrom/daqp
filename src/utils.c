@@ -30,7 +30,7 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
     }
 
     // Check bounds early
-    if(mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M||mask&DAQP_UPDATE_v||mask&DAQP_UPDATE_d){
+    if(mask&DAQP_UPDATE_M||mask&DAQP_UPDATE_v||mask&DAQP_UPDATE_d){
         error_flag = daqp_check_bounds(work,qp->bupper,qp->blower);
         if(error_flag<0) return error_flag;
         if(error_flag==1) do_activate = 1;
@@ -53,78 +53,8 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
         daqp_update_v(qp->f,work,mask);
     }
 
-    // The unconstrained shortcut is invalid when:
-    //   - The problem is an LP (H == NULL, f != NULL): Rinv and RinvD are both NULL
-    //   - Equality constraints are present
-    const int has_hessian = (work->Rinv != NULL || work->RinvD != NULL || work->v == NULL);
-    const int check_unconstrained_base =
-        (mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M||mask&DAQP_UPDATE_v||mask&DAQP_UPDATE_d) &&
-        work->bnb == NULL && work->nh <= 1 && work->avi == NULL;
-    int has_equalities = 0;
-    if(check_unconstrained_base && has_hessian){
-        for(i = 0; i < work->m; i++)
-            if(work->sense[i]&(DAQP_ACTIVE + DAQP_IMMUTABLE)){ has_equalities = 1; break; }
-    }
-
-    const int check_unconstrained = check_unconstrained_base && has_hessian && !has_equalities;
-    /** Check if unconstrained optimum is primal feasible.
-     *  Compute x_unc = Rinv * (-v) (using the raw, un-normalized Rinv) and
-     *  verify dupper_unnorm = bupper - A*x_unc >= 0 and
-     *         dlower_unnorm = blower - A*x_unc <= 0 for every constraint.
-     *  If so, x_unc is optimal and we can skip the expensive M = A*Rinv step.
-     *  Only applicable for standard QPs (no BnB, no hierarchy, no AVI, no prox,
-     *  no equality constraints, and with a positive-definite Hessian). **/
-    if(check_unconstrained){
-        int j, disp;
-        c_float sum;
-        c_float* swp_ptr;
-        int feasible = 1;
-        const int n = work->n;
-        const c_float primal_tol = work->settings->primal_tol;
-
-        // Compute x_unc = Rinv_unnorm * (-v) stored temporarily in work->x.
-        swp_ptr = work->x; work->u = work->xold; work->x = work->xold; work->xold = swp_ptr;
-        if(work->v != NULL){
-            if(work->Rinv != NULL){
-                // Upper-triangular back-substitution: u[i] = sum_{j>=i} Rinv[i,j]*(-v[j])
-                for(i = 0, disp = 0; i < n; i++){
-                    for(j = i, sum = 0; j < n; j++)
-                        sum += work->Rinv[disp++] * work->v[j];
-                    work->x[i] = -sum;
-                }
-            } else if(work->RinvD != NULL){
-                for(i = 0; i < n; i++) work->x[i] = -work->RinvD[i] * work->v[i];
-            } else {
-                for(i = 0; i < n; i++) work->x[i] = -work->v[i];
-            }
-        }
-        // If v == NULL (f == 0), x_unc = 0 and work->x is already 0.
-
-        // Check simple bounds: blower[i] <= x_unc[i] <= bupper[i]
-        for(i = 0; i < work->ms; i++){
-            work->dupper[i] = qp->bupper[i] - work->x[i];
-            work->dlower[i] = qp->blower[i] - work->x[i];
-            if(work->dupper[i] < -primal_tol || work->dlower[i] > primal_tol)
-                feasible = 0;
-        }
-
-        // Check general constraints: blower[i] <= A[i,:]*x_unc <= bupper[i]
-        for(i = work->ms, disp = 0; i < work->m; i++){
-            for(j = 0, sum = 0.0; j < n; j++)
-                sum += qp->A[disp++] * work->x[j];
-            work->dupper[i] = qp->bupper[i] - sum;
-            work->dlower[i] = qp->blower[i] - sum;
-            if(work->dupper[i] < -primal_tol || work->dlower[i] > primal_tol)
-                feasible = 0;
-        }
-        if(feasible){
-            reset_daqp_workspace(work);
-            work->sing_ind = DAQP_UNCONSTRAINED_OPTIMAL;
-            return 0;
-        }
-        // Switch back such that any warm starts a preserved 
-        swp_ptr = work->x; work->u = work->xold; work->x = work->xold; work->xold = swp_ptr;
-    }
+    int unconstrained_flag = daqp_check_unconstrained(work,mask);
+    if(unconstrained_flag == DAQP_UNCONSTRAINED_OPTIMAL) return 0;
 
     /** Update M **/
     if(mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M){
@@ -140,7 +70,7 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
 
     /** Update d **/
     if(mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M||mask&DAQP_UPDATE_v||mask&DAQP_UPDATE_d){
-        if(check_unconstrained){ // Already computed d, just need to normalize
+        if(unconstrained_flag == 1){ // Already computed d, just need to normalize
             if(work->scaling != NULL){
                 for(i = 0; i < work->m; i++){
                     work->dupper[i]*=work->scaling[i];
@@ -479,6 +409,70 @@ int daqp_normalize_M(DAQPWorkspace* work){
             work->M[disp]*=scaling_i;
     }
     return 0;
+}
+
+// Returns 0 if it did not even compute the unconstrained solution 
+// Returns 1 if it computed the unconstrained solution, but it was not optimal
+// Returns DAQP_UNCONSTRAINED_OPTIMAL if the unconstrained solution is optimal
+int daqp_check_unconstrained(DAQPWorkspace* work, const int mask){
+    int i;
+    if ((mask&(DAQP_UPDATE_Rinv+DAQP_UPDATE_M+DAQP_UPDATE_v+DAQP_UPDATE_d)) == 0) return 0; // Nothing to update
+    if (work->bnb != NULL || work->nh > 1 || work->avi != NULL || work->n_prox >0) return 0; // Not a QP 
+    for(i = 0; i < work->m; i++) if(work->sense[i]&(DAQP_ACTIVE + DAQP_IMMUTABLE)) return 0; // No equalities
+
+    // Check if unconstrained optimum is primal feasible.
+    // Compute x_unc = Rinv * (-v) (using the raw, un-normalized Rinv) and
+    // verify dupper_unnorm = bupper - A*x_unc >= 0 and
+    //        dlower_unnorm = blower - A*x_unc <= 0 for every constraint.
+    int j, disp;
+    c_float sum;
+    c_float* swp_ptr;
+    int feasible = 1;
+    const int n = work->n;
+    const c_float primal_tol = work->settings->primal_tol;
+
+    // Compute x_unc = Rinv_unnorm * (-v) stored temporarily in work->x.
+    swp_ptr = work->x; work->u = work->xold; work->x = work->xold; work->xold = swp_ptr;
+    if(work->v != NULL){
+        if(work->Rinv != NULL){
+            // Upper-triangular back-substitution: u[i] = sum_{j>=i} Rinv[i,j]*(-v[j])
+            for(i = 0, disp = 0; i < n; i++){
+                for(j = i, sum = 0; j < n; j++)
+                    sum += work->Rinv[disp++] * work->v[j];
+                work->x[i] = -sum;
+            }
+        } else if(work->RinvD != NULL){
+            for(i = 0; i < n; i++) work->x[i] = -work->RinvD[i] * work->v[i];
+        } else {
+            for(i = 0; i < n; i++) work->x[i] = -work->v[i];
+        }
+    }
+    //
+    // Check simple bounds: blower[i] <= x_unc[i] <= bupper[i]
+    for(i = 0; i < work->ms; i++){
+        work->dupper[i] = work->qp->bupper[i] - work->x[i];
+        work->dlower[i] = work->qp->blower[i] - work->x[i];
+        if(work->dupper[i] < -primal_tol || work->dlower[i] > primal_tol)
+            feasible = 0;
+    }
+
+    // Check general constraints: blower[i] <= A[i,:]*x_unc <= bupper[i]
+    for(i = work->ms, disp = 0; i < work->m; i++){
+        for(j = 0, sum = 0.0; j < n; j++)
+            sum += work->qp->A[disp++] * work->x[j];
+        work->dupper[i] = work->qp->bupper[i] - sum;
+        work->dlower[i] = work->qp->blower[i] - sum;
+        if(work->dupper[i] < -primal_tol || work->dlower[i] > primal_tol)
+            feasible = 0;
+    }
+    if(feasible){
+        reset_daqp_workspace(work);
+        work->sing_ind = DAQP_UNCONSTRAINED_OPTIMAL;
+        return DAQP_UNCONSTRAINED_OPTIMAL;
+    }
+    // Switch back such that any warm starts a preserved
+    swp_ptr = work->x; work->u = work->xold; work->x = work->xold; work->xold = swp_ptr;
+    return 1;
 }
 
 int daqp_update_avi(DAQPAVI* avi, DAQPProblem* p){
