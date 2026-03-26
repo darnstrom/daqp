@@ -494,3 +494,19 @@ end
     @test norm(x3 .- (-5.0)) < tol  # all at lower bound
 end
 
+@testset "Unconstrained shortcut" begin
+    H = diagm(ones(10))
+    f = zeros(10)
+    A = randn(10000,10)
+    b = rand(10000)
+    tquad = @elapsed x,fval,exitflag,info = quadprog(H,f,A,b)
+    @test norm(x) < tol
+    tsetup = @elapsed begin
+        d = DAQPBase.Model()
+        setup(d,H,f,A,b)
+        x,fval,exitflag,info2 = solve(d)
+        @test norm(x) < tol
+    end
+    @test tquad < 10*tsetup #Should be orders of magnitude faster
+end
+
