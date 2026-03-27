@@ -126,5 +126,80 @@ int main() {
         all_pass = all_pass && pass;
     }
 
+    // -----------------------------------------------------------------------
+    // Test 4: QP with Hessian but NO linear term (f = empty -> v == NULL).
+    //
+    // min  0.5*(x1^2 + x2^2)   (H = I, f = empty)
+    // s.t. -1 <= x1 <= 1
+    //      -1 <= x2 <= 1
+    //
+    // Unconstrained optimum is x = 0, which is feasible.
+    // The shortcut should detect this and return x* = [0, 0] with
+    // exitflag == DAQP_EXIT_OPTIMAL without running the iterative solver.
+    // Before the fix, work->x pointed to uninitialized memory (the malloc'd
+    // xold buffer), so the feasibility check used garbage values and could
+    // return incorrect results.
+    // -----------------------------------------------------------------------
+    {
+        int n = 2, m = 2;
+        Eigen::MatrixXd H = Eigen::MatrixXd::Identity(2, 2);
+        Eigen::VectorXd f(0);  // Empty linear term (f == NULL in C layer)
+        Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> A(0, n);
+        Eigen::VectorXd bu = (Eigen::VectorXd(2) << 1, 1).finished();
+        Eigen::VectorXd bl = (Eigen::VectorXd(2) << -1, -1).finished();
+        Eigen::VectorXi sense        = Eigen::VectorXi::Zero(m);
+        Eigen::VectorXi break_points = Eigen::VectorXi::Zero(0);
+
+        EigenDAQPResult result = daqp_solve(H, f, A, bu, bl, sense, break_points);
+
+        Eigen::VectorXd expected = Eigen::VectorXd::Zero(2);
+        bool pass = (result.exitflag == DAQP_EXIT_OPTIMAL) &&
+                    result.get_primal().isApprox(expected, precision);
+        std::cout << "Test 4 (QP no linear term, x=0 feasible, v==NULL fix): "
+                  << (pass ? "PASS" : "FAIL") << std::endl;
+        if (!pass) {
+            std::cout << "  Expected: " << expected.transpose() << std::endl;
+            std::cout << "  Got:      " << result.get_primal().transpose() << std::endl;
+            std::cout << "  exitflag: " << result.exitflag << std::endl;
+        }
+        all_pass = all_pass && pass;
+    }
+
+    // -----------------------------------------------------------------------
+    // Test 5: QP with Hessian but NO linear term, where x = 0 violates
+    // a constraint. The solver must run normally and find the true optimum.
+    //
+    // min  0.5*(x1^2 + x2^2)   (H = I, f = empty)
+    // s.t. 2 <= x1 <= 5
+    //      2 <= x2 <= 5
+    //
+    // x = 0 violates both lower bounds, so the shortcut must NOT be taken.
+    // True optimum: x* = [2, 2].
+    // -----------------------------------------------------------------------
+    {
+        int n = 2, m = 2;
+        Eigen::MatrixXd H = Eigen::MatrixXd::Identity(2, 2);
+        Eigen::VectorXd f(0);  // Empty linear term
+        Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> A(0, n);
+        Eigen::VectorXd bu = (Eigen::VectorXd(2) << 5, 5).finished();
+        Eigen::VectorXd bl = (Eigen::VectorXd(2) << 2, 2).finished();
+        Eigen::VectorXi sense        = Eigen::VectorXi::Zero(m);
+        Eigen::VectorXi break_points = Eigen::VectorXi::Zero(0);
+
+        EigenDAQPResult result = daqp_solve(H, f, A, bu, bl, sense, break_points);
+
+        Eigen::VectorXd expected = (Eigen::VectorXd(2) << 2, 2).finished();
+        bool pass = (result.exitflag == DAQP_EXIT_OPTIMAL) &&
+                    result.get_primal().isApprox(expected, precision);
+        std::cout << "Test 5 (QP no linear term, x=0 infeasible, v==NULL fix): "
+                  << (pass ? "PASS" : "FAIL") << std::endl;
+        if (!pass) {
+            std::cout << "  Expected: " << expected.transpose() << std::endl;
+            std::cout << "  Got:      " << result.get_primal().transpose() << std::endl;
+            std::cout << "  exitflag: " << result.exitflag << std::endl;
+        }
+        all_pass = all_pass && pass;
+    }
+
     return all_pass ? 0 : 1;
 }
