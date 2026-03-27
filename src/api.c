@@ -278,6 +278,8 @@ void free_daqp_bnb(DAQPWorkspace* work){
 // Allocate memory for iterates  
 void allocate_daqp_workspace(DAQPWorkspace *work, int n, int ns){
     work->n = n;
+    work->m = 0;
+    work->ms = 0;
     n = n + ns; //To account for soft_constraints
     work->Rinv = NULL;
     work->RinvD = NULL;
