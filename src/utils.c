@@ -447,6 +447,9 @@ int daqp_check_unconstrained(DAQPWorkspace* work, const int mask){
         } else {
             for(i = 0; i < n; i++) work->x[i] = -work->v[i];
         }
+    } else {
+        // No linear term: unconstrained optimum is x = 0
+        for(i = 0; i < n; i++) work->x[i] = 0.0;
     }
     //
     // Check simple bounds: blower[i] <= x_unc[i] <= bupper[i]
