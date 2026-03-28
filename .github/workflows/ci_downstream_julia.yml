@@ -1,0 +1,57 @@
+name: Downstream Julia CI
+
+on:
+  push:
+    branches:
+      - master
+    paths-ignore:
+      - "docs/**"
+  pull_request:
+    branches:
+      - master
+    paths-ignore:
+      - "docs/**"
+  workflow_dispatch:
+
+jobs:
+  test-downstream:
+    name: ${{ matrix.package }}.jl
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - package: ParametricDAQP
+            repo: darnstrom/ParametricDAQP.jl
+          - package: ASCertain
+            repo: darnstrom/ASCertain.jl
+          - package: PolyDAQP
+            repo: darnstrom/PolyDAQP.jl
+          - package: LinearMPC
+            repo: darnstrom/LinearMPC.jl
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build libdaqp and sync Julia interface
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DJULIA=ON
+          cmake --build build -- -j$(nproc)
+
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+
+      - name: Clone ${{ matrix.package }}.jl
+        run: git clone https://github.com/${{ matrix.repo }}.git /tmp/${{ matrix.package }}
+
+      - name: Test ${{ matrix.package }}.jl with local DAQPBase and libdaqp
+        run: |
+          julia --project=/tmp/${{ matrix.package }} -e '
+            import Pkg
+            Pkg.develop(path="${{ github.workspace }}/build/interfaces/daqp-julia")
+            Pkg.instantiate()
+            Pkg.test("${{ matrix.package }}")
+          '
