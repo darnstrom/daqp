@@ -32,11 +32,7 @@ void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind){
             sum+=Mi[i]*Mi[i];
 
     if(DAQP_IS_SOFT(add_ind) && DAQP_IS_SLACK_FREE(add_ind)){
-#ifdef SOFT_WEIGHTS
-        sum+= DAQP_IS_LOWER(add_ind) ? work->rho_ls[add_ind] : work->rho_us[add_ind];
-#else
         sum+=work->settings->rho_soft;
-#endif
         ns_active++;
     }
 
