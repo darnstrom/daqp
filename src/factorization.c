@@ -31,7 +31,7 @@ void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind){
         for(i=start_col,sum=0;i<work->n;i++)
             sum+=Mi[i]*Mi[i];
 
-    if(DAQP_IS_SOFT(add_ind) && DAQP_IS_SLACK_FREE(add_ind)){
+    if(DAQP_IS_SOFT(add_ind)){
         sum+=work->settings->rho_soft;
         ns_active++;
     }
@@ -43,7 +43,7 @@ void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind){
     // store l <-- Mk* m
     for(i=0;i<work->n_active;i++){
         id = work->WS[i];
-        if(DAQP_IS_SOFT(id) && DAQP_IS_SLACK_FREE(id)) ns_active++;
+        if(DAQP_IS_SOFT(id)) ns_active++;
         // Use Rinv or M for Mk depending on if k is simple bound or not 
         if(id < work->ms){ 
             Mk = (work->Rinv) ? work->Rinv+DAQP_R_OFFSET(id,work->n): NULL;
