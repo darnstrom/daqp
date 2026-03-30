@@ -328,6 +328,9 @@ void daqp_refine_active(DAQPWorkspace *work){
         }
         d = DAQP_IS_LOWER(id) ? work->dlower[id] : work->dupper[id];
         work->xldl[i] = Mu - d; // RHS: +r[i] (positive, so L*D*L'*dlam=r gives u-=M'*dlam zeroes residual)
+        // For soft constraints the CSP system is (MM'+rho*I)*lam = -d,
+        if(DAQP_IS_SOFT(id))
+            work->xldl[i] -= work->settings->rho_soft * work->lam_star[i];
     }
 
     // Forward substitution L * y = xldl
