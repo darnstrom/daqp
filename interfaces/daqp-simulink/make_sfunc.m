@@ -1,11 +1,11 @@
 function make_sfunc(do_debug)
 %-------------------------------------------------------------------------%
-% 
-%   Description : MEX-compilation of the daqp solver for simulink with code 
-%                 generation. 
+%
+%   Description : MEX-compilation of the daqp solver for simulink with code
+%                 generation.
 %   Author      : Christopher Schulte, RWTH Aachen University, IRT
 %                 christopher.schulte@rwth-aachen.de
-% 
+%
 %-------------------------------------------------------------------------%
 
 if nargin == 0
@@ -32,7 +32,7 @@ source_files = {'daqp.c', ...
 
 
 sfunc = 'DAQP_sfunc.c';
-    
+
 % Construct compile command
 if do_debug
     cmd = [ 'mex -D__DEBUG__ -g ', sfunc ];
@@ -52,7 +52,7 @@ end
 
 % Compile daqp for Simulink
 cd(this_dir)
-eval(cmd) 
+eval(cmd)
 cd(current_dir)
 
 end

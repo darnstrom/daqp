@@ -63,14 +63,14 @@ void render_daqp_workspace(DAQPWorkspace* work, const char *fname, const char *d
         write_int_array(fsrc,work->break_points, work->nh,varname);
     }
 
-    // TODO Check soft constraints 
+    // TODO Check soft constraints
 
     //Write workspace
     write_daqp_workspace_h(fh,work,prefix);
     write_daqp_workspace_src(fsrc,work,prefix);
 
 
-    // Close header guard 
+    // Close header guard
     fprintf(fh, "#endif // ifndef %s\n", hguard);
 
     fclose(fh);
@@ -147,7 +147,7 @@ void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work, const char* prefix){
     int m = work->m;
     int ms = work->ms;
     int ntot = n;
-    for(i = 0; i < m ; i++) 
+    for(i = 0; i < m ; i++)
         if(work->sense[i] & DAQP_SOFT) ntot++;
 
     char varname[256];
@@ -192,7 +192,7 @@ void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work, const char* prefix){
     //Workspace struct
     fprintf(f, "DAQPWorkspace %swork= {\n", prefix);
     fprintf(f, "NULL,\n"); // DAQPProblem
-    fprintf(f, "%d, %d, %d,\n",n,m,ms); // dimensions 
+    fprintf(f, "%d, %d, %d,\n",n,m,ms); // dimensions
     fprintf(f, "%sM, %sdupper, %sdlower, %sRinv, NULL, %ssense,\n",
             prefix,prefix,prefix,prefix,prefix); //LDP
     fprintf(f, "NULL,\n"); // scaling

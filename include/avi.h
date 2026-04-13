@@ -1,4 +1,4 @@
-#ifndef DAQP_AVI_H 
+#ifndef DAQP_AVI_H
 # define DAQP_AVI_H
 
 # ifdef __cplusplus

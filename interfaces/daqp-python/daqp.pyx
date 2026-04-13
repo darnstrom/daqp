@@ -71,7 +71,7 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
           zero_tol = DAQP_DEFAULT_ZERO_TOL, pivot_tol = DAQP_DEFAULT_PIVOT_TOL,
           progress_tol = DAQP_DEFAULT_PROG_TOL, cycle_tol = DAQP_DEFAULT_CYCLE_TOL,
           iter_limit =  DAQP_DEFAULT_ITER_LIMIT, fval_bound = DAQP_INF,
-          eps_prox= DAQP_DEFAULT_EPS_PROX, eta_prox = DAQP_DEFAULT_ETA, 
+          eps_prox= DAQP_DEFAULT_EPS_PROX, eta_prox = DAQP_DEFAULT_ETA,
           rho_soft = DAQP_DEFAULT_RHO_SOFT,
           rel_subopt = DAQP_DEFAULT_REL_SUBOPT, abs_subopt = DAQP_DEFAULT_ABS_SUBOPT,
           sing_tol = DAQP_DEFAULT_SING_TOL, refactor_tol = DAQP_DEFAULT_REFACTOR_TOL,
@@ -116,13 +116,13 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
           * 0  ->  Inequality constraint (default)
           * 1  ->  Active inequality constraint (used as warm start)
           * 5  ->  Equality constraint
-          * 8  ->  Soft constraint (allowed to be violated if necessary) 
+          * 8  ->  Soft constraint (allowed to be violated if necessary)
           * 16 ->  Binary constraint (the upper or lower bound should hold with equality)
     See <https://darnstrom.github.io/daqp/parameters>`_ for more information
     break_points:
         Break points that define prioritized constraints
     is_avi:
-        flag for interpreting the problem as an AVI (relevant for asymmetric H) 
+        flag for interpreting the problem as an AVI (relevant for asymmetric H)
     primal_start:
         Initial guess of primal iterate (used for warm starting). Sets the initial
         active set based on which constraints are nearly active at this iterate, and
@@ -646,7 +646,7 @@ def minrep(double[:,:] A, double[:] b):
     # Setup output
     cdef int[::1] is_redundant = np.zeros(m, dtype=np.intc)
 
-    # Solve 
+    # Solve
     with nogil:
         daqp_minrep(&is_redundant[0], &A[0,0], &b[0],n,m,ms)
     return np.asarray(is_redundant)

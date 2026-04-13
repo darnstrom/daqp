@@ -1,4 +1,4 @@
-#ifndef DAQP_AUX_H 
+#ifndef DAQP_AUX_H
 # define DAQP_AUX_H
 
 # ifdef __cplusplus

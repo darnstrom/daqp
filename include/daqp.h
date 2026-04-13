@@ -5,7 +5,7 @@
 extern "C" {
 # endif // ifdef __cplusplus
 
-#include "factorization.h" 
+#include "factorization.h"
 #include "constants.h"
 #include "auxiliary.h"
 

@@ -1,4 +1,4 @@
- 
+
 # DAQP
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![](https://img.shields.io/badge/docs-online-brightgreen)](https://darnstrom.github.io/daqp)
@@ -12,7 +12,7 @@ subject to      l  <=  x  <= u
 ```
 Binary constraints of the form $A x \in \lbrace b_l, b_u \rbrace$ are also supported, allowing for mixed-integer quadratic programs to be solved.
 
-The code is written in C and is *library free*. DAQP can be interfaced to C, Julia, MATLAB, and Python. 
+The code is written in C and is *library free*. DAQP can be interfaced to C, Julia, MATLAB, and Python.
 
 ## Quick installation
 
@@ -21,7 +21,7 @@ The code is written in C and is *library free*. DAQP can be interfaced to C, Jul
 ] add DAQP
 ```
 
-### MATLAB  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/matlab/matlab-original.svg" height="20"/> 
+### MATLAB  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/matlab/matlab-original.svg" height="20"/>
 ```bash
 websave('install_daqp','https://raw.githubusercontent.com/darnstrom/daqp/master/interfaces/daqp-matlab/install_daqp.m')
 install_daqp
@@ -32,8 +32,8 @@ install_daqp
 pip install daqp
 ```
 
-### Details 
-See the [Documentation](https://darnstrom.github.io/daqp/start) for more detailed installation instructions and basic use of the interfaces. 
+### Details
+See the [Documentation](https://darnstrom.github.io/daqp/start) for more detailed installation instructions and basic use of the interfaces.
 
 ## Citing DAQP
 ```
