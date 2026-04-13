@@ -1,5 +1,5 @@
-#ifndef DAQP_PROX_H 
-# define DAQP_PROX_H 
+#ifndef DAQP_PROX_H
+# define DAQP_PROX_H
 
 # ifdef __cplusplus
 extern "C" {
@@ -15,4 +15,4 @@ int daqp_prox(DAQPWorkspace *work);
 }
 # endif // ifdef __cplusplus
 
-#endif //ifndef DAQP_PROX_H 
+#endif //ifndef DAQP_PROX_H

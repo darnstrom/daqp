@@ -29,9 +29,9 @@ int daqp_solve_avi(DAQPWorkspace *work) {
             }
             avi->Hx[i] = sum;
             avi->xtemp[i] = sum + work->qp->f[i] - sum2;
-        } 
+        }
 
-        // Update linear term 
+        // Update linear term
         daqp_update_v(avi->xtemp,work,0);
         daqp_update_d(work, work->qp->bupper,work->qp->blower);
 
@@ -48,7 +48,7 @@ int daqp_solve_avi(DAQPWorkspace *work) {
                 val = work->avi->x[i]-work->x[i];
                 sum += val*val;
             }
-            // If no decrease since last Newton iterate -> revert Newton step 
+            // If no decrease since last Newton iterate -> revert Newton step
             if(sum > minimum_newton_residual){
                 for(i = 0; i < n; i++) work->avi->x[i] = work->xold[i];
                 terminate_limit += 5; // Increase terminate limit to give DR more time to converge
@@ -70,10 +70,10 @@ int daqp_solve_avi(DAQPWorkspace *work) {
                 // Find KKT point
                 daqp_solve_avi_kkt(work);
                 if (daqp_check_optimal_avi(work)) {
-                    for(i=0; i < n; i++) work->x[i] = work->avi->x[i]; // TODO no need for local x in avi 
+                    for(i=0; i < n; i++) work->x[i] = work->avi->x[i]; // TODO no need for local x in avi
                     exitflag = 1;
                     break;
-                } 
+                }
                 continue;
             }
         }
@@ -145,7 +145,7 @@ void daqp_solve_avi_kkt(DAQPWorkspace* work) {
 
     for (i = 0; i < nAS; i++) {
         row_idx = WS[i];
-        sum = DAQP_IS_LOWER(row_idx) ? 
+        sum = DAQP_IS_LOWER(row_idx) ?
             work->qp->blower[row_idx] : work->qp->bupper[row_idx];
         if(row_idx < work->ms) // Simple bound
             sum += temp[row_idx];
@@ -163,7 +163,7 @@ void daqp_solve_avi_kkt(DAQPWorkspace* work) {
     }
 
     // Get lambda by solving S * lambda = rhs
-    daqp_lu(S, avi->P_S, nAS); 
+    daqp_lu(S, avi->P_S, nAS);
     daqp_lu_solve(S, avi->P_S, rhs, lambda, nAS);
 
     // Get x by solving for: H * x = -f - A_WS^T * lambda
@@ -200,7 +200,7 @@ int daqp_check_optimal_avi(DAQPWorkspace* work){
     // Simple constraints
     for(i=0; i < work->ms; i++){
         if(DAQP_IS_ACTIVE(i)) continue;
-        if(work->avi->x[i] > work->qp->bupper[i] + primal_tol) return 0; 
+        if(work->avi->x[i] > work->qp->bupper[i] + primal_tol) return 0;
         if(work->avi->x[i] < work->qp->blower[i] - primal_tol) return 0;
     }
 
@@ -212,7 +212,7 @@ int daqp_check_optimal_avi(DAQPWorkspace* work){
         }
         c_float Ax = 0.0;
         for(j=0; j < work->n; j++) Ax += work->qp->A[disp++]*work->avi->x[j];
-        if(Ax > work->qp->bupper[i] + primal_tol) return 0; 
+        if(Ax > work->qp->bupper[i] + primal_tol) return 0;
         if(Ax < work->qp->blower[i] - primal_tol) return 0;
     }
     // All checks passed -> optimal KKT point found

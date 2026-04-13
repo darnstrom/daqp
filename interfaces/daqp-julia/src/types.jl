@@ -14,7 +14,7 @@ struct QPj
     is_avi::Bool
     is_factorized::Bool
 end
-function QPj() 
+function QPj()
     return QPj(0,0,0,Matrix{Cdouble}(undef,0,0),Vector{Cdouble}(undef,0),Matrix{Cdouble}(undef,0,0), Vector{Cdouble}(undef,0), Vector{Cdouble}(undef,0), Vector{Cint}(undef,0),Vector{Cint}(undef,0),0,false,false)
 end
 function QPj(H::Matrix{Float64},f::Vector{Float64},
@@ -43,7 +43,7 @@ function QPj(C::Cholesky,f::Vector{Float64},
     QPj(chol_packed,f,A,bupper,blower,sense;A_rowmaj,break_points,is_avi,is_factorized=true);
 end
 
-struct QPc 
+struct QPc
     n::Cint
     m::Cint
     ms::Cint
@@ -66,7 +66,7 @@ function QPc(qpj::QPj)
     # Find the problem type
     if qpj.is_avi
         problem_type = 1;
-    elseif qpj.is_factorized 
+    elseif qpj.is_factorized
         problem_type = 2;
     else
         problem_type = 0;

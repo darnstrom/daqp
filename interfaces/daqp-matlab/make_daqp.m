@@ -3,7 +3,7 @@ function make_daqp(varargin)
 %
 %    make_daqp: build all components (library and mex) from source and link.
 %    make_daqp('lib'): builds the DAQP library using CMake
-%    make_daqp('mex'): builds the DAQP mex interface and links it to the library 
+%    make_daqp('mex'): builds the DAQP mex interface and links it to the library
 
 
 if( nargin == 0 )
@@ -12,13 +12,13 @@ else
     what = varargin{nargin};
 	if(	isempty(strfind(what, 'lib'))   && ...
 		isempty(strfind(what, 'mex'))   && ...
-		isempty(strfind(what, 'package'))) 
+		isempty(strfind(what, 'package')))
             fprintf('"%s" is not a valid command\n', what);
 			return
     end
 end
 
-% clear daqpmex from memory 
+% clear daqpmex from memory
 if(mislocked('daqpmex'))
     munlock('daqpmex');
 end
@@ -35,7 +35,7 @@ inc_dir = [
     fullfile(sprintf(' -I%s', daqp_dir), 'include'),...
     fullfile(sprintf(' -I%s', daqp_dir), 'codegen')];
 
-%% Compiler commands and arguments 
+%% Compiler commands and arguments
 % Get make and mex commands
 make_cmd = 'cmake --build .';
 mex_cmd = sprintf('mex -O -silent');
@@ -71,12 +71,12 @@ if (isunix && ~ismac)
    mex_libs = sprintf('%s %s', mex_libs, '-ldl');
 end
 
-% Large arrays 
+% Large arrays
 if (~isempty(strfind(computer, '64')) && verLessThan('matlab', '9.4'))
     mexoptflags = sprintf('%s %s', mexoptflags, '-largeArrayDims');
 end
 
-% Old-style usage of mxGetPr 
+% Old-style usage of mxGetPr
 if ~verLessThan('matlab', '9.4')
     mexoptflags = sprintf('%s %s', mexoptflags, '-R2017b');
 end
@@ -128,7 +128,7 @@ if(any(strcmpi(what,'lib')) || isempty(what))
     cd(daqp_matlab_dir);
 end
 
-%% Compile daqpmex 
+%% Compile daqpmex
 if(any(strcmpi(what,'mex')) || isempty(what))
     % Compile interface
     fprintf('Compiling and linking daqpmex...\n');
@@ -142,9 +142,9 @@ if(any(strcmpi(what,'mex')) || isempty(what))
     eval(cmd);
 end
 
-%% Package  
+%% Package
 if(any(strcmpi(what,'package')))
-  % Get platform 
+  % Get platform
   if ispc
 	platform = 'windows';
   elseif ismac
@@ -160,7 +160,7 @@ if(any(strcmpi(what,'package')))
   end
   mkdir(pkg_name);
 
-  % Copy examples, test, and utils 
+  % Copy examples, test, and utils
   folders = {'examples', 'test', 'utils'};
   for i = 1:length(folders)
 	folder = folders{i};
@@ -177,7 +177,7 @@ if(any(strcmpi(what,'package')))
     copyfile(fullfile(daqp_matlab_dir, file), ...
   	fullfile(pkg_name, file));
   end
-  
+
   % Copy license
   copyfile(fullfile(daqp_dir, 'LICENSE'), fullfile(pkg_name));
 
@@ -186,6 +186,6 @@ if(any(strcmpi(what,'package')))
   rmdir(pkg_name, 's');
 end
 
-%% Finalize 
+%% Finalize
 cd(start_dir);
 end

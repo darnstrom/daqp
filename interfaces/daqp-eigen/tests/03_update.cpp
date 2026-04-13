@@ -3,7 +3,6 @@
 #include <daqp.hpp>
 
 int main() {
-    // 
     double precision = 1e-5;
     Eigen::MatrixXd A;
     Eigen::VectorXd bu, bl;

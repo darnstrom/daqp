@@ -14,15 +14,15 @@ function load_benchmarks(filename::String)
     if !isfile(filename)
         error("File not found: $filename")
     end
-    
+
     lines = readlines(filename)
     if isempty(lines)
         error("Empty benchmark file: $filename")
     end
-    
+
     # Parse header
     header = split(lines[1], ",")
-    
+
     # Parse data rows
     benchmarks = []
     for line in lines[2:end]
@@ -33,7 +33,7 @@ function load_benchmarks(filename::String)
         row = Dict(header[i] => values[i] for i in 1:length(header))
         push!(benchmarks, row)
     end
-    
+
     return benchmarks
 end
 
@@ -50,44 +50,44 @@ function parse_float(s::Union{String, SubString})
     end
 end
 
-function compare_benchmarks(baseline_file::String, current_file::String; 
+function compare_benchmarks(baseline_file::String, current_file::String;
                            regression_threshold::Float64=5.0)
     """
     Compare two benchmark result files and report regressions.
     regression_threshold: percentage slowdown to flag as regression (default 5%)
     """
-    
+
     baseline = load_benchmarks(baseline_file)
     current = load_benchmarks(current_file)
-    
+
     # Index benchmarks by problem_id for easy lookup
     baseline_dict = Dict(b["problem_id"] => b for b in baseline)
     current_dict = Dict(b["problem_id"] => b for b in current)
-    
+
     println("\n" * "="^70)
     println("DAQP Performance Comparison")
     println("="^70)
     println("Baseline: $baseline_file")
     println("Current:  $current_file")
     println("Regression threshold: $regression_threshold%\n")
-    
+
     # Track statistics
     regressions = []
     improvements = []
     unchanged = []
     missing_current = []
     new_in_current = []
-    
+
     # Compare common benchmarks
     for problem_id in sort(collect(keys(baseline_dict)))
         if !haskey(current_dict, problem_id)
             push!(missing_current, problem_id)
             continue
         end
-        
+
         base_row = baseline_dict[problem_id]
         curr_row = current_dict[problem_id]
-        
+
         # Parse values
         base_setup = parse_float(base_row["setup_time_median_s"])
         curr_setup = parse_float(curr_row["setup_time_median_s"])
@@ -97,16 +97,16 @@ function compare_benchmarks(baseline_file::String, current_file::String;
         curr_total = parse_float(curr_row["total_time_median_s"])
         base_iters = parse_float(base_row["iter_median"])
         curr_iters = parse_float(curr_row["iter_median"])
-        
+
         # Calculate percentage change (positive = slower)
         if base_total === nothing || curr_total === nothing
             continue
         end
-        
+
         pct_change = ((curr_total - base_total) / base_total) * 100
-        
+
         problem_desc = "$(base_row["problem_type"]): n=$(base_row["n_variables"]), m=$(base_row["n_constraints"])"
-        
+
         if pct_change > regression_threshold
             push!(regressions, (
                 problem_id=problem_id,
@@ -151,14 +151,14 @@ function compare_benchmarks(baseline_file::String, current_file::String;
             ))
         end
     end
-    
+
     # Find new benchmarks in current
     for problem_id in sort(collect(keys(current_dict)))
         if !haskey(baseline_dict, problem_id)
             push!(new_in_current, problem_id)
         end
     end
-    
+
     # Print results
     if !isempty(regressions)
         println("⚠️  PERFORMANCE REGRESSIONS (>$(regression_threshold)% slower):")
@@ -168,7 +168,7 @@ function compare_benchmarks(baseline_file::String, current_file::String;
             baseline_total_ms = reg.base_total * 1000
             current_total_ms = reg.curr_total * 1000
             println("    Total: $(round(baseline_total_ms; digits=3)) ms → $(round(current_total_ms; digits=3)) ms ($(round(reg.pct_change; digits=1))%)")
-            
+
             if reg.base_setup !== nothing && reg.curr_setup !== nothing
                 setup_change = ((reg.curr_setup - reg.base_setup) / reg.base_setup) * 100
                 println("    Setup: $(round(reg.base_setup*1e6; digits=1))µs → $(round(reg.curr_setup*1e6; digits=1))µs ($(round(setup_change; digits=1))%)")
@@ -184,7 +184,7 @@ function compare_benchmarks(baseline_file::String, current_file::String;
         end
         println()
     end
-    
+
     if !isempty(improvements)
         println("✓ PERFORMANCE IMPROVEMENTS (>$(regression_threshold)% faster):")
         println(repeat("-", 70))
@@ -193,7 +193,7 @@ function compare_benchmarks(baseline_file::String, current_file::String;
             baseline_total_ms = imp.base_total * 1000
             current_total_ms = imp.curr_total * 1000
             println("    Total: $(round(baseline_total_ms; digits=3)) ms → $(round(current_total_ms; digits=3)) ms ($(round(imp.pct_change; digits=1))%)")
-            
+
             if imp.base_setup !== nothing && imp.curr_setup !== nothing
                 setup_change = ((imp.curr_setup - imp.base_setup) / imp.base_setup) * 100
                 println("    Setup: $(round(imp.base_setup*1e6; digits=1))µs → $(round(imp.curr_setup*1e6; digits=1))µs ($(round(setup_change; digits=1))%)")
@@ -209,14 +209,14 @@ function compare_benchmarks(baseline_file::String, current_file::String;
         end
         println()
     end
-    
+
     if !isempty(unchanged)
         println("≈ UNCHANGED (within ±$(regression_threshold)%):")
         println(repeat("-", 70))
         for unch in sort(unchanged, by=x -> abs(x.pct_change), rev=true)
             time_str = "$(round(unch.pct_change; digits=2))%"
             details = []
-            
+
             if unch.base_setup !== nothing && unch.curr_setup !== nothing
                 setup_change = ((unch.curr_setup - unch.base_setup) / unch.base_setup) * 100
                 push!(details, "Setup: $(round(setup_change; digits=1))%")
@@ -229,13 +229,13 @@ function compare_benchmarks(baseline_file::String, current_file::String;
                 iter_change = ((unch.curr_iters - unch.base_iters) / unch.base_iters) * 100
                 push!(details, "Iters: $(round(iter_change; digits=1))%")
             end
-            
+
             detail_str = isempty(details) ? "" : " | " * join(details, ", ")
             println("  $(unch.desc): $(time_str)$(detail_str)")
         end
         println()
     end
-    
+
     if !isempty(missing_current)
         println("⚠️  MISSING IN CURRENT RESULTS:")
         println(repeat("-", 70))
@@ -244,7 +244,7 @@ function compare_benchmarks(baseline_file::String, current_file::String;
         end
         println()
     end
-    
+
     if !isempty(new_in_current)
         println("★ NEW BENCHMARKS IN CURRENT:")
         println(repeat("-", 70))
@@ -253,7 +253,7 @@ function compare_benchmarks(baseline_file::String, current_file::String;
         end
         println()
     end
-    
+
     # Summary
     println("="^70)
     println("SUMMARY:")
@@ -263,7 +263,7 @@ function compare_benchmarks(baseline_file::String, current_file::String;
     println("  Unchanged:      $(length(unchanged))")
     println("  Missing:        $(length(missing_current))")
     println("  New:            $(length(new_in_current))")
-    
+
     if !isempty(regressions)
         println("\n⚠️  WARNING: $(length(regressions)) performance regression(s) detected!")
         return false
@@ -279,24 +279,24 @@ function print_benchmark_info(filename::String)
         println("File not found: $filename")
         return
     end
-    
+
     data = load_benchmarks(filename)
-    
+
     if isempty(data)
         println("Benchmark file: $filename (empty)")
         return
     end
-    
+
     # Get version and timestamp from first row
     first_row = data[1]
     version = get(first_row, "daqp_version", "unknown")
     timestamp = get(first_row, "timestamp", "unknown")
-    
+
     println("\nBenchmark file: $filename")
     println("  Version:   $version")
     println("  Timestamp: $timestamp")
     println("  Benchmarks: $(length(data))")
-    
+
     # Summary stats
     times = [parse_float(b["total_time_median_s"]) for b in data]
     times = filter(x -> x !== nothing, times)
@@ -315,11 +315,11 @@ if abspath(PROGRAM_FILE) == @__FILE__
         """)
         exit(1)
     end
-    
+
     local baseline_file = ""
     local current_file = ""
     local threshold = 5.0
-    
+
     local i = 1
     while i <= length(ARGS)
         if ARGS[i] == "--baseline" && i < length(ARGS)
@@ -338,26 +338,26 @@ if abspath(PROGRAM_FILE) == @__FILE__
             i += 1
         end
     end
-    
+
     # Validate arguments
     if baseline_file == "" || current_file == ""
         @error "Must provide both baseline and current benchmark files"
         exit(1)
     end
-    
+
     if !isfile(baseline_file)
         @error "Baseline file not found: $baseline_file"
         exit(1)
     end
-    
+
     if !isfile(current_file)
         @error "Current file not found: $current_file"
         exit(1)
     end
-    
+
     print_benchmark_info(baseline_file)
     print_benchmark_info(current_file)
-    
+
     success = compare_benchmarks(baseline_file, current_file; regression_threshold=threshold)
     exit(success ? 0 : 1)
 end

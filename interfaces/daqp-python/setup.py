@@ -3,7 +3,7 @@ import os
 from shutil import copyfile,copytree,rmtree
 from platform import system
 import pathlib
-from Cython.Distutils import build_ext 
+from Cython.Distutils import build_ext
 from Cython.Build import cythonize
 
 

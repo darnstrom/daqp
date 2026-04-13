@@ -28,7 +28,7 @@ tol = 1e-4
         x,fval,exitflag,info = quadprog(H,f,A,bupper,blower,sense);
         @test norm(xref-x) < tol;
     end
-    # Test quadprog interface by passing settings 
+    # Test quadprog interface by passing settings
     xref,H,f,A,bupper,blower,sense = generate_test_QP(n,m,ms,nAct,kappa);
     s = settings(DAQPBase.Model(),Dict(:iter_limit=>1))
     x,fval,exitflag,info = quadprog(H,f,A,bupper,blower,sense;settings=s)
@@ -120,7 +120,7 @@ end
     bl = [0.0;0;0;4;1]
     sense = Cint.([DAQPBase.BINARY;DAQPBase.BINARY;DAQPBase.BINARY;0;0])
     x,_,_,info = DAQPBase.quadprog(H,f,A,bu,bl,sense)
-    @test norm(x-[0;1;1]) < tol 
+    @test norm(x-[0;1;1]) < tol
 
 end
 
@@ -154,7 +154,7 @@ end
     xref,H,f,A,bupper,blower,sense = generate_test_QP(n,m,ms,nAct,kappa)
     p=DAQPBase.setup_c_workspace(n)
     A = A'[:,:] # since row major...
-    DAQPBase.init_c_workspace_ldp(p,A,bupper,blower,sense;max_radius=1e30) 
+    DAQPBase.init_c_workspace_ldp(p,A,bupper,blower,sense;max_radius=1e30)
     @test isfeasible(p,m,ms)
     buold = bupper[1]
     bupper[1] = -1e30 #Make trivially infeasible
@@ -195,7 +195,7 @@ end
     catch
     end
 
-    # Test special case with diagonal H 
+    # Test special case with diagonal H
     d = DAQPBase.Model()
     DAQPBase.setup(d,diagm(5*ones(n)),f,A,bupper,blower,sense)
     srcdir = tempname();
@@ -235,7 +235,7 @@ end
         daqp_work_ptr = cglobal((:daqp_work,templib),DAQPBase.Workspace)
         ws = unsafe_load(daqp_work_ptr)
 
-        # Setup correct LDP 
+        # Setup correct LDP
         dupper = unsafe_wrap(Vector{Cdouble}, ws.dupper, ws.m, own=false)
         dlower = unsafe_wrap(Vector{Cdouble}, ws.dlower, ws.m, own=false)
         sense = unsafe_wrap(Vector{Cint}, ws.sense, ws.m, own=false)
@@ -244,7 +244,7 @@ end
         dlower .= bl ./ Anorm
 
         # Solve
-        lambda = zeros(ws.m) 
+        lambda = zeros(ws.m)
         exitflag = ccall((:daqp_hiqp,templib),Cint,(Ptr{DAQPBase.Workspace},Ptr{Cdouble}),daqp_work_ptr,lambda);
         ccall((:ldp2qp_solution,templib),Cvoid,(Ptr{DAQPBase.Workspace},),daqp_work_ptr);
         xgen = copy(unsafe_wrap(Vector{Cdouble}, ws.x, ws.n, own=false))
@@ -317,7 +317,7 @@ end
         x,λ,info = DAQPBase.avi(H,f,A,b);
         @test norm(xref-x) < tol;
 
-        # Pure Julia implemenetation 
+        # Pure Julia implemenetation
         x,fval,exitflag,info = DAQPBase.solve_avi_jl(H,f,A,b);
         @test norm(xref-x) < tol;
 
@@ -327,7 +327,7 @@ end
         x,fval,exitflag,info = solve(d)
         @test norm(xref-x) < tol;
         x,fval,exitflag,info = solve(d)
-        @test info.iterations == 5 
+        @test info.iterations == 5
         @test norm(xref-x) < tol;
     end
 
@@ -351,7 +351,7 @@ end
     x,fval,exitflag,info = quadprog(C,f,A,bupper,blower,sense)
     @test norm(xref-x) < tol;
 
-    # Test Model API 
+    # Test Model API
     d = DAQPBase.Model()
     setup(d,C,f,A,bupper,blower,sense)
     x,fval,exitflag,info = solve(d)
@@ -367,7 +367,7 @@ end
 end
 
 @testset "Setting Warm Start" begin
-    # Test primal start 
+    # Test primal start
     d = DAQPBase.Model()
     xref,H,f,A,bupper,blower,sense = generate_test_QP(n,m,ms,nAct,kappa)
     setup(d,H,f,A,bupper,blower,sense;primal_start=xref)
@@ -404,7 +404,7 @@ end
     xref,f,A,bupper,blower,sense = generate_test_LP(n,m,ms);
     xcold,fval,exitflag,info_cold = linprog(f,A,bupper,blower,sense)
     xwarm,fval,exitflag,info_warm = linprog(f,A,bupper,blower,sense;primal_start = 0.95*xref)
-    @test info_cold.iterations > info_warm.iterations 
+    @test info_cold.iterations > info_warm.iterations
     @test norm(xwarm-xref) < tol
 
     # Test warm start for AVIs

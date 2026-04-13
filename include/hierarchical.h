@@ -1,4 +1,4 @@
-#ifndef DAQP_HIERARCHICAL_H 
+#ifndef DAQP_HIERARCHICAL_H
 # define DAQP_HIERARCHICAL_H
 
 # ifdef __cplusplus

@@ -13,9 +13,9 @@ const char* INFO_FIELDS[] = {
     "soft_slack"};
 
 const char* SETTINGS_FIELDS[] = {
-  "primal_tol",           
-  "dual_tol",           
-  "zero_tol",           
+  "primal_tol",
+  "dual_tol",
+  "zero_tol",
   "pivot_tol",
   "progress_tol",
   "cycle_tol",
@@ -40,14 +40,14 @@ void mexFunction( int nlhs, mxArray *plhs[],
   // Extract command
   char cmd[64];
   mxGetString(prhs[0], cmd, sizeof(cmd));
-  
-  // Extract workspace pointer 
+
+  // Extract workspace pointer
   DAQPWorkspace *work;
   long long *work_i;
   union{long long i; void *ptr;} work_ptr; // Used for int64 & pointer juggling..
   if(nrhs>1){// Pointer always second argument (stored as int64)
 	work_i = (long long *)mxGetData(prhs[1]);
-	work_ptr.i  = *work_i; 
+	work_ptr.i  = *work_i;
 	work = work_ptr.ptr;
   }
 
@@ -61,7 +61,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  return;
 	}
 	else if (!strcmp("delete", cmd)) {
-	  // Free workspace 
+	  // Free workspace
 	  free_daqp_workspace(work);
 	  free_daqp_ldp(work);
 	  if(work->qp) free(work->qp);
@@ -74,13 +74,13 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  DAQPProblem *qp = calloc(1,sizeof(DAQPProblem));
 	  // Extract data
 	  int error_flag;
-	  
-	  // Get dimensions 
+
+	  // Get dimensions
 	  int n = mxGetM(prhs[4]);
 	  int m = mxGetM(prhs[5]);
       int ms = m-mxGetN(prhs[4]);
       int nh = mxGetM(prhs[8]);
-	  
+
 	  // Setup QP struct
 	  qp->n = n;
 	  qp->m = m;
@@ -123,14 +123,14 @@ void mexFunction( int nlhs, mxArray *plhs[],
 
 	  DAQPResult result;
 	  if(work->qp == NULL) mexErrMsgTxt("No problem to solve");
-	  // Update QP pointers 
+	  // Update QP pointers
 	  work->qp->H= mxIsEmpty(prhs[2]) ? NULL : (c_float *)mxGetPr(prhs[2]);
 	  work->qp->f= mxIsEmpty(prhs[3]) ? NULL : (c_float *)mxGetPr(prhs[3]);
 	  work->qp->A= (c_float *)mxGetPr(prhs[4]);
 	  work->qp->bupper= (c_float *)mxGetPr(prhs[5]);
 	  work->qp->blower= (c_float *)mxGetPr(prhs[6]);
 	  work->qp->sense= (int *)mxGetPr(prhs[7]);
-	  // Setup output 
+	  // Setup output
 #ifdef DAQP_SINGLE_PRECISION
 	  plhs[0] = mxCreateNumericMatrix((mwSize)work->n,1,mxSINGLE_CLASS,mxREAL); // x_star
 	  mxArray* lam = mxCreateNumericMatrix((mwSize)work->m,1,mxSINGLE_CLASS,mxREAL); // lambda
@@ -143,12 +143,12 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  result.x = (c_float *) mxGetPr(plhs[0]);
 	  result.lam = (c_float *) mxGetPr(lam);
 	  exitflag = (int *)mxGetPr(plhs[2]);
-	  
+
 	  // Solve problem
-	  daqp_solve(&result,work); 
+	  daqp_solve(&result,work);
 	  // Extract solution information
 	  result.setup_time = 0; // solve is called on a setup problem
-	  exitflag[0] = result.exitflag; 
+	  exitflag[0] = result.exitflag;
 	  plhs[1] = mxCreateDoubleScalar(result.fval);
 
 	  // Package info struct
@@ -206,7 +206,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	}
 	else if (!strcmp("update", cmd)) {
 	  if(work->qp == NULL) mexErrMsgTxt("No problem to update");
-	  // Update QP pointers 
+	  // Update QP pointers
 	  work->qp->H= mxIsEmpty(prhs[2]) ? NULL : (c_float *)mxGetPr(prhs[2]);
 	  work->qp->f= mxIsEmpty(prhs[3]) ? NULL : (c_float *)mxGetPr(prhs[3]);
 	  work->qp->A= (c_float *)mxGetPr(prhs[4]);
@@ -228,7 +228,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
         render_daqp_workspace(work,fname,dir,prefix);
     }
     else if (!strcmp("isdouble", cmd)) {
-        plhs[0] = mxCreateNumericMatrix(1, 1, mxINT32_CLASS, mxREAL); // is_double 
+        plhs[0] = mxCreateNumericMatrix(1, 1, mxINT32_CLASS, mxREAL); // is_double
         int* isdouble_ptr = (int *)mxGetPr(plhs[0]);
 #ifdef DAQP_SINGLE_PRECISION
         isdouble_ptr[0] = 0;
