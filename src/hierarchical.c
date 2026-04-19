@@ -67,7 +67,9 @@ int daqp_hiqp(DAQPWorkspace *work, c_float *lambda){
         // Make constraints in current level hard
         for(j=start; j<end;j++) DAQP_SET_HARD(j);
 
-        // find first active constraint in current level
+        if(i==work->nh-1) break;
+        
+        // find first active constraint in current level 
         for(j=0;j < work->n_active; j++) if(work->WS[j]>=start) break;
 
         // reactive constraint in level current (to addresss soft->hard)

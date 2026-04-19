@@ -81,13 +81,6 @@ extern "C" {
 #define DAQP_BINARY 16
 #define DAQP_IS_BINARY(x) (work->sense[x]&16)
 
-// marks that the soft slack is at its lower bound (d_ls or d_us)
-#define DAQP_SLACK_FIXED 32
-#define DAQP_IS_SLACK_FIXED(x) (work->sense[x]&32)
-#define DAQP_IS_SLACK_FREE(x) ((work->sense[x]&32)==0)
-#define DAQP_SET_SLACK_FIXED(x) (work->sense[x]|=32)
-#define DAQP_SET_SLACK_FREE(x) (work->sense[x]&=~32)
-
 # ifdef __cplusplus
 }
 # endif // ifdef __cplusplus

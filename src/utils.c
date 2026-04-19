@@ -84,18 +84,6 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
         }
     }
 
-#ifdef SOFT_WEIGHTS
-    // TODO: Use mask or something to avoid scaling something more times...
-    if(work->d_ls != NULL && work->scaling !=NULL){
-        for(i=0;i<work->m; i++){
-            work->d_ls[i]*=work->scaling[i];
-            work->d_us[i]*=work->scaling[i];
-            work->rho_ls[i]/=work->scaling[i]*work->scaling[i];
-            work->rho_us[i]/=work->scaling[i]*work->scaling[i];
-        }
-    }
-#endif
-
     /** Update hierarchy **/
     if(mask&DAQP_UPDATE_hierarchy){
         work->nh = qp->nh;
