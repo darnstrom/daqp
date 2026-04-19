@@ -26,7 +26,7 @@ typedef struct{
     // bupper = [ub; ubA];
     // (The number of rows in A is hence m-ms)
 
-    // sense define the state of the constraints 
+    // sense define the state of the constraints
     // (active, immutable, upper/lower, soft, binary).
 
     int n;
@@ -40,7 +40,7 @@ typedef struct{
     c_float* bupper;
     c_float* blower;
 
-    int* sense; 
+    int* sense;
 
     // Hierarchical QP
     int* break_points;
@@ -120,17 +120,17 @@ typedef struct{
 
 typedef struct{
     DAQPProblem* qp;
-    // LDP data 
+    // LDP data
     int n; // Number of primal variables
-    int m; // Number of constraints  
+    int m; // Number of constraints
     int ms; // Number of simple bounds
-    c_float *M; // M' M is the Hessian of the dual objective function (dimensions: n x m)  
-    c_float *dupper; // Linear part of dual objective function (dimensions: m x 1) 
-    c_float *dlower; // Linear part of dual objective function (dimensions: m x 1) 
-    c_float *Rinv; // Inverse of upper cholesky factor of primal Hessian 
-    c_float *v; // v = R'\f (used to transform QP to LDP 
-    int *sense; // State of constraints  
-    c_float *scaling; // normalizations 
+    c_float *M; // M' M is the Hessian of the dual objective function (dimensions: n x m)
+    c_float *dupper; // Linear part of dual objective function (dimensions: m x 1)
+    c_float *dlower; // Linear part of dual objective function (dimensions: m x 1)
+    c_float *Rinv; // Inverse of upper cholesky factor of primal Hessian
+    c_float *v; // v = R'\f (used to transform QP to LDP
+    int *sense; // State of constraints
+    c_float *scaling; // normalizations
     c_float *RinvD; // in case Rinv is diagonal
 
 
@@ -138,8 +138,8 @@ typedef struct{
     c_float *x; // The final primal solution
     c_float *xold; // The latest primal solution (used for proximal-point iteratios)
 
-    c_float* lam; // Dual iterate 
-    c_float* lam_star; // Current constrained stationary point 
+    c_float* lam; // Dual iterate
+    c_float* lam_star; // Current constrained stationary point
     c_float* u; // Stores Mk' lam_star
     c_float fval;
 
@@ -152,10 +152,10 @@ typedef struct{
     int reuse_ind; // How much work that can be saved when solving Mk Mk' lam* = -dk
 
     int *WS; // Working set, size: maximum number of constraints (n+ns+1)
-    int n_active; // Number of active contraints 
+    int n_active; // Number of active contraints
 
     int iterations;
-    int sing_ind; // Flag for denoting whether Mk Mk' is singular or not 
+    int sing_ind; // Flag for denoting whether Mk Mk' is singular or not
 
     // Semi-proximal support: prox_mask[i] == 1 iff direction i needed eps
     // regularization to make the Cholesky factor non-singular.
@@ -171,7 +171,7 @@ typedef struct{
 
     // BnB
     DAQPBnB* bnb;
-    // Hierarchical QP 
+    // Hierarchical QP
     int nh;
     int* break_points;
     // AVI

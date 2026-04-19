@@ -324,7 +324,7 @@ function run_benchmarks(; suite="all", output_file="daqp_benchmark_results.csv",
         println("not local")
         local_lib = false
     end
-    
+
     # Determine which sizes to run
     sizes_to_run = if suite == "all"
         vcat(values(PROBLEM_SIZES)...)
@@ -334,26 +334,26 @@ function run_benchmarks(; suite="all", output_file="daqp_benchmark_results.csv",
         @error "Unknown suite: $suite. Must be one of: all, small, medium, large"
         return
     end
-    
+
     # Prepare CSV header and data
     csv_lines = [
         "timestamp,daqp_version,problem_type,problem_id,n_variables,n_constraints,n_simple_bounds,condition_number,setup_time_median_s,solve_time_median_s,total_time_median_s,iter_median,iter_min,iter_max,num_problems,num_repeats"
     ]
-    
+
     timestamp = string(now())
     version = string(pkgversion(DAQPBase))
-    
+
     @info "Starting DAQP performance benchmarks..."
     @info "Running suite: $suite"
-    
+
     # Run QP benchmarks
     println("\n=== Quadratic Programming Benchmarks ===")
     for (i, (n, m, ms, nAct, kappa)) in enumerate(sizes_to_run)
         problem_id = "qp_$(n)_$(m)_$(ms)_$(nAct)_$(Int(log10(kappa)))"
         println("  [$i/$(length(sizes_to_run))] QP: n=$n, m=$m, ms=$ms, nAct=$nAct, κ=$kappa")
-        
+
         stats = benchmark_qp(n, m, ms, nAct, kappa)
-        
+
         csv_row = join([
             timestamp,
             version,
@@ -373,18 +373,18 @@ function run_benchmarks(; suite="all", output_file="daqp_benchmark_results.csv",
             stats.num_repeats
         ], ",")
         push!(csv_lines, csv_row)
-        
+
         println("    Setup: $(round(stats.setup_median*1e6; digits=2))µs (median) | Solve: $(round(stats.solve_median*1e6; digits=2))µs (median) | Iters: $(round(stats.iter_median; digits=1)) (median)")
     end
-    
+
     # Run LP benchmarks
     println("\n=== Linear Programming Benchmarks ===")
     for (i, (n, m, ms, _, _)) in enumerate(sizes_to_run)
         problem_id = "lp_$(n)_$(m)_$(ms)"
         println("  [$i/$(length(sizes_to_run))] LP: n=$n, m=$m, ms=$ms")
-        
+
         stats = benchmark_lp(n, m, ms)
-        
+
         csv_row = join([
             timestamp,
             version,
@@ -404,10 +404,10 @@ function run_benchmarks(; suite="all", output_file="daqp_benchmark_results.csv",
             stats.num_repeats
         ], ",")
         push!(csv_lines, csv_row)
-        
+
         println("    Setup: $(round(stats.setup_median*1e6; digits=2))µs (median) | Solve: $(round(stats.solve_median*1e6; digits=2))µs (median) | Iters: $(round(stats.iter_median; digits=1)) (median)")
     end
-    
+
     # Save to CSV
     open(output_file, "w") do f
         for line in csv_lines
@@ -415,7 +415,7 @@ function run_benchmarks(; suite="all", output_file="daqp_benchmark_results.csv",
         end
     end
     println("\n✓ Results saved to: $output_file")
-    
+
     return csv_lines
 end
 if abspath(PROGRAM_FILE) == @__FILE__
@@ -433,8 +433,8 @@ if abspath(PROGRAM_FILE) == @__FILE__
             suite = ARGS[i+1]
             i += 2
         elseif ARGS[i] == "--local"
-            use_local = true 
-            i += 1 
+            use_local = true
+            i += 1
         elseif ARGS[i] == "--prox"
             run_prox = true
             i += 1
@@ -442,7 +442,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
             i += 1
         end
     end
-    
+
     if run_prox
         run_prox_benchmark(; output_file="prox_comparison.csv", use_local=use_local)
     else

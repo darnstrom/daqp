@@ -11,8 +11,7 @@ int daqp_hiqp(DAQPWorkspace *work, c_float *lambda){
     // If only one hiearchy -> just solve normal LDP
     if( work->nh < 2) return daqp_ldp(work);
 
-
-    // Reset lambda for output 
+    // Reset lambda for output
     if(lambda != NULL) for(i=0;i<work->m;i++) lambda[i]=0;
 
     // Start moving down the hierarchy
@@ -23,7 +22,7 @@ int daqp_hiqp(DAQPWorkspace *work, c_float *lambda){
         // initialize current level
         end=work->break_points[i];
         work->m = end;
-        // Soften constraints and activate 
+        // Soften constraints and activate
         for(j =start;j<end;j++){
             DAQP_SET_SOFT(j);
             if(DAQP_IS_ACTIVE(j)){
@@ -31,7 +30,7 @@ int daqp_hiqp(DAQPWorkspace *work, c_float *lambda){
                     daqp_add_constraint(work,j, -1.0);
                 else
                     daqp_add_constraint(work,j, 1.0);
-                if(work->sing_ind != DAQP_EMPTY_IND) 
+                if(work->sing_ind != DAQP_EMPTY_IND)
                     return DAQP_EXIT_OVERDETERMINED_INITIAL;
                 }
         }
@@ -48,10 +47,10 @@ int daqp_hiqp(DAQPWorkspace *work, c_float *lambda){
             break;
         }
 
-        // Perturb rhs with slacks in level 
+        // Perturb rhs with slacks in level
         for(j=0; j<work->n_active;j++){
             id=work->WS[j];
-            if(DAQP_IS_SOFT(id)){ 
+            if(DAQP_IS_SOFT(id)){
                 w = work->lam_star[j]*work->settings->rho_soft;
                 if(w < -work->settings->primal_tol)
                     work->dlower[id]+=w;

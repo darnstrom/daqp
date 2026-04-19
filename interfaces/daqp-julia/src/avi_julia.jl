@@ -1,11 +1,11 @@
-Base.@kwdef mutable struct AVISettings 
+Base.@kwdef mutable struct AVISettings
     iter_limit::Int = 1000
     inner_iter_limit::Int = 10000
     primal_tol::Float64 = 1e-6
     dual_tol::Float64 = 1e-12
     alpha::Float64 = 1.0
     beta::Float64 = 0.25
-    regularization::Float64 = 0.5 
+    regularization::Float64 = 0.5
     max_terminate_counter::Int = 5
     min_terminate_counter::Int = 5
 end
@@ -62,8 +62,8 @@ function setup_avi_jl(H,f,A,bu,bl,sense;x0 = zeros(0), rho_soft = 1e6, daqp_work
     #sizehint!(kkt_buffer,4*(n+1)*(n+1))
 
     daqp_workspace = isnothing(daqp_workspace) ? Model() : daqp_workspace;
-    DAQPBase.settings(daqp_workspace, Dict(:iter_limit => settings.inner_iter_limit, 
-                                           :primal_tol => settings.primal_tol, 
+    DAQPBase.settings(daqp_workspace, Dict(:iter_limit => settings.inner_iter_limit,
+                                           :primal_tol => settings.primal_tol,
                                            :dual_tol => settings.dual_tol))
     exitflag,tsetup = DAQPBase.setup(daqp_workspace, H1pI, xtemp, A, bu, bl, sense)
 
@@ -128,21 +128,21 @@ function solve(ws::AVIWorkspace)
             res_cand = norm(ws.y-ws.x)
             if res_cand > res
                 # Revert newton step
-                ws.y .= yold 
+                ws.y .= yold
                 ws.x .= xt
                 terminate_limit = min(terminate_limit + 5, 30)
             else
                 res = res_cand
             end
         end
-        exitflag < 0 && break 
+        exitflag < 0 && break
         tot_iter += info.iterations
 
         # Same AS -> Check if KKT conditions are satisfied
-        if info.iterations == 1 
-            if (counter += 1) == terminate_limit 
+        if info.iterations == 1
+            if (counter += 1) == terminate_limit
                 nkkt += 1
-                ASu,ASl = _get_AS(info.λ,ϵd) 
+                ASu,ASl = _get_AS(info.λ,ϵd)
                 xt[:],λ,AS = _solve_kkt(ws,ASu,ASl)
                 if _is_optimal(λ,xt,info.λ,ws,ASu,ASl)
                     ws.x .= xt
@@ -173,7 +173,7 @@ end
 function _get_AS(λ,dual_tol)
     ASu,ASl = Int[],Int[]
     for i in 1:length(λ)
-        if λ[i] > dual_tol 
+        if λ[i] > dual_tol
             push!(ASu,i)
         elseif λ[i] < -dual_tol
             push!(ASl,i)
@@ -207,23 +207,23 @@ end
     x, λ, info = DAQPBase.solve_avi_jl(H,f,A,b)
     x, λ, info = DAQPBase.solve_avi_jl(H,f,A,bupper,blower)
 
-finds a solution `x` to the affine variational inequality 
+finds a solution `x` to the affine variational inequality
 
 ```
-x ∈ {x: blower ≤ Ax ≤ bupper} such that: 
+x ∈ {x: blower ≤ Ax ≤ bupper} such that:
 (Hx+f)'(x-y) ≥ 0 ∀y ∈ {y: blower ≤ Ay ≤ bupper}
 ```
 
-# Input 
-* `H`  			- linear term in objective function, (`n x n`)-matrix 
-* `f`  			- linear term in objective function, n-vector 
+# Input
+* `H`  			- linear term in objective function, (`n x n`)-matrix
+* `f`  			- linear term in objective function, n-vector
 * `A`  			- constraint normals, (`m x n`)-matrix
 * `bupper` 		- upper bounds for constraints, `m`-vector
 * `blower` 		- lower bounds for constraints, `m`-vector (default: -Inf)
 
 # Output
 * `x` 		- solution provided by solver
-* `λ` 	  	    - dual variables 
+* `λ` 	  	    - dual variables
 * `info` 		- tuple containing extra information from the solver such as status, active set and number of iterations.
 
 """

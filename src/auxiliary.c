@@ -3,15 +3,15 @@
 void daqp_remove_constraint(DAQPWorkspace* work, const int rm_ind){
     int i;
     // Update data structures
-    DAQP_SET_INACTIVE(work->WS[rm_ind]); 
+    DAQP_SET_INACTIVE(work->WS[rm_ind]);
     daqp_update_LDL_remove(work,rm_ind);
     (work->n_active)--;
 
     for(i=rm_ind;i<work->n_active;i++){
-        work->WS[i] = work->WS[i+1]; 
-        work->lam[i] = work->lam[i+1]; 
+        work->WS[i] = work->WS[i+1];
+        work->lam[i] = work->lam[i+1];
     }
-    // Can only reuse work less than the ind that was removed 
+    // Can only reuse work less than the ind that was removed
     if(rm_ind < work->reuse_ind)
         work->reuse_ind = rm_ind;
 
@@ -25,7 +25,7 @@ void daqp_remove_constraint(DAQPWorkspace* work, const int rm_ind){
     }
 }
 void daqp_add_constraint(DAQPWorkspace *work, const int add_ind, c_float lam){
-    // Update data structures  
+    // Update data structures
     DAQP_SET_ACTIVE(add_ind);
     daqp_update_LDL_add(work, add_ind);
     work->WS[work->n_active] = add_ind;
@@ -47,7 +47,7 @@ void daqp_compute_primal_and_fval(DAQPWorkspace *work){
     for(i=0;i<work->n_active;i++){
         id = work->WS[i];
         if(id < work->ms){
-            // Simple constraint 
+            // Simple constraint
             if(work->Rinv!=NULL){ // Hessian is not identity
                 for(j=id, disp=DAQP_R_OFFSET(id,work->n);j<work->n;++j)
                     work->u[j]-=work->Rinv[disp+j]*work->lam_star[i];
@@ -76,15 +76,15 @@ int daqp_add_infeasible(DAQPWorkspace *work){
     c_float bound;
     c_float Mu,min_cand;
     int isupper=0, add_ind=DAQP_EMPTY_IND;
-    // Simple bounds 
+    // Simple bounds
     for(j=0, disp=0;j<work->ms;j++){
-        // Never activate immutable or already active constraints 
-        if(work->sense[j]&(DAQP_ACTIVE+DAQP_IMMUTABLE)){ 
+        // Never activate immutable or already active constraints
+        if(work->sense[j]&(DAQP_ACTIVE+DAQP_IMMUTABLE)){
             disp+=work->n-j;
             continue;
         }
         if(work->Rinv==NULL){// Hessian is identify
-            Mu=work->u[j]; 
+            Mu=work->u[j];
         }
         else{
             Mu = daqp_dot(work->Rinv+disp,work->u+j,work->n-j);
@@ -106,8 +106,8 @@ int daqp_add_infeasible(DAQPWorkspace *work){
     }
     /* General two-sided constraints */
     for(j=work->ms, disp=0;j<work->m;j++){
-        // Never activate immutable or already active constraints 
-        if(work->sense[j]&(DAQP_ACTIVE+DAQP_IMMUTABLE)){ 
+        // Never activate immutable or already active constraints
+        if(work->sense[j]&(DAQP_ACTIVE+DAQP_IMMUTABLE)){
             disp+=work->n;// Skip ahead in M
             continue;
         }
@@ -130,7 +130,7 @@ int daqp_add_infeasible(DAQPWorkspace *work){
     }
     // No constraint is infeasible => return
     if(add_ind == DAQP_EMPTY_IND) return 0;
-    // Otherwise add infeasible constraint to working set 
+    // Otherwise add infeasible constraint to working set
     if(isupper)
         DAQP_SET_UPPER(add_ind);
     else
@@ -146,7 +146,7 @@ int daqp_add_infeasible(DAQPWorkspace *work){
     return 1;
 }
 int daqp_remove_blocking(DAQPWorkspace *work){
-    int i,rm_ind = DAQP_EMPTY_IND; 
+    int i,rm_ind = DAQP_EMPTY_IND;
     c_float alpha=DAQP_INF;
     c_float alpha_cand;
     const c_float dual_tol = work->settings->dual_tol;
@@ -162,7 +162,7 @@ int daqp_remove_blocking(DAQPWorkspace *work){
         else
             alpha_cand= -work->lam[i]/work->lam_star[i];
         if(alpha_cand < alpha){
-            alpha = alpha_cand; 
+            alpha = alpha_cand;
             rm_ind = i;
         }
     }
@@ -195,7 +195,7 @@ void daqp_compute_CSP(DAQPWorkspace *work){
         }
         for(j=0; j<i; j++)
             sum -= work->L[disp++]*work->xldl[j];
-        disp++; //Skip 1 in L 
+        disp++; //Skip 1 in L
         work->xldl[i] = sum;
     }
     // Scale with D  (zi = xi/di)
@@ -209,7 +209,7 @@ void daqp_compute_CSP(DAQPWorkspace *work){
         for(j=work->n_active-1;j>i;j--){
             sum-=work->lam_star[j]*work->L[disp];
             disp-=j;
-        } 
+        }
         work->lam_star[i] = sum;
     }
     work->reuse_ind = work->n_active; // Save forward substitution information
@@ -228,33 +228,33 @@ void daqp_compute_singular_direction(DAQPWorkspace *work){
         for(j=work->sing_ind-1;j>i;j--){
             work->lam_star[i]-=work->lam_star[j]*work->L[disp];
             disp-=j;
-        } 
+        }
     }
     work->lam_star[work->sing_ind]=1;
 
-    if(DAQP_IS_LOWER(work->WS[work->sing_ind])) //Flip to ensure descent direction 
+    if(DAQP_IS_LOWER(work->WS[work->sing_ind])) //Flip to ensure descent direction
         for(i=0;i<=work->sing_ind;i++)
             work->lam_star[i] =-work->lam_star[i];
 }
 
 
 void daqp_pivot_last(DAQPWorkspace *work){
-    const int rm_ind = work->n_active-2; 
-    if(work->n_active > 1 && 
+    const int rm_ind = work->n_active-2;
+    if(work->n_active > 1 &&
             work->D[rm_ind] < work->settings->pivot_tol && // element in D small enough
             work->D[rm_ind] < work->D[work->n_active-1]){ // element in D smallar than neighbor
         const int ind_old = work->WS[rm_ind];
-        // Ensure that binaries never swap order (since this order is exploited) 
-        if(DAQP_IS_BINARY(ind_old) && DAQP_IS_BINARY(work->WS[work->n_active-1])) return; 
+        // Ensure that binaries never swap order (since this order is exploited)
+        if(DAQP_IS_BINARY(ind_old) && DAQP_IS_BINARY(work->WS[work->n_active-1])) return;
         if(work->bnb != NULL && rm_ind < work->bnb->n_clean) return;
 
         c_float lam_old = work->lam[rm_ind];
-        daqp_remove_constraint(work,rm_ind); // pivot_last might be recursively called here 
+        daqp_remove_constraint(work,rm_ind); // pivot_last might be recursively called here
 
         if(work->sing_ind!=DAQP_EMPTY_IND) return; // Abort if D becomes singular
 
         daqp_add_constraint(work,ind_old,lam_old);
-    }	
+    }
 }
 
 // Activate constrainte that are marked active in sense
@@ -270,11 +270,11 @@ int daqp_activate_constraints(DAQPWorkspace *work){
         }
         if(work->sing_ind != DAQP_EMPTY_IND){
             int exitflag = 1;
-            for(;i<work->m;i++){ 
+            for(;i<work->m;i++){
                 // 1. Check if there are equalities that couldn't be activated
-                // 2. Make sure that sense is clean for unactivated constraints 
+                // 2. Make sure that sense is clean for unactivated constraints
                 if(DAQP_IS_ACTIVE(i)){
-                    if(DAQP_IS_IMMUTABLE(i)) 
+                    if(DAQP_IS_IMMUTABLE(i))
                         exitflag = DAQP_EXIT_OVERDETERMINED_INITIAL;
                     else
                         DAQP_SET_INACTIVE(i);
@@ -293,8 +293,8 @@ int daqp_activate_constraints(DAQPWorkspace *work){
 void daqp_deactivate_constraints(DAQPWorkspace *work){
     int i;
     for(i =0;i<work->n_active;i++){
-        if(DAQP_IS_IMMUTABLE(work->WS[i])) continue; 
-        DAQP_SET_INACTIVE(work->WS[i]); 
+        if(DAQP_IS_IMMUTABLE(work->WS[i])) continue;
+        DAQP_SET_INACTIVE(work->WS[i]);
     }
 }
 

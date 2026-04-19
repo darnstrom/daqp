@@ -35,7 +35,7 @@ data = struct();
     % tic
     for idxExperiment = 1:numExperiments
         simout = sim(input(idxExperiment));
-        
+
         if idxExperiment == 1
             data = simout2data(simout);
         else
@@ -60,7 +60,7 @@ function data = simout2data(simout)
     youtLength = length(simout.yout.signals);
     youtSignals = cell(1,youtLength);
     timeLen = length(simout.tout);
-    
+
     % Get the signal names from the yout signals
     for i = 1:youtLength
         if ~isempty(simout.yout.signals(i).label)
@@ -70,7 +70,7 @@ function data = simout2data(simout)
             youtSignals{i} = signalParts{end};
         end
     end
-    
+
     % Get the signal names from the logsout signals
     if isempty(simout.logsout)
         logsOutLength = 0;
@@ -82,7 +82,7 @@ function data = simout2data(simout)
             logsOutSignals{i} = simout.logsout{i}.Name;
         end
     end
-    
+
     % Create the data structure
     % The first row contains the signal names, the second row contains the signal values
     signalLength = 1 + youtLength + logsOutLength;
@@ -103,26 +103,26 @@ function data = simout2data(simout)
         end
         % Signal name
         dataCell{1,idxSignal} = logsOutSignals{idxLogsOut};
-        
+
         % Signal values
         dataCell{2,idxSignal} = permuteSignalMatrix(simout.logsout{idxLogsOut}.Values.Data,timeLen);
         idxSignal = idxSignal + 1;
     end
-    
+
     % Convert the cell array to a struct
     data = struct(dataCell{:,1:idxSignal-1});
 end
-    
+
 function mat = permuteSignalMatrix(dataMat, timeLen)
     % Permute the signal matrix so that the time dimension is the last dimension
-    % 
+    %
     % 2D-input:
     % - the time dimension will always be the last dimension
     %
-    %  3D-input: 
-    % - if one of the data dimensions is 1, then it will result in a 2D matrix 
+    %  3D-input:
+    % - if one of the data dimensions is 1, then it will result in a 2D matrix
     %       with the time dimension as the last dimension
-    % - if none of the data dimensions is 1, then the time dimension will be 
+    % - if none of the data dimensions is 1, then the time dimension will be
     %       the last dimension
 
     dims = size(dataMat);

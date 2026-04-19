@@ -1,4 +1,4 @@
-#include "daqp.h" 
+#include "daqp.h"
 #ifdef PROFILING
 #include "utils.h"
 #endif
@@ -11,7 +11,7 @@ int daqp_ldp(DAQPWorkspace *work){
 
     for(iter=1; iter < work->settings->iter_limit; ++iter){
 
-        if(work->sing_ind==DAQP_EMPTY_IND){ 
+        if(work->sing_ind==DAQP_EMPTY_IND){
             daqp_compute_CSP(work);
             // Check dual feasibility of CSP
             if(!daqp_remove_blocking(work)){ //lam_star >= 0 (i.e., dual feasible)
@@ -21,7 +21,7 @@ int daqp_ldp(DAQPWorkspace *work){
                     exitflag = DAQP_EXIT_INFEASIBLE;
                     break;
                 }
-                // Try to add infeasible constraint 
+                // Try to add infeasible constraint
                 if(!daqp_add_infeasible(work)){ //mu >= (i.e., primal feasible)
                                            // All KKT-conditions satisfied -> optimum found
 
@@ -54,7 +54,7 @@ int daqp_ldp(DAQPWorkspace *work){
 
 
                     if(work->soft_slack > work->settings->primal_tol)
-                        exitflag = DAQP_EXIT_SOFT_OPTIMAL; 
+                        exitflag = DAQP_EXIT_SOFT_OPTIMAL;
                     else
                         exitflag = DAQP_EXIT_OPTIMAL;
                     break;
@@ -84,7 +84,7 @@ int daqp_ldp(DAQPWorkspace *work){
         }
         else{// Singular case
             daqp_compute_singular_direction(work);
-            if(!daqp_remove_blocking(work)){ 
+            if(!daqp_remove_blocking(work)){
                 exitflag = DAQP_EXIT_INFEASIBLE;
                 break;
             }

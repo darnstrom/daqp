@@ -7,11 +7,11 @@ extern "C" {
 
 #include <stddef.h>
 
-#define DAQP_EMPTY_IND -1 
+#define DAQP_EMPTY_IND -1
 #define DAQP_UNCONSTRAINED_OPTIMAL -2
 #define DAQP_INF ((c_float)1e30)
 
-// DEFAULT SETTINGS 
+// DEFAULT SETTINGS
 #define DAQP_DEFAULT_PRIM_TOL 1e-6
 #define DAQP_DEFAULT_DUAL_TOL 1e-12
 #define DAQP_DEFAULT_ZERO_TOL 1e-11
@@ -44,23 +44,23 @@ extern "C" {
 #define DAQP_EXIT_OVERDETERMINED_INITIAL -6
 #define DAQP_EXIT_TIMELIMIT -7
 
-// UPDATE LDP MASKS 
+// UPDATE LDP MASKS
 #define DAQP_UPDATE_Rinv 1
 #define DAQP_UPDATE_M 2
 #define DAQP_UPDATE_v 4
 #define DAQP_UPDATE_d 8
-#define DAQP_UPDATE_sense 16 
+#define DAQP_UPDATE_sense 16
 #define DAQP_UPDATE_hierarchy 32
 #define DAQP_UPDATE_unconstrained 64
 
-// CONSTRAINT MASKS 
+// CONSTRAINT MASKS
 #define DAQP_ACTIVE 1
 #define DAQP_IS_ACTIVE(x) (work->sense[x]&1)
 #define DAQP_SET_ACTIVE(x) (work->sense[x]|=1)
 #define DAQP_SET_INACTIVE(x) (work->sense[x]&=~1)
 
 // marks if a constraints is active at its lower bound
-#define DAQP_LOWER 2 
+#define DAQP_LOWER 2
 #define DAQP_IS_LOWER(x) (work->sense[x]&2)
 #define DAQP_SET_LOWER(x) (work->sense[x]|=2)
 #define DAQP_SET_UPPER(x) (work->sense[x]&=~2)
@@ -77,8 +77,8 @@ extern "C" {
 #define DAQP_SET_SOFT(x) (work->sense[x]|=8)
 #define DAQP_SET_HARD(x) (work->sense[x]&=~8)
 
-// marks that a constraint has to be active at either its upper or lower bound 
-#define DAQP_BINARY 16 
+// marks that a constraint has to be active at either its upper or lower bound
+#define DAQP_BINARY 16
 #define DAQP_IS_BINARY(x) (work->sense[x]&16)
 
 # ifdef __cplusplus

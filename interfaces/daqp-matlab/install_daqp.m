@@ -1,7 +1,7 @@
 function install_daqp
     % Install the Matlab interface for DAQP
 
-    % Get platform 
+    % Get platform
     if ispc
         platform = 'windows';
     elseif ismac

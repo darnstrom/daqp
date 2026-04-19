@@ -1,7 +1,7 @@
 """
 # Example calls
     xstar, fval, exitflag, info = DAQPBase.quadprog(H,f,A,bupper)
-    xstar, fval, exitflag, info = DAQPBase.quadprog(H,f,A,bupper,blower,sense;primal_start,dual_start) 
+    xstar, fval, exitflag, info = DAQPBase.quadprog(H,f,A,bupper,blower,sense;primal_start,dual_start
 
 finds the solution `xstar` to the quadratic program
 
@@ -26,7 +26,7 @@ is interpreted as
 
 ```
 
-# Input 
+# Input
 * `H`           - cost matrix
 * `f`           - cost vector
 * `A`           - linear constraint matrix
@@ -43,36 +43,36 @@ is interpreted as
 
 # Output
 * `xstar`       - solution
-* `fval`        - objective function value for `xstar`. 
-* `exitflag`    - flag from solver (>0 success, <0 failure) 
-* `info`        - tuple containing profiling information from the solver. 
+* `fval`        - objective function value for `xstar`.
+* `exitflag`    - flag from solver (>0 success, <0 failure)
+* `info`        - tuple containing profiling information from the solver.
 
 """
-function quadprog(H::Union{Matrix{Float64}, Cholesky},f::Vector{Float64}, 
+function quadprog(H::Union{Matrix{Float64}, Cholesky},f::Vector{Float64},
         A::Matrix{Float64},bupper::Vector{Float64},blower::Vector{Float64}=Float64[],
-        sense::Vector{Cint}=Cint[];A_rowmaj=false,settings=nothing, 
+        sense::Vector{Cint}=Cint[];A_rowmaj=false,settings=nothing,
         primal_start::Vector{Cdouble}=Cdouble[], dual_start::Vector{Cdouble}=Cdouble[])
-    d = DAQPBase.Model() 
+    d = DAQPBase.Model()
     !isnothing(settings) && DAQPBase.settings(d,settings)
     exitflag,setup_time = DAQPBase.setup(d,QPj(H,f,A,bupper,blower,sense;A_rowmaj);
                                          primal_start,dual_start, check_unconstrained=true)
     return DAQPBase.solve(d;setup_time);
 end
 
-# XXX Just kept for test for now  
+# XXX Just kept for test for now
 function quadprog(qpj::QPj;settings=nothing)
     # Setup QP
     qp = QPc(qpj);
 
     # Setup output struct
-    xstar = zeros(Float64,qp.n); 
-    lam= zeros(Float64,qp.m); 
+    xstar = zeros(Float64,qp.n);
+    lam= zeros(Float64,qp.m);
     result= Ref(DAQPResult(xstar,lam));
     ptr_settings = settings isa DAQPSettings ? Ref(settings) : Ptr{DAQPBase.DAQPSettings}(C_NULL)
 
 
     ccall((:daqp_quadprog, DAQPBase.libdaqp), Nothing,
-          (Ref{DAQPBase.DAQPResult},Ref{DAQPBase.QPc},Ref{DAQPBase.DAQPSettings}), 
+          (Ref{DAQPBase.DAQPResult},Ref{DAQPBase.QPc},Ref{DAQPBase.DAQPSettings}),
           result,Ref(qp),ptr_settings)
 
     info = (x = xstar, λ=lam, fval=result[].fval,
@@ -92,14 +92,14 @@ finds the solution `xstar` to the linear program
 
 ```
 min_x	f' x
-subject to 
+subject to
     blower[1:ms]	<= x[1:ms] <= bupper[1:ms]
     blower[ms+1:m]  <= A*x 	   <= bupper[ms+1:m],
 ```
 where `m = length(bupper)` and `ms = m-size(A,2)`.
 
-# Input 
-* `f`  			- linear term in objective function, n-vector 
+# Input
+* `f`  			- linear term in objective function, n-vector
 * `A`  			- constraint normals, (`(m-ms) x n`)-matrix
 * `bupper` 		- upper bounds for constraints, `m`-vector
 * `blower` 		- lower bounds for constraints, `m`-vector (default: -Inf)
@@ -111,29 +111,29 @@ where `m = length(bupper)` and `ms = m-size(A,2)`.
 
 # Output
 * `xstar` 		- solution provided by solver
-* `fval` 		- objective function value for `xstar`. 
-* `exitflag` 	- flag from solver (>0 success, <0 failure) 
-* `info` 		- tuple containing profiling information from the solver. 
+* `fval` 		- objective function value for `xstar`.
+* `exitflag` 	- flag from solver (>0 success, <0 failure)
+* `info` 		- tuple containing profiling information from the solver.
 
 """
-function linprog(f::Vector{Float64}, 
+function linprog(f::Vector{Float64},
         A::Matrix{Float64},bupper::Vector{Float64},blower::Vector{Float64}=Float64[],
         sense::Vector{Cint}=Cint[];A_rowmaj=false, primal_start::Vector{Cdouble}=Cdouble[],
         dual_start::Vector{Cdouble}=Cdouble[])
-    d = DAQPBase.Model() 
+    d = DAQPBase.Model()
     exitflag,setup_time = DAQPBase.setup(d,QPj(zeros(0,0),f,A,bupper,blower,sense;A_rowmaj);primal_start,dual_start)
     return  DAQPBase.solve(d;setup_time);
 end
 """
 # Example calls
     xstar, _, exitflag, info = DAQPBase.avi(H,f,A,bupper)
-    xstar, _, exitflag, info = DAQPBase.avi(H,f,A,bupper,blower,sense;primal_start,dual_start) 
+    xstar, _, exitflag, info = DAQPBase.avi(H,f,A,bupper,blower,sense;primal_start,dual_start)
 
-finds the primal solution `xstar` and dual solution `lambda` to the affine variational inequality 
+finds the primal solution `xstar` and dual solution `lambda` to the affine variational inequality
 
 Find `xstar` ∈ C ≜ {x : blower <= A x <= bupper}
 ```
-⟨H*xstar f, y-xstar⟩ ≥ 0 for all y ∈ C 
+⟨H*xstar f, y-xstar⟩ ≥ 0 for all y ∈ C
 ```
 If `bupper` and `blower` have more elements than rows of `A`, the first
 elements are interpreted as simple bounds. For example:
@@ -152,9 +152,9 @@ is interpreted as
 
 ```
 
-# Input 
+# Input
 * `H`           - linear transform
-* `f`           - offset 
+* `f`           - offset
 * `A`           - linear constraint matrix
 * `bupper`       - upper bounds for constraints
 * `blower`      - lower bounds for constraints (default: -Inf)
@@ -170,32 +170,32 @@ is interpreted as
 # Output
 * `xstar`       - primal solution
 * `_`           - placeholder
-* `exitflag`    - flag from solver (>0 success, <0 failure) 
-* `info`        - tuple containing profiling information from the solver. 
+* `exitflag`    - flag from solver (>0 success, <0 failure)
+* `info`        - tuple containing profiling information from the solver.
 
 """
-function avi(H::Matrix{Float64},f::Vector{Float64}, 
+function avi(H::Matrix{Float64},f::Vector{Float64},
         A::Matrix{Float64},bupper::Vector{Float64},blower::Vector{Float64}=Float64[],sense::Vector{Cint}=Cint[];A_rowmaj=false,settings=nothing, primal_start::Vector{Cdouble}=Cdouble[],
         dual_start::Vector{Cdouble}=Cdouble[])
-    d = DAQPBase.Model() 
+    d = DAQPBase.Model()
     exitflag,setup_time = DAQPBase.setup(d,QPj(H,f,A,bupper,blower,sense;A_rowmaj,is_avi=true);
                                          primal_start,dual_start)
     return  DAQPBase.solve(d;setup_time);
 end
 """
-    d = DAQPBase.Model() 
-creates an empty optimization model `d`. 
+    d = DAQPBase.Model()
+creates an empty optimization model `d`.
 
 
-The following functions acts on such models: 
+The following functions acts on such models:
 
 * `setup(d,H,f,A,bupper,blower,sense;primal_start, dual_start)`: setup a problem (see `DAQPBase.quadprog` or DAQPBase.avi for details)
 * `solve(d)`: solve a populated model
-* `update(d,H,f,A,bupper,blower,sense)`: update an existing model 
-* `dict = DAQPBase.settings(d)`: return a Dictionary with the current settings for the model `d` 
-* `settings(d,dict)`: update the settings for `d` with the Dictionary `dict` 
+* `update(d,H,f,A,bupper,blower,sense)`: update an existing model
+* `dict = DAQPBase.settings(d)`: return a Dictionary with the current settings for the model `d`
+* `settings(d,dict)`: update the settings for `d` with the Dictionary `dict`
 """
-mutable struct Model 
+mutable struct Model
     work::Ptr{DAQPBase.Workspace}
     qpj::QPj
     qpc::QPc
@@ -211,7 +211,7 @@ mutable struct Model
         ccall((:allocate_daqp_settings,DAQPBase.libdaqp),Nothing,(Ptr{DAQPBase.Workspace},),work)
         finalizer(DAQPBase.delete!, daqp)
         daqp.has_model=false
-        return daqp 
+        return daqp
     end
 end
 
@@ -249,8 +249,8 @@ function setup(daqp::DAQPBase.Model, qp::DAQPBase.QPj;primal_start::Vector{Cdoub
         @assert(!any((qp.sense.&BINARY).==BINARY),
                 "DAQP requires the objective to be strictly convex to support binary variables")
     end
-    
-    # Handle AVI with other setup 
+
+    # Handle AVI with other setup
     exitflag = ccall((:setup_daqp_main,DAQPBase.libdaqp),Cint,(Ptr{DAQPBase.QPc}, Ptr{DAQPBase.Workspace}, Ptr{Cdouble},Cint), daqp.qpc_ptr, daqp.work, setup_time, Cint(check_unconstrained))
     if(exitflag < 0)
         # XXX: if setup fails DAQP currently clears settings
@@ -260,7 +260,7 @@ function setup(daqp::DAQPBase.Model, qp::DAQPBase.QPj;primal_start::Vector{Cdoub
         daqp.has_model = true
         daqp.x = Vector{Float64}(undef, qp.n)
         daqp.λ = Vector{Float64}(undef, qp.m)
-        if !isempty(primal_start) 
+        if !isempty(primal_start)
             ccall((:daqp_set_primal_start,DAQPBase.libdaqp),Nothing,(Ptr{DAQPBase.Workspace},Ptr{Cdouble}),
                   daqp.work,primal_start)
         end
@@ -271,7 +271,7 @@ end
 
 function setup(daqp::DAQPBase.Model, H::Union{Matrix{Cdouble},Cholesky},f::Vector{Cdouble},
         A::Matrix{Cdouble},bupper::Vector{Cdouble},blower::Vector{Cdouble}=Cdouble[],
-        sense::Vector{Cint}=Cint[];A_rowmaj=false,break_points = Cint[], is_avi=false, 
+        sense::Vector{Cint}=Cint[];A_rowmaj=false,break_points = Cint[], is_avi=false,
         primal_start::Vector{Cdouble}=Cdouble[],dual_start::Vector{Cdouble}=Cdouble[])
     return setup(daqp,QPj(H,f,A,bupper,blower,sense;A_rowmaj,break_points,is_avi);primal_start,dual_start)
 end
@@ -366,7 +366,7 @@ function update(daqp::DAQPBase.Model, H,f,A,bupper,blower,sense=nothing,break_po
     daqp.qpc = QPc(daqp.qpj);
     unsafe_store!(daqp.qpc_ptr, daqp.qpc)
 
-    exitflag = ccall((:daqp_update_ldp,DAQPBase.libdaqp),Cint,(Cint,Ptr{DAQPBase.Workspace},Ptr{DAQPBase.QPc}), 
+    exitflag = ccall((:daqp_update_ldp,DAQPBase.libdaqp),Cint,(Cint,Ptr{DAQPBase.Workspace},Ptr{DAQPBase.QPc}),
                      update_mask, daqp.work, daqp.qpc_ptr);
 end
 
@@ -393,7 +393,7 @@ function codegen(d::DAQPBase.Model; fname="daqp_workspace", dir="codegen", prefi
     if src
         cfiles = ["daqp.c","auxiliary.c","factorization.c"]
         hfiles = ["daqp.h","auxiliary.h","factorization.h","constants.h", "types.h"]
- 
+
         # Append BnB code if there are any binary variables
         if any((d.qpj.sense.&BINARY).==BINARY)
             push!(cfiles,"bnb.c")
@@ -426,7 +426,7 @@ function free_c_workspace(p::Ptr{DAQPBase.Workspace})
     Libc.free(p)
 end
 
-function init_c_workspace_ldp(p::Ptr{DAQPBase.Workspace},A::Matrix{Cdouble},bupper::Vector{Cdouble},blower::Vector{Cdouble},sense::Vector{Cint}; max_radius=nothing) 
+function init_c_workspace_ldp(p::Ptr{DAQPBase.Workspace},A::Matrix{Cdouble},bupper::Vector{Cdouble},blower::Vector{Cdouble},sense::Vector{Cint}; max_radius=nothing)
     # Set fval_bound to maximal radius for early termination
     if(!isnothing(max_radius))
         d_work = unsafe_load(Ptr{DAQPBase.Workspace}(p));
@@ -441,7 +441,7 @@ function init_c_workspace_ldp(p::Ptr{DAQPBase.Workspace},A::Matrix{Cdouble},bupp
 end
 
 function isfeasible(p::Ptr{DAQPBase.Workspace}, m=nothing, ms=nothing ;validate=false)::Bool
-    # Update A and bupper/blower dimensions 
+    # Update A and bupper/blower dimensions
     !isnothing(m)  && unsafe_store!(Ptr{Cint}(p+fieldoffset(DAQPBase.Workspace,3)),m)
     !isnothing(ms) && unsafe_store!(Ptr{Cint}(p+fieldoffset(DAQPBase.Workspace,4)),ms)
 

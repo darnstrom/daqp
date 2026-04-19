@@ -6,11 +6,11 @@ end
 
 
 const ACTIVE = 1
-const LOWER = 2 
+const LOWER = 2
 const IMMUTABLE= 4
 const EQUALITY = ACTIVE+IMMUTABLE
-const SOFT= 8 
-const BINARY= 16 
+const SOFT= 8
+const BINARY= 16
 
 # Exit Flags
 const  CONSTRAINED_POINT   = 3

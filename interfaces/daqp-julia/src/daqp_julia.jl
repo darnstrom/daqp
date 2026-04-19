@@ -1,5 +1,5 @@
 function daqp_ldp_jl(M,d,AS0,senses;settings=DAQPSettings(),selection_rule=DANTZIG)
-    # Initial AS is union AS0 and equality constraints  
+    # Initial AS is union AS0 and equality constraints
     AS = findall((senses.&IMMUTABLE).!=0);
     AS = AS ∪ AS0;
     IS = setdiff(1:length(d),AS);
@@ -18,8 +18,8 @@ function daqp_ldp_jl(M,d,AS0,senses;settings=DAQPSettings(),selection_rule=DANTZ
     while(~fin)
         ASs = [ASs falses(length(d),1)];
         ASs[AS,end].=true;
-        singular_ind= findfirst(D.<=settings.zero_tol); 
-        if(isnothing(singular_ind)) # "Normal iteration 
+        singular_ind= findfirst(D.<=settings.zero_tol);
+        if(isnothing(singular_ind)) # "Normal iteration
             if(!isempty(AS))
                 lambda_star = -d[AS]
                 forward_L!(L,lambda_star);
@@ -52,15 +52,15 @@ function daqp_ldp_jl(M,d,AS0,senses;settings=DAQPSettings(),selection_rule=DANTZ
                     deleteat!(IS,free_ind);
                     push!(lambda,0);
                 end
-            else #Constrained stationary point not primal feasible 
+            else #Constrained stationary point not primal feasible
                 p = lambda_star-lambda;
                 block_inds = inequality_mask[AS] .& (lambda_star.<0)
                 lambda,AS,IS,L,D = remove_constraint(lambda,AS,IS,L,D,p,block_inds);
             end
-        else #Singular 
+        else #Singular
             p = compute_singulardirection(L,D,singular_ind);
             block_inds = inequality_mask[AS] .& (p.<-settings.zero_tol)
-            if(sum(block_inds)==0) # Infeasible  
+            if(sum(block_inds)==0) # Infeasible
                 return zeros(0),zeros(0),AS,Inf,iter,ASs;
             end
             lambda,AS,IS,L,D = remove_constraint(lambda,AS,IS,L,D,p,block_inds);
@@ -69,7 +69,7 @@ function daqp_ldp_jl(M,d,AS0,senses;settings=DAQPSettings(),selection_rule=DANTZ
             iter = iter + 1;
         end
     end
-    # Optimum found 
+    # Optimum found
     lam_opt = zeros(length(d),1);
     if(isempty(AS))
         u=zeros(size(M,2)); # Unconstrained solution
@@ -82,7 +82,7 @@ function daqp_ldp_jl(M,d,AS0,senses;settings=DAQPSettings(),selection_rule=DANTZ
     return u,lam_opt,AS,J,iter,ASs;
 end
 
-function remove_constraint(lambda,AS,IS,L,D,p,block_inds) 
+function remove_constraint(lambda,AS,IS,L,D,p,block_inds)
     alpha_cands = -lambda[block_inds]./p[block_inds];
     alpha,alpha_ind = findmin(alpha_cands);#Find first blocking constraint
     AS_tmp = AS[block_inds];
@@ -91,7 +91,7 @@ function remove_constraint(lambda,AS,IS,L,D,p,block_inds)
     push!(IS,AS[fix_ind]);
     deleteat!(AS,fix_ind);
     deleteat!(lambda,fix_ind);
-    L,D = updateLDLremove(L,D,fix_ind); 
+    L,D = updateLDLremove(L,D,fix_ind);
     return lambda,AS,IS,L,D
 end
 
@@ -104,7 +104,7 @@ function daqp_jl(H,f,A,b,sense,AS;settings=DAQPSettings(),selection_rule=DANTZIG
     # normalize
     norm_factor = 0
     for i in 1:size(M,1)
-        norm_factor = norm(M[i,:],2); 
+        norm_factor = norm(M[i,:],2);
         M[i,:]./=norm_factor;
         d[i,:]./=norm_factor;
     end
@@ -157,11 +157,11 @@ function updateLDLadd(L,D,b,bet;precision=Float64)
     #b = A*a, bet = a'*a
     @inbounds begin
         k = length(b);
-        Ln = zeros(k+1,k+1) 
+        Ln = zeros(k+1,k+1)
         Ln[1:k,1:k] = L
         Ln[k+1,k+1] = 1
         if(isempty(D))
-            return Ln,[D;bet] 
+            return Ln,[D;bet]
         end
         forward_L!(L,b);
         d = bet

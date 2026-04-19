@@ -18,7 +18,7 @@ classdef daqp< handle
             [exitflag,setup_time] = d.setup(H,f,A,bupper,blower,sense,[],0,primal_start,dual_start,1);
             if(exitflag <0)
                 x = [];fval=[];info=[];
-                return; 
+                return;
             end
             [x,fval,exitflag,info] = d.solve();
             info.setup_time = setup_time;
@@ -31,7 +31,7 @@ classdef daqp< handle
             [exitflag,setup_time] = d.setup([],f,A,bupper,blower,sense,[],0,primal_start,dual_start);
             if(exitflag <0)
                 x = [];fval=[];info=[];
-                return; 
+                return;
             end
             settings = d.settings;
             settings.eps_prox = 1;
@@ -48,7 +48,7 @@ classdef daqp< handle
             [exitflag,setup_time] = d.setup(H,f,A,bupper,blower,sense,[],1,primal_start,dual_start);
             if(exitflag <0)
                 x = [];fval=[];info=[];
-                return; 
+                return;
             end
             [x,fval,exitflag,info] = d.solve();
             info.setup_time = setup_time;
@@ -71,7 +71,7 @@ classdef daqp< handle
             sense = zeros(m,1,'int32');
             d = daqp();
             d.setup([],[],A,bu,bl,sense,break_points);
-            [x,fval,exitflag, info] = d.solve(); 
+            [x,fval,exitflag, info] = d.solve();
             es = {};
             for i = 1:nh
                 etot = zeros(size(As{i},1),1);
@@ -95,7 +95,7 @@ classdef daqp< handle
             this.isdouble = daqpmex('isdouble');
         end
 
-        %% Destructor (Free C workspace) 
+        %% Destructor (Free C workspace)
         function delete(this)
             daqpmex('delete', this.work_ptr);
         end
@@ -122,20 +122,20 @@ classdef daqp< handle
             end
 
             % TODO Check validity
-            % TODO match double/single with c_float... 
+            % TODO match double/single with c_float...
             this.n = length(f);
             this.m = length(bupper);
             this.ms = this.m-size(A,1);
             if(this.isdouble)
                 this.H = double(H);
                 this.f = double(f);
-                this.A = double(A'); % col.major => row.major 
+                this.A = double(A'); % col.major => row.major
                 this.bupper = double(bupper);
                 this.blower = double(blower);
             else
                 this.H = single(H);
                 this.f = single(f);
-                this.A = single(A'); % col.major => row.major 
+                this.A = single(A'); % col.major => row.major
                 this.bupper = single(bupper);
                 this.blower = single(blower);
             end
@@ -157,7 +157,7 @@ classdef daqp< handle
             if(length(varargin)==1)
                 if(isstruct(varargin{1})) % If struct as input treat it as new settings
                     new_settings = varargin{1};
-                else 
+                else
                     if(isstr(varargin{1})&& strcmp(varargin{1},'default')) % set/return default settings
                         daqpmex('set_default_settings', this.work_ptr);
                         settings = daqpmex('get_settings', this.work_ptr);
@@ -170,7 +170,7 @@ classdef daqp< handle
             end
             fn= fieldnames(new_settings);
             for k=1:numel(fn)
-                if(isfield(settings,fn{k}) && isscalar(new_settings.(fn{k}))) 
+                if(isfield(settings,fn{k}) && isscalar(new_settings.(fn{k})))
                     settings = setfield(settings,fn{k},cast(new_settings.(fn{k}),class(settings.(fn{k}))));
                 else
                     fprintf('Unable to set field %s\n',fn{k});
@@ -183,7 +183,7 @@ classdef daqp< handle
         function soften_constraints(this,ids)
             this.sense(ids) = this.sense(ids)+8;
             % TODO: update workspace
-            this 
+            this
         end
         function update(this,H,f,A,bupper,blower,sense)
             update_mask = int32(0);

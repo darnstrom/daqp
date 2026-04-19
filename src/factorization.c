@@ -6,7 +6,6 @@ c_float daqp_dot(const c_float* v1, const c_float* v2, const int n) {
     return sum;
 }
 
-
 void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind){
     work->sing_ind = DAQP_EMPTY_IND;
     int i,j,disp,id;
@@ -63,11 +62,11 @@ void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind){
 
         work->L[new_L_start+i] = sum;
     }
-    //Forward substitution: l <-- L\(Mk*m)  
+    //Forward substitution: l <-- L\(Mk*m)
     for(i=0,disp=0; i<work->n_active; i++){
         sum = work->L[new_L_start+i];
         for(j=0; j<i; j++)
-            sum -= work->L[disp++]*work->L[new_L_start+j]; 
+            sum -= work->L[disp++]*work->L[new_L_start+j];
         work->L[new_L_start+i] = sum;
         disp++; //Skip diagonal elements (which is 1)
     }
@@ -78,7 +77,7 @@ void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind){
     c_float tmp;
     for (i =0,disp=new_L_start; i<work->n_active;i++,disp++){
         tmp = work->L[disp];
-        work->L[disp] /= work->D[i];  
+        work->L[disp] /= work->D[i];
         sum -= tmp*work->L[disp];
     }
     work->D[work->n_active]=sum;

@@ -1,10 +1,10 @@
-#include "api.h" 
+#include "api.h"
 #include "utils.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
 
-// Solve problem from a given workspace and measure setup and solve time 
+// Solve problem from a given workspace and measure setup and solve time
 void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
 #ifdef PROFILING
     DAQPtimer timer;
@@ -21,7 +21,7 @@ void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
                     res->exitflag = daqp_hiqp(work,res->lam);
                 else
                     res->exitflag = daqp_ldp(work);
-                if(res->exitflag > 0) ldp2qp_solution(work); // Retrieve qp solution 
+                if(res->exitflag > 0) ldp2qp_solution(work); // Retrieve qp solution
             }
             else{ //AVI
                 res->exitflag = daqp_solve_avi(work);
@@ -31,7 +31,7 @@ void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
             res->exitflag = daqp_prox(work);
         }
     }
-    else{// Unconstrained optimum 
+    else{// Unconstrained optimum
         work->iterations = 1;
         work->fval = 0;
         work->soft_slack = 0;
@@ -48,7 +48,7 @@ void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
 #ifdef PROFILING
     res->solve_time = get_time(&timer);
 #else
-    res->solve_time = 0; 
+    res->solve_time = 0;
 #endif
 }
 
@@ -78,7 +78,7 @@ void daqp_avi(DAQPResult *res, DAQPProblem* problem, DAQPSettings *settings){
 
 // Setup workspace and transform QP to LDP
 int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time){
-    return setup_daqp_main(qp,work,setup_time,0);//  
+    return setup_daqp_main(qp,work,setup_time,0);//
 }
 
 // Internal function for setting workspace and transform QP to LDP
@@ -89,14 +89,14 @@ int setup_daqp_main(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time, i
 #ifdef PROFILING
     DAQPtimer timer;
     if(setup_time != NULL){
-        *setup_time = 0; // in case setup fails 
+        *setup_time = 0; // in case setup fails
         tic(&timer);
     }
 #endif
     // Check if QP is well-posed
     //validate_QP(qp);
 
-    // Count number of soft/binary constraints 
+    // Count number of soft/binary constraints
     // (to account for it in allocation)
     int ns = 0, nb = 0;
     int i;
@@ -115,7 +115,7 @@ int setup_daqp_main(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time, i
             start = qp->break_points[i];
         }
      }
-   
+
     // Setup workspace
     if(work->settings == NULL)
         allocate_daqp_settings(work);
@@ -151,10 +151,10 @@ int setup_daqp_main(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time, i
     return 1;
 }
 
-//  Setup LDP from QP  
+//  Setup LDP from QP
 int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp, const int check_unc){
     // Always update M, d and sense
-    int update_mask = DAQP_UPDATE_M+DAQP_UPDATE_d+DAQP_UPDATE_sense; 
+    int update_mask = DAQP_UPDATE_M+DAQP_UPDATE_d+DAQP_UPDATE_sense;
     int error_flag;
     int alloc_R=0, alloc_v=0;
 
@@ -181,7 +181,7 @@ int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp, const int check_unc){
     // Update hierarchy if hqp
     if(qp->nh > 1) update_mask += DAQP_UPDATE_hierarchy;
 
-    if(check_unc) update_mask += DAQP_UPDATE_unconstrained; 
+    if(check_unc) update_mask += DAQP_UPDATE_unconstrained;
 
     // Form LDP
     error_flag = daqp_update_ldp(update_mask, work, qp);
@@ -218,14 +218,14 @@ int setup_daqp_bnb(DAQPWorkspace* work, int* sense, int nb, int ns){
         // Setup tree
         work->bnb->tree= malloc((work->bnb->nb+1)*sizeof(DAQPNode));
         work->bnb->tree_WS= malloc((work->n+ns+1)*(nb+1)*sizeof(int));
-        work->bnb->n_nodes = 0; 
-        work->bnb->nWS= 0; 
+        work->bnb->n_nodes = 0;
+        work->bnb->nWS= 0;
         work->bnb->fixed_ids= malloc((nb+1)*sizeof(int));
     }
     return 1;
 }
 
-// Free data for LDP 
+// Free data for LDP
 void free_daqp_ldp(DAQPWorkspace *work){
     if(work->sense==NULL) return; // Already freed
     free(work->sense);
@@ -275,7 +275,7 @@ void free_daqp_bnb(DAQPWorkspace* work){
     }
 }
 
-// Allocate memory for iterates  
+// Allocate memory for iterates
 void allocate_daqp_workspace(DAQPWorkspace *work, int n, int ns){
     work->n = n;
     n = n + ns; //To account for soft_constraints
@@ -297,7 +297,7 @@ void allocate_daqp_workspace(DAQPWorkspace *work, int n, int ns){
 
 
     work->u= calloc(work->n,sizeof(c_float)); // calloc -> uninitialized itearte is 0
-    work->x = work->u; 
+    work->x = work->u;
 
     work->xold= malloc(work->n*sizeof(c_float));
 
@@ -393,7 +393,7 @@ void free_daqp_workspace(DAQPWorkspace *work){
         work->lam = NULL;
     }
 
-    if(work->settings != NULL){ 
+    if(work->settings != NULL){
         free(work->settings);
         work->settings = NULL;
     }
@@ -424,18 +424,18 @@ void free_daqp_avi(DAQPWorkspace* work){
         work->avi = NULL;
     }
 }
-        
 
-// Extract solution information from workspace 
+
+// Extract solution information from workspace
 void daqp_extract_result(DAQPResult* res, DAQPWorkspace* work){
-    int i; 
+    int i;
     // Extract primal solution
     for(i=0;i<work->n;i++) res->x[i] = work->x[i];
 
     // Extract dual solution
     if(res->lam != NULL && work->nh < 2){
-        for(i=0;i<work->m;i++) 
-            res->lam[i] = 0; 
+        for(i=0;i<work->m;i++)
+            res->lam[i] = 0;
         for(i=0;i<work->n_active;i++)
             res->lam[work->WS[i]] = work->lam_star[i];
     }
@@ -464,19 +464,19 @@ void daqp_extract_result(DAQPResult* res, DAQPWorkspace* work){
 
 void daqp_default_settings(DAQPSettings* settings){
     settings->primal_tol = DAQP_DEFAULT_PRIM_TOL;
-    settings->dual_tol = DAQP_DEFAULT_DUAL_TOL; 
+    settings->dual_tol = DAQP_DEFAULT_DUAL_TOL;
     settings->zero_tol = DAQP_DEFAULT_ZERO_TOL;
     settings->pivot_tol = DAQP_DEFAULT_PIVOT_TOL;
     settings->progress_tol= DAQP_DEFAULT_PROG_TOL;
 
     settings->cycle_tol = DAQP_DEFAULT_CYCLE_TOL;
     settings->iter_limit = DAQP_DEFAULT_ITER_LIMIT;
-    settings->fval_bound = DAQP_INF; 
+    settings->fval_bound = DAQP_INF;
 
     settings->eps_prox = DAQP_DEFAULT_EPS_PROX;
     settings->eta_prox = DAQP_DEFAULT_ETA;
 
-    settings->rho_soft = DAQP_DEFAULT_RHO_SOFT; 
+    settings->rho_soft = DAQP_DEFAULT_RHO_SOFT;
 
     settings->rel_subopt = DAQP_DEFAULT_REL_SUBOPT;
     settings->abs_subopt = DAQP_DEFAULT_ABS_SUBOPT;
@@ -534,13 +534,13 @@ int daqp_first_violating(c_float* x, c_float* A, c_float* bu, c_float* bl, int n
 }
 
 
-// Sets the starting active-set (by modifying sense) 
-// based on a primal iterate 
+// Sets the starting active-set (by modifying sense)
+// based on a primal iterate
 void daqp_primal_init_active(DAQPProblem* qp, c_float* x){
     int i,disp;
     c_float Ax, slack;
     c_float tol= 1e-9;
-    
+
     // Simple constraints
     for(i=0; i < qp->ms; i++){
         if(qp->sense[i] & DAQP_IMMUTABLE) continue;
