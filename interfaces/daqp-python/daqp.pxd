@@ -32,6 +32,7 @@ cdef extern from "types.h":
         double eta_prox;
 
         double rho_soft;
+        double rho_avi;
 
         double rel_subopt;
         double abs_subopt;
@@ -39,7 +40,6 @@ cdef extern from "types.h":
         double sing_tol;
         double refactor_tol;
         double time_limit;
-        double rho_avi;
 
     ctypedef struct DAQPWorkspace:
         int n
