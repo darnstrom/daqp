@@ -380,6 +380,11 @@ void DAQP::set_rho_soft(double val) {
     is_solved_ = false;
 }
 
+void DAQP::set_rho_avi(double val) {
+    settings_.rho_avi = val;
+    is_solved_ = false;
+}
+
 void DAQP::set_rel_subopt(double val) {
     settings_.rel_subopt = val;
     is_solved_ = false;

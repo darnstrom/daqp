@@ -41,7 +41,7 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
         if(work->avi == NULL)
             error_flag = daqp_update_Rinv(work, qp->H, qp->problem_type==2 ? 1 : 0);
         else{
-            daqp_update_avi(work->avi,qp);
+            daqp_update_avi(work->avi, qp, work->settings);
             error_flag = daqp_update_Rinv(work, work->avi->Hs_rho,0);
         }
         if(error_flag<0)
@@ -464,46 +464,6 @@ int daqp_check_unconstrained(DAQPWorkspace* work, const int mask){
     }
     // Switch back such that any warm starts a preserved
     swp_ptr = work->x; work->u = work->xold; work->x = work->xold; work->xold = swp_ptr;
-    return 1;
-}
-
-int daqp_update_avi(DAQPAVI* avi, DAQPProblem* p){
-    const int n = p->n;
-    // Setup matrices Hsym, Hs_rho, and H_rho, LU_H
-    int i,j,disp;
-    c_float val;
-    c_float min_diag = DAQP_INF;
-    c_float max_row_sum = 0.0;
-    c_float fro_norm_sq = 0.0;
-    avi->rho = 0.0;
-    for (i = 0, disp=0; i < n; i++) {
-        c_float row_sum = 0.0;
-        for (j = 0; j < n; j++, disp++) {
-            val = (p->H[disp] + p->H[j * n + i]) * 0.5;
-            avi->Hsym[disp] = val;
-            avi->Hs_rho[disp] = val;
-            avi->H_rho[disp] = p->H[disp];
-            avi->LU_H[disp] = p->H[disp];
-            row_sum += (val < 0.0) ? -val : val;
-            fro_norm_sq += p->H[disp] * p->H[disp];
-            if(i == j && val < min_diag) min_diag = val;
-        }
-        if(row_sum > max_row_sum) max_row_sum = row_sum;
-    }
-    // Regularization
-    if(min_diag > 0.0 && max_row_sum > 0.0)
-        avi->rho = sqrt(min_diag * max_row_sum);
-    else
-        avi->rho = sqrt(fro_norm_sq)/2;
-    for(i=0,disp=0; i<n;i++){
-        avi->Hs_rho[disp] += avi->rho;
-        avi->H_rho[disp] += avi->rho;
-        disp += n+1;
-    }
-
-    // Factorize H and H_rho
-    daqp_lu(avi->LU_H, avi->P_H, n);
-    daqp_lu(avi->H_rho, avi->P_H2, n);
     return 1;
 }
 

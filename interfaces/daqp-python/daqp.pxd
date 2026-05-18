@@ -32,6 +32,7 @@ cdef extern from "types.h":
         double eta_prox;
 
         double rho_soft;
+        double rho_avi;
 
         double rel_subopt;
         double abs_subopt;
@@ -98,6 +99,7 @@ cdef extern from "constants.h":
     cdef double DAQP_DEFAULT_ETA
     cdef int DAQP_DEFAULT_ITER_LIMIT
     cdef double DAQP_DEFAULT_RHO_SOFT
+    cdef double DAQP_DEFAULT_RHO_AVI
     cdef double  DAQP_DEFAULT_REL_SUBOPT
     cdef double  DAQP_DEFAULT_ABS_SUBOPT
     cdef double  DAQP_DEFAULT_SING_TOL

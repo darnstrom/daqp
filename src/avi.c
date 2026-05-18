@@ -1,6 +1,7 @@
 #include "avi.h"
 #include "daqp.h"
 #include "utils.h"
+#include <math.h>
 
 // Solve AVI
 int daqp_solve_avi(DAQPWorkspace *work) {
@@ -216,5 +217,47 @@ int daqp_check_optimal_avi(DAQPWorkspace* work){
         if(Ax < work->qp->blower[i] - primal_tol) return 0;
     }
     // All checks passed -> optimal KKT point found
+    return 1;
+}
+
+int daqp_update_avi(DAQPAVI* avi, DAQPProblem* p, DAQPSettings* settings) {
+    const int n = p->n;
+    int i, j, disp;
+    c_float val;
+    c_float min_diag = DAQP_INF;
+    c_float max_row_sum = 0.0;
+    c_float fro_norm_sq = 0.0;
+
+    avi->rho = 0.0;
+    for (i = 0, disp = 0; i < n; i++) {
+        c_float row_sum = 0.0;
+        for (j = 0; j < n; j++, disp++) {
+            val = (p->H[disp] + p->H[j * n + i]) * 0.5;
+            avi->Hsym[disp] = val;
+            avi->Hs_rho[disp] = val;
+            avi->H_rho[disp] = p->H[disp];
+            avi->LU_H[disp] = p->H[disp];
+            row_sum += (val < 0.0) ? -val : val;
+            fro_norm_sq += p->H[disp] * p->H[disp];
+            if(i == j && val < min_diag) min_diag = val;
+        }
+        if(row_sum > max_row_sum) max_row_sum = row_sum;
+    }
+
+    if(settings != NULL && settings->rho_avi > 0.0)
+        avi->rho = settings->rho_avi;
+    else if(min_diag > 0.0 && max_row_sum > 0.0)
+        avi->rho = sqrt(min_diag * max_row_sum);
+    else
+        avi->rho = sqrt(fro_norm_sq) / 2;
+
+    for(i = 0, disp = 0; i < n; i++) {
+        avi->Hs_rho[disp] += avi->rho;
+        avi->H_rho[disp] += avi->rho;
+        disp += n + 1;
+    }
+
+    daqp_lu(avi->LU_H, avi->P_H, n);
+    daqp_lu(avi->H_rho, avi->P_H2, n);
     return 1;
 }
