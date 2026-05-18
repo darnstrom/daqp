@@ -93,7 +93,6 @@ struct DAQPSettings
     eta_prox::Cdouble
 
     rho_soft::Cdouble
-    rho_avi::Cdouble
 
     rel_subopt::Cdouble
     abs_subopt::Cdouble
@@ -101,6 +100,7 @@ struct DAQPSettings
     sing_tol::Cdouble
     refactor_tol::Cdouble
     time_limit::Cdouble
+    rho_avi::Cdouble
 end
 function DAQPSettings()
     settings = Ref{DAQPBase.DAQPSettings}()
