@@ -205,8 +205,8 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
     cdef DAQPProblem problem = [n, m, m-mA, H_ptr, f_ptr, A_ptr, bu_ptr, bl_ptr, sense_ptr, bp_ptr, nh, problem_type]
     cdef DAQPSettings settings = [primal_tol, dual_tol, zero_tol, pivot_tol,
             progress_tol, cycle_tol, iter_limit, fval_bound,
-            eps_prox, eta_prox, rho_soft, rel_subopt, abs_subopt, sing_tol, refactor_tol,
-            time_limit, rho_avi]
+            eps_prox, eta_prox, rho_soft, rho_avi, rel_subopt, abs_subopt, sing_tol, refactor_tol,
+            time_limit]
     cdef DAQPResult res = [&x[0], lam_ptr, 0, 0, 0, 0, 0, 0, 0]
 
     if primal_start is None and dual_start is None:
@@ -586,8 +586,8 @@ cdef class Model:
         Available keys: ``primal_tol``, ``dual_tol``, ``zero_tol``,
         ``pivot_tol``, ``progress_tol``, ``cycle_tol``, ``iter_limit``,
         ``fval_bound``, ``eps_prox``, ``eta_prox``, ``rho_soft``,
-        ``rel_subopt``, ``abs_subopt``, ``sing_tol``, ``refactor_tol``,
-        ``time_limit``, ``rho_avi``.
+        ``rho_avi``, ``rel_subopt``, ``abs_subopt``, ``sing_tol``,
+        ``refactor_tol``, ``time_limit``.
         """
         if self._work.settings == NULL:
             return {}
@@ -604,12 +604,12 @@ cdef class Model:
             'eps_prox':     s.eps_prox,
             'eta_prox':     s.eta_prox,
             'rho_soft':     s.rho_soft,
+            'rho_avi':      s.rho_avi,
             'rel_subopt':   s.rel_subopt,
             'abs_subopt':   s.abs_subopt,
             'sing_tol':     s.sing_tol,
             'refactor_tol': s.refactor_tol,
             'time_limit':   s.time_limit,
-            'rho_avi':      s.rho_avi,
         }
 
     @settings.setter
@@ -629,12 +629,12 @@ cdef class Model:
         if 'eps_prox'     in new_settings: s.eps_prox     = new_settings['eps_prox']
         if 'eta_prox'     in new_settings: s.eta_prox     = new_settings['eta_prox']
         if 'rho_soft'     in new_settings: s.rho_soft     = new_settings['rho_soft']
+        if 'rho_avi'      in new_settings: s.rho_avi      = new_settings['rho_avi']
         if 'rel_subopt'   in new_settings: s.rel_subopt   = new_settings['rel_subopt']
         if 'abs_subopt'   in new_settings: s.abs_subopt   = new_settings['abs_subopt']
         if 'sing_tol'     in new_settings: s.sing_tol     = new_settings['sing_tol']
         if 'refactor_tol' in new_settings: s.refactor_tol = new_settings['refactor_tol']
         if 'time_limit'   in new_settings: s.time_limit   = new_settings['time_limit']
-        if 'rho_avi'      in new_settings: s.rho_avi      = new_settings['rho_avi']
 
 
 @cython.boundscheck(False)

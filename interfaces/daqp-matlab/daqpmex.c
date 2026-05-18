@@ -24,12 +24,12 @@ const char* SETTINGS_FIELDS[] = {
   "eps_prox",
   "eta_prox",
   "rho_soft",
+  "rho_avi",
   "abs_subopt",
   "rel_subopt",
   "sing_tol",
   "refactor_tol",
-  "time_limit",
-  "rho_avi"
+  "time_limit"
 };
 
 
