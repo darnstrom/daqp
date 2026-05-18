@@ -20,7 +20,6 @@ add_executable(05_warmstart tests/05_warmstart.cpp)
 add_executable(06_general_hessian tests/06_general_hessian.cpp)
 add_executable(07_symmetrize_hessian tests/07_symmetrize_hessian.cpp)
 add_executable(08_unconstrained_check tests/08_unconstrained_check.cpp)
-add_executable(09_avi_rho tests/09_avi_rho.cpp)
 
 set(TARGETS
     00_basic_qp
@@ -32,7 +31,6 @@ set(TARGETS
     06_general_hessian
     07_symmetrize_hessian
     08_unconstrained_check
-    09_avi_rho
 )
 
 foreach(TARGET ${TARGETS})

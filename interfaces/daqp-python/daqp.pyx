@@ -73,7 +73,6 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
           iter_limit =  DAQP_DEFAULT_ITER_LIMIT, fval_bound = DAQP_INF,
           eps_prox= DAQP_DEFAULT_EPS_PROX, eta_prox = DAQP_DEFAULT_ETA,
           rho_soft = DAQP_DEFAULT_RHO_SOFT,
-          rho_avi = DAQP_DEFAULT_RHO_AVI,
           rel_subopt = DAQP_DEFAULT_REL_SUBOPT, abs_subopt = DAQP_DEFAULT_ABS_SUBOPT,
           sing_tol = DAQP_DEFAULT_SING_TOL, refactor_tol = DAQP_DEFAULT_REFACTOR_TOL,
           time_limit = 0,
@@ -124,9 +123,6 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
         Break points that define prioritized constraints
     is_avi:
         flag for interpreting the problem as an AVI (relevant for asymmetric H)
-    rho_avi:
-        Overrides the automatic AVI regularization parameter when positive.
-        The default ``-1`` keeps the automatic choice based on the Hessian.
     primal_start:
         Initial guess of primal iterate (used for warm starting). Sets the initial
         active set based on which constraints are nearly active at this iterate, and
@@ -205,7 +201,7 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
     cdef DAQPProblem problem = [n, m, m-mA, H_ptr, f_ptr, A_ptr, bu_ptr, bl_ptr, sense_ptr, bp_ptr, nh, problem_type]
     cdef DAQPSettings settings = [primal_tol, dual_tol, zero_tol, pivot_tol,
             progress_tol, cycle_tol, iter_limit, fval_bound,
-            eps_prox, eta_prox, rho_soft, rho_avi, rel_subopt, abs_subopt, sing_tol, refactor_tol,
+            eps_prox, eta_prox, rho_soft, rel_subopt, abs_subopt, sing_tol, refactor_tol,
             time_limit]
     cdef DAQPResult res = [&x[0], lam_ptr, 0, 0, 0, 0, 0, 0, 0]
 
@@ -586,8 +582,8 @@ cdef class Model:
         Available keys: ``primal_tol``, ``dual_tol``, ``zero_tol``,
         ``pivot_tol``, ``progress_tol``, ``cycle_tol``, ``iter_limit``,
         ``fval_bound``, ``eps_prox``, ``eta_prox``, ``rho_soft``,
-        ``rho_avi``, ``rel_subopt``, ``abs_subopt``, ``sing_tol``,
-        ``refactor_tol``, ``time_limit``.
+        ``rel_subopt``, ``abs_subopt``, ``sing_tol``, ``refactor_tol``,
+        ``time_limit``.
         """
         if self._work.settings == NULL:
             return {}
@@ -604,7 +600,6 @@ cdef class Model:
             'eps_prox':     s.eps_prox,
             'eta_prox':     s.eta_prox,
             'rho_soft':     s.rho_soft,
-            'rho_avi':      s.rho_avi,
             'rel_subopt':   s.rel_subopt,
             'abs_subopt':   s.abs_subopt,
             'sing_tol':     s.sing_tol,
@@ -629,7 +624,6 @@ cdef class Model:
         if 'eps_prox'     in new_settings: s.eps_prox     = new_settings['eps_prox']
         if 'eta_prox'     in new_settings: s.eta_prox     = new_settings['eta_prox']
         if 'rho_soft'     in new_settings: s.rho_soft     = new_settings['rho_soft']
-        if 'rho_avi'      in new_settings: s.rho_avi      = new_settings['rho_avi']
         if 'rel_subopt'   in new_settings: s.rel_subopt   = new_settings['rel_subopt']
         if 'abs_subopt'   in new_settings: s.abs_subopt   = new_settings['abs_subopt']
         if 'sing_tol'     in new_settings: s.sing_tol     = new_settings['sing_tol']

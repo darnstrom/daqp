@@ -136,11 +136,9 @@ end
     # Test access settings
     s = settings(d)
     @test s.primal_tol==1e-6
-    @test s.rho_avi==-1
-    settings(d,Dict(:primal_tol=>1e-5, :rho_avi=>0.25))
+    settings(d,Dict(:primal_tol=>1e-5))
     s = settings(d)
     @test s.primal_tol==1e-5
-    @test s.rho_avi==0.25
 
     # Update existing model with new problem
     xref,H,f,A,bupper,blower,sense = generate_test_QP(n,m,ms,nAct,kappa)
@@ -511,3 +509,4 @@ end
     end
     @test tquad < 10*tsetup #Should be orders of magnitude faster
 end
+

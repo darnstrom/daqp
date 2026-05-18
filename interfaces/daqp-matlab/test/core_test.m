@@ -63,15 +63,6 @@ classdef core_test < matlab.unittest.TestCase
             fprintf('=============================================================\n')
         end
 
-        function settings_roundtrip(testCase)
-            d = daqp();
-            s = d.settings();
-            testCase.verifyEqual(s.rho_avi,-1);
-            d.settings('rho_avi',0.25);
-            s = d.settings();
-            testCase.verifyEqual(s.rho_avi,0.25);
-        end
-
         function random_feasible_LPs(testCase)
             % Test on randomly generated feasible LPs
             rng('default');

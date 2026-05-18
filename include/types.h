@@ -64,7 +64,6 @@ typedef struct{
     c_float eta_prox;
 
     c_float rho_soft;
-    c_float rho_avi;
 
     c_float rel_subopt;
     c_float abs_subopt;

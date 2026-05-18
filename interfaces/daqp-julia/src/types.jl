@@ -93,7 +93,6 @@ struct DAQPSettings
     eta_prox::Cdouble
 
     rho_soft::Cdouble
-    rho_avi::Cdouble
 
     rel_subopt::Cdouble
     abs_subopt::Cdouble

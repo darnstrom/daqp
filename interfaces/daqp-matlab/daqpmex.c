@@ -24,7 +24,6 @@ const char* SETTINGS_FIELDS[] = {
   "eps_prox",
   "eta_prox",
   "rho_soft",
-  "rho_avi",
   "abs_subopt",
   "rel_subopt",
   "sing_tol",
@@ -182,11 +181,8 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		mxSetField(s, 0, "eps_prox", mxCreateDoubleScalar(work->settings->eps_prox));
 		mxSetField(s, 0, "eta_prox", mxCreateDoubleScalar(work->settings->eta_prox));
 		mxSetField(s, 0, "rho_soft", mxCreateDoubleScalar(work->settings->rho_soft));
-		mxSetField(s, 0, "rho_avi", mxCreateDoubleScalar(work->settings->rho_avi));
 		mxSetField(s, 0, "abs_subopt", mxCreateDoubleScalar(work->settings->abs_subopt));
 		mxSetField(s, 0, "rel_subopt", mxCreateDoubleScalar(work->settings->rel_subopt));
-		mxSetField(s, 0, "sing_tol", mxCreateDoubleScalar(work->settings->sing_tol));
-		mxSetField(s, 0, "refactor_tol", mxCreateDoubleScalar(work->settings->refactor_tol));
 		mxSetField(s, 0, "time_limit", mxCreateDoubleScalar(work->settings->time_limit));
 		plhs[0] = s;
 	  }
@@ -204,11 +200,8 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  work->settings->eps_prox = (c_float)mxGetScalar(mxGetField(s, 0, "eps_prox"));
 	  work->settings->eta_prox= (c_float)mxGetScalar(mxGetField(s, 0, "eta_prox"));
 	  work->settings->rho_soft= (c_float)mxGetScalar(mxGetField(s, 0, "rho_soft"));
-	  work->settings->rho_avi= (c_float)mxGetScalar(mxGetField(s, 0, "rho_avi"));
 	  work->settings->abs_subopt= (c_float)mxGetScalar(mxGetField(s, 0, "abs_subopt"));
 	  work->settings->rel_subopt= (c_float)mxGetScalar(mxGetField(s, 0, "rel_subopt"));
-	  work->settings->sing_tol= (c_float)mxGetScalar(mxGetField(s, 0, "sing_tol"));
-	  work->settings->refactor_tol= (c_float)mxGetScalar(mxGetField(s, 0, "refactor_tol"));
 	  work->settings->time_limit= (c_float)mxGetScalar(mxGetField(s, 0, "time_limit"));
 	}
 	else if (!strcmp("update", cmd)) {
