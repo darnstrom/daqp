@@ -29,12 +29,12 @@ Table of contents
 | `eps_prox` | Regularization parameter used for proximal-point iterations | 1e-6|
 | `eta_prox` | Tolerance that determines if a fix-point has been reached during proximal-point iterations | 1e-6|
 | `rho_soft` | Weight used for soft constraints (higher enables more violations) | 1e-6|
-| `rho_avi` | Regularization parameter for AVIs. `-1` means automatic selection | -1 |
 | `rel_subopt` | Allowed relative suboptimality in branch and bound | 0 |
 | `abs_subopt` | Allowed absolute suboptimality in branch and bound | 0 |
 | `sing_tol` | Tolerance for checking if the LDL' factorization is singular| 3.7e-11 |
 | `refactor_tol` | Tolerance for refactoring the LDL' factorization before terminating | 1e-9 |
 | `time_limit` | Maximum wall-clock time in seconds before terminating (0 means no limit) | 0 |
+| `rho_avi` | Regularization parameter for AVIs. `-1` means automatic selection | -1 |
 
 
 ## Exit flags 
