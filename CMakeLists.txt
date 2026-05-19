@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(daqp VERSION 0.8.5)
+project(daqp VERSION 0.8.6)
 
 
 include(GNUInstallDirs)
