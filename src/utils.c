@@ -42,6 +42,10 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
             error_flag = daqp_update_Rinv(work, qp->H, qp->problem_type==2 ? 1 : 0);
         else{
             daqp_update_avi(work->avi,qp);
+            // Early unconstrained check for AVI: skip Cholesky if x=-H^{-1}f is feasible
+            int avi_unc = daqp_check_unconstrained(work,mask);
+            if(avi_unc == DAQP_UNCONSTRAINED_OPTIMAL) return 0;
+            daqp_lu(work->avi->H_rho, work->avi->P_H2, work->n);
             error_flag = daqp_update_Rinv(work, work->avi->Hs_rho,0);
         }
         if(error_flag<0)
@@ -53,7 +57,7 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
         daqp_update_v(qp->f,work,mask);
     }
 
-    int unconstrained_flag = daqp_check_unconstrained(work,mask);
+    int unconstrained_flag = (work->avi != NULL) ? 1 : daqp_check_unconstrained(work,mask);
     if(unconstrained_flag == DAQP_UNCONSTRAINED_OPTIMAL) return 0;
 
     /** Update M **/
@@ -406,13 +410,10 @@ int daqp_check_unconstrained(DAQPWorkspace* work, const int mask){
     int i;
     if ((mask&DAQP_UPDATE_unconstrained)==0) return 0;
     if ((mask&(DAQP_UPDATE_Rinv+DAQP_UPDATE_M+DAQP_UPDATE_v+DAQP_UPDATE_d)) == 0) return 0; // Nothing to update
-    if (work->bnb != NULL || work->nh > 1 || work->avi != NULL || work->n_prox >0) return 0; // Not a QP
+    if (work->bnb != NULL || work->nh > 1 || work->n_prox >0) return 0; // Not a standard QP/AVI
     for(i = 0; i < work->m; i++) if(work->sense[i]&(DAQP_ACTIVE + DAQP_IMMUTABLE)) return 0; // No equalities
 
     // Check if unconstrained optimum is primal feasible.
-    // Compute x_unc = Rinv * (-v) (using the raw, un-normalized Rinv) and
-    // verify dupper_unnorm = bupper - A*x_unc >= 0 and
-    //        dlower_unnorm = blower - A*x_unc <= 0 for every constraint.
     int j, disp;
     c_float sum;
     c_float* swp_ptr;
@@ -420,9 +421,18 @@ int daqp_check_unconstrained(DAQPWorkspace* work, const int mask){
     const int n = work->n;
     const c_float primal_tol = work->settings->primal_tol;
 
-    // Compute x_unc = Rinv_unnorm * (-v) stored temporarily in work->x.
+    // Compute x_unc stored temporarily in work->x.
     swp_ptr = work->x; work->u = work->xold; work->x = work->xold; work->xold = swp_ptr;
-    if(work->v != NULL){
+
+    if(work->avi != NULL){
+        // AVI: unconstrained solution is x = -H^{-1} f
+        if(work->qp->f != NULL)
+            daqp_lu_solve(work->avi->LU_H, work->avi->P_H, work->qp->f, work->x, n);
+        else
+            for(i = 0; i < n; i++) work->x[i] = 0.0;
+        for(i = 0; i < n; i++) work->x[i] = -work->x[i];
+    }
+    else if(work->v != NULL){
         if(work->Rinv != NULL){
             // Upper-triangular back-substitution: u[i] = sum_{j>=i} Rinv[i,j]*(-v[j])
             for(i = 0, disp = 0; i < n; i++){
@@ -503,7 +513,7 @@ int daqp_update_avi(DAQPAVI* avi, DAQPProblem* p){
 
     // Factorize H and H_rho
     daqp_lu(avi->LU_H, avi->P_H, n);
-    daqp_lu(avi->H_rho, avi->P_H2, n);
+    // H_rho factorization deferred until needed (skipped if unconstrained optimal)
     return 1;
 }
 
