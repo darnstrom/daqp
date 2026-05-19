@@ -190,6 +190,7 @@ int daqp_check_optimal_avi(DAQPWorkspace* work){
     c_float primal_tol = work->settings->primal_tol;
     // First check dual variables
     for(i=0; i < work->n_active; i++){
+        if(DAQP_IS_IMMUTABLE(work->WS[i])) continue;
         if(DAQP_IS_LOWER(work->WS[i])){
             if(work->lam_star[i] > dual_tol) return 0;
         }
