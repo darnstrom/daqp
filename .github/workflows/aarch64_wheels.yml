@@ -8,52 +8,46 @@ on:
 
 jobs:
   build_wheels:
-    name: Build wheel on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest]
+    name: Build aarch64 wheels
+    runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@master
+    - uses: actions/checkout@v4
 
-    - uses: actions/setup-python@v4
-      name: Install Python
-      with:
-        python-version: '3.9'
+    - uses: docker/setup-qemu-action@v3
+      name: Set up QEMU (emulator for aarch64)
 
-    - uses: docker/setup-qemu-action@v1
-      name: Set up QEMU (emulator for arm64)
-
-    - name: Build wheels
+    - name: Prepare source files
+      # Using shell: bash keeps this in sync with wheels.yml
+      shell: bash
       run: |
-        mkdir interfaces/daqp-python/csrc
+        mkdir -p interfaces/daqp-python/csrc
         cp -r src interfaces/daqp-python/csrc/src
         cp -r include interfaces/daqp-python/csrc/include
         cp -r codegen interfaces/daqp-python/csrc/codegen
         cp CMakeLists.txt interfaces/daqp-python/csrc/CMakeLists.txt
         cp LICENSE interfaces/daqp-python/LICENSE
 
-        cd interfaces/daqp-python
-        python -m pip install --upgrade pip
-        python -m pip install --upgrade build
-        python -m pip install cibuildwheel
-        python -m cibuildwheel --output-dir wheelhouse
+    - name: Build wheels
+      uses: pypa/cibuildwheel@v3.4.0
       env:
-        CIBW_ARCHS_LINUX: "aarch64"
+        CIBW_ARCHS_LINUX: aarch64
         CIBW_SKIP: "pp*"
+      with:
+        package-dir: interfaces/daqp-python
+        output-dir: interfaces/daqp-python/wheelhouse
 
     - name: Release to pypi
-      if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags'))
+      if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
       env:
         TWINE_USERNAME: __token__
         TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN}}
       run: |
         cd interfaces/daqp-python
-        python -m pip install --upgrade twine
-        twine upload wheelhouse/*
+        pipx run twine upload wheelhouse/* --skip-existing
+
     - name: Upload artifacts to github
       uses: actions/upload-artifact@v4
       with:
-        name: wheels
-        path: interfaces/daqp-python/wheelhouse
+        name: wheels-aarch64
+        path: interfaces/daqp-python/wheelhouse/*
