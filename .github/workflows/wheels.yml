@@ -13,7 +13,17 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-2022]
+        include:
+          # aarch64 Linux runs on native ARM hosted runners (no QEMU) and keeps
+          # musllinux, so Alpine/musl aarch64 targets stay covered.
+          - os: ubuntu-24.04-arm
+            cibw_skip: "pp*"
+          - os: ubuntu-latest
+            cibw_skip: "pp* *-musllinux*"
+          - os: macos-latest
+            cibw_skip: "pp* *-musllinux*"
+          - os: windows-2022
+            cibw_skip: "pp* *-musllinux*"
 
     steps:
     - uses: actions/checkout@v4
@@ -37,7 +47,7 @@ jobs:
     - name: Build wheels
       uses: pypa/cibuildwheel@v3.4.0
       env:
-        CIBW_SKIP: "pp* *-musllinux*"
+        CIBW_SKIP: ${{ matrix.cibw_skip }}
         CIBW_ARCHS_MACOS: "x86_64 arm64"
         CIBW_TEST_REQUIRES: "pytest numpy"
         CIBW_TEST_COMMAND: "pytest -s {package}/test"
@@ -46,7 +56,7 @@ jobs:
         output-dir: interfaces/daqp-python/wheelhouse
 
     - name: Build source
-      if: startsWith(matrix.os, 'ubuntu')
+      if: matrix.os == 'ubuntu-latest'
       run: |
         cd interfaces/daqp-python
         pipx run build --sdist --outdir wheelhouse
