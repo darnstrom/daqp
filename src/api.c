@@ -432,8 +432,10 @@ void daqp_extract_result(DAQPResult* res, DAQPWorkspace* work){
     // Extract primal solution
     for(i=0;i<work->n;i++) res->x[i] = work->x[i];
 
-    // Extract dual solution
-    if(res->lam != NULL && work->nh < 2){
+    // Extract the final active-set dual solution. For hierarchical QPs the
+    // final workspace contains the active constraints across all priorities,
+    // which makes these dual signs suitable for a subsequent warm start.
+    if(res->lam != NULL){
         for(i=0;i<work->m;i++)
             res->lam[i] = 0;
         for(i=0;i<work->n_active;i++)
