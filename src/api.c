@@ -432,10 +432,10 @@ void daqp_extract_result(DAQPResult* res, DAQPWorkspace* work){
     // Extract primal solution
     for(i=0;i<work->n;i++) res->x[i] = work->x[i];
 
-    // Extract the final active-set dual solution. For hierarchical QPs the
-    // final workspace contains the active constraints across all priorities,
-    // which makes these dual signs suitable for a subsequent warm start.
-    if(res->lam != NULL){
+    // Extract dual solution for ordinary QPs. Hierarchical QPs populate the
+    // output duals in daqp_hiqp(), where they represent the soft-level
+    // penalties used by the public interfaces.
+    if(res->lam != NULL && work->nh < 2){
         for(i=0;i<work->m;i++)
             res->lam[i] = 0;
         for(i=0;i<work->n_active;i++)
@@ -462,6 +462,14 @@ void daqp_extract_result(DAQPResult* res, DAQPWorkspace* work){
     res->soft_slack = work->soft_slack;
     res->iter = work->iterations;
     res->nodes = (work->bnb == NULL) ? 1 : work->bnb->nodecount;
+}
+
+void daqp_extract_active_duals(DAQPResult* res, DAQPWorkspace* work){
+    int i;
+    if(res->lam == NULL) return;
+    for(i=0;i<work->m;i++) res->lam[i] = 0;
+    for(i=0;i<work->n_active;i++)
+        res->lam[work->WS[i]] = work->lam_star[i];
 }
 
 void daqp_default_settings(DAQPSettings* settings){
