@@ -241,10 +241,10 @@ int daqp_update_M(DAQPWorkspace *work, c_float *A, const int mask){
                 work->M[disp2-j]=work->Rinv[--disp]*A[disp2-j];
             }
             for(; j<n; ++j){// Take into account scaling in Rinv
-                c_float inv_scaling = 1/work->scaling[n-j-1];
+                c_float col_scaling = A[disp2-j]/work->scaling[n-j-1];
                 for(i=0;i<j;++i)
-                    work->M[disp2-i] += (work->Rinv[--disp]*inv_scaling)*A[disp2-j];
-                work->M[disp2-j]=(work->Rinv[--disp]*inv_scaling)*A[disp2-j];
+                    work->M[disp2-i] += work->Rinv[--disp]*col_scaling;
+                work->M[disp2-j]= work->Rinv[--disp]*col_scaling;
             }
         }
     }
@@ -285,10 +285,10 @@ void daqp_update_v(c_float *f, DAQPWorkspace *work, const int mask){
         work->v[j]=work->Rinv[--disp]*f[j];
     }
     for(;j>=0;j--){// Take into accoutn scaling in Rinv
-        c_float inv_scaling = 1/work->scaling[j];
+        c_float col_scaling = f[j]/work->scaling[j];
         for(i=n-1;i>j;i--)
-            work->v[i] +=(work->Rinv[--disp]*inv_scaling)*f[j];
-        work->v[j]=(work->Rinv[--disp]*inv_scaling)*f[j];
+            work->v[i] +=work->Rinv[--disp]*col_scaling;
+        work->v[j]=work->Rinv[--disp]*col_scaling;
     }
 }
 
