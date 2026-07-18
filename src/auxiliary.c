@@ -449,15 +449,16 @@ void daqp_refine_active(DAQPWorkspace *work){
         // For free soft slacks the CSP system has a diagonal reciprocal-weight
         // term. Account for it (and for a nonzero slack lower bound) when
         // forming the refinement residual.
-        if(DAQP_IS_SOFT(id) && DAQP_IS_SLACK_FREE(id)){
 #ifdef SOFT_WEIGHTS
+        if(DAQP_IS_SOFT(id) && DAQP_IS_SLACK_FREE(id)){
             c_float rho = DAQP_IS_LOWER(id) ? work->rho_ls[id] : work->rho_us[id];
             c_float d_slack = DAQP_IS_LOWER(id) ? work->d_ls[id] : -work->d_us[id];
             work->xldl[i] -= rho * (work->lam_star[i] + d_slack);
+        }
 #else
+        if(DAQP_IS_SOFT(id))
             work->xldl[i] -= work->settings->rho_soft * work->lam_star[i];
 #endif
-        }
     }
 
     // Forward substitution L * y = xldl
