@@ -165,6 +165,19 @@ typedef struct{
 
     // Soft constraint
     c_float soft_slack;
+#ifdef SOFT_WEIGHTS
+    // The softened objective is given by
+    //    min  0.5 x'*H*x + f'x + 0.5 su'su + 0.5 sl'sl,
+    // and the softened constraints are given by (similarly for simple bounds)
+    //    lbA-rho_ls*sl <= A*x <= ubA+rho_us*su,
+    // with the bounds sl >= d_ls, su >= d_us.
+    // The bounds are assumed to include the contribution from d_ls/d_us,
+    // since the slacks start active at their bounds.
+    c_float *d_ls;
+    c_float *d_us;
+    c_float *rho_ls;
+    c_float *rho_us;
+#endif
 
     // Settings
     DAQPSettings* settings;
