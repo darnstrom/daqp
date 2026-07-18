@@ -366,7 +366,7 @@ int daqp_check_bounds(DAQPWorkspace* work, c_float* bupper, c_float* blower){
             return DAQP_EXIT_INFEASIBLE;
         }
         // Check for unmarked equality constraint (blower == bupper)
-        else if ( diff < work->settings->zero_tol ){
+        else if (diff < work->settings->zero_tol && !DAQP_IS_SOFT(i)){
             work->sense[i] |= DAQP_ACTIVE + DAQP_IMMUTABLE;
             do_activate = 1;
         }
@@ -403,9 +403,12 @@ int daqp_normalize_M(DAQPWorkspace* work){
         for(j=0;j<work->n;disp++,j++)
             scaling_i+=work->M[disp]*work->M[disp];
         if(scaling_i < zero_tol){
+            // Keep downstream transformations well-defined for constraints
+            // that are deliberately omitted from the normalized LDP.
+            work->scaling[i] = 1.0;
 #ifndef DAQP_ASSUME_VALID
             if(work->qp->bupper[i] < -zero_tol || work->qp->blower[i] > zero_tol)
-                if(work->sense[i] != DAQP_IMMUTABLE)
+                if(!DAQP_IS_IMMUTABLE(i) && !DAQP_IS_SOFT(i))
                     return DAQP_EXIT_INFEASIBLE;
 #endif
             work->sense[i] = DAQP_IMMUTABLE; // ignore zero-row constraint

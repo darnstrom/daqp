@@ -207,6 +207,8 @@ int daqp_remove_blocking(DAQPWorkspace *work){
         }
 
         alpha_cand = -lam_slack / p;
+        if(alpha_cand < 0)
+            alpha_cand = 0;
         if(alpha_cand < alpha){
             alpha = alpha_cand;
             rm_ind = i;

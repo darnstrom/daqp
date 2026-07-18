@@ -49,8 +49,11 @@ int daqp_ldp(DAQPWorkspace *work){
                     // amplified by 1/scaling in original space.  Apply one step of
                     // iterative refinement to correct both u and lam_star before
                     // declaring optimal.
-                    if(work->n_active > 0 && min_D < work->settings->pivot_tol)
+                    if(work->n_active > 0 && min_D < work->settings->pivot_tol){
                         daqp_refine_active(work);
+                        if(daqp_add_infeasible(work))
+                            continue;
+                    }
 
 
                     if(work->soft_slack > work->settings->primal_tol)
