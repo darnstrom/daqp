@@ -103,7 +103,7 @@ int daqp_add_infeasible(DAQPWorkspace *work){
             Mu=work->u[j];
         }
         else{
-            Mu = daqp_dot(work->Rinv+disp,work->u+j,work->n-j);
+            Mu = daqp_dot_inline(work->Rinv+disp,work->u+j,work->n-j);
         }
         disp+=work->n-j;
         bound = (work->scaling == NULL) ? ep : ep*work->scaling[j];
@@ -127,7 +127,7 @@ int daqp_add_infeasible(DAQPWorkspace *work){
             disp+=work->n;// Skip ahead in M
             continue;
         }
-        Mu = daqp_dot(work->M+disp,work->u,work->n);
+        Mu = daqp_dot_inline(work->M+disp,work->u,work->n);
         disp+=work->n;
         bound = (work->scaling == NULL) ? ep : ep*work->scaling[j];
 

@@ -570,7 +570,7 @@ void daqp_primal_init_active(DAQPProblem* qp, c_float* x){
     // General constraints
     for(i=qp->ms, disp=0; i < qp->m; i++, disp+=qp->n){
         if(qp->sense[i] & DAQP_IMMUTABLE) continue;
-        Ax = daqp_dot(x,qp->A+disp,qp->n);
+        Ax = daqp_dot_inline(x,qp->A+disp,qp->n);
         slack = Ax - qp->bupper[i];
         if (slack < tol && slack > -tol){
             qp->sense[i] |= DAQP_ACTIVE;
