@@ -241,6 +241,7 @@ void free_daqp_ldp(DAQPWorkspace *work){
     if(work->scaling != NULL){
         free(work->scaling);
         free(work->M);
+        free(work->Mu);
         free(work->dupper);
         free(work->dlower);
     }
@@ -283,6 +284,7 @@ void allocate_daqp_workspace(DAQPWorkspace *work, int n, int ns){
     work->RinvD = NULL;
     work->v = NULL;
     work->scaling = NULL;
+    work->Mu = NULL;
 
     work->lam = malloc((n+1)*sizeof(c_float));
     work->lam_star = malloc((n+1)*sizeof(c_float));
@@ -326,6 +328,7 @@ void allocate_daqp_ldp(DAQPWorkspace *work, int n, int m, int ms, int alloc_R, i
     work->scaling= malloc(m*sizeof(c_float));
     for(i =0; i < ms; i++) work->scaling[i] =1;
     work->M = malloc(n*(m-ms)*sizeof(c_float));
+    work->Mu = m > ms ? malloc((m-ms)*sizeof(c_float)) : NULL;
     work->dupper = malloc(m*sizeof(c_float));
     work->dlower = malloc(m*sizeof(c_float));
     work->sense = malloc(m*sizeof(int));

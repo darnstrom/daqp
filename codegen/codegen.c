@@ -112,6 +112,8 @@ void write_daqp_workspace_h(FILE *f, DAQPWorkspace* work, const char* prefix){
     fprintf(f, "// Workspace prototypes\n");
 
     fprintf(f, "extern c_float %sM[%d];\n", prefix, (m-ms)*n);
+    if(m > ms)
+        fprintf(f, "extern c_float %sMu[%d];\n", prefix, m-ms);
     fprintf(f, "extern c_float %sdupper[%d];\n", prefix, m);
     fprintf(f, "extern c_float %sdlower[%d];\n", prefix, m);
     if(work->Rinv != NULL)
@@ -155,6 +157,8 @@ void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work, const char* prefix){
     // LDP data
     snprintf(varname, sizeof(varname), "%sM", prefix);
     write_float_array(f,work->M,(m-ms)*n,varname);
+    if(m > ms)
+        fprintf(f, "c_float %sMu[%d];\n", prefix, m-ms);
     //snprintf(varname, sizeof(varname), "%sdupper", prefix);
     //write_float_array(f,work->dupper,m,varname);
     //snprintf(varname, sizeof(varname), "%sdlower", prefix);
@@ -219,7 +223,11 @@ void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work, const char* prefix){
     // AVI
     fprintf(f, "NULL,\n"); // TODO: Generate for avi (also requires problem to be generated)
     // Timer
-    fprintf(f, "NULL};\n\n");
+    fprintf(f, "NULL,\n"); // Timer
+    if(m > ms)
+        fprintf(f, "%sMu};\n\n", prefix);
+    else
+        fprintf(f, "NULL};\n\n");
 }
 
 void write_daqp_settings_src(FILE*  f, DAQPSettings* settings, const char* prefix){

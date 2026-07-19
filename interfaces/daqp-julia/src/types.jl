@@ -172,4 +172,5 @@ struct Workspace
     break_points::Ptr{Cint}
     avi::Ptr{Cvoid}
     timer::Ptr{Cvoid}
+    Mu::Ptr{Cdouble}
 end
