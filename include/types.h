@@ -191,6 +191,8 @@ typedef struct{
     DAQPAVI* avi;
     // Timer (used for time limit checking, set externally by daqp_solve)
     void *timer;
+    // M*u from the latest feasibility scan (length m-ms); NULL disables batching
+    c_float *Mu;
 }DAQPWorkspace;
 
 # ifdef __cplusplus
