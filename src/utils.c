@@ -553,7 +553,7 @@ int daqp_lu(c_float* A, int* P, int n) {
         }
 
         // Check for singularity
-        if (max_val < 1e-12) return -1;
+        if (max_val < DAQP_LU_SING_TOL) return -1;
 
         // Swap rows in A
         for (int k = 0; k < n; k++) {
