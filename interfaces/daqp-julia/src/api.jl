@@ -321,13 +321,7 @@ function settings(p::Ptr{DAQPBase.Workspace},changes::Dict{Symbol,<:Any})
     workspace = unsafe_load(p);
     if(workspace.settings == C_NULL) return end
     settings = unsafe_load(workspace.settings)
-    eta_prox = if haskey(changes, :dual_tol) && !haskey(changes, :eta_prox)
-        min(settings.eta_prox, 0.1 * changes[:dual_tol])
-    else
-        get(changes, :eta_prox, settings.eta_prox)
-    end
-    new = [f == :eta_prox ? eta_prox :
-           haskey(changes,f) ? changes[f] : getfield(settings,f)
+    new = [haskey(changes,f) ? changes[f] : getfield(settings,f)
            for f in fieldnames(DAQPBase.DAQPSettings)];
     new_settings = DAQPBase.DAQPSettings(new...)
     unsafe_store!(workspace.settings,new_settings);

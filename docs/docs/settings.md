@@ -27,7 +27,7 @@ Table of contents
 | `iter_limit` | Maximum number of iterations before terminating| 10000 |
 | `fval_bound` | Maximum allowed objective function value. The solver terminates if the dual objective exceeds this value (since it is a lower bound of the optimal value). | 1e30|
 | `eps_prox` | Requested regularization for proximal-point iterations. For a numerically singular dense Hessian, DAQP raises this to `sqrt(zero_tol)` times the Hessian scale and grows it until the Cholesky pivot ratio is numerically acceptable. | 1e-6|
-| `eta_prox` | Tolerance that determines if a fixed point has been reached during proximal-point iterations. The Python and Julia dictionary interfaces tighten the default value when a tighter `dual_tol` is supplied; an explicit `eta_prox` takes precedence. | 1e-6|
+| `eta_prox` | Tolerance that determines if a fixed point has been reached during proximal-point iterations. A negative value selects an automatic tolerance: 1e-6 for the default `dual_tol`, otherwise the smaller of 1e-6 and `0.1*dual_tol`. A nonnegative value is used directly. | -1|
 | `rho_soft` | Weight used for soft constraints (higher enables more violations) | 1e-6|
 | `rel_subopt` | Allowed relative suboptimality in branch and bound | 0 |
 | `abs_subopt` | Allowed absolute suboptimality in branch and bound | 0 |

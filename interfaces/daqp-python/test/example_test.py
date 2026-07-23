@@ -202,11 +202,12 @@ class TestModel(unittest.TestCase):
         # Other settings should be unchanged
         self.assertAlmostEqual(d.settings['primal_tol'], original_primal_tol)
 
-    def test_dual_tolerance_tightens_default_prox_tolerance(self):
-        """A requested dual tolerance tightens eta unless eta is explicit."""
+    def test_automatic_prox_tolerance_setting(self):
+        """Negative eta remains automatic as dual tolerance changes."""
         d = daqp.Model()
+        self.assertAlmostEqual(d.settings['eta_prox'], -1.0)
         d.settings = {'dual_tol': 1e-9}
-        self.assertAlmostEqual(d.settings['eta_prox'], 1e-10)
+        self.assertAlmostEqual(d.settings['eta_prox'], -1.0)
 
         d.settings = {'dual_tol': 1e-10, 'eta_prox': 5e-8}
         self.assertAlmostEqual(d.settings['eta_prox'], 5e-8)

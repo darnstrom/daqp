@@ -36,6 +36,17 @@ int daqp_prox(DAQPWorkspace *work){
     // original problem, so one solve gives the exact solution.
     const int all_pd = (!is_lp) && (work->n_prox == 0);
 
+    // A negative eta selects an automatic tolerance. Preserve the established
+    // default, but tighten it when the user requests a non-default dual
+    // tolerance. Skip this entirely for positive-definite QPs, where no
+    // proximal convergence test is needed.
+    if(!all_pd && eta < 0.0){
+        eta = DAQP_AUTO_ETA_CAP;
+        if(work->settings->dual_tol != DAQP_DEFAULT_DUAL_TOL &&
+           0.1 * work->settings->dual_tol < eta)
+            eta = 0.1 * work->settings->dual_tol;
+    }
+
     while(total_iter < work->settings->iter_limit){
 
         /* ----------------------------------------------------------------
