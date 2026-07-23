@@ -50,8 +50,17 @@ int main() {
     result     = solver.solve(A, bu, bl, break_points);
     bool test2 = verify_slack(result);
 
+    // Pure bounds are represented by a 0-by-n general constraint matrix.
+    // The class must map only those zero general rows when computing slacks.
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> no_general_constraints(0, 3);
+    Eigen::VectorXi no_hierarchy(0);
+    DAQP bounds_solver(3, 3, 0);
+    bounds_solver.solve(no_general_constraints, bu0, bl0, no_hierarchy);
+    bool test3 = bounds_solver.get_slack().isZero();
+
     std::cout << "Static function: " << (test1 ? "PASS" : "FAIL") << std::endl;
     std::cout << "Class method: " << (test2 ? "PASS" : "FAIL") << std::endl;
+    std::cout << "Pure-bound slacks: " << (test3 ? "PASS" : "FAIL") << std::endl;
 
-    return (test1 && test2) ? 0 : 1;
+    return (test1 && test2 && test3) ? 0 : 1;
 }

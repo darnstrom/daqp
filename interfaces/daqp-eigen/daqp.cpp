@@ -1,5 +1,6 @@
 #include "daqp.hpp"
 #include "utils.h"
+#include <utility>
 
 
 EigenDAQPResult::EigenDAQPResult()
@@ -15,25 +16,25 @@ EigenDAQPResult::EigenDAQPResult(int n, int m)
 }
 
 void EigenDAQPResult::resize_primal(int n) {
-    x_.conservativeResizeLike(Eigen::VectorXd::Zero(n));
+    x_.resize(n);
     x = x_.data();
 }
 
 void EigenDAQPResult::resize_dual(int m) {
-    lam_.conservativeResizeLike(Eigen::VectorXd::Zero(m));
+    lam_.resize(m);
     lam = lam_.data();
     slack_.resize(m);
 }
 
-Eigen::VectorXd EigenDAQPResult::get_primal() const {
+Eigen::VectorXd const& EigenDAQPResult::get_primal() const {
     return x_;
 }
 
-Eigen::VectorXd EigenDAQPResult::get_dual() const {
+Eigen::VectorXd const& EigenDAQPResult::get_dual() const {
     return lam_;
 }
 
-Eigen::VectorXd EigenDAQPResult::get_slack() const {
+Eigen::VectorXd const& EigenDAQPResult::get_slack() const {
     return slack_;
 }
 
@@ -52,6 +53,10 @@ Eigen::VectorXi EigenDAQPResult::get_active_set() const {
 
 void EigenDAQPResult::set_slack(Eigen::VectorXd const& slack) {
     slack_ = slack;
+}
+
+void EigenDAQPResult::set_slack(Eigen::VectorXd&& slack) {
+    slack_ = std::move(slack);
 }
 
 
@@ -77,25 +82,25 @@ Eigen::VectorXd compute_slacks(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dyna
 }
 
 
-EigenDAQPResult daqp_solve(Eigen::MatrixXd& H,
-                           Eigen::VectorXd& f,
-                           Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> A,
-                           Eigen::VectorXd& bu,
-                           Eigen::VectorXd& bl,
-                           Eigen::VectorXi& sense,
-                           Eigen::VectorXi& break_points) {
+EigenDAQPResult daqp_solve(Eigen::MatrixXd const& H,
+                           Eigen::VectorXd const& f,
+                           Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> const& A,
+                           Eigen::VectorXd const& bu,
+                           Eigen::VectorXd const& bl,
+                           Eigen::VectorXi const& sense,
+                           Eigen::VectorXi const& break_points) {
     int n       = A.cols();
     int m       = bu.size();
     int ms      = m - A.rows();
     int n_tasks = break_points.size();
 
-    double* H_ptr  = H.size() == 0 ? nullptr : H.data();
-    double* f_ptr  = f.size() == 0 ? nullptr : f.data();
-    double* A_ptr  = A.size() == 0 ? nullptr : A.data();
-    double* bu_ptr = bu.size() == 0 ? nullptr : bu.data();
-    double* bl_ptr = bl.size() == 0 ? nullptr : bl.data();
-    int* sense_ptr = sense.size() == 0 ? nullptr : sense.data();
-    int* bp_ptr    = break_points.size() == 0 ? nullptr : break_points.data();
+    double* H_ptr  = H.size() == 0 ? nullptr : const_cast<double*>(H.data());
+    double* f_ptr  = f.size() == 0 ? nullptr : const_cast<double*>(f.data());
+    double* A_ptr  = A.size() == 0 ? nullptr : const_cast<double*>(A.data());
+    double* bu_ptr = bu.size() == 0 ? nullptr : const_cast<double*>(bu.data());
+    double* bl_ptr = bl.size() == 0 ? nullptr : const_cast<double*>(bl.data());
+    int* sense_ptr = sense.size() == 0 ? nullptr : const_cast<int*>(sense.data());
+    int* bp_ptr    = break_points.size() == 0 ? nullptr : const_cast<int*>(break_points.data());
 
     assert(bu.size() == bl.size());
     assert(ms <= n);
@@ -112,20 +117,20 @@ EigenDAQPResult daqp_solve(Eigen::MatrixXd& H,
 
 // Solve: min_x 0.5 x'*H*x + f'*x
 //         s.t  bl<= A*x <= bu
-EigenDAQPResult daqp_solve(Eigen::MatrixXd& H,
-                           Eigen::VectorXd& f,
-                           Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> A,
-                           Eigen::VectorXd& bu,
-                           Eigen::VectorXd& bl) {
+EigenDAQPResult daqp_solve(Eigen::MatrixXd const& H,
+                           Eigen::VectorXd const& f,
+                           Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> const& A,
+                           Eigen::VectorXd const& bu,
+                           Eigen::VectorXd const& bl) {
     Eigen::VectorXi sense(0);
     Eigen::VectorXi break_points(0);
     return daqp_solve(H, f, A, bu, bl, sense, break_points);
 }
 
-EigenDAQPResult daqp_solve(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> A,
-                           Eigen::VectorXd& bu,
-                           Eigen::VectorXd& bl,
-                           Eigen::VectorXi& break_points) {
+EigenDAQPResult daqp_solve(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> const& A,
+                           Eigen::VectorXd const& bu,
+                           Eigen::VectorXd const& bl,
+                           Eigen::VectorXi const& break_points) {
     Eigen::MatrixXd H(0, 0);
     Eigen::VectorXd f(0);
     Eigen::VectorXi sense(0);
@@ -406,28 +411,28 @@ void DAQP::set_time_limit(double val) {
 }
 
 
-Eigen::VectorXd DAQP::get_primal() {
+Eigen::VectorXd const& DAQP::get_primal() {
     if (!is_solved_) {
         solve();
     }
     return result_.get_primal();
 }
 
-Eigen::VectorXd DAQP::get_dual() {
+Eigen::VectorXd const& DAQP::get_dual() {
     if (!is_solved_) {
         solve();
     }
     return result_.get_dual();
 }
 
-Eigen::VectorXd DAQP::get_slack() {
+Eigen::VectorXd const& DAQP::get_slack() {
     if (!is_solved_) {
         solve();
     }
 
     if (!is_slack_computed_) {
         Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> matrix(
-          qp_.A, qp_.m, qp_.n);
+          qp_.A, qp_.m - qp_.ms, qp_.n);
         Eigen::Map<const Eigen::VectorXd> upper(qp_.bupper, qp_.m);
         Eigen::Map<const Eigen::VectorXd> lower(qp_.blower, qp_.m);
 
