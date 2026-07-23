@@ -1,4 +1,5 @@
 #include "daqp_prox.h"
+#include "auxiliary.h"
 #include "utils.h"
 #include <math.h>
 
@@ -204,11 +205,12 @@ int daqp_prox(DAQPWorkspace *work){
  * Used for LP problems when the current iterate is not at a vertex (the
  * active set does not span all n variables).  Advances x along the
  * direction delta_x = x - x_old until the nearest constraint boundary is
- * hit, then returns the index of that constraint.
+ * hit, activates that blocking constraint for the next inner solve, and
+ * returns its index.
  * Returns DAQP_EMPTY_IND if the problem is unbounded in that direction.
  * --------------------------------------------------------------------------*/
 static int gradient_step(DAQPWorkspace* work){
-    int j, k, disp, add_ind = DAQP_EMPTY_IND;
+    int j, k, disp, add_ind = DAQP_EMPTY_IND, add_lower = 0;
     const int nx = work->n;
     const int m  = work->m;
     const int ms = work->ms;
@@ -222,12 +224,14 @@ static int gradient_step(DAQPWorkspace* work){
                 work->qp->bupper[j] < DAQP_INF &&
                 work->qp->bupper[j] - work->x[j] < min_alpha*delta_s){
             add_ind   = j;
+            add_lower = 0;
             min_alpha = (work->qp->bupper[j] - work->x[j]) / delta_s;
         }
         else if(delta_s < 0 &&
                 work->qp->blower[j] > -DAQP_INF &&
                 work->qp->blower[j] - work->x[j] > min_alpha*delta_s){
             add_ind   = j;
+            add_lower = 1;
             min_alpha = (work->qp->blower[j] - work->x[j]) / delta_s;
         }
     }
@@ -253,12 +257,14 @@ static int gradient_step(DAQPWorkspace* work){
                     work->qp->bupper[j] < DAQP_INF &&
                     work->dupper[j] - Ax < delta_s*min_alpha){
                 add_ind   = j;
+                add_lower = 0;
                 min_alpha = (work->dupper[j] - Ax) / delta_s;
             }
             else if(delta_s < 0 &&
                     work->qp->blower[j] > -DAQP_INF &&
                     work->dlower[j] - Ax > delta_s*min_alpha){
                 add_ind   = j;
+                add_lower = 1;
                 min_alpha = (work->dlower[j] - Ax) / delta_s;
             }
             continue;
@@ -278,20 +284,28 @@ static int gradient_step(DAQPWorkspace* work){
                 work->qp->bupper[j] < DAQP_INF &&
                 work->qp->bupper[j] - Ax < delta_s*min_alpha){
             add_ind   = j;
+            add_lower = 0;
             min_alpha = (work->qp->bupper[j] - Ax) / delta_s;
         }
         else if(delta_s < 0 &&
                 work->qp->blower[j] > -DAQP_INF &&
                 work->qp->blower[j] - Ax > delta_s*min_alpha){
             add_ind   = j;
+            add_lower = 1;
             min_alpha = (work->qp->blower[j] - Ax) / delta_s;
         }
     }
 
     // Advance: x <-- x + min_alpha * (x - x_old)
-    if(add_ind != DAQP_EMPTY_IND)
+    if(add_ind != DAQP_EMPTY_IND){
         for(k = 0; k < nx; k++)
             work->x[k] += min_alpha * (work->x[k] - work->xold[k]);
+        if(add_lower)
+            DAQP_SET_LOWER(add_ind);
+        else
+            DAQP_SET_UPPER(add_ind);
+        daqp_add_constraint(work, add_ind, add_lower ? -1.0 : 1.0);
+    }
 
     return add_ind;
 }
