@@ -20,7 +20,9 @@ static int gradient_step(DAQPWorkspace* work);
  * --------------------------------------------------------------------------*/
 int daqp_prox(DAQPWorkspace *work){
     int i, total_iter = 0;
+    int center_relaxed = 0;
     const int nx = work->n;
+    const c_float relaxation = 1.5;
     int exitflag;
     c_float *swp_ptr;
     c_float max_diff, tol_stat;
@@ -118,9 +120,27 @@ int daqp_prox(DAQPWorkspace *work){
             if(max_diff > tol_stat || max_diff < -tol_stat) break;
         }
         if(i == nx){
+            if(center_relaxed &&
+                    total_iter < work->settings->iter_limit){
+                center_relaxed = 0;
+                continue; // Confirm convergence from the feasible iterate.
+            }
             exitflag = DAQP_EXIT_OPTIMAL;
             break;
         }
+
+        // With an unchanged working set the proximal map is locally affine.
+        // Relax its fixed-point iteration, but retain the feasible subproblem
+        // solution when no further iteration can be taken.
+        if(!is_lp && work->iterations == 1 &&
+                total_iter < work->settings->iter_limit){
+            for(i = 0; i < nx; i++)
+                work->x[i] = work->xold[i]
+                    + relaxation*(work->x[i] - work->xold[i]);
+            center_relaxed = 1;
+        }
+        else
+            center_relaxed = 0;
 
         if(work->iterations == 1){
             // LP: when not at a vertex take a gradient step toward the
