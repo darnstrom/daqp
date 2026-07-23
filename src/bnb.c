@@ -1,4 +1,7 @@
 #include "bnb.h"
+#ifdef PROFILING
+#include "utils.h"
+#endif
 
 int daqp_bnb(DAQPWorkspace* work){
     int branch_id, exitflag;
@@ -27,6 +30,17 @@ int daqp_bnb(DAQPWorkspace* work){
 
         node = work->bnb->tree+(--work->bnb->n_nodes);
         exitflag = daqp_process_node(node,work); // Solve relaxation
+#ifdef PROFILING
+        // Individual relaxations are often too short to reach the timer check
+        // in daqp_ldp, so also enforce the limit across the BnB tree.
+        if(work->timer != NULL && (work->bnb->nodecount&31)==0){
+            toc((DAQPtimer*)work->timer);
+            if(get_time((DAQPtimer*)work->timer) > work->settings->time_limit){
+                exitflag = DAQP_EXIT_TIMELIMIT;
+                break;
+            }
+        }
+#endif
         // Cut conditions
         if(exitflag==DAQP_EXIT_INFEASIBLE) continue; // Dominance cut
         if(exitflag<0) break; // Inner solver failed => exit loop
@@ -54,7 +68,7 @@ int daqp_bnb(DAQPWorkspace* work){
         work->settings->fval_bound = fval_bound0;
         // Let work->u point to the best feasible solution
         swp_ptr=work->u; work->u= work->xold; work->xold=swp_ptr;
-        return DAQP_EXIT_OPTIMAL;
+        return exitflag < DAQP_EXIT_INFEASIBLE ? exitflag : DAQP_EXIT_OPTIMAL;
     }
 }
 
@@ -96,7 +110,7 @@ int daqp_process_node(DAQPNode* node, DAQPWorkspace* work){
 int daqp_get_branch_id(DAQPWorkspace* work){
     int i, j, disp;
     int branch_id = DAQP_EMPTY_IND;
-    c_float diff;
+    c_float diff, endpoint_dist, tol;
 
     for(i=0; i < work->bnb->nb; i++){
         branch_id = work->bnb->bin_ids[i];
@@ -112,12 +126,19 @@ int daqp_get_branch_id(DAQPWorkspace* work){
                     diff -= work->Rinv[disp++]*work->u[j];
             }
         }
-        else{//General bound
-            for(j=0,disp=work->n*(branch_id-work->ms);j<work->n;j++)
-                diff -= work->M[disp++]*work->u[j];
+        else{//General bound; daqp_add_infeasible already computed M*u
+            diff -= work->Mu[branch_id-work->ms];
         }
 
-        // Branch on the first infeasible binary variable
+        // A zero-dual binary constraint can lie at an endpoint without being
+        // active. It is already integer feasible and does not need branching.
+        endpoint_dist = 0.5*(work->dupper[branch_id]-work->dlower[branch_id])
+                        - (diff < 0 ? -diff : diff);
+        tol = work->settings->primal_tol;
+        if(work->scaling != NULL) tol *= work->scaling[branch_id];
+        if(endpoint_dist <= tol) continue;
+
+        // Explore the endpoint nearest to the relaxation first.
         return diff < 0 ? branch_id : DAQP_ADD_LOWER_FLAG(branch_id);
     }
 

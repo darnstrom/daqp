@@ -1,6 +1,6 @@
 module DAQPBase
 
-using DAQP_jll
+import DAQP_jll
 # Prefer a locally-built libdaqp (e.g. placed there by a CMake build) over the
 # DAQP_jll artifact.  This allows downstream packages that `Pkg.develop` this
 # module to pick up the latest compiled library automatically.
@@ -10,6 +10,7 @@ let _local_lib = joinpath(@__DIR__, "..", "libdaqp." * Libc.Libdl.dlext)
         DAQP_jll.libdaqp = _local_lib
     end
 end
+using DAQP_jll
 
 using LinearAlgebra 
 
