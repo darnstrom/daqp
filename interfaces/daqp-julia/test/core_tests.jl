@@ -541,14 +541,12 @@ end
                       Dict(:eps_prox => 1e-8, :primal_tol => 1e-3))
     DAQPBase.setup(d_dense_loose, H_dense, f_dense, A_dense, bu_dense,
                    bl_dense, sense_dense)
-    ws_dense_loose =
-        unsafe_load(Ptr{DAQPBase.Workspace}(d_dense_loose.work))
-    @test ws_dense_loose.proximal_regularization ==
-          ws_dense.proximal_regularization
-
     x_dense,_,ef_dense,_ = DAQPBase.solve(d_dense)
+    x_dense_loose,_,ef_dense_loose,_ = DAQPBase.solve(d_dense_loose)
     @test ef_dense == DAQPBase.OPTIMAL
+    @test ef_dense_loose == DAQPBase.OPTIMAL
     @test norm(x_dense-x_dense_ref, Inf) < tol
+    @test norm(x_dense_loose-x_dense, Inf) < tol
 
     # --- Singular quadratic with no linear term still needs proximal v ---
     H_no_f = [1.0 0.0; 0.0 0.0]

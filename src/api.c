@@ -313,7 +313,6 @@ void allocate_daqp_workspace(DAQPWorkspace *work, int n, int ns){
 
     work->prox_mask = calloc(work->n, sizeof(int)); // all zeros initially
     work->n_prox = 0;
-    work->proximal_regularization = 0.0;
 
 #ifdef SOFT_WEIGHTS
     work->d_ls= NULL;
@@ -459,16 +458,6 @@ void daqp_extract_result(DAQPResult* res, DAQPWorkspace* work){
         res->fval = work->fval;
         for(i=0;i<work->n;i++) res->fval-=work->v[i]*work->v[i];
         res->fval *=0.5;
-        if(work->n_prox > 0){
-            c_float prox_norm = 0.0;
-            for(i=0;i<work->n;i++){
-                if(work->prox_mask == NULL || work->prox_mask[i])
-                    prox_norm += work->x[i]*work->x[i];
-            }
-            // Remove proximal bias: at a fixed point x≈x_old, so
-            // true_fval = perturbed_fval + 0.5*eps*||x_mask||^2.
-            res->fval += 0.5*work->proximal_regularization*prox_norm;
-        }
     }
     else if(work->qp != NULL && work->qp->f != NULL ){ // LP
         res->fval = 0;

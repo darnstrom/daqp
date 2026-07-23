@@ -3,6 +3,14 @@
 #include <math.h>
 #include <stdio.h>
 
+static c_float proximal_regularization_scaled(
+        const DAQPWorkspace *work, c_float hessian_scale){
+    c_float eps = work->settings->eps_prox;
+    c_float floor = sqrt(work->settings->zero_tol)*hessian_scale;
+    if(eps > 0.0 && eps < floor) eps = floor;
+    return eps;
+}
+
 int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
     // TODO: copy dimensions from work->qp?
     int error_flag, i;
@@ -142,7 +150,6 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
         for(i = 0; i < n; i++) work->prox_mask[i] = 0;
     }
     work->n_prox = 0;
-    work->proximal_regularization = 0.0;
 
     // Check if Diagonal — for unfactored H scan only the upper-triangle
     // off-diagonals of the n×n row-major matrix (O(n²/2) reads), skipping
@@ -172,7 +179,7 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
     if(is_diagonal){
         if(!is_factored && hessian_scale > 0){
             factor_tol = sqrt(zero_tol) * hessian_scale;
-            if(eps > 0 && eps < factor_tol) eps = factor_tol;
+            eps = proximal_regularization_scaled(work, hessian_scale);
         }
         if(work->Rinv != NULL){ work->RinvD = work->Rinv; work->Rinv = NULL; }
         for(i = 0, disp = 0; i < n; i++){
@@ -197,7 +204,6 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
             work->RinvD[i] = 1/Hi;
             if(work->scaling != NULL && i < work->ms) work->scaling[i] = Hi;
         }
-        if(work->n_prox > 0) work->proximal_regularization = eps;
         return 1;
     }
 
@@ -266,8 +272,7 @@ regularize_hessian:
                     if(abs_diag < 0) abs_diag = -abs_diag;
                     if(abs_diag > hessian_scale) hessian_scale = abs_diag;
                 }
-                if(eps > 0 && eps < sqrt(zero_tol)*hessian_scale)
-                    eps = sqrt(zero_tol)*hessian_scale;
+                eps = proximal_regularization_scaled(work, hessian_scale);
                 if(eps <= 0) return DAQP_EXIT_NONCONVEX;
                 regularize_all = 1;
                 work->n_prox = n;
@@ -277,8 +282,6 @@ regularize_hessian:
             goto pack_hessian;
         }
     }
-    if(regularize_all) work->proximal_regularization = eps;
-
     // R -> Rinv
     for(k=0, disp=0; k<n; k++){
         disp2 = disp;
@@ -291,6 +294,52 @@ regularize_hessian:
         }
     }
     return 1;
+}
+
+c_float daqp_get_proximal_regularization(const DAQPWorkspace *work){
+    int i;
+    c_float eps, recovered, rinv, scale = 0.0;
+
+    if(work->n_prox == 0 || work->qp == NULL || work->qp->H == NULL)
+        return 0.0;
+
+    eps = work->settings->eps_prox;
+    if(work->RinvD != NULL){
+        // Diagonal regularization has no retry loop, so reproduce its
+        // scale-based floor directly. Avoid subtracting nearly equal large
+        // diagonals from the factor, which would lose a small eps.
+        if(work->qp->problem_type != 2){
+            for(i = 0; i < work->n; i++){
+                c_float abs_diag = work->qp->H[i*work->n+i];
+                if(abs_diag < 0.0) abs_diag = -abs_diag;
+                if(abs_diag > scale) scale = abs_diag;
+            }
+            eps = proximal_regularization_scaled(work, scale);
+        }
+        return eps;
+    }
+
+    /*
+     * Dense singular Hessians are shifted by eps*I. Before normalization,
+     * Rinv[0] = 1/sqrt(H[0,0] + eps). Simple-bound normalization scales
+     * that row, with the scale retained in scaling[0]. Recover the retry
+     * level from that pivot, but return the exact base*2^k value produced
+     * by factorization.
+     */
+    rinv = work->Rinv[0];
+    if(work->ms > 0)
+        rinv /= work->scaling[0];
+    recovered = 1.0/(rinv*rinv) - work->qp->H[0];
+
+    for(i = 0; i < work->n; i++){
+        c_float abs_diag = work->qp->H[i*work->n+i];
+        if(abs_diag < 0.0) abs_diag = -abs_diag;
+        if(abs_diag > scale) scale = abs_diag;
+    }
+    eps = proximal_regularization_scaled(work, scale);
+    if(eps <= 0.0) return 0.0;
+    while(1.5*eps < recovered) eps *= 2.0;
+    return eps;
 }
 
 int daqp_update_M(DAQPWorkspace *work, c_float *A, const int mask){

@@ -29,7 +29,7 @@ int daqp_prox(DAQPWorkspace *work){
     c_float eta = work->settings->eta_prox;
 
     const int is_lp = (work->Rinv == NULL && work->RinvD == NULL);
-    c_float eps = is_lp ? 1.0 : work->proximal_regularization;
+    c_float eps = is_lp ? 1.0 : daqp_get_proximal_regularization(work);
 
     // For a QP whose Hessian is already positive definite (n_prox == 0),
     // no direction needs a proximal shift.  The inner QP equals the
@@ -170,6 +170,19 @@ int daqp_prox(DAQPWorkspace *work){
     if(is_lp){
         for(i = 0; i < work->n_active; i++)
             work->lam_star[i] /= eps; // Rescale dual variables
+    }
+    else{
+        /*
+         * daqp_extract_result forms 0.5*(fval - ||v||^2). Correct the
+         * regularized objective here while the reconstructed eps is local,
+         * avoiding a second reconstruction during result extraction.
+         */
+        c_float prox_norm = 0.0;
+        for(i = 0; i < nx; i++){
+            if(work->prox_mask == NULL || work->prox_mask[i])
+                prox_norm += work->x[i]*work->x[i];
+        }
+        work->fval += eps*prox_norm;
     }
     work->iterations = total_iter;
     return exitflag;
