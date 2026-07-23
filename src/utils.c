@@ -1,4 +1,5 @@
 #include "daqp.h"
+#include "daqp_prox.h"
 #include "utils.h"
 #include <math.h>
 #include <stdio.h>
@@ -131,6 +132,9 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
     const int n = work->n;
     c_float eps = work->settings->eps_prox;
     c_float zero_tol = work->settings->zero_tol;
+    c_float factor_tol = zero_tol;
+    c_float hessian_scale = 0.0;
+    int regularize_all = 0;
 
 
     // Reset the semi-proximal mask for this factorization
@@ -145,6 +149,9 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
     int is_diagonal = 1;
     if(!is_factored){
         for(i = 0, disp = 1; i < n && is_diagonal; i++, disp += i+1){
+            c_float abs_diag = H[i*n+i];
+            if(abs_diag < 0) abs_diag = -abs_diag;
+            if(abs_diag > hessian_scale) hessian_scale = abs_diag;
             for(j = 1; j < n-i; j++, disp++){
                 if(H[disp] > zero_tol || H[disp] < -zero_tol){ is_diagonal = 0; break; }
             }
@@ -162,13 +169,17 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
 
     // Diagonal Case — for unfactored H read diagonals directly (no packing needed).
     if(is_diagonal){
+        if(!is_factored && hessian_scale > 0){
+            factor_tol = sqrt(zero_tol) * hessian_scale;
+            eps = daqp_proximal_regularization_scaled(work, hessian_scale);
+        }
         if(work->Rinv != NULL){ work->RinvD = work->Rinv; work->Rinv = NULL; }
         for(i = 0, disp = 0; i < n; i++){
             c_float Hi;
             if(is_factored){ Hi = H[disp]; disp += n-i; }
             else            { Hi = H[i*n+i]; }
             if(!is_factored){
-                if(Hi <= zero_tol){
+                if(Hi <= factor_tol){
                     if(work->prox_mask != NULL) work->prox_mask[i] = 1;
                     work->n_prox++;
                     Hi += eps;
@@ -176,7 +187,7 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
                 if(Hi <= zero_tol) return DAQP_EXIT_NONCONVEX;
                 Hi = sqrt(Hi);
             } else {
-                if(Hi <= zero_tol){
+                if(Hi <= factor_tol){
                     if(work->prox_mask != NULL) work->prox_mask[i] = 1;
                     work->n_prox++;
                     Hi = sqrt(Hi*Hi + eps); // Regularization for factors
@@ -192,8 +203,9 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
     // (symmetrize) H into Rinv before Cholesky.
     if(work->RinvD != NULL){ work->Rinv = work->RinvD; work->RinvD = NULL; }
     if(!is_factored){
+pack_hessian:
         for(i = 0, disp = 0; i < n; i++){
-            work->Rinv[disp++] = H[i*n+i];
+            work->Rinv[disp++] = H[i*n+i] + (regularize_all ? eps : 0.0);
             for(j = i+1; j < n; j++)
                 work->Rinv[disp++] = (c_float)0.5*(H[i*n+j] + H[j*n+i]);
         }
@@ -207,16 +219,18 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
                 work->Rinv[disp] = H[disp];
         }
     } else {
+        c_float min_pivot = DAQP_INF;
+        c_float max_pivot = 0.0;
         for(i = 0, disp = 0; i < n; disp += n-i, i++){
             c_float diag_i = work->Rinv[disp];  // read before overwrite
             for(k = 0, disp2 = i; k < i; k++, disp2 += n-k)
                 diag_i -= work->Rinv[disp2] * work->Rinv[disp2];
-            if(diag_i <= zero_tol){
-                if(work->prox_mask != NULL) work->prox_mask[i] = 1;
-                work->n_prox++;
-                diag_i += eps;
+            if(diag_i <= zero_tol)
+                goto regularize_hessian;
+            if(!regularize_all){
+                if(diag_i < min_pivot) min_pivot = diag_i;
+                if(diag_i > max_pivot) max_pivot = diag_i;
             }
-            if(diag_i <= zero_tol) return DAQP_EXIT_NONCONVEX;
             diag_i = 1/sqrt(diag_i);
             for(j = 1; j < n-i; j++){
                 for(k = 0, disp2 = i; k < i; k++, disp2 += n-k)
@@ -224,6 +238,31 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
                 work->Rinv[disp+j] *= diag_i;
             }
             work->Rinv[disp] = diag_i;
+        }
+        if(!regularize_all && min_pivot <= sqrt(zero_tol)*max_pivot){
+regularize_hessian:
+            /*
+             * A shift on failed pivots alone is not a robust
+             * regularization for a dense PSD matrix.  The selected
+             * coordinate axes can be almost orthogonal to the nullspace,
+             * leaving H + eps*diag(mask) nearly singular even for a
+             * large eps.  Restart with H + eps*I instead.  Compute the
+             * scale only on this exceptional path.
+             */
+            if(regularize_all) return DAQP_EXIT_NONCONVEX;
+            hessian_scale = 0.0;
+            for(k = 0; k < n; k++){
+                c_float abs_diag = H[k*n+k];
+                if(abs_diag < 0) abs_diag = -abs_diag;
+                if(abs_diag > hessian_scale) hessian_scale = abs_diag;
+            }
+            eps = daqp_proximal_regularization_scaled(work, hessian_scale);
+            if(eps <= 0) return DAQP_EXIT_NONCONVEX;
+            regularize_all = 1;
+            work->n_prox = n;
+            if(work->prox_mask != NULL)
+                for(k = 0; k < n; k++) work->prox_mask[k] = 1;
+            goto pack_hessian;
         }
     }
 

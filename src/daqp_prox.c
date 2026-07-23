@@ -1,18 +1,58 @@
 #include "daqp_prox.h"
 #include "utils.h"
+#include <math.h>
 
 static int gradient_step(DAQPWorkspace* work);
+
+/*
+ * Return the proximal shift used consistently by factorization, the outer
+ * iteration, and objective-value recovery.  A relative floor prevents the
+ * regularized LDP from inheriting a condition number that is too large for
+ * the requested primal accuracy.
+ */
+c_float daqp_proximal_regularization_scaled(
+        const DAQPWorkspace *work, c_float hessian_scale){
+    c_float eps;
+    if(work == NULL || work->settings == NULL) return 0.0;
+    eps = work->settings->eps_prox;
+    if(eps <= 0 || work->qp == NULL || work->qp->H == NULL ||
+            work->qp->problem_type == 2)
+        return eps;
+
+    if(hessian_scale > 0){
+        c_float floor = sqrt(work->settings->primal_tol) * hessian_scale;
+        if(eps < floor) eps = floor;
+    }
+    return eps;
+}
+
+c_float daqp_proximal_regularization(const DAQPWorkspace *work){
+    int i;
+    c_float hessian_scale = 0.0;
+
+    if(work == NULL || work->settings == NULL) return 0.0;
+    if(work->settings->eps_prox <= 0 || work->qp == NULL ||
+            work->qp->H == NULL || work->qp->problem_type == 2)
+        return work->settings->eps_prox;
+
+    for(i = 0; i < work->n; i++){
+        c_float abs_diag = work->qp->H[i*work->n+i];
+        if(abs_diag < 0) abs_diag = -abs_diag;
+        if(abs_diag > hessian_scale) hessian_scale = abs_diag;
+    }
+    return daqp_proximal_regularization_scaled(work, hessian_scale);
+}
 
 /* --------------------------------------------------------------------------
  * daqp_prox  --  outer proximal-point / semi-proximal loop
  *
  * QP problems (Rinv or RinvD is set):
- *   Implements a Semi-Proximal Method.  Only the directions i where the
- *   Cholesky diagonal would have been non-positive without regularisation
- *   (prox_mask[i] == 1) receive the eps·x_old[i] perturbation in the
- *   right-hand side.  If H is already positive definite everywhere
- *   (n_prox == 0) the inner QP equals the original and we exit after one
- *   solve.
+ *   Diagonal Hessians use a semi-proximal method, perturbing only singular
+ *   coordinate directions. Dense Hessians use a full proximal shift when
+ *   Cholesky detects numerical singularity; selectively shifting failed
+ *   pivots is not a reliable nullspace regularization. If H is already
+ *   positive definite (n_prox == 0), the inner QP equals the original and
+ *   we exit after one solve.
  *
  * LP problems (Rinv == NULL && RinvD == NULL):
  *   Classical regularisation-based smoothing with adaptive eps.
@@ -24,49 +64,72 @@ int daqp_prox(DAQPWorkspace *work){
     c_float *swp_ptr;
     c_float max_diff, tol_stat;
     c_float eta = work->settings->eta_prox;
-    int  cycle_counter = 0;
-    c_float best_fval  = DAQP_INF;
+    int rhs_is_current = 1;
 
     const int is_lp = (work->Rinv == NULL && work->RinvD == NULL);
-    c_float eps = is_lp ? 1.0 : work->settings->eps_prox;
+    c_float eps = is_lp ? 1.0 : daqp_proximal_regularization(work);
 
     // For a QP whose Hessian is already positive definite (n_prox == 0),
     // no direction needs a proximal shift.  The inner QP equals the
     // original problem, so one solve gives the exact solution.
     const int all_pd = (!is_lp) && (work->n_prox == 0);
 
+    /*
+     * Setup has already formed v and d for x=0. Preserve that work for the
+     * common cold-start case instead of rebuilding the same transformed
+     * gradient and every constraint RHS before the first inner solve.
+     */
+    for(i = 0; i < nx; i++){
+        if(work->x[i] != 0.0){
+            rhs_is_current = 0;
+            break;
+        }
+    }
+
     while(total_iter < work->settings->iter_limit){
 
         /* ----------------------------------------------------------------
          * Perturb the problem: form v = R'\(f - eps_mask * x_old)
          * ----------------------------------------------------------------*/
-        if(is_lp){
+        if(!rhs_is_current && is_lp){
             // No Hessian factor.  Adapt eps heuristically: grow when the
             // inner LP stalls (iterations==1), shrink otherwise to improve
-            // accuracy.
-            eps *= (work->iterations == 1) ? 10.0 : 0.9;
+            // accuracy. Keep the deterministic initial value for the first
+            // solve; work->iterations has no current-loop value yet.
+            if(total_iter > 0)
+                eps *= (work->iterations == 1) ? 10.0 : 0.9;
             if(eps > 1e3) eps = 1e3;
             for(i = 0; i < nx; i++)
                 work->v[i] = work->qp->f[i]*eps - work->x[i];
         }
-        else{
-            // Semi-proximal: shift f only for directions that needed
-            // regularisation to make the Cholesky factor non-singular.
-            if(work->prox_mask != NULL){
-                for(i = 0; i < nx; i++)
-                    work->v[i] = work->qp->f[i]
-                                 - (work->prox_mask[i] ? eps : 0.0) * work->x[i];
+        else if(!rhs_is_current){
+            if(work->prox_mask == NULL || work->n_prox == nx){
+                // Dense singular Hessians use a full shift. Avoid a mask
+                // load and branch for every component on every outer step.
+                if(work->qp->f != NULL)
+                    for(i = 0; i < nx; i++)
+                        work->v[i] = work->qp->f[i] - eps * work->x[i];
+                else
+                    for(i = 0; i < nx; i++)
+                        work->v[i] = -eps * work->x[i];
             }
             else{
-                // prox_mask unavailable -- fall back to full proximal
-                for(i = 0; i < nx; i++)
-                    work->v[i] = work->qp->f[i] - eps * work->x[i];
+                // Diagonal Hessians can regularize only singular directions.
+                if(work->qp->f != NULL)
+                    for(i = 0; i < nx; i++)
+                        work->v[i] = work->qp->f[i]
+                                     - (work->prox_mask[i] ? eps : 0.0) * work->x[i];
+                else
+                    for(i = 0; i < nx; i++)
+                        work->v[i] = -(work->prox_mask[i] ? eps : 0.0)
+                                     * work->x[i];
             }
             daqp_update_v(work->v, work, 0);
         }
 
-        // Perturb RHS of constraints to match the shifted objective
-        daqp_update_d(work, work->qp->bupper, work->qp->blower);
+        if(!rhs_is_current)
+            daqp_update_d(work, work->qp->bupper, work->qp->blower);
+        rhs_is_current = 0;
 
         // xold <-- x  (pointer swap avoids copying)
         swp_ptr = work->xold; work->xold = work->x; work->x = swp_ptr;
@@ -95,21 +158,25 @@ int daqp_prox(DAQPWorkspace *work){
         }
 
         /* ----------------------------------------------------------------
-         * Convergence check: fixed point  ||x - x_old||_inf < tol_stat
-         * Only test when the active set did not change (iterations == 1),
-         * because that is the cheapest indicator that a stationary point
-         * has been reached for the inner QP.
+         * Convergence check: fixed point  ||x - x_old||_inf < tol_stat.
+         *
+         * A fixed point is a valid stationarity certificate regardless of
+         * how many active-set changes the inner solve needed.  Checking it
+         * after every successful solve avoids extra outer iterations and,
+         * unlike objective stagnation, cannot label a non-stationary point
+         * as optimal.
          * ----------------------------------------------------------------*/
+        tol_stat = is_lp ? eta*eps : eta/eps;
+        for(i = 0; i < nx; i++){
+            max_diff = work->x[i] - work->xold[i];
+            if(max_diff > tol_stat || max_diff < -tol_stat) break;
+        }
+        if(i == nx){
+            exitflag = DAQP_EXIT_OPTIMAL;
+            break;
+        }
+
         if(work->iterations == 1){
-            tol_stat = is_lp ? eta*eps : eta/eps;
-            for(i = 0; i < nx; i++){
-                max_diff = work->x[i] - work->xold[i];
-                if(max_diff > tol_stat || max_diff < -tol_stat) break;
-            }
-            if(i == nx){
-                exitflag = DAQP_EXIT_OPTIMAL; // Fixed point reached
-                break;
-            }
             // LP: when not at a vertex take a gradient step toward the
             // nearest constraint to escape from the interior.
             if(is_lp && work->n_active != nx){
@@ -117,46 +184,6 @@ int daqp_prox(DAQPWorkspace *work){
                     exitflag = DAQP_EXIT_UNBOUNDED;
                     break;
                 }
-            }
-        }
-
-        /* ----------------------------------------------------------------
-         * Stagnation / cycle detection
-         * ----------------------------------------------------------------*/
-        if(is_lp){
-            // Track LP objective f'x; no improvement over several
-            // consecutive iterations signals a fixed point.
-            // Use DAQP_DEFAULT_LP_PROG_TOL (1e-10) rather than the QP
-            // progress_tol (1e-14): the LP objective is in raw problem
-            // units and a much larger threshold is appropriate.
-            c_float lp_obj = 0.0;
-            for(i = 0; i < nx; i++) lp_obj += work->qp->f[i] * work->x[i];
-            max_diff = best_fval - lp_obj;
-            if(max_diff < DAQP_DEFAULT_LP_PROG_TOL){
-                if(cycle_counter++ > work->settings->cycle_tol){
-                    exitflag = DAQP_EXIT_OPTIMAL; // Stagnated at fixed point
-                    break;
-                }
-            }
-            else{
-                best_fval    = lp_obj;
-                cycle_counter = 0;
-            }
-        }
-        else{
-            // QP: track the inner LDP dual objective ||u||^2 (work->fval).
-            // When the outer iterate converges, v stabilises and so does
-            // work->fval; stagnation therefore indicates a fixed point.
-            max_diff = best_fval - work->fval;
-            if(max_diff < work->settings->progress_tol){
-                if(++cycle_counter > work->settings->cycle_tol){
-                    exitflag = DAQP_EXIT_OPTIMAL; // Stagnated at fixed point
-                    break;
-                }
-            }
-            else{
-                best_fval    = work->fval;
-                cycle_counter = 0;
             }
         }
     }
@@ -211,14 +238,40 @@ static int gradient_step(DAQPWorkspace* work){
             disp += nx;
             continue;
         }
+        if(work->Mu != NULL){
+            /*
+             * At a completed inner solve Mu=M*u and x=u-v, while
+             * d=b_scaled+M*v. Hence the normalized upper slack is
+             * dupper-Mu (similarly for the lower slack). Only M*(x-xold)
+             * still needs a dot product; normalization cancels in the
+             * step-length ratio.
+             */
+            for(k = 0, delta_s = 0; k < nx; k++)
+                delta_s += work->M[disp++] * (work->x[k]-work->xold[k]);
+            Ax = work->Mu[j-ms];
+            if(delta_s > 0 &&
+                    work->qp->bupper[j] < DAQP_INF &&
+                    work->dupper[j] - Ax < delta_s*min_alpha){
+                add_ind   = j;
+                min_alpha = (work->dupper[j] - Ax) / delta_s;
+            }
+            else if(delta_s < 0 &&
+                    work->qp->blower[j] > -DAQP_INF &&
+                    work->dlower[j] - Ax > delta_s*min_alpha){
+                add_ind   = j;
+                min_alpha = (work->dlower[j] - Ax) / delta_s;
+            }
+            continue;
+        }
+
+        // Fallback for static workspaces without the batched Mu cache.
         for(k = 0, delta_s = 0, Ax = 0; k < nx; k++){
             Ax      += work->M[disp]   * work->x[k];
             delta_s -= work->M[disp++] * work->xold[k];
         }
         delta_s += Ax;
-
         if(work->scaling != NULL){
-            Ax      /= work->scaling[j];
+            Ax /= work->scaling[j];
             delta_s /= work->scaling[j];
         }
         if(delta_s > 0 &&

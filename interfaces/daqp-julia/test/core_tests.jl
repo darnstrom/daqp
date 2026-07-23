@@ -474,6 +474,44 @@ end
     @test abs(x2[1] - (-1.0)) < tol   # x1* = -1
     @test abs(x2[2] - (-2.0)) < tol   # x2* = -2 (lower bound)
 
+    # --- Dense singular Hessian: use a full shift, not failed pivots only ---
+    #
+    # For H = 11', shifting only the failed second and third Cholesky
+    # pivots leaves the regularized Hessian badly conditioned because those
+    # coordinate axes are poorly aligned with null(H).  Dense singular
+    # Hessians must therefore fall back to H + eps*I.
+    H_dense = ones(3, 3)
+    x_dense_ref = [1.0; -1.0; 0.5]
+    lambda_dense = [0.5; 0.75; 1.0]
+    f_dense = -H_dense*x_dense_ref-lambda_dense
+    A_dense = zeros(0, 3)
+    bu_dense = copy(x_dense_ref)
+    bl_dense = x_dense_ref .- 1.0
+    sense_dense = zeros(Cint, 3)
+
+    d_dense = DAQPBase.Model()
+    DAQPBase.settings(d_dense, Dict(:eps_prox => 1e-8))
+    DAQPBase.setup(d_dense, H_dense, f_dense, A_dense, bu_dense, bl_dense,
+                   sense_dense)
+    ws_dense = unsafe_load(Ptr{DAQPBase.Workspace}(d_dense.work))
+    @test ws_dense.n_prox == 3
+
+    x_dense,_,ef_dense,_ = DAQPBase.solve(d_dense)
+    @test ef_dense == DAQPBase.OPTIMAL
+    @test norm(x_dense-x_dense_ref, Inf) < tol
+
+    # --- Singular quadratic with no linear term still needs proximal v ---
+    H_no_f = [1.0 0.0; 0.0 0.0]
+    f_no_f = Float64[]
+    A_no_f = zeros(0, 2)
+    bu_no_f = [2.0; 2.0]
+    bl_no_f = [-2.0; 1.0]
+    sense_no_f = zeros(Cint, 2)
+    x_no_f,_,ef_no_f,_ = quadprog(
+        H_no_f, f_no_f, A_no_f, bu_no_f, bl_no_f, sense_no_f)
+    @test ef_no_f == DAQPBase.OPTIMAL
+    @test norm(x_no_f-[0.0; 1.0], Inf) < tol
+
     # --- Zero Hessian: all directions singular -> n_prox == n ---
     n3 = 3
     H_zero = zeros(n3, n3)
@@ -509,4 +547,3 @@ end
     end
     @test tquad < 10*tsetup #Should be orders of magnitude faster
 end
-
