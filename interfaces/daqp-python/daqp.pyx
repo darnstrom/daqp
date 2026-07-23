@@ -71,7 +71,7 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
           zero_tol = DAQP_DEFAULT_ZERO_TOL, pivot_tol = DAQP_DEFAULT_PIVOT_TOL,
           progress_tol = DAQP_DEFAULT_PROG_TOL, cycle_tol = DAQP_DEFAULT_CYCLE_TOL,
           iter_limit =  DAQP_DEFAULT_ITER_LIMIT, fval_bound = DAQP_INF,
-          eps_prox= DAQP_DEFAULT_EPS_PROX, eta_prox = DAQP_DEFAULT_ETA,
+          eps_prox= DAQP_DEFAULT_EPS_PROX, eta_prox = None,
           rho_soft = DAQP_DEFAULT_RHO_SOFT,
           rel_subopt = DAQP_DEFAULT_REL_SUBOPT, abs_subopt = DAQP_DEFAULT_ABS_SUBOPT,
           sing_tol = DAQP_DEFAULT_SING_TOL, refactor_tol = DAQP_DEFAULT_REFACTOR_TOL,
@@ -174,6 +174,10 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
         blower = np.full(m, -DAQP_INF)
     if sense is None:
         sense = np.zeros(m, dtype=np.intc)
+    if eta_prox is None:
+        eta_prox = DAQP_DEFAULT_ETA
+        if dual_tol != DAQP_DEFAULT_DUAL_TOL:
+            eta_prox = min(eta_prox, 0.1 * dual_tol)
 
     # Setup output buffers (np.empty avoids zeroing; the solver fills all entries)
     cdef double[::1] x = np.empty(n)
@@ -614,7 +618,10 @@ cdef class Model:
             return
         cdef DAQPSettings* s = self._work.settings
         if 'primal_tol'   in new_settings: s.primal_tol   = new_settings['primal_tol']
-        if 'dual_tol'     in new_settings: s.dual_tol     = new_settings['dual_tol']
+        if 'dual_tol'     in new_settings:
+            s.dual_tol = new_settings['dual_tol']
+            if 'eta_prox' not in new_settings:
+                s.eta_prox = min(s.eta_prox, 0.1 * s.dual_tol)
         if 'zero_tol'     in new_settings: s.zero_tol     = new_settings['zero_tol']
         if 'pivot_tol'    in new_settings: s.pivot_tol    = new_settings['pivot_tol']
         if 'progress_tol' in new_settings: s.progress_tol = new_settings['progress_tol']

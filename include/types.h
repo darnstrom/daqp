@@ -161,6 +161,7 @@ typedef struct{
     // directions; dense singular Hessians use a full shift for stability.
     int* prox_mask;
     int  n_prox; // Number of directions that needed regularization
+    c_float proximal_regularization; // Shift used by the current factorization
 
 
     // Soft constraint

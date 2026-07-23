@@ -161,6 +161,7 @@ struct Workspace
 
     prox_mask::Ptr{Cint}
     n_prox::Cint
+    proximal_regularization::Cdouble
 
     soft_slack::Cdouble
 

@@ -10,9 +10,6 @@ extern "C" {
 #include "daqp.h"
 
 int daqp_prox(DAQPWorkspace *work);
-c_float daqp_proximal_regularization(const DAQPWorkspace *work);
-c_float daqp_proximal_regularization_scaled(
-        const DAQPWorkspace *work, c_float hessian_scale);
 
 # ifdef __cplusplus
 }

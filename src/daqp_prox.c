@@ -1,48 +1,8 @@
 #include "daqp_prox.h"
 #include "auxiliary.h"
 #include "utils.h"
-#include <math.h>
 
 static int gradient_step(DAQPWorkspace* work);
-
-/*
- * Return the proximal shift used consistently by factorization, the outer
- * iteration, and objective-value recovery.  A relative floor prevents the
- * regularized LDP from inheriting a condition number that is too large for
- * the requested primal accuracy.
- */
-c_float daqp_proximal_regularization_scaled(
-        const DAQPWorkspace *work, c_float hessian_scale){
-    c_float eps;
-    if(work == NULL || work->settings == NULL) return 0.0;
-    eps = work->settings->eps_prox;
-    if(eps <= 0 || work->qp == NULL || work->qp->H == NULL ||
-            work->qp->problem_type == 2)
-        return eps;
-
-    if(hessian_scale > 0){
-        c_float floor = sqrt(work->settings->primal_tol) * hessian_scale;
-        if(eps < floor) eps = floor;
-    }
-    return eps;
-}
-
-c_float daqp_proximal_regularization(const DAQPWorkspace *work){
-    int i;
-    c_float hessian_scale = 0.0;
-
-    if(work == NULL || work->settings == NULL) return 0.0;
-    if(work->settings->eps_prox <= 0 || work->qp == NULL ||
-            work->qp->H == NULL || work->qp->problem_type == 2)
-        return work->settings->eps_prox;
-
-    for(i = 0; i < work->n; i++){
-        c_float abs_diag = work->qp->H[i*work->n+i];
-        if(abs_diag < 0) abs_diag = -abs_diag;
-        if(abs_diag > hessian_scale) hessian_scale = abs_diag;
-    }
-    return daqp_proximal_regularization_scaled(work, hessian_scale);
-}
 
 /* --------------------------------------------------------------------------
  * daqp_prox  --  outer proximal-point / semi-proximal loop
@@ -65,34 +25,21 @@ int daqp_prox(DAQPWorkspace *work){
     c_float *swp_ptr;
     c_float max_diff, tol_stat;
     c_float eta = work->settings->eta_prox;
-    int rhs_is_current = 1;
 
     const int is_lp = (work->Rinv == NULL && work->RinvD == NULL);
-    c_float eps = is_lp ? 1.0 : daqp_proximal_regularization(work);
+    c_float eps = is_lp ? 1.0 : work->proximal_regularization;
 
     // For a QP whose Hessian is already positive definite (n_prox == 0),
     // no direction needs a proximal shift.  The inner QP equals the
     // original problem, so one solve gives the exact solution.
     const int all_pd = (!is_lp) && (work->n_prox == 0);
 
-    /*
-     * Setup has already formed v and d for x=0. Preserve that work for the
-     * common cold-start case instead of rebuilding the same transformed
-     * gradient and every constraint RHS before the first inner solve.
-     */
-    for(i = 0; i < nx; i++){
-        if(work->x[i] != 0.0){
-            rhs_is_current = 0;
-            break;
-        }
-    }
-
     while(total_iter < work->settings->iter_limit){
 
         /* ----------------------------------------------------------------
          * Perturb the problem: form v = R'\(f - eps_mask * x_old)
          * ----------------------------------------------------------------*/
-        if(!rhs_is_current && is_lp){
+        if(is_lp){
             // No Hessian factor.  Adapt eps heuristically: grow when the
             // inner LP stalls (iterations==1), shrink otherwise to improve
             // accuracy. Keep the deterministic initial value for the first
@@ -103,7 +50,7 @@ int daqp_prox(DAQPWorkspace *work){
             for(i = 0; i < nx; i++)
                 work->v[i] = work->qp->f[i]*eps - work->x[i];
         }
-        else if(!rhs_is_current){
+        else{
             if(work->prox_mask == NULL || work->n_prox == nx){
                 // Dense singular Hessians use a full shift. Avoid a mask
                 // load and branch for every component on every outer step.
@@ -128,9 +75,7 @@ int daqp_prox(DAQPWorkspace *work){
             daqp_update_v(work->v, work, 0);
         }
 
-        if(!rhs_is_current)
-            daqp_update_d(work, work->qp->bupper, work->qp->blower);
-        rhs_is_current = 0;
+        daqp_update_d(work, work->qp->bupper, work->qp->blower);
 
         // xold <-- x  (pointer swap avoids copying)
         swp_ptr = work->xold; work->xold = work->x; work->x = swp_ptr;
@@ -242,35 +187,6 @@ static int gradient_step(DAQPWorkspace* work){
             disp += nx;
             continue;
         }
-        if(work->Mu != NULL){
-            /*
-             * At a completed inner solve Mu=M*u and x=u-v, while
-             * d=b_scaled+M*v. Hence the normalized upper slack is
-             * dupper-Mu (similarly for the lower slack). Only M*(x-xold)
-             * still needs a dot product; normalization cancels in the
-             * step-length ratio.
-             */
-            for(k = 0, delta_s = 0; k < nx; k++)
-                delta_s += work->M[disp++] * (work->x[k]-work->xold[k]);
-            Ax = work->Mu[j-ms];
-            if(delta_s > 0 &&
-                    work->qp->bupper[j] < DAQP_INF &&
-                    work->dupper[j] - Ax < delta_s*min_alpha){
-                add_ind   = j;
-                add_lower = 0;
-                min_alpha = (work->dupper[j] - Ax) / delta_s;
-            }
-            else if(delta_s < 0 &&
-                    work->qp->blower[j] > -DAQP_INF &&
-                    work->dlower[j] - Ax > delta_s*min_alpha){
-                add_ind   = j;
-                add_lower = 1;
-                min_alpha = (work->dlower[j] - Ax) / delta_s;
-            }
-            continue;
-        }
-
-        // Fallback for static workspaces without the batched Mu cache.
         for(k = 0, delta_s = 0, Ax = 0; k < nx; k++){
             Ax      += work->M[disp]   * work->x[k];
             delta_s -= work->M[disp++] * work->xold[k];

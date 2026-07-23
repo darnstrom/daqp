@@ -530,6 +530,18 @@ end
     ws_dense = unsafe_load(Ptr{DAQPBase.Workspace}(d_dense.work))
     @test ws_dense.n_prox == 3
 
+    # The factorization regularization is a numerical property and must not
+    # change when only the requested feasibility tolerance changes.
+    d_dense_loose = DAQPBase.Model()
+    DAQPBase.settings(d_dense_loose,
+                      Dict(:eps_prox => 1e-8, :primal_tol => 1e-3))
+    DAQPBase.setup(d_dense_loose, H_dense, f_dense, A_dense, bu_dense,
+                   bl_dense, sense_dense)
+    ws_dense_loose =
+        unsafe_load(Ptr{DAQPBase.Workspace}(d_dense_loose.work))
+    @test ws_dense_loose.proximal_regularization ==
+          ws_dense.proximal_regularization
+
     x_dense,_,ef_dense,_ = DAQPBase.solve(d_dense)
     @test ef_dense == DAQPBase.OPTIMAL
     @test norm(x_dense-x_dense_ref, Inf) < tol
