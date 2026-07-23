@@ -464,4 +464,3 @@ function isfeasible(p::Ptr{DAQPBase.Workspace}, m=nothing, ms=nothing ;validate=
     reset(p)
     return exitflag == 1
 end
-

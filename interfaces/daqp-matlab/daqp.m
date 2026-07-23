@@ -35,7 +35,7 @@ classdef daqp< handle
             end
             settings = d.settings;
             settings.eps_prox = 1;
-            settings.eta_prox = 1e-6;
+            settings.eta_prox = -1;
             daqpmex('set_settings', d.work_ptr, settings);
             [x,fval,exitflag,info] = d.solve();
             info.setup_time = setup_time;

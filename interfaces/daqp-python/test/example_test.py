@@ -202,6 +202,16 @@ class TestModel(unittest.TestCase):
         # Other settings should be unchanged
         self.assertAlmostEqual(d.settings['primal_tol'], original_primal_tol)
 
+    def test_automatic_prox_tolerance_setting(self):
+        """Negative eta remains automatic as dual tolerance changes."""
+        d = daqp.Model()
+        self.assertAlmostEqual(d.settings['eta_prox'], -1.0)
+        d.settings = {'dual_tol': 1e-9}
+        self.assertAlmostEqual(d.settings['eta_prox'], -1.0)
+
+        d.settings = {'dual_tol': 1e-10, 'eta_prox': 5e-8}
+        self.assertAlmostEqual(d.settings['eta_prox'], 5e-8)
+
     def test_model_settings_preserved_across_setup(self):
         """Settings modified before setup are preserved after setup."""
         H, f, A, bupper, blower, sense = self._make_qp()
@@ -358,6 +368,35 @@ class TestSemiProximal(unittest.TestCase):
         x_prox, _, ef_prox, _ = d.solve()
         self.assertEqual(ef_prox, 1)
         np.testing.assert_allclose(x_prox, x_ref, atol=1e-3)
+
+    def test_consistent_redundant_equalities_are_ignored(self):
+        """Dependent consistent equalities do not make setup fail."""
+        H = np.eye(2, dtype=c_double)
+        f = np.zeros(2, dtype=c_double)
+        A = np.array([[1.0, 0.0], [2.0, 0.0]], dtype=c_double)
+        bounds = np.array([1.0, 2.0], dtype=c_double)
+        sense = np.array([5, 5], dtype=c_int)
+
+        x, _, exitflag, _ = daqp.solve(
+            H, f, A, bounds, bounds, sense
+        )
+
+        self.assertEqual(exitflag, 1)
+        self.assertAlmostEqual(x[0], 1.0)
+
+    def test_inconsistent_redundant_equalities_still_fail(self):
+        """A dependent equality with an inconsistent RHS is not discarded."""
+        H = np.eye(2, dtype=c_double)
+        f = np.zeros(2, dtype=c_double)
+        A = np.array([[1.0, 0.0], [2.0, 0.0]], dtype=c_double)
+        bounds = np.array([1.0, 3.0], dtype=c_double)
+        sense = np.array([5, 5], dtype=c_int)
+
+        _, _, exitflag, _ = daqp.solve(
+            H, f, A, bounds, bounds, sense
+        )
+
+        self.assertLess(exitflag, 0)
 
 
 if __name__ == '__main__':

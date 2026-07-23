@@ -174,7 +174,6 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
         blower = np.full(m, -DAQP_INF)
     if sense is None:
         sense = np.zeros(m, dtype=np.intc)
-
     # Setup output buffers (np.empty avoids zeroing; the solver fills all entries)
     cdef double[::1] x = np.empty(n)
     cdef double[::1] lam = np.empty(m) if m > 0 else np.empty(0)

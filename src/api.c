@@ -190,6 +190,14 @@ int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp, const int check_unc){
         return error_flag;
     }
 
+    /*
+     * A singular quadratic needs v for the proximal linear term even when
+     * the original problem has no f. Allocate it only after factorization
+     * has identified that need, keeping the positive-definite path unchanged.
+     */
+    if(work->n_prox > 0 && work->v == NULL && qp->H != NULL)
+        work->v = calloc(work->n, sizeof(c_float));
+
     return 1;
 }
 
@@ -450,11 +458,6 @@ void daqp_extract_result(DAQPResult* res, DAQPWorkspace* work){
         res->fval = work->fval;
         for(i=0;i<work->n;i++) res->fval-=work->v[i]*work->v[i];
         res->fval *=0.5;
-        if(work->n_prox > 0)
-            for(i=0;i<work->n;i++) // remove proximal bias: at fixed point x≈x_old so
-                // true_fval = perturbed_fval + 0.5*eps*||x_mask||^2
-                if(work->prox_mask == NULL || work->prox_mask[i])
-                    res->fval+= 0.5*work->settings->eps_prox*work->x[i]*work->x[i];
     }
     else if(work->qp != NULL && work->qp->f != NULL ){ // LP
         res->fval = 0;

@@ -421,6 +421,42 @@ int daqp_activate_constraints(DAQPWorkspace *work){
 #endif
         }
         if(work->sing_ind != DAQP_EMPTY_IND){
+            int last_ind = work->WS[work->n_active-1];
+            if(DAQP_IS_IMMUTABLE(last_ind)){
+                c_float dependency_residual = 0.0;
+                c_float dependency_scale = 1.0;
+                int j;
+
+                /*
+                 * The new equality is linearly dependent on the active
+                 * equalities. The singular direction is a null vector of
+                 * their row Gramian. It also provides a consistency check
+                 * for the corresponding right-hand sides.
+                 */
+                daqp_compute_singular_direction(work);
+                for(j = 0; j < work->n_active; j++){
+                    int id = work->WS[j];
+                    c_float bound = DAQP_IS_LOWER(id)
+                        ? work->dlower[id] : work->dupper[id];
+                    c_float term = work->lam_star[j] * bound;
+                    dependency_residual += term;
+                    dependency_scale += term < 0 ? -term : term;
+                }
+
+                DAQP_SET_INACTIVE(last_ind);
+                work->n_active--;
+                work->sing_ind = DAQP_EMPTY_IND;
+                if(work->reuse_ind > work->n_active)
+                    work->reuse_ind = work->n_active;
+
+                if(dependency_residual <=
+                            work->settings->primal_tol*dependency_scale &&
+                        dependency_residual >=
+                            -work->settings->primal_tol*dependency_scale)
+                    continue; // Consistent redundant equality: safely ignore.
+                return DAQP_EXIT_OVERDETERMINED_INITIAL;
+            }
+
             int exitflag = 1;
             for(;i<work->m;i++){
                 // 1. Check if there are equalities that couldn't be activated

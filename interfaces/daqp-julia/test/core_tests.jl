@@ -58,6 +58,40 @@ end
         x,fval,exitflag,info = linprog(f,A,bupper,blower,sense);
         @test abs(f'*(xref-x)) < tol;
     end
+
+    # A boundary gradient step must carry its blocking constraint into the
+    # next inner solve. Without the direct activation this LP cycles until
+    # the iteration limit.
+    f_cycle = [
+         0.39565845534355815;  1.0547224186098394;
+        -0.6079736130218228;   0.08664354239083986
+    ]
+    A_cycle = [
+         0.02567471103491733   1.7939107275243051  -1.5930403662318176  -1.6268049010944303;
+         0.17430767539690895   0.9393983598218338   1.3853828760377995  -0.12156671583176686;
+         0.1501841861988604    1.3229055909658318   0.06340819575037879  0.00444070515780678;
+        -0.3381833190415828   -0.8034139813242723   1.1295816385119204  -0.13300267414467912;
+         0.8222305102124798   -0.4876066796950338   1.6040189329364452   1.4786982612616595
+    ]
+    bu_cycle = [
+         0.6219967993947606; -1.7148261687971498; -4.035856723121925;
+         0.42802173327763904; -2.1046708743722897; 2.1244179526639546;
+         3.3321342110568404
+    ]
+    bl_cycle = [
+        -0.5562536036016433; -2.5667350684115884; -5.200480703737678;
+        -0.5024572486929929; -2.1713208424238117; 1.4858484259752665;
+         1.8907523366788457
+    ]
+    x_cycle_ref = [
+         0.30757892308706225; -1.7148261687971498;
+         0.7856067762605017;   0.27583126130300034
+    ]
+    x_cycle,_,ef_cycle,info_cycle = linprog(
+        f_cycle, A_cycle, bu_cycle, bl_cycle, zeros(Cint, 7))
+    @test ef_cycle == DAQPBase.OPTIMAL
+    @test norm(x_cycle-x_cycle_ref, Inf) < tol
+    @test info_cycle.iterations <= 20
 end
 
 @testset "Linprog (one-sided)" begin
@@ -136,9 +170,13 @@ end
     # Test access settings
     s = settings(d)
     @test s.primal_tol==1e-6
-    settings(d,Dict(:primal_tol=>1e-5))
+    @test s.eta_prox == -1.0
+    settings(d,Dict(:primal_tol=>1e-5, :dual_tol=>1e-9))
     s = settings(d)
     @test s.primal_tol==1e-5
+    @test s.eta_prox == -1.0
+    settings(d,Dict(:eta_prox=>5e-8))
+    @test settings(d).eta_prox == 5e-8
 
     # Update existing model with new problem
     xref,H,f,A,bupper,blower,sense = generate_test_QP(n,m,ms,nAct,kappa)
@@ -474,6 +512,54 @@ end
     @test abs(x2[1] - (-1.0)) < tol   # x1* = -1
     @test abs(x2[2] - (-2.0)) < tol   # x2* = -2 (lower bound)
 
+    # --- Dense singular Hessian: use a full shift, not failed pivots only ---
+    #
+    # For H = 11', shifting only the failed second and third Cholesky
+    # pivots leaves the regularized Hessian badly conditioned because those
+    # coordinate axes are poorly aligned with null(H).  Dense singular
+    # Hessians must therefore fall back to H + eps*I.
+    H_dense = ones(3, 3)
+    x_dense_ref = [1.0; -1.0; 0.5]
+    lambda_dense = [0.5; 0.75; 1.0]
+    f_dense = -H_dense*x_dense_ref-lambda_dense
+    A_dense = zeros(0, 3)
+    bu_dense = copy(x_dense_ref)
+    bl_dense = x_dense_ref .- 1.0
+    sense_dense = zeros(Cint, 3)
+
+    d_dense = DAQPBase.Model()
+    DAQPBase.settings(d_dense, Dict(:eps_prox => 1e-8))
+    DAQPBase.setup(d_dense, H_dense, f_dense, A_dense, bu_dense, bl_dense,
+                   sense_dense)
+    ws_dense = unsafe_load(Ptr{DAQPBase.Workspace}(d_dense.work))
+    @test ws_dense.n_prox == 3
+
+    # The factorization regularization is a numerical property and must not
+    # change when only the requested feasibility tolerance changes.
+    d_dense_loose = DAQPBase.Model()
+    DAQPBase.settings(d_dense_loose,
+                      Dict(:eps_prox => 1e-8, :primal_tol => 1e-3))
+    DAQPBase.setup(d_dense_loose, H_dense, f_dense, A_dense, bu_dense,
+                   bl_dense, sense_dense)
+    x_dense,_,ef_dense,_ = DAQPBase.solve(d_dense)
+    x_dense_loose,_,ef_dense_loose,_ = DAQPBase.solve(d_dense_loose)
+    @test ef_dense == DAQPBase.OPTIMAL
+    @test ef_dense_loose == DAQPBase.OPTIMAL
+    @test norm(x_dense-x_dense_ref, Inf) < tol
+    @test norm(x_dense_loose-x_dense, Inf) < tol
+
+    # --- Singular quadratic with no linear term still needs proximal v ---
+    H_no_f = [1.0 0.0; 0.0 0.0]
+    f_no_f = Float64[]
+    A_no_f = zeros(0, 2)
+    bu_no_f = [2.0; 2.0]
+    bl_no_f = [-2.0; 1.0]
+    sense_no_f = zeros(Cint, 2)
+    x_no_f,_,ef_no_f,_ = quadprog(
+        H_no_f, f_no_f, A_no_f, bu_no_f, bl_no_f, sense_no_f)
+    @test ef_no_f == DAQPBase.OPTIMAL
+    @test norm(x_no_f-[0.0; 1.0], Inf) < tol
+
     # --- Zero Hessian: all directions singular -> n_prox == n ---
     n3 = 3
     H_zero = zeros(n3, n3)
@@ -509,4 +595,3 @@ end
     end
     @test tquad < 10*tsetup #Should be orders of magnitude faster
 end
-
