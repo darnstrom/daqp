@@ -1,4 +1,24 @@
 #include "bnb.h"
+#ifdef PROFILING
+#include "utils.h"
+#endif
+
+static c_float daqp_binary_diff(const int id, DAQPWorkspace* work){
+    int j, disp;
+    c_float diff = 0.5*(work->dupper[id]+work->dlower[id]);
+
+    if(id < work->ms){//Simple bound
+        if(work->Rinv==NULL) diff -= work->u[id]; //Hessian is identity
+        else{
+            for(j=id,disp=id+DAQP_R_OFFSET(id,work->n);j<work->n;j++)
+                diff -= work->Rinv[disp++]*work->u[j];
+        }
+    }
+    else{//General bound; daqp_add_infeasible already computed M*u
+        diff -= work->Mu[id-work->ms];
+    }
+    return diff;
+}
 
 int daqp_bnb(DAQPWorkspace* work){
     int branch_id, exitflag;
@@ -27,6 +47,17 @@ int daqp_bnb(DAQPWorkspace* work){
 
         node = work->bnb->tree+(--work->bnb->n_nodes);
         exitflag = daqp_process_node(node,work); // Solve relaxation
+#ifdef PROFILING
+        // Individual relaxations are often too short to reach the timer check
+        // in daqp_ldp, so also enforce the limit across the BnB tree.
+        if(work->timer != NULL && (work->bnb->nodecount&31)==0){
+            toc((DAQPtimer*)work->timer);
+            if(get_time((DAQPtimer*)work->timer) > work->settings->time_limit){
+                exitflag = DAQP_EXIT_TIMELIMIT;
+                break;
+            }
+        }
+#endif
         // Cut conditions
         if(exitflag==DAQP_EXIT_INFEASIBLE) continue; // Dominance cut
         if(exitflag<0) break; // Inner solver failed => exit loop
@@ -54,7 +85,7 @@ int daqp_bnb(DAQPWorkspace* work){
         work->settings->fval_bound = fval_bound0;
         // Let work->u point to the best feasible solution
         swp_ptr=work->u; work->u= work->xold; work->xold=swp_ptr;
-        return DAQP_EXIT_OPTIMAL;
+        return exitflag < DAQP_EXIT_INFEASIBLE ? exitflag : DAQP_EXIT_OPTIMAL;
     }
 }
 
@@ -74,9 +105,9 @@ int daqp_process_node(DAQPNode* node, DAQPWorkspace* work){
         else{
             daqp_add_upper_lower(node->bin_id,work);
             work->sense[DAQP_REMOVE_LOWER_FLAG(node->bin_id)] |= DAQP_IMMUTABLE; //Equality
-            if(work->sing_ind != DAQP_EMPTY_IND) // Need to cold start to not miss integer feasible
+            if(work->sing_ind != DAQP_EMPTY_IND){ // Need to cold start to not miss integer feasible
                 daqp_setup_cold_bnb(node,work);
-
+            }
         }
         // Add binary constraint
     }
@@ -85,6 +116,9 @@ int daqp_process_node(DAQPNode* node, DAQPWorkspace* work){
     work->bnb->itercount += work->iterations;
 
     if(exitflag == DAQP_EXIT_CYCLE){// Try to repair (cold start)
+        // A cycle can be caused by stale cached forward-substitution data.
+        // Force the retained fixed prefix to be recomputed during repair.
+        work->reuse_ind=0;
         daqp_setup_cold_bnb(node,work);
         exitflag = daqp_ldp(work);
         work->bnb->itercount += work->iterations;
@@ -94,31 +128,28 @@ int daqp_process_node(DAQPNode* node, DAQPWorkspace* work){
 }
 
 int daqp_get_branch_id(DAQPWorkspace* work){
-    int i, j, disp;
-    int branch_id = DAQP_EMPTY_IND;
-    c_float diff;
+    int i;
+    int id = DAQP_EMPTY_IND;
+    c_float diff, dist, tol;
 
     for(i=0; i < work->bnb->nb; i++){
-        branch_id = work->bnb->bin_ids[i];
+        id = work->bnb->bin_ids[i];
         // Skip fixed binary constraints
-        if(DAQP_IS_ACTIVE(branch_id)) continue;
+        if(DAQP_IS_ACTIVE(id)) continue;
 
         // Compute signed distance from midpoint between bounds
-        diff = 0.5*(work->dupper[branch_id]+work->dlower[branch_id]);
-        if(branch_id < work->ms){//Simple bound
-            if(work->Rinv==NULL) diff -= work->u[branch_id]; //Hessian is identity
-            else{
-                for(j=branch_id,disp=branch_id+DAQP_R_OFFSET(branch_id,work->n);j<work->n;j++)
-                    diff -= work->Rinv[disp++]*work->u[j];
-            }
-        }
-        else{//General bound
-            for(j=0,disp=work->n*(branch_id-work->ms);j<work->n;j++)
-                diff -= work->M[disp++]*work->u[j];
-        }
+        diff = daqp_binary_diff(id,work);
 
-        // Branch on the first infeasible binary variable
-        return diff < 0 ? branch_id : DAQP_ADD_LOWER_FLAG(branch_id);
+        // A zero-dual binary constraint can lie at an endpoint without being
+        // active. It is already integer feasible and does not need branching.
+
+        dist = 0.5*(work->dupper[id]-work->dlower[id])-(diff < 0 ? -diff : diff);
+        tol = work->settings->primal_tol;
+        if(work->scaling != NULL) tol *= work->scaling[id];
+        if(dist <= tol) continue;
+
+        // Explore the endpoint nearest to the relaxation first.
+        return diff < 0 ? id : DAQP_ADD_LOWER_FLAG(id);
     }
 
     return DAQP_EMPTY_IND;
@@ -150,7 +181,9 @@ void daqp_node_cleanup_workspace(int n_clean, DAQPWorkspace* work){
     // Reset workspace
     work->sing_ind=DAQP_EMPTY_IND;
     work->n_active=n_clean;
-    work->reuse_ind=n_clean;
+    // Truncation cannot make a previously invalid cached prefix reusable.
+    if(work->reuse_ind > n_clean)
+        work->reuse_ind=n_clean;
 }
 
 

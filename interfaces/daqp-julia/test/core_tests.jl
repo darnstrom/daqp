@@ -156,6 +156,48 @@ end
     x,_,_,info = DAQPBase.quadprog(H,f,A,bu,bl,sense)
     @test norm(x-[0;1;1]) < tol
 
+    # A binary constraint can be integer feasible at a zero-dual endpoint
+    # without belonging to the active set. Do not branch in that case.
+    ndeg = 8
+    Hdeg = Matrix{Float64}(I, ndeg, ndeg)
+    fdeg = zeros(ndeg)
+    bdeg_u = ones(ndeg)
+    bdeg_l = zeros(ndeg)
+    sdeg = fill(Cint(DAQPBase.BINARY), ndeg)
+    xdeg, _, efdeg, ideg = DAQPBase.quadprog(
+        Hdeg, fdeg, zeros(0, ndeg), bdeg_u, bdeg_l, sdeg)
+    @test efdeg == DAQPBase.OPTIMAL
+    @test norm(xdeg, Inf) < tol
+    @test ideg.nodes == 1
+
+    # Cover the same zero-dual case for general binary constraints.
+    xgen, _, efgen, igen = DAQPBase.quadprog(
+        Hdeg, fdeg, Hdeg, bdeg_u, bdeg_l, sdeg)
+    @test efgen == DAQPBase.OPTIMAL
+    @test norm(xgen, Inf) < tol
+    @test igen.nodes == 1
+
+    # BnB cleanup may shorten, but must never lengthen, the valid prefix of
+    # the cached triangular solve. Lengthening it can reuse stale xldl/zldl
+    # entries and produce a CSP that violates its own active equalities.
+    dreuse = DAQPBase.Model()
+    Hreuse = Matrix{Float64}(I, 2, 2)
+    Areuse = ones(1, 2)
+    bureuse = [1.0, 1.0, 1.0]
+    blreuse = [0.0, 0.0, 1.0]
+    sreuse = Cint[DAQPBase.BINARY, DAQPBase.BINARY, DAQPBase.EQUALITY]
+    DAQPBase.setup(
+        dreuse, Hreuse, zeros(2), Areuse, bureuse, blreuse, sreuse)
+    wsreuse = unsafe_load(Ptr{DAQPBase.Workspace}(dreuse.work))
+    @test wsreuse.n_active == 1
+    reuse_field = findfirst(==(:reuse_ind), fieldnames(DAQPBase.Workspace))
+    reuse_offset = fieldoffset(DAQPBase.Workspace, reuse_field)
+    reuse_ptr = Ptr{Cint}(Ptr{UInt8}(dreuse.work) + reuse_offset)
+    unsafe_store!(reuse_ptr, 0)
+    ccall((:daqp_node_cleanup_workspace, DAQPBase.libdaqp), Cvoid,
+          (Cint, Ptr{DAQPBase.Workspace}), wsreuse.n_active, dreuse.work)
+    @test unsafe_load(Ptr{DAQPBase.Workspace}(dreuse.work)).reuse_ind == 0
+
 end
 
 @testset "Model interface" begin
@@ -467,6 +509,29 @@ end
     x,fval,exitflag,info = quadprog(H,f,A,bupper,blower,sense; settings=s)
     @test exitflag == DAQPBase.OPTIMAL
     @test norm(xref-x) < tol
+
+    # Node relaxations in BnB can each finish before the inner solver's
+    # periodic timer check. The tree-level check must still enforce the limit.
+    rng_bnb = Xoshiro(1)
+    nt, nbt, mt = 30, 14, 6
+    Qt = randn(rng_bnb, nt, nt)
+    Ht = Matrix(Qt' * Qt / nt + 0.2I)
+    target = 0.15 .+ 0.7rand(rng_bnb, nt)
+    ft = -Ht * target
+    At = zeros(mt, nt)
+    for row in 1:mt
+        At[row, 1:nbt] .= 0.2 .+ rand(rng_bnb, nbt)
+        At[row, nbt+1:end] .= 0.1randn(rng_bnb, nt - nbt)
+    end
+    center = At * target
+    width = 0.15 .+ 0.15rand(rng_bnb, mt)
+    but = vcat(ones(nbt), fill(2.0, nt - nbt), center + width)
+    blt = vcat(zeros(nbt), fill(-2.0, nt - nbt), center - width)
+    st = vcat(fill(Cint(DAQPBase.BINARY), nbt), zeros(Cint, nt - nbt + mt))
+    s = settings(DAQPBase.Model(), Dict(:time_limit => 1e-9))
+    _, _, exitflag, info = quadprog(Ht, ft, At, but, blt, st; settings=s)
+    @test exitflag == DAQPBase.TIMELIMIT
+    @test info.nodes <= 32
 end
 
 @testset "Semi-proximal method" begin
