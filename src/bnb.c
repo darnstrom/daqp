@@ -20,37 +20,6 @@ static c_float daqp_binary_diff(const int id, DAQPWorkspace* work){
     return diff;
 }
 
-static c_float daqp_binary_endpoint_distance(
-        const int id, const c_float diff, DAQPWorkspace* work){
-    return 0.5*(work->dupper[id]-work->dlower[id])
-            - (diff < 0 ? -diff : diff);
-}
-
-static void daqp_order_root_binaries(DAQPWorkspace* work){
-    int i, j, id;
-    c_float diff, gap, score;
-
-    // xold is not used for an incumbent until after root processing.
-    for(i=0; i<work->bnb->nb; i++){
-        id = work->bnb->bin_ids[i];
-        if(DAQP_IS_ACTIVE(id)) score = 0;
-        else{
-            diff = daqp_binary_diff(id,work);
-            gap = work->dupper[id]-work->dlower[id];
-            score = gap > 0
-                ? daqp_binary_endpoint_distance(id,diff,work)/gap : 0;
-        }
-
-        // Stable insertion sort; nb <= n, so xold has enough storage.
-        for(j=i; j>0 && work->xold[j-1] > score; j--){
-            work->xold[j] = work->xold[j-1];
-            work->bnb->bin_ids[j] = work->bnb->bin_ids[j-1];
-        }
-        work->xold[j] = score;
-        work->bnb->bin_ids[j] = id;
-    }
-}
-
 int daqp_bnb(DAQPWorkspace* work){
     int branch_id, exitflag;
     DAQPNode* node;
@@ -92,9 +61,6 @@ int daqp_bnb(DAQPWorkspace* work){
         // Cut conditions
         if(exitflag==DAQP_EXIT_INFEASIBLE) continue; // Dominance cut
         if(exitflag<0) break; // Inner solver failed => exit loop
-
-        if(node->depth < 0)
-            daqp_order_root_binaries(work);
 
         // Find index to branch over
         branch_id = daqp_get_branch_id(work);
@@ -163,26 +129,27 @@ int daqp_process_node(DAQPNode* node, DAQPWorkspace* work){
 
 int daqp_get_branch_id(DAQPWorkspace* work){
     int i;
-    int branch_id = DAQP_EMPTY_IND;
-    c_float diff, endpoint_dist, tol;
+    int id = DAQP_EMPTY_IND;
+    c_float diff, dist, tol;
 
     for(i=0; i < work->bnb->nb; i++){
-        branch_id = work->bnb->bin_ids[i];
+        id = work->bnb->bin_ids[i];
         // Skip fixed binary constraints
-        if(DAQP_IS_ACTIVE(branch_id)) continue;
+        if(DAQP_IS_ACTIVE(id)) continue;
 
         // Compute signed distance from midpoint between bounds
-        diff = daqp_binary_diff(branch_id,work);
+        diff = daqp_binary_diff(id,work);
 
         // A zero-dual binary constraint can lie at an endpoint without being
         // active. It is already integer feasible and does not need branching.
-        endpoint_dist = daqp_binary_endpoint_distance(branch_id,diff,work);
+
+        dist = 0.5*(work->dupper[id]-work->dlower[id])-(diff < 0 ? -diff : diff);
         tol = work->settings->primal_tol;
-        if(work->scaling != NULL) tol *= work->scaling[branch_id];
-        if(endpoint_dist <= tol) continue;
+        if(work->scaling != NULL) tol *= work->scaling[id];
+        if(dist <= tol) continue;
 
         // Explore the endpoint nearest to the relaxation first.
-        return diff < 0 ? branch_id : DAQP_ADD_LOWER_FLAG(branch_id);
+        return diff < 0 ? id : DAQP_ADD_LOWER_FLAG(id);
     }
 
     return DAQP_EMPTY_IND;
