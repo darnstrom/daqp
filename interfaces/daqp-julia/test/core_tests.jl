@@ -177,6 +177,27 @@ end
     @test norm(xgen, Inf) < tol
     @test igen.nodes == 1
 
+    # BnB cleanup may shorten, but must never lengthen, the valid prefix of
+    # the cached triangular solve. Lengthening it can reuse stale xldl/zldl
+    # entries and produce a CSP that violates its own active equalities.
+    dreuse = DAQPBase.Model()
+    Hreuse = Matrix{Float64}(I, 2, 2)
+    Areuse = ones(1, 2)
+    bureuse = [1.0, 1.0, 1.0]
+    blreuse = [0.0, 0.0, 1.0]
+    sreuse = Cint[DAQPBase.BINARY, DAQPBase.BINARY, DAQPBase.EQUALITY]
+    DAQPBase.setup(
+        dreuse, Hreuse, zeros(2), Areuse, bureuse, blreuse, sreuse)
+    wsreuse = unsafe_load(Ptr{DAQPBase.Workspace}(dreuse.work))
+    @test wsreuse.n_active == 1
+    reuse_field = findfirst(==(:reuse_ind), fieldnames(DAQPBase.Workspace))
+    reuse_offset = fieldoffset(DAQPBase.Workspace, reuse_field)
+    reuse_ptr = Ptr{Cint}(Ptr{UInt8}(dreuse.work) + reuse_offset)
+    unsafe_store!(reuse_ptr, 0)
+    ccall((:daqp_node_cleanup_workspace, DAQPBase.libdaqp), Cvoid,
+          (Cint, Ptr{DAQPBase.Workspace}), wsreuse.n_active, dreuse.work)
+    @test unsafe_load(Ptr{DAQPBase.Workspace}(dreuse.work)).reuse_ind == 0
+
 end
 
 @testset "Model interface" begin

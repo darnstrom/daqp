@@ -3,6 +3,54 @@
 #include "utils.h"
 #endif
 
+static c_float daqp_binary_diff(const int id, DAQPWorkspace* work){
+    int j, disp;
+    c_float diff = 0.5*(work->dupper[id]+work->dlower[id]);
+
+    if(id < work->ms){//Simple bound
+        if(work->Rinv==NULL) diff -= work->u[id]; //Hessian is identity
+        else{
+            for(j=id,disp=id+DAQP_R_OFFSET(id,work->n);j<work->n;j++)
+                diff -= work->Rinv[disp++]*work->u[j];
+        }
+    }
+    else{//General bound; daqp_add_infeasible already computed M*u
+        diff -= work->Mu[id-work->ms];
+    }
+    return diff;
+}
+
+static c_float daqp_binary_endpoint_distance(
+        const int id, const c_float diff, DAQPWorkspace* work){
+    return 0.5*(work->dupper[id]-work->dlower[id])
+            - (diff < 0 ? -diff : diff);
+}
+
+static void daqp_order_root_binaries(DAQPWorkspace* work){
+    int i, j, id;
+    c_float diff, gap, score;
+
+    // xold is not used for an incumbent until after root processing.
+    for(i=0; i<work->bnb->nb; i++){
+        id = work->bnb->bin_ids[i];
+        if(DAQP_IS_ACTIVE(id)) score = 0;
+        else{
+            diff = daqp_binary_diff(id,work);
+            gap = work->dupper[id]-work->dlower[id];
+            score = gap > 0
+                ? daqp_binary_endpoint_distance(id,diff,work)/gap : 0;
+        }
+
+        // Stable insertion sort; nb <= n, so xold has enough storage.
+        for(j=i; j>0 && work->xold[j-1] > score; j--){
+            work->xold[j] = work->xold[j-1];
+            work->bnb->bin_ids[j] = work->bnb->bin_ids[j-1];
+        }
+        work->xold[j] = score;
+        work->bnb->bin_ids[j] = id;
+    }
+}
+
 int daqp_bnb(DAQPWorkspace* work){
     int branch_id, exitflag;
     DAQPNode* node;
@@ -44,6 +92,9 @@ int daqp_bnb(DAQPWorkspace* work){
         // Cut conditions
         if(exitflag==DAQP_EXIT_INFEASIBLE) continue; // Dominance cut
         if(exitflag<0) break; // Inner solver failed => exit loop
+
+        if(node->depth < 0)
+            daqp_order_root_binaries(work);
 
         // Find index to branch over
         branch_id = daqp_get_branch_id(work);
@@ -88,9 +139,9 @@ int daqp_process_node(DAQPNode* node, DAQPWorkspace* work){
         else{
             daqp_add_upper_lower(node->bin_id,work);
             work->sense[DAQP_REMOVE_LOWER_FLAG(node->bin_id)] |= DAQP_IMMUTABLE; //Equality
-            if(work->sing_ind != DAQP_EMPTY_IND) // Need to cold start to not miss integer feasible
+            if(work->sing_ind != DAQP_EMPTY_IND){ // Need to cold start to not miss integer feasible
                 daqp_setup_cold_bnb(node,work);
-
+            }
         }
         // Add binary constraint
     }
@@ -99,6 +150,9 @@ int daqp_process_node(DAQPNode* node, DAQPWorkspace* work){
     work->bnb->itercount += work->iterations;
 
     if(exitflag == DAQP_EXIT_CYCLE){// Try to repair (cold start)
+        // A cycle can be caused by stale cached forward-substitution data.
+        // Force the retained fixed prefix to be recomputed during repair.
+        work->reuse_ind=0;
         daqp_setup_cold_bnb(node,work);
         exitflag = daqp_ldp(work);
         work->bnb->itercount += work->iterations;
@@ -108,7 +162,7 @@ int daqp_process_node(DAQPNode* node, DAQPWorkspace* work){
 }
 
 int daqp_get_branch_id(DAQPWorkspace* work){
-    int i, j, disp;
+    int i;
     int branch_id = DAQP_EMPTY_IND;
     c_float diff, endpoint_dist, tol;
 
@@ -118,22 +172,11 @@ int daqp_get_branch_id(DAQPWorkspace* work){
         if(DAQP_IS_ACTIVE(branch_id)) continue;
 
         // Compute signed distance from midpoint between bounds
-        diff = 0.5*(work->dupper[branch_id]+work->dlower[branch_id]);
-        if(branch_id < work->ms){//Simple bound
-            if(work->Rinv==NULL) diff -= work->u[branch_id]; //Hessian is identity
-            else{
-                for(j=branch_id,disp=branch_id+DAQP_R_OFFSET(branch_id,work->n);j<work->n;j++)
-                    diff -= work->Rinv[disp++]*work->u[j];
-            }
-        }
-        else{//General bound; daqp_add_infeasible already computed M*u
-            diff -= work->Mu[branch_id-work->ms];
-        }
+        diff = daqp_binary_diff(branch_id,work);
 
         // A zero-dual binary constraint can lie at an endpoint without being
         // active. It is already integer feasible and does not need branching.
-        endpoint_dist = 0.5*(work->dupper[branch_id]-work->dlower[branch_id])
-                        - (diff < 0 ? -diff : diff);
+        endpoint_dist = daqp_binary_endpoint_distance(branch_id,diff,work);
         tol = work->settings->primal_tol;
         if(work->scaling != NULL) tol *= work->scaling[branch_id];
         if(endpoint_dist <= tol) continue;
@@ -171,7 +214,9 @@ void daqp_node_cleanup_workspace(int n_clean, DAQPWorkspace* work){
     // Reset workspace
     work->sing_ind=DAQP_EMPTY_IND;
     work->n_active=n_clean;
-    work->reuse_ind=n_clean;
+    // Truncation cannot make a previously invalid cached prefix reusable.
+    if(work->reuse_ind > n_clean)
+        work->reuse_ind=n_clean;
 }
 
 
