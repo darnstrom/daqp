@@ -21,15 +21,20 @@ static int gradient_step(DAQPWorkspace* work);
 int daqp_prox(DAQPWorkspace *work){
     int i, total_iter = 0;
     int center_relaxed = 0;
-    const int nx = work->n;
+    int nx, is_lp;
     const c_float relaxation = 1.5;
     int exitflag;
     c_float *swp_ptr;
     c_float max_diff, tol_stat;
     c_float eta = work->settings->eta_prox;
+    c_float eps;
 
-    const int is_lp = (work->Rinv == NULL && work->RinvD == NULL);
-    c_float eps = is_lp ? 1.0 : daqp_get_proximal_regularization(work);
+    // The outer iteration works in the full space; the elimination is applied
+    // to each inner least-distance problem below
+    daqp_eq_restore(work);
+    nx = work->n;
+    is_lp = (work->Rinv == NULL && work->RinvD == NULL);
+    eps = is_lp ? 1.0 : daqp_get_proximal_regularization(work);
 
     // For a QP whose Hessian is already positive definite (n_prox == 0),
     // no direction needs a proximal shift.  The inner QP equals the
@@ -48,6 +53,9 @@ int daqp_prox(DAQPWorkspace *work){
     }
 
     while(total_iter < work->settings->iter_limit){
+        int is_reduced;
+
+        daqp_eq_restore(work); // v and d are formed for the full problem
 
         /* ----------------------------------------------------------------
          * Perturb the problem: form v = R'\(f - eps_mask * x_old)
@@ -88,7 +96,19 @@ int daqp_prox(DAQPWorkspace *work){
             daqp_update_v(work->v, work, 0);
         }
 
-        daqp_update_d(work, work->qp->bupper, work->qp->blower);
+        /* ----------------------------------------------------------------
+         * Reduce the inner problem by eliminating the equality constraints.
+         * Only the bounds change between outer iterations, so the projection
+         * from the setup is reused and only the bounds are reformed.
+         * ----------------------------------------------------------------*/
+        is_reduced = 0;
+        if(daqp_eq_will_reduce(work)){
+            const int elim_flag = daqp_eq_reduce(work, DAQP_UPDATE_d);
+            if(elim_flag < 0) return elim_flag;
+            is_reduced = (elim_flag > 0);
+        }
+        if(!is_reduced)
+            daqp_update_d(work, work->qp->bupper, work->qp->blower);
 
         // xold <-- x  (pointer swap avoids copying)
         swp_ptr = work->xold; work->xold = work->x; work->x = swp_ptr;
@@ -102,8 +122,10 @@ int daqp_prox(DAQPWorkspace *work){
         total_iter += work->iterations;
         if(exitflag < 0)
             break;              // Inner solver failed -- propagate error
-        else
+        else{
+            if(is_reduced) daqp_eq_expand(work); // Expand the reduced iterate
             ldp2qp_solution(work); // Recover QP primal from LDP dual
+        }
 
         if(eps == 0) break;     // No regularisation -> single outer step
 
@@ -157,6 +179,7 @@ int daqp_prox(DAQPWorkspace *work){
             // LP: when not at a vertex take a gradient step toward the
             // nearest constraint to escape from the interior.
             if(is_lp && work->n_active != nx){
+                daqp_eq_restore(work); // gradient_step works in the full space
                 if(gradient_step(work) == DAQP_EMPTY_IND){
                     exitflag = DAQP_EXIT_UNBOUNDED;
                     break;

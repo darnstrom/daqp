@@ -15,6 +15,10 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
     // TODO: copy dimensions from work->qp?
     int error_flag, i;
     int do_activate = 0;
+    const int was_reduced = DAQP_IS_REDUCED(work);
+
+    // The full LDP is updated; eliminating equalities is left to the caller
+    daqp_eq_restore(work);
 
     // Add original qp to workspace
     work->qp = qp;
@@ -116,7 +120,18 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
         work->break_points = qp->break_points;
     }
 
-    // Make sure activate constraints are activated
+    // The working set refers to the reduced LDP if one was installed
+    if(was_reduced) do_activate = 1;
+
+    /*
+     * Make sure activate constraints are activated. Equality constraints are
+     * always active, so forming the working set here is wasted work if they
+     * are eliminated afterwards; daqp_eq_eliminate then forms it instead.
+     */
+    if(do_activate == 1 && (mask&DAQP_UPDATE_eliminate) && daqp_eq_will_reduce(work)){
+        reset_daqp_workspace(work);
+        do_activate = 0;
+    }
     if(do_activate == 1){
         reset_daqp_workspace(work);
         if(work->nh < 2)

@@ -27,6 +27,13 @@ extern "C" {
 #define DAQP_DEFAULT_SING_TOL (3.7e-11)
 #define DAQP_DEFAULT_REFACTOR_TOL 1e-9
 #define DAQP_DEFAULT_EPS_PROX 1e-6
+#define DAQP_DEFAULT_EQ_ELIM 1
+
+// Equality elimination requires sufficiently many equality constraints
+// (neq > EQ_MIN_COUNT and neq > n/EQ_MIN_RATIO); unless eq_elim > 1, the
+// reduction also has to make the constraints cheaper to scan
+#define DAQP_EQ_MIN_COUNT 5
+#define DAQP_EQ_MIN_RATIO 20
 
 
 // MACROS
@@ -52,6 +59,7 @@ extern "C" {
 #define DAQP_UPDATE_sense 16
 #define DAQP_UPDATE_hierarchy 32
 #define DAQP_UPDATE_unconstrained 64
+#define DAQP_UPDATE_eliminate 128
 
 // CONSTRAINT MASKS
 #define DAQP_ACTIVE 1

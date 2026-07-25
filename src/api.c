@@ -58,11 +58,19 @@ void daqp_quadprog(DAQPResult *res, DAQPProblem* qp, DAQPSettings *settings){
 
     DAQPWorkspace work;
     work.settings = settings;
-    setup_flag = setup_daqp_main(qp,&work,&(res->setup_time),1);
+    // 1 - check for an unconstrained optimum, 2 - equalities are eliminated
+    setup_flag = setup_daqp_main(qp,&work,&(res->setup_time),1+2);
     res->exitflag = setup_flag;
 
     if(setup_flag >= 0){
-        daqp_solve(res,&work);
+        // Equality constraints are eliminated around an ordinary solve
+        int elim_flag = daqp_eq_eliminate(&work);
+        if(elim_flag < 0)
+            res->exitflag = elim_flag;
+        else{
+            daqp_solve(res,&work);
+            daqp_eq_retrieve(res,&work);
+        }
         // Free memory
         if(settings != NULL) work.settings = NULL;
         free_daqp_workspace(&work);
@@ -181,7 +189,9 @@ int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp, const int check_unc){
     // Update hierarchy if hqp
     if(qp->nh > 1) update_mask += DAQP_UPDATE_hierarchy;
 
-    if(check_unc) update_mask += DAQP_UPDATE_unconstrained;
+    if(check_unc&1) update_mask += DAQP_UPDATE_unconstrained;
+    // The caller eliminates equality constraints after the setup
+    if(check_unc&2) update_mask += DAQP_UPDATE_eliminate;
 
     // Form LDP
     error_flag = daqp_update_ldp(update_mask, work, qp);
@@ -236,6 +246,7 @@ int setup_daqp_bnb(DAQPWorkspace* work, int* sense, int nb, int ns){
 // Free data for LDP
 void free_daqp_ldp(DAQPWorkspace *work){
     if(work->sense==NULL) return; // Already freed
+    free_daqp_eq(work); // Restores the full LDP before it is freed
     free(work->sense);
     if(work->Rinv != NULL){
         free(work->Rinv);
@@ -325,6 +336,7 @@ void allocate_daqp_workspace(DAQPWorkspace *work, int n, int ns){
     work->nh = 0;
     work->break_points = NULL;
     work->avi = NULL;
+    work->eq = NULL;
     work->timer = NULL;
 
     reset_daqp_workspace(work);
@@ -500,6 +512,7 @@ void daqp_default_settings(DAQPSettings* settings){
     settings->sing_tol = DAQP_DEFAULT_SING_TOL;
     settings->refactor_tol = DAQP_DEFAULT_REFACTOR_TOL;
     settings->time_limit = 0;
+    settings->eq_elim = DAQP_DEFAULT_EQ_ELIM;
 }
 
 /* Remove redundant constraints*/

@@ -107,6 +107,7 @@ class DAQP {
     void set_sing_tol(double val);
     void set_refactor_tol(double val);
     void set_time_limit(double val);
+    void set_eq_elim(int val);
 
     // Getters for result
     Eigen::VectorXd const& get_primal();

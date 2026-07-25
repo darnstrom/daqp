@@ -40,6 +40,8 @@ cdef extern from "types.h":
         double refactor_tol;
         double time_limit;
 
+        int eq_elim;
+
     ctypedef struct DAQPWorkspace:
         int n
         int m
@@ -103,3 +105,4 @@ cdef extern from "constants.h":
     cdef double  DAQP_DEFAULT_SING_TOL
     cdef double  DAQP_DEFAULT_REFACTOR_TOL
     cdef double  DAQP_DEFAULT_EPS_PROX
+    cdef int DAQP_DEFAULT_EQ_ELIM

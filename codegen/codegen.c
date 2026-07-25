@@ -222,6 +222,8 @@ void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work, const char* prefix){
         fprintf(f, "0, NULL,\n");
     // AVI
     fprintf(f, "NULL,\n"); // TODO: Generate for avi (also requires problem to be generated)
+    // Equality elimination (not supported in generated code)
+    fprintf(f, "NULL,\n");
     // Timer
     fprintf(f, "NULL,\n"); // Timer
     if(m > ms)
@@ -254,7 +256,8 @@ void write_daqp_settings_src(FILE*  f, DAQPSettings* settings, const char* prefi
 
     fprintf(f, "(c_float)%.20f,",  settings->sing_tol);
     fprintf(f, "(c_float)%.20f,",  settings->refactor_tol);
-    fprintf(f, "(c_float)%.20f",  settings->time_limit);
+    fprintf(f, "(c_float)%.20f,",  settings->time_limit);
+    fprintf(f, "%d",  0); // Equality elimination is not supported in generated code
     fprintf(f, "};\n\n");
 }
 

@@ -405,6 +405,11 @@ void DAQP::set_refactor_tol(double val) {
     is_solved_ = false;
 }
 
+void DAQP::set_eq_elim(int val) {
+    settings_.eq_elim = val;
+    is_solved_ = false;
+}
+
 void DAQP::set_time_limit(double val) {
     settings_.time_limit = val;
     is_solved_ = false;

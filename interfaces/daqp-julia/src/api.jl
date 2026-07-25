@@ -332,28 +332,31 @@ function update(daqp::DAQPBase.Model, H,f,A,bupper,blower,sense=nothing,break_po
         check_unconstrained = true)
     update_mask = Cint(0);
     work = unsafe_load(daqp.work);
-    if(!isnothing(H) && work.n == size(H,1) && work.n == size(H,2))
+    # The workspace dimensions can differ from the problem's if equality
+    # constraints have been eliminated, so validate against the problem.
+    qp = unsafe_load(work.qp);
+    if(!isnothing(H) && qp.n == size(H,1) && qp.n == size(H,2))
         daqp.qpj.H.=H
         update_mask +=1
     end
-    if(!isnothing(A) && size(A,1)==(work.m-work.ms) && size(A,2)==work.n)
+    if(!isnothing(A) && size(A,1)==(qp.m-qp.ms) && size(A,2)==qp.n)
         daqp.qpj.A.=A'
         update_mask+=2
     end
 
-    if(!isnothing(f) && length(f)==work.n)
+    if(!isnothing(f) && length(f)==qp.n)
         daqp.qpj.f.=f
         update_mask+=4
     end
 
     if(!isnothing(bupper) && !isnothing(blower) &&
-       length(bupper)==work.m && length(blower)==work.m)
+       length(bupper)==qp.m && length(blower)==qp.m)
         daqp.qpj.bupper.=bupper
         daqp.qpj.blower.=blower
         update_mask+=8
     end
 
-    if(!isnothing(sense) && length(sense)== work.m)
+    if(!isnothing(sense) && length(sense)== qp.m)
         daqp.qpj.sense .= sense
         update_mask+=16
     end

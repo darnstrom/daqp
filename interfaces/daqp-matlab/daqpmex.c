@@ -28,7 +28,8 @@ const char* SETTINGS_FIELDS[] = {
   "rel_subopt",
   "sing_tol",
   "refactor_tol",
-  "time_limit"
+  "time_limit",
+  "eq_elim"
 };
 
 
@@ -132,11 +133,11 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  work->qp->sense= (int *)mxGetPr(prhs[7]);
 	  // Setup output
 #ifdef DAQP_SINGLE_PRECISION
-	  plhs[0] = mxCreateNumericMatrix((mwSize)work->n,1,mxSINGLE_CLASS,mxREAL); // x_star
-	  mxArray* lam = mxCreateNumericMatrix((mwSize)work->m,1,mxSINGLE_CLASS,mxREAL); // lambda
+	  plhs[0] = mxCreateNumericMatrix((mwSize)work->qp->n,1,mxSINGLE_CLASS,mxREAL); // x_star
+	  mxArray* lam = mxCreateNumericMatrix((mwSize)work->qp->m,1,mxSINGLE_CLASS,mxREAL); // lambda
 #else
-	  plhs[0] = mxCreateNumericMatrix((mwSize)work->n,1,mxDOUBLE_CLASS,mxREAL); // x_star
-	  mxArray* lam = mxCreateNumericMatrix((mwSize)work->m,1,mxDOUBLE_CLASS,mxREAL); // lambda
+	  plhs[0] = mxCreateNumericMatrix((mwSize)work->qp->n,1,mxDOUBLE_CLASS,mxREAL); // x_star
+	  mxArray* lam = mxCreateNumericMatrix((mwSize)work->qp->m,1,mxDOUBLE_CLASS,mxREAL); // lambda
 #endif
 	  plhs[2] = mxCreateNumericMatrix(1, 1, mxINT32_CLASS, mxREAL); //Exit flag
 
@@ -184,6 +185,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		mxSetField(s, 0, "abs_subopt", mxCreateDoubleScalar(work->settings->abs_subopt));
 		mxSetField(s, 0, "rel_subopt", mxCreateDoubleScalar(work->settings->rel_subopt));
 		mxSetField(s, 0, "time_limit", mxCreateDoubleScalar(work->settings->time_limit));
+		mxSetField(s, 0, "eq_elim", mxCreateDoubleScalar(work->settings->eq_elim));
 		plhs[0] = s;
 	  }
 	}
@@ -203,6 +205,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  work->settings->abs_subopt= (c_float)mxGetScalar(mxGetField(s, 0, "abs_subopt"));
 	  work->settings->rel_subopt= (c_float)mxGetScalar(mxGetField(s, 0, "rel_subopt"));
 	  work->settings->time_limit= (c_float)mxGetScalar(mxGetField(s, 0, "time_limit"));
+	  work->settings->eq_elim= (int)mxGetScalar(mxGetField(s, 0, "eq_elim"));
 	}
 	else if (!strcmp("update", cmd)) {
 	  if(work->qp == NULL) mexErrMsgTxt("No problem to update");
