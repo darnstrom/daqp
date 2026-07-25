@@ -122,10 +122,10 @@ int daqp_prox(DAQPWorkspace *work){
         total_iter += work->iterations;
         if(exitflag < 0)
             break;              // Inner solver failed -- propagate error
-        else{
-            if(is_reduced) daqp_eq_expand(work); // Expand the reduced iterate
+        else if(is_reduced)
+            daqp_eq_expand(work); // Gives the primal of the full problem
+        else
             ldp2qp_solution(work); // Recover QP primal from LDP dual
-        }
 
         if(eps == 0) break;     // No regularisation -> single outer step
 

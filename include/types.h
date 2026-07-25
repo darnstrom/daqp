@@ -139,35 +139,43 @@ typedef struct{
  */
 typedef struct{
     int n;  // Number of primal variables before elimination
-    int m;  // Number of constraints
+    int m;  // Number of constraints before elimination
     int ms; // Number of simple bounds before elimination
     int neq; // Number of eliminated equality constraints
     int nign; // Number of equalities that were linearly dependent (ignored)
+    int ndrop; // Number of constraints that the equalities imply
     int ncand; // Number of equality candidates that memory is allocated for
-    int nz; // Reduced dimension that M is allocated for (n-neq)
-    int installed; // Whether the reduced LDP is currently in the workspace
+    int nz; // Reduced number of primal variables (n-neq)
+    int m_r; // Reduced number of constraints
+    int installed; // Whether the reduced problem is currently in the workspace
+    int expanded; // Whether the reduced solution has already been expanded
 
-    int* eq_ids; // Constraint index of the neq eliminated (then nign ignored) rows
-    c_float* Q; // Orthogonal factor [Q1 Q2] of M_E' (n x n, column major)
+    int* eq_ids; // The neq eliminated, followed by the nign ignored, equalities
+    int* drop_ids; // Constraints that are implied by the equalities
+    int* map; // Constraint index in the original problem of each reduced one
+    c_float* Q; // Householder vectors (leading neq columns) and Q2 (trailing)
     c_float* R; // Upper triangular factor of M_E' (packed by columns)
-    c_float* tau; // Householder scalars (only used while factorizing)
-    c_float* y1; // Q1-part of u (solves R' y1 = d_E)
+    c_float* tau; // Householder scalars
+    c_float* s_eq; // Normalization of the eliminated equality constraints
+    c_float* y1; // Q1-part of u (solves R'y1 = d_E)
     c_float* lam_eq; // Multipliers of the eliminated constraints
-    c_float* up; // Particular solution Q1*y1
-    c_float* tmp; // Scratch of size n
-    c_float* t; // Normalization of the reduced constraints
+    c_float* W; // Rinv*Q2 (n x nz, row major)
+    c_float* xp; // Part of the solution that the equalities determine
+    c_float* tmp; // Scratch of size 2n
 
     c_float up_norm2; // ||up||^2 (offset in the objective function)
 
-    // Reduced LDP data (swapped into the workspace while solving)
+    // Reduced problem (swapped into the workspace while solving)
     c_float* M;
     c_float* dupper;
     c_float* dlower;
     c_float* scaling;
     c_float* Mu;
-    // Full LDP data (restored into the workspace before it is updated).
-    // The reduced problem has an identity Hessian, so Rinv/RinvD/v are set
-    // aside as well: the solver then sees an ordinary least-distance problem.
+    int* sense;
+    // Full problem (restored into the workspace when it is updated). The
+    // reduced problem has an identity Hessian, so the Hessian factor and the
+    // linear term are set aside as well: the solver then sees an ordinary
+    // least-distance problem.
     c_float* M_full;
     c_float* dupper_full;
     c_float* dlower_full;
@@ -176,6 +184,7 @@ typedef struct{
     c_float* Rinv_full;
     c_float* RinvD_full;
     c_float* v_full;
+    int* sense_full;
 }DAQPEqElim;
 
 typedef struct{

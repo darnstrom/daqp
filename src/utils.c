@@ -15,6 +15,7 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
     // TODO: copy dimensions from work->qp?
     int error_flag, i;
     int do_activate = 0;
+    int skip_constraints = 0;
     const int was_reduced = DAQP_IS_REDUCED(work);
 
     // The full LDP is updated; eliminating equalities is left to the caller
@@ -72,8 +73,15 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
     int unconstrained_flag = (work->avi != NULL) ? 1 : daqp_check_unconstrained(work,mask);
     if(unconstrained_flag == DAQP_UNCONSTRAINED_OPTIMAL) return 0;
 
-    /** Update M **/
-    if(mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M){
+    /*
+     * Update M. Only the equality rows are needed if the constraints are about
+     * to be eliminated, and those are formed by the elimination itself.
+     */
+    if(mask&DAQP_UPDATE_eliminate && daqp_eq_will_reduce(work)){
+        reset_daqp_workspace(work); // M is not formed
+        skip_constraints = 1;
+    }
+    else if(mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M){
         error_flag = daqp_update_M(work,qp->A,mask);
         if(error_flag<0)
             return error_flag;
@@ -85,7 +93,10 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
     }
 
     /** Update d **/
-    if(mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M||mask&DAQP_UPDATE_v||mask&DAQP_UPDATE_d){
+    if(skip_constraints){
+        // Formed together with the reduced constraints by the elimination
+    }
+    else if(mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M||mask&DAQP_UPDATE_v||mask&DAQP_UPDATE_d){
         if(unconstrained_flag == 1){ // Already computed d, just need to normalize
             if(work->scaling != NULL){
                 for(i = 0; i < work->m; i++){
@@ -128,7 +139,7 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
      * always active, so forming the working set here is wasted work if they
      * are eliminated afterwards; daqp_eq_eliminate then forms it instead.
      */
-    if(do_activate == 1 && (mask&DAQP_UPDATE_eliminate) && daqp_eq_will_reduce(work)){
+    if(do_activate == 1 && skip_constraints){
         reset_daqp_workspace(work);
         do_activate = 0;
     }
