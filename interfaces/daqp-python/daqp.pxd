@@ -73,7 +73,7 @@ cdef extern from "api.h":
     cdef extern nogil:
         void daqp_set_primal_start(DAQPWorkspace *work, double *x)
     cdef extern nogil:
-        int setup_daqp_main(DAQPProblem *qp, DAQPWorkspace *work, double *setup_time, int check_unc)
+        int setup_daqp_main(DAQPProblem *qp, DAQPWorkspace *work, double *setup_time, int init_mask)
     cdef extern nogil:
         void daqp_solve(DAQPResult *res, DAQPWorkspace *work)
     cdef extern nogil:
@@ -103,3 +103,11 @@ cdef extern from "constants.h":
     cdef double  DAQP_DEFAULT_SING_TOL
     cdef double  DAQP_DEFAULT_REFACTOR_TOL
     cdef double  DAQP_DEFAULT_EPS_PROX
+    cdef int DAQP_UPDATE_Rinv
+    cdef int DAQP_UPDATE_M
+    cdef int DAQP_UPDATE_v
+    cdef int DAQP_UPDATE_d
+    cdef int DAQP_UPDATE_sense
+    cdef int DAQP_UPDATE_hierarchy
+    cdef int DAQP_UPDATE_unconstrained
+    cdef int DAQP_UPDATE_eliminate

@@ -171,6 +171,34 @@ class TestModel(unittest.TestCase):
         self.assertEqual(ef, 1)
         np.testing.assert_allclose(x, [-0.5, -0.5], atol=1e-6)
 
+    def test_model_keeps_equalities_by_default(self):
+        """Persistent models do not eliminate equalities by default."""
+        n = 10
+        neq = 6
+        H = np.eye(n, dtype=c_double)
+        f = np.zeros(n, dtype=c_double)
+        A = np.vstack((np.eye(n, dtype=c_double)[:neq], np.ones((1, n))))
+        bupper = np.concatenate((
+            np.full(n, 10.0), np.zeros(neq), np.array([10.0])))
+        blower = np.concatenate((
+            np.full(n, -10.0), np.zeros(neq), np.array([-10.0])))
+        sense = np.concatenate((
+            np.zeros(n, dtype=c_int), np.full(neq, 5, dtype=c_int),
+            np.zeros(1, dtype=c_int)))
+
+        d = daqp.Model()
+        setup_flag, _ = d.setup(H, f, A, bupper, blower, sense)
+        self.assertGreater(setup_flag, 0)
+
+        x, _, exitflag, _ = d.solve()
+        self.assertEqual(exitflag, 1)
+        np.testing.assert_allclose(x, np.zeros(n), atol=1e-8)
+
+        bupper[-1] = 9.0
+        blower[-1] = -9.0
+        update_flag = d.update(bupper=bupper, blower=blower)
+        self.assertEqual(update_flag, 0)
+
     def test_model_solve_returns_copies(self):
         """Each solve() call returns independent copies of x and lam."""
         H, f, A, bupper, blower, sense = self._make_qp()

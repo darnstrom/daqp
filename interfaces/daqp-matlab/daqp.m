@@ -1,4 +1,8 @@
 classdef daqp< handle
+    properties (Constant, Access = private)
+        DAQP_UPDATE_UNCONSTRAINED = int32(64);
+        DAQP_UPDATE_ELIMINATE = int32(128);
+    end
     properties (SetAccess = immutable, Hidden = true)
         work_ptr;
         isdouble;
@@ -15,7 +19,10 @@ classdef daqp< handle
             if nargin < 7, primal_start = []; end
             if nargin < 8, dual_start = []; end
             d = daqp();
-            [exitflag,setup_time] = d.setup(H,f,A,bupper,blower,sense,[],0,primal_start,dual_start,1);
+            init_mask = bitor(daqp.DAQP_UPDATE_UNCONSTRAINED, ...
+                              daqp.DAQP_UPDATE_ELIMINATE);
+            [exitflag,setup_time] = d.setup(H,f,A,bupper,blower,sense,[],0,...
+                primal_start,dual_start,init_mask);
             if(exitflag <0)
                 x = [];fval=[];info=[];
                 return;
@@ -28,7 +35,8 @@ classdef daqp< handle
             if nargin < 6, primal_start = []; end
             if nargin < 7, dual_start = []; end
             d = daqp();
-            [exitflag,setup_time] = d.setup([],f,A,bupper,blower,sense,[],0,primal_start,dual_start);
+            [exitflag,setup_time] = d.setup([],f,A,bupper,blower,sense,[],0,...
+                primal_start,dual_start,daqp.DAQP_UPDATE_ELIMINATE);
             if(exitflag <0)
                 x = [];fval=[];info=[];
                 return;
@@ -45,7 +53,8 @@ classdef daqp< handle
             if nargin < 7, primal_start = []; end
             if nargin < 8, dual_start = []; end
             d = daqp();
-            [exitflag,setup_time] = d.setup(H,f,A,bupper,blower,sense,[],1,primal_start,dual_start);
+            [exitflag,setup_time] = d.setup(H,f,A,bupper,blower,sense,[],1,...
+                primal_start,dual_start,daqp.DAQP_UPDATE_ELIMINATE);
             if(exitflag <0)
                 x = [];fval=[];info=[];
                 return;
@@ -70,7 +79,8 @@ classdef daqp< handle
             end
             sense = zeros(m,1,'int32');
             d = daqp();
-            d.setup([],[],A,bu,bl,sense,break_points);
+            d.setup([],[],A,bu,bl,sense,break_points,0,[],[],...
+                daqp.DAQP_UPDATE_ELIMINATE);
             [x,fval,exitflag, info] = d.solve();
             es = {};
             for i = 1:nh
@@ -104,7 +114,7 @@ classdef daqp< handle
             [x,fval,exitflag,info] = daqpmex('solve', this.work_ptr,...
                 this.H,this.f,this.A,this.bupper,this.blower,this.sense,this.break_points);
         end
-        function [exitflag,setup_time] = setup(this,H,f,A,bupper,blower,sense,break_points,problem_type,primal_start,dual_start,check_unconstrained)
+        function [exitflag,setup_time] = setup(this,H,f,A,bupper,blower,sense,break_points,problem_type,primal_start,dual_start,init_mask)
             if(nargin < 8)
                 break_points = [];
             end
@@ -117,8 +127,8 @@ classdef daqp< handle
             if(nargin < 11)
                 dual_start = [];
             end
-            if(nargin < 11)
-                check_unconstrained = 0;
+            if(nargin < 12)
+                init_mask = int32(0);
             end
 
             % TODO Check validity
@@ -146,7 +156,7 @@ classdef daqp< handle
             this.break_points= int32(break_points);
             [exitflag,setup_time] = daqpmex('setup', this.work_ptr,this.H,this.f,...
                 this.A,this.bupper,this.blower,this.sense,this.break_points,int32(problem_type),...
-                primal_start,dual_start,check_unconstrained);
+                primal_start,dual_start,init_mask);
         end
 
         function settings = settings(this,varargin)

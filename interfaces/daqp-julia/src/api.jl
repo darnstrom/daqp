@@ -55,7 +55,8 @@ function quadprog(H::Union{Matrix{Float64}, Cholesky},f::Vector{Float64},
     d = DAQPBase.Model()
     !isnothing(settings) && DAQPBase.settings(d,settings)
     exitflag,setup_time = DAQPBase.setup(d,QPj(H,f,A,bupper,blower,sense;A_rowmaj);
-                                         primal_start,dual_start, check_unconstrained=true)
+        primal_start,dual_start,
+        init_mask=DAQP_UPDATE_unconstrained | DAQP_UPDATE_eliminate)
     return DAQPBase.solve(d;setup_time);
 end
 
@@ -121,7 +122,9 @@ function linprog(f::Vector{Float64},
         sense::Vector{Cint}=Cint[];A_rowmaj=false, primal_start::Vector{Cdouble}=Cdouble[],
         dual_start::Vector{Cdouble}=Cdouble[])
     d = DAQPBase.Model()
-    exitflag,setup_time = DAQPBase.setup(d,QPj(zeros(0,0),f,A,bupper,blower,sense;A_rowmaj);primal_start,dual_start)
+    exitflag,setup_time = DAQPBase.setup(
+        d, QPj(zeros(0,0),f,A,bupper,blower,sense;A_rowmaj);
+        primal_start,dual_start,init_mask=DAQP_UPDATE_eliminate)
     return  DAQPBase.solve(d;setup_time);
 end
 """
@@ -179,7 +182,7 @@ function avi(H::Matrix{Float64},f::Vector{Float64},
         dual_start::Vector{Cdouble}=Cdouble[])
     d = DAQPBase.Model()
     exitflag,setup_time = DAQPBase.setup(d,QPj(H,f,A,bupper,blower,sense;A_rowmaj,is_avi=true);
-                                         primal_start,dual_start)
+        primal_start,dual_start,init_mask=DAQP_UPDATE_eliminate)
     return  DAQPBase.solve(d;setup_time);
 end
 """
@@ -228,7 +231,7 @@ function delete!(daqp::DAQPBase.Model)
 end
 
 function setup(daqp::DAQPBase.Model, qp::DAQPBase.QPj;primal_start::Vector{Cdouble}=Cdouble[],
-        dual_start::Vector{Cdouble}=Cdouble[],check_unconstrained=false)
+        dual_start::Vector{Cdouble}=Cdouble[],init_mask=Cint(0))
     daqp.qpj = qp
     daqp.qpc = DAQPBase.QPc(daqp.qpj)
     old_settings = settings(daqp); # in case setup fails
@@ -251,7 +254,9 @@ function setup(daqp::DAQPBase.Model, qp::DAQPBase.QPj;primal_start::Vector{Cdoub
     end
 
     # Handle AVI with other setup
-    exitflag = ccall((:setup_daqp_main,DAQPBase.libdaqp),Cint,(Ptr{DAQPBase.QPc}, Ptr{DAQPBase.Workspace}, Ptr{Cdouble},Cint), daqp.qpc_ptr, daqp.work, setup_time, Cint(check_unconstrained))
+    exitflag = ccall((:setup_daqp_main,DAQPBase.libdaqp),Cint,
+        (Ptr{DAQPBase.QPc}, Ptr{DAQPBase.Workspace}, Ptr{Cdouble},Cint),
+        daqp.qpc_ptr, daqp.work, setup_time, Cint(init_mask))
     if(exitflag < 0)
         # XXX: if setup fails DAQP currently clears settings
         ccall((:allocate_daqp_settings,DAQPBase.libdaqp),Nothing,(Ptr{DAQPBase.Workspace},),daqp.work)
@@ -272,8 +277,11 @@ end
 function setup(daqp::DAQPBase.Model, H::Union{Matrix{Cdouble},Cholesky},f::Vector{Cdouble},
         A::Matrix{Cdouble},bupper::Vector{Cdouble},blower::Vector{Cdouble}=Cdouble[],
         sense::Vector{Cint}=Cint[];A_rowmaj=false,break_points = Cint[], is_avi=false,
-        primal_start::Vector{Cdouble}=Cdouble[],dual_start::Vector{Cdouble}=Cdouble[])
-    return setup(daqp,QPj(H,f,A,bupper,blower,sense;A_rowmaj,break_points,is_avi);primal_start,dual_start)
+        primal_start::Vector{Cdouble}=Cdouble[],dual_start::Vector{Cdouble}=Cdouble[],
+        init_mask=Cint(0))
+    return setup(
+        daqp, QPj(H,f,A,bupper,blower,sense;A_rowmaj,break_points,is_avi);
+        primal_start,dual_start,init_mask)
 end
 
 function solve(daqp::DAQPBase.Model;setup_time=0.0)
@@ -329,43 +337,42 @@ function settings(p::Ptr{DAQPBase.Workspace},changes::Dict{Symbol,<:Any})
 end
 
 function update(daqp::DAQPBase.Model, H,f,A,bupper,blower,sense=nothing,break_points=nothing,
-        check_unconstrained = true)
-    update_mask = Cint(0);
+        init_mask=Cint(0))
+    update_mask = Cint(init_mask);
     work = unsafe_load(daqp.work);
     # The workspace dimensions can differ from the problem's if equality
     # constraints have been eliminated, so validate against the problem.
     qp = unsafe_load(work.qp);
     if(!isnothing(H) && qp.n == size(H,1) && qp.n == size(H,2))
         daqp.qpj.H.=H
-        update_mask +=1
+        update_mask |= DAQP_UPDATE_Rinv
     end
     if(!isnothing(A) && size(A,1)==(qp.m-qp.ms) && size(A,2)==qp.n)
         daqp.qpj.A.=A'
-        update_mask+=2
+        update_mask |= DAQP_UPDATE_M
     end
 
     if(!isnothing(f) && length(f)==qp.n)
         daqp.qpj.f.=f
-        update_mask+=4
+        update_mask |= DAQP_UPDATE_v
     end
 
     if(!isnothing(bupper) && !isnothing(blower) &&
        length(bupper)==qp.m && length(blower)==qp.m)
         daqp.qpj.bupper.=bupper
         daqp.qpj.blower.=blower
-        update_mask+=8
+        update_mask |= DAQP_UPDATE_d
     end
 
     if(!isnothing(sense) && length(sense)== qp.m)
         daqp.qpj.sense .= sense
-        update_mask+=16
+        update_mask |= DAQP_UPDATE_sense
     end
 
     if(!isnothing(break_points) && length(break_points)== work.nh)
         daqp.qpj.break_points .= break_points
-        update_mask+=32
+        update_mask |= DAQP_UPDATE_hierarchy
     end
-    #check_unconstrained && (update_mask += 64) # Enable shortcut for unconstrained optimum
     daqp.qpc = QPc(daqp.qpj);
     unsafe_store!(daqp.qpc_ptr, daqp.qpc)
 

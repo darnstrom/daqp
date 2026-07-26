@@ -31,8 +31,8 @@ void daqp_quadprog(DAQPResult* res, DAQPProblem* qp,DAQPSettings* settings);
 void daqp_avi(DAQPResult *res, DAQPProblem* problem, DAQPSettings *settings);
 
 int setup_daqp(DAQPProblem *qp, DAQPWorkspace* work, c_float* setup_time);
-int setup_daqp_main(DAQPProblem *qp, DAQPWorkspace* work, c_float* setup_time, int check_unc);
-int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem* qp, const int check_unc);
+int setup_daqp_main(DAQPProblem *qp, DAQPWorkspace* work, c_float* setup_time, int init_mask);
+int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem* qp, const int init_mask);
 void setup_daqp_hiqp(DAQPWorkspace *work, int* break_points, int nh);
 int setup_daqp_bnb(DAQPWorkspace* work, int* sense, int nb, int ns);
 int setup_daqp_avi(DAQPAVI* avi, DAQPProblem* p, DAQPWorkspace* work, c_float* setup_time);

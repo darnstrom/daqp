@@ -12,6 +12,16 @@ const EQUALITY = ACTIVE+IMMUTABLE
 const SOFT= 8
 const BINARY= 16
 
+# LDP update masks
+const DAQP_UPDATE_Rinv = 1
+const DAQP_UPDATE_M = 2
+const DAQP_UPDATE_v = 4
+const DAQP_UPDATE_d = 8
+const DAQP_UPDATE_sense = 16
+const DAQP_UPDATE_hierarchy = 32
+const DAQP_UPDATE_unconstrained = 64
+const DAQP_UPDATE_eliminate = 128
+
 # Exit Flags
 const  CONSTRAINED_POINT   = 3
 const  SOFT_OPTIMAL   =  2

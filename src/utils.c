@@ -18,7 +18,7 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
     int skip_constraints = 0;
     const int was_reduced = DAQP_IS_REDUCED(work);
 
-    // The full LDP is updated; eliminating equalities is left to the caller
+    // Update the full LDP before optionally installing a reduced one below
     daqp_eq_restore(work);
     // An elimination is formed from Rinv and A, so it cannot be reused if
     // either changes (neq == 0 marks the factorization as invalid)
@@ -160,6 +160,9 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
         if(error_flag<0)
             return error_flag;
     }
+
+    if(mask&DAQP_UPDATE_eliminate)
+        return daqp_eq_eliminate(work);
 
     return 0;
 }

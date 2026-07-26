@@ -61,19 +61,13 @@ void daqp_quadprog(DAQPResult *res, DAQPProblem* qp, DAQPSettings *settings){
 
     DAQPWorkspace work;
     work.settings = settings;
-    // 1 - check for an unconstrained optimum, 2 - equalities are eliminated
-    setup_flag = setup_daqp_main(qp,&work,&(res->setup_time),1+2);
+    const int init_mask =
+        DAQP_UPDATE_unconstrained | DAQP_UPDATE_eliminate;
+    setup_flag = setup_daqp_main(qp,&work,&(res->setup_time),init_mask);
     res->exitflag = setup_flag;
 
     if(setup_flag >= 0){
-        // Equality constraints are eliminated around an ordinary solve
-        int elim_flag = daqp_eq_eliminate(&work);
-        if(elim_flag < 0)
-            res->exitflag = elim_flag;
-        else{
-            daqp_solve(res,&work);
-            daqp_eq_retrieve(res,&work);
-        }
+        daqp_solve(res,&work);
         // Free memory
         if(settings != NULL) work.settings = NULL;
         free_daqp_workspace(&work);
@@ -89,11 +83,11 @@ void daqp_avi(DAQPResult *res, DAQPProblem* problem, DAQPSettings *settings){
 
 // Setup workspace and transform QP to LDP
 int setup_daqp(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time){
-    return setup_daqp_main(qp,work,setup_time,0);//
+    return setup_daqp_main(qp,work,setup_time,0);
 }
 
 // Internal function for setting workspace and transform QP to LDP
-int setup_daqp_main(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time, int check_unc){
+int setup_daqp_main(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time, int init_mask){
     int errorflag;
     int own_settings=1;
     (void)setup_time; // avoids warning when compiling without profiling
@@ -146,7 +140,7 @@ int setup_daqp_main(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time, i
         return errorflag;
     }
 
-    errorflag = setup_daqp_ldp(work,qp,check_unc);
+    errorflag = setup_daqp_ldp(work,qp,init_mask);
     if(errorflag < 0){
         if(own_settings==0) work->settings = NULL;
         free_daqp_workspace(work);
@@ -163,9 +157,10 @@ int setup_daqp_main(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time, i
 }
 
 //  Setup LDP from QP
-int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp, const int check_unc){
+int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp, const int init_mask){
     // Always update M, d and sense
-    int update_mask = DAQP_UPDATE_M+DAQP_UPDATE_d+DAQP_UPDATE_sense;
+    int update_mask =
+        init_mask | DAQP_UPDATE_M | DAQP_UPDATE_d | DAQP_UPDATE_sense;
     int error_flag;
     int alloc_R=0, alloc_v=0;
 
@@ -173,12 +168,12 @@ int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp, const int check_unc){
     // Only allocate Rinv if H is not NULL
     if(qp->H!=NULL){
         alloc_R = 1;
-        update_mask+=DAQP_UPDATE_Rinv;
+        update_mask |= DAQP_UPDATE_Rinv;
     }
     // Only allocate v if f is not NULL (QP linear term or LP objective).
     if(qp->f!=NULL){
         alloc_v = 1;
-        update_mask+=DAQP_UPDATE_v;
+        update_mask |= DAQP_UPDATE_v;
     }
 
     // For LPs (no Hessian), mark all directions as needing proximal regularisation.
@@ -190,11 +185,7 @@ int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp, const int check_unc){
     allocate_daqp_ldp(work, qp->n, qp->m, qp->ms, alloc_R, alloc_v);
 
     // Update hierarchy if hqp
-    if(qp->nh > 1) update_mask += DAQP_UPDATE_hierarchy;
-
-    if(check_unc&1) update_mask += DAQP_UPDATE_unconstrained;
-    // The caller eliminates equality constraints after the setup
-    if(check_unc&2) update_mask += DAQP_UPDATE_eliminate;
+    if(qp->nh > 1) update_mask |= DAQP_UPDATE_hierarchy;
 
     // Form LDP
     error_flag = daqp_update_ldp(update_mask, work, qp);
@@ -483,6 +474,9 @@ void daqp_extract_result(DAQPResult* res, DAQPWorkspace* work){
     res->soft_slack = work->soft_slack;
     res->iter = work->iterations;
     res->nodes = (work->bnb == NULL) ? 1 : work->bnb->nodecount;
+
+    // Expand a reduced equality-eliminated result and restore the full LDP.
+    daqp_eq_retrieve(res,work);
 }
 
 void daqp_extract_active_duals(DAQPResult* res, DAQPWorkspace* work){

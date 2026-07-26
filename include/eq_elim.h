@@ -11,10 +11,9 @@ extern "C" {
 #define DAQP_IS_REDUCED(work) ((work)->eq != NULL && (work)->eq->installed)
 
 /*
- * Eliminate the equality constraints of the LDP in the workspace, and retrieve
- * the solution of the original problem from the reduced one. daqp_quadprog
- * applies these around an ordinary setup/solve; a workspace that is set up and
- * solved directly is reduced only if these are called.
+ * Eliminate the equality constraints of the LDP in the workspace.
+ * daqp_update_ldp applies the elimination when DAQP_UPDATE_eliminate is set;
+ * daqp_extract_result retrieves the full solution after solving.
  *
  * Returns the number of eliminated constraints (0 if the LDP was left intact)
  * or a negative exit flag if the equality constraints cannot be satisfied.

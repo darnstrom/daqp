@@ -659,6 +659,51 @@ end
     @test norm(x3 .- (-5.0)) < tol  # all at lower bound
 end
 
+@testset "Equality elimination update dispatch" begin
+    n_eq_test = 10
+    neq_test = 6
+    H_eq_test = Matrix{Float64}(I, n_eq_test, n_eq_test)
+    A_eq_test = [Matrix{Float64}(I, n_eq_test, n_eq_test)[1:neq_test, :];
+                 ones(1, n_eq_test)]
+    bu_eq_test = vcat(fill(10.0, n_eq_test), zeros(neq_test), 10.0)
+    bl_eq_test = vcat(fill(-10.0, n_eq_test), zeros(neq_test), -10.0)
+    sense_eq_test = vcat(zeros(Cint, n_eq_test),
+                         fill(Cint(DAQPBase.EQUALITY), neq_test), Cint(0))
+
+    d_eq_test = DAQPBase.Model()
+    qp_eq_test = DAQPBase.QPj(H_eq_test, zeros(n_eq_test), A_eq_test,
+                              bu_eq_test, bl_eq_test, sense_eq_test)
+
+    # Persistent models retain the full workspace unless explicitly requested.
+    d_full_test = DAQPBase.Model()
+    setup_full_flag, _ = DAQPBase.setup(d_full_test, qp_eq_test)
+    @test setup_full_flag > 0
+    @test unsafe_load(d_full_test.work).n == n_eq_test
+
+    # The init mask explicitly enables equality elimination for a model.
+    setup_flag, _ = DAQPBase.setup(
+        d_eq_test, qp_eq_test; init_mask=DAQPBase.DAQP_UPDATE_eliminate)
+    @test setup_flag > 0
+    @test unsafe_load(d_eq_test.work).n == n_eq_test - neq_test
+
+    x_eq_test, _, exitflag_eq_test, _ = DAQPBase.solve(d_eq_test)
+    @test exitflag_eq_test == DAQPBase.OPTIMAL
+    @test x_eq_test ≈ zeros(n_eq_test)
+    @test unsafe_load(d_eq_test.work).n == n_eq_test
+
+    # An explicit update mask restores, updates, and reduces the workspace
+    # again without requiring a separate elimination call.
+    bu_updated = copy(d_eq_test.qpj.bupper)
+    bl_updated = copy(d_eq_test.qpj.blower)
+    bu_updated[end] = 9.0
+    bl_updated[end] = -9.0
+    update_flag = DAQPBase.update(
+        d_eq_test, nothing, nothing, nothing, bu_updated, bl_updated,
+        nothing, nothing, DAQPBase.DAQP_UPDATE_eliminate)
+    @test update_flag == neq_test
+    @test unsafe_load(d_eq_test.work).n == n_eq_test - neq_test
+end
+
 @testset "Unconstrained shortcut" begin
     H = diagm(ones(10))
     f = zeros(10)

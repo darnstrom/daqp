@@ -100,11 +100,11 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		daqp_dual_init_active(qp, (c_float *)mxGetPr(prhs[11]));
 	  } else if (nrhs > 10 && !mxIsEmpty(prhs[10])) {
 		daqp_primal_init_active(qp, (c_float *)mxGetPr(prhs[10]));
-	  }
-      int check_unconstrained = mxGetM(prhs[12]);
+      }
+      const int init_mask = (int)mxGetScalar(prhs[12]);
 
 	  c_float solve_time;
-	  error_flag = setup_daqp_main(qp,work,&solve_time,check_unconstrained);
+	  error_flag = setup_daqp_main(qp,work,&solve_time,init_mask);
 	  if(error_flag < 0){
 		free(work->qp);
 		work->qp = NULL;
