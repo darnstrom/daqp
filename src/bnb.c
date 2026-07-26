@@ -130,7 +130,7 @@ int daqp_process_node(DAQPNode* node, DAQPWorkspace* work){
 int daqp_get_branch_id(DAQPWorkspace* work){
     int i;
     int id = DAQP_EMPTY_IND;
-    c_float diff;
+    c_float diff, dist, tol;
 
     for(i=0; i < work->bnb->nb; i++){
         id = work->bnb->bin_ids[i];
@@ -139,6 +139,14 @@ int daqp_get_branch_id(DAQPWorkspace* work){
 
         // Compute signed distance from midpoint between bounds
         diff = daqp_binary_diff(id,work);
+
+        // A zero-dual binary constraint can lie at an endpoint without being
+        // active. It is already integer feasible and does not need branching.
+        dist = 0.5*(work->dupper[id]-work->dlower[id])
+            -(diff < 0 ? -diff : diff);
+        tol = work->settings->primal_tol;
+        if(work->scaling != NULL) tol *= work->scaling[id];
+        if(dist <= tol) continue;
 
         // Explore the endpoint nearest to the relaxation first.
         return diff < 0 ? id : DAQP_ADD_LOWER_FLAG(id);
@@ -173,7 +181,7 @@ void daqp_node_cleanup_workspace(int n_clean, DAQPWorkspace* work){
     // Reset workspace
     work->sing_ind=DAQP_EMPTY_IND;
     work->n_active=n_clean;
-    // Truncation cannot make a previously invalid cached prefix reusable.
+    // Only the retained prefix can still have a valid cached substitution.
     if(work->reuse_ind > n_clean)
         work->reuse_ind=n_clean;
 }

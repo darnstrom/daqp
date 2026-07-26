@@ -498,6 +498,10 @@ void daqp_refine_active(DAQPWorkspace *work){
     int i, j, disp, id;
     c_float sum, Mu, d;
 
+    // Refinement uses xldl and zldl as scratch, invalidating the cached CSP
+    // forward substitution independently of whether the active set changes.
+    work->reuse_ind = 0;
+
     // Compute -r[i] = -(M_i*u - d_i) and store in xldl[i].
     for(i = 0; i < work->n_active; i++){
         id = work->WS[i];
