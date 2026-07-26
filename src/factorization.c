@@ -170,13 +170,10 @@ void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind){
         work->L[disp] /= work->D[i];
         sum -= tmp*work->L[disp];
     }
-    /*
-     * Below this the pivot consists of the rounding errors of the terms that
-     * were cancelled, which are orders of magnitude larger than the tolerance
-     * it is compared against. Recompute it from the residual, so that the
-     * dependence of the constraint is decided by the geometry.
-     */
-    if(sum < DAQP_REORTH_TOL*mnorm2 && ns_active == 0 && work->n_active > 0)
+    // Cancellation error is larger than the pivot.
+    // Recompute it from the geometric residual
+    if(work->bnb == NULL && sum < DAQP_REORTH_TOL*mnorm2 &&
+            ns_active == 0 && work->n_active > 0)
         sum = daqp_pivot_from_residual(work,add_ind,new_L_start);
     work->D[work->n_active]=sum;
 

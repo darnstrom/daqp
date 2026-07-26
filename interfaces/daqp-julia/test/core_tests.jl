@@ -156,8 +156,9 @@ end
     x,_,_,info = DAQPBase.quadprog(H,f,A,bu,bl,sense)
     @test norm(x-[0;1;1]) < tol
 
-    # A binary constraint can be integer feasible at a zero-dual endpoint
-    # without belonging to the active set. Do not branch in that case.
+    # A binary constraint can be at a zero-dual endpoint without belonging to
+    # the active set. It must still be fixed explicitly so that BnB returns a
+    # stable binary active set.
     ndeg = 8
     Hdeg = Matrix{Float64}(I, ndeg, ndeg)
     fdeg = zeros(ndeg)
@@ -168,14 +169,14 @@ end
         Hdeg, fdeg, zeros(0, ndeg), bdeg_u, bdeg_l, sdeg)
     @test efdeg == DAQPBase.OPTIMAL
     @test norm(xdeg, Inf) < tol
-    @test ideg.nodes == 1
+    @test ideg.nodes == 2 * ndeg + 1
 
     # Cover the same zero-dual case for general binary constraints.
     xgen, _, efgen, igen = DAQPBase.quadprog(
         Hdeg, fdeg, Hdeg, bdeg_u, bdeg_l, sdeg)
     @test efgen == DAQPBase.OPTIMAL
     @test norm(xgen, Inf) < tol
-    @test igen.nodes == 1
+    @test igen.nodes == 2 * ndeg + 1
 
     # BnB cleanup may shorten, but must never lengthen, the valid prefix of
     # the cached triangular solve. Lengthening it can reuse stale xldl/zldl
@@ -557,6 +558,19 @@ end
     p = d.work  # raw workspace pointer (Ptr{Cvoid})
     ws = unsafe_load(Ptr{DAQPBase.Workspace}(p))
     @test ws.n_prox == 0
+
+    # A dense, ill-conditioned but positive-definite Hessian must not be
+    # mistaken for a singular one merely because its pivot ratio is below
+    # sqrt(zero_tol). This is representative of condensed MPC Hessians.
+    Q_ill = [1.0 1.0; -1.0 1.0] / sqrt(2.0)
+    H_ill = Q_ill' * Diagonal([1.0, 1e-7]) * Q_ill
+    d_ill = DAQPBase.Model()
+    DAQPBase.setup(d_ill, H_ill, zeros(2), zeros(0, 2), ones(2),
+                   -ones(2), zeros(Cint, 2))
+    ws_ill = unsafe_load(Ptr{DAQPBase.Workspace}(d_ill.work))
+    @test ws_ill.n_prox == 0
+    _,_,ef_ill,_ = DAQPBase.solve(d_ill)
+    @test ef_ill == DAQPBase.OPTIMAL
 
     # --- Rank-1 Hessian: x2 direction is singular -> n_prox == 1 ---
     H_sing = [1.0 0.0; 0.0 0.0]

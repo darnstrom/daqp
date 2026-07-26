@@ -275,12 +275,10 @@ pack_hessian:
             }
             work->Rinv[disp] = diag_i;
         }
-        /*
-         * Check the achieved pivot ratio after regularization as well as
-         * before it.  The scale-based floor is only an initial estimate:
-         * cancellation and matrix geometry can require a larger shift.
-         */
-        if(min_pivot <= sqrt(zero_tol)*max_pivot){
+         // A successful unregularized Cholesky factorization represents a
+         // positive-definite Hessian down to zero_tol relative pivots.
+         // Once a singular Hessian has been shifted, be more conservative 
+        if(min_pivot <= (regularize_all ? sqrt(zero_tol) : zero_tol)*max_pivot){
 regularize_hessian:
             /*
              * A shift on failed pivots alone is not a robust
