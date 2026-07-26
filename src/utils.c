@@ -208,7 +208,7 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
     // Diagonal Case — for unfactored H read diagonals directly (no packing needed).
     if(is_diagonal){
         if(!is_factored && hessian_scale > 0){
-            factor_tol = sqrt(zero_tol) * hessian_scale;
+            factor_tol = zero_tol * hessian_scale;
             eps = proximal_regularization_scaled(work, hessian_scale);
         }
         if(work->Rinv != NULL){ work->RinvD = work->Rinv; work->Rinv = NULL; }

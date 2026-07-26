@@ -28,7 +28,10 @@ void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
             }
         }
         else{//Prox
-            res->exitflag = daqp_prox(work);
+            if(work->bnb != NULL)
+                res->exitflag = DAQP_EXIT_NONCONVEX;
+            else
+                res->exitflag = daqp_prox(work);
         }
     }
     else{// Unconstrained optimum
