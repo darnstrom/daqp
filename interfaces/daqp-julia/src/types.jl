@@ -171,6 +171,7 @@ struct Workspace
     nh::Cint
     break_points::Ptr{Cint}
     avi::Ptr{Cvoid}
+    eq::Ptr{Cvoid}
     timer::Ptr{Cvoid}
     Mu::Ptr{Cdouble}
 end

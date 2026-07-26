@@ -15,6 +15,15 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
     // TODO: copy dimensions from work->qp?
     int error_flag, i;
     int do_activate = 0;
+    int skip_constraints = 0;
+    const int was_reduced = DAQP_IS_REDUCED(work);
+
+    // Update the full LDP before optionally installing a reduced one below
+    daqp_eq_restore(work);
+    // An elimination is formed from Rinv and A, so it cannot be reused if
+    // either changes (neq == 0 marks the factorization as invalid)
+    if(work->eq != NULL && (mask&(DAQP_UPDATE_Rinv+DAQP_UPDATE_M)))
+        work->eq->neq = 0;
 
     // Add original qp to workspace
     work->qp = qp;
@@ -68,8 +77,15 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
     int unconstrained_flag = (work->avi != NULL) ? 1 : daqp_check_unconstrained(work,mask);
     if(unconstrained_flag == DAQP_UNCONSTRAINED_OPTIMAL) return 0;
 
-    /** Update M **/
-    if(mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M){
+    /*
+     * Update M. Only the equality rows are needed if the constraints are about
+     * to be eliminated, and those are formed by the elimination itself.
+     */
+    if(mask&DAQP_UPDATE_eliminate && daqp_eq_will_reduce(work)){
+        reset_daqp_workspace(work); // M is not formed
+        skip_constraints = 1;
+    }
+    else if(mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M){
         error_flag = daqp_update_M(work,qp->A,mask);
         if(error_flag<0)
             return error_flag;
@@ -81,7 +97,10 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
     }
 
     /** Update d **/
-    if(mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M||mask&DAQP_UPDATE_v||mask&DAQP_UPDATE_d){
+    if(skip_constraints){
+        // Formed together with the reduced constraints by the elimination
+    }
+    else if(mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M||mask&DAQP_UPDATE_v||mask&DAQP_UPDATE_d){
         if(unconstrained_flag == 1){ // Already computed d, just need to normalize
             if(work->scaling != NULL){
                 for(i = 0; i < work->m; i++){
@@ -116,7 +135,18 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
         work->break_points = qp->break_points;
     }
 
-    // Make sure activate constraints are activated
+    // The working set refers to the reduced LDP if one was installed
+    if(was_reduced) do_activate = 1;
+
+    /*
+     * Make sure activate constraints are activated. Equality constraints are
+     * always active, so forming the working set here is wasted work if they
+     * are eliminated afterwards; daqp_eq_eliminate then forms it instead.
+     */
+    if(do_activate == 1 && skip_constraints){
+        reset_daqp_workspace(work);
+        do_activate = 0;
+    }
     if(do_activate == 1){
         reset_daqp_workspace(work);
         if(work->nh < 2)
@@ -130,6 +160,13 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
         if(error_flag<0)
             return error_flag;
     }
+
+    if(mask&DAQP_UPDATE_eliminate)
+        return daqp_eq_eliminate(work);
+
+    // An earlier elimination left the full constraints unformed
+    if(work->eq != NULL && work->eq->neq != 0)
+        return daqp_eq_form_full(work);
 
     return 0;
 }
@@ -178,7 +215,7 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
     // Diagonal Case — for unfactored H read diagonals directly (no packing needed).
     if(is_diagonal){
         if(!is_factored && hessian_scale > 0){
-            factor_tol = sqrt(zero_tol) * hessian_scale;
+            factor_tol = zero_tol * hessian_scale;
             eps = proximal_regularization_scaled(work, hessian_scale);
         }
         if(work->Rinv != NULL){ work->RinvD = work->Rinv; work->Rinv = NULL; }
@@ -245,12 +282,10 @@ pack_hessian:
             }
             work->Rinv[disp] = diag_i;
         }
-        /*
-         * Check the achieved pivot ratio after regularization as well as
-         * before it.  The scale-based floor is only an initial estimate:
-         * cancellation and matrix geometry can require a larger shift.
-         */
-        if(min_pivot <= sqrt(zero_tol)*max_pivot){
+         // A successful unregularized Cholesky factorization represents a
+         // positive-definite Hessian down to zero_tol relative pivots.
+         // Once a singular Hessian has been shifted, be more conservative 
+        if(min_pivot <= (regularize_all ? sqrt(zero_tol) : zero_tol)*max_pivot){
 regularize_hessian:
             /*
              * A shift on failed pivots alone is not a robust

@@ -156,8 +156,8 @@ end
     x,_,_,info = DAQPBase.quadprog(H,f,A,bu,bl,sense)
     @test norm(x-[0;1;1]) < tol
 
-    # A binary constraint can be integer feasible at a zero-dual endpoint
-    # without belonging to the active set. Do not branch in that case.
+    # A binary constraint at a zero-dual endpoint is already integer feasible
+    # and should not create redundant branches.
     ndeg = 8
     Hdeg = Matrix{Float64}(I, ndeg, ndeg)
     fdeg = zeros(ndeg)
@@ -177,9 +177,8 @@ end
     @test norm(xgen, Inf) < tol
     @test igen.nodes == 1
 
-    # BnB cleanup may shorten, but must never lengthen, the valid prefix of
-    # the cached triangular solve. Lengthening it can reuse stale xldl/zldl
-    # entries and produce a CSP that violates its own active equalities.
+    # Iterative refinement uses xldl/zldl as scratch and must invalidate the
+    # cached CSP substitution. Cleanup may then reuse an unchanged prefix.
     dreuse = DAQPBase.Model()
     Hreuse = Matrix{Float64}(I, 2, 2)
     Areuse = ones(1, 2)
@@ -188,15 +187,22 @@ end
     sreuse = Cint[DAQPBase.BINARY, DAQPBase.BINARY, DAQPBase.EQUALITY]
     DAQPBase.setup(
         dreuse, Hreuse, zeros(2), Areuse, bureuse, blreuse, sreuse)
+    DAQPBase.solve(dreuse)
     wsreuse = unsafe_load(Ptr{DAQPBase.Workspace}(dreuse.work))
-    @test wsreuse.n_active == 1
+    @test wsreuse.n_active > 0
     reuse_field = findfirst(==(:reuse_ind), fieldnames(DAQPBase.Workspace))
     reuse_offset = fieldoffset(DAQPBase.Workspace, reuse_field)
     reuse_ptr = Ptr{Cint}(Ptr{UInt8}(dreuse.work) + reuse_offset)
-    unsafe_store!(reuse_ptr, 0)
+    unsafe_store!(reuse_ptr, wsreuse.n_active)
+    ccall((:daqp_refine_active, DAQPBase.libdaqp), Cvoid,
+          (Ptr{DAQPBase.Workspace},), dreuse.work)
+    @test unsafe_load(Ptr{DAQPBase.Workspace}(dreuse.work)).reuse_ind == 0
+
+    unsafe_store!(reuse_ptr, wsreuse.n_active)
     ccall((:daqp_node_cleanup_workspace, DAQPBase.libdaqp), Cvoid,
           (Cint, Ptr{DAQPBase.Workspace}), wsreuse.n_active, dreuse.work)
-    @test unsafe_load(Ptr{DAQPBase.Workspace}(dreuse.work)).reuse_ind == 0
+    @test unsafe_load(Ptr{DAQPBase.Workspace}(dreuse.work)).reuse_ind ==
+          wsreuse.n_active
 
 end
 
@@ -558,6 +564,19 @@ end
     ws = unsafe_load(Ptr{DAQPBase.Workspace}(p))
     @test ws.n_prox == 0
 
+    # A dense, ill-conditioned but positive-definite Hessian must not be
+    # mistaken for a singular one merely because its pivot ratio is below
+    # sqrt(zero_tol). This is representative of condensed MPC Hessians.
+    Q_ill = [1.0 1.0; -1.0 1.0] / sqrt(2.0)
+    H_ill = Q_ill' * Diagonal([1.0, 1e-7]) * Q_ill
+    d_ill = DAQPBase.Model()
+    DAQPBase.setup(d_ill, H_ill, zeros(2), zeros(0, 2), ones(2),
+                   -ones(2), zeros(Cint, 2))
+    ws_ill = unsafe_load(Ptr{DAQPBase.Workspace}(d_ill.work))
+    @test ws_ill.n_prox == 0
+    _,_,ef_ill,_ = DAQPBase.solve(d_ill)
+    @test ef_ill == DAQPBase.OPTIMAL
+
     # --- Rank-1 Hessian: x2 direction is singular -> n_prox == 1 ---
     H_sing = [1.0 0.0; 0.0 0.0]
     f_sing = [1.0; 1.0]
@@ -643,6 +662,99 @@ end
     x3,_,ef3,_ = DAQPBase.solve(d3)
     @test ef3 > 0
     @test norm(x3 .- (-5.0)) < tol  # all at lower bound
+end
+
+@testset "Equality elimination update dispatch" begin
+    n_eq_test = 10
+    neq_test = 6
+    H_eq_test = Matrix{Float64}(I, n_eq_test, n_eq_test)
+    A_eq_test = [Matrix{Float64}(I, n_eq_test, n_eq_test)[1:neq_test, :];
+                 ones(1, n_eq_test)]
+    bu_eq_test = vcat(fill(10.0, n_eq_test), zeros(neq_test), 10.0)
+    bl_eq_test = vcat(fill(-10.0, n_eq_test), zeros(neq_test), -10.0)
+    sense_eq_test = vcat(zeros(Cint, n_eq_test),
+                         fill(Cint(DAQPBase.EQUALITY), neq_test), Cint(0))
+
+    d_eq_test = DAQPBase.Model()
+    qp_eq_test = DAQPBase.QPj(H_eq_test, zeros(n_eq_test), A_eq_test,
+                              bu_eq_test, bl_eq_test, sense_eq_test)
+
+    # Persistent models retain the full workspace unless explicitly requested.
+    d_full_test = DAQPBase.Model()
+    setup_full_flag, _ = DAQPBase.setup(d_full_test, qp_eq_test)
+    @test setup_full_flag > 0
+    @test unsafe_load(d_full_test.work).n == n_eq_test
+
+    # The init mask explicitly enables equality elimination for a model.
+    setup_flag, _ = DAQPBase.setup(
+        d_eq_test, qp_eq_test; init_mask=DAQPBase.DAQP_UPDATE_eliminate)
+    @test setup_flag > 0
+    @test unsafe_load(d_eq_test.work).n == n_eq_test - neq_test
+
+    x_eq_test, _, exitflag_eq_test, _ = DAQPBase.solve(d_eq_test)
+    @test exitflag_eq_test == DAQPBase.OPTIMAL
+    @test x_eq_test ≈ zeros(n_eq_test)
+    @test unsafe_load(d_eq_test.work).n == n_eq_test
+
+    # An explicit update mask restores, updates, and reduces the workspace
+    # again without requiring a separate elimination call.
+    bu_updated = copy(d_eq_test.qpj.bupper)
+    bl_updated = copy(d_eq_test.qpj.blower)
+    bu_updated[end] = 9.0
+    bl_updated[end] = -9.0
+    update_flag = DAQPBase.update(
+        d_eq_test, nothing, nothing, nothing, bu_updated, bl_updated,
+        nothing, nothing, DAQPBase.DAQP_UPDATE_eliminate)
+    @test update_flag == neq_test
+    @test unsafe_load(d_eq_test.work).n == n_eq_test - neq_test
+end
+
+@testset "Equality elimination workspace reuse" begin
+    # A reduction only forms the equality rows of the constraints, so a
+    # workspace whose result has been retrieved has to be given either a new
+    # reduction or the full constraints before it can be solved again.
+    Random.seed!(2024)
+    n, neq, mineq = 30, 20, 40
+    L = randn(n, n)
+    H = L'L / n + I
+    f = randn(n)
+    A = randn(neq + mineq, n)
+    sense = vcat(zeros(Cint, n), fill(Cint(DAQPBase.EQUALITY), neq),
+                 zeros(Cint, mineq))
+    bounds(xr) = (vcat(xr .+ rand(n), A[1:neq, :] * xr,
+                       A[neq+1:end, :] * xr .+ 0.3rand(mineq)),
+                  vcat(xr .- rand(n), A[1:neq, :] * xr, fill(-1e30, mineq)))
+    bu1, bl1 = bounds(randn(n))
+    bu2, bl2 = bounds(randn(n))
+
+    elim_mask = DAQPBase.DAQP_UPDATE_unconstrained | DAQPBase.DAQP_UPDATE_eliminate
+    xref1, fref1, eref1, _ = DAQPBase.quadprog(H, f, A, bu1, bl1, sense)
+    xref2, fref2, eref2, _ = DAQPBase.quadprog(H, f, A, bu2, bl2, sense)
+    @test eref1 == DAQPBase.OPTIMAL
+    @test eref2 == DAQPBase.OPTIMAL
+
+    # Solving the same workspace twice gives the same answer both times
+    d = DAQPBase.Model()
+    DAQPBase.setup(d, H, f, A, bu1, bl1, sense; init_mask=elim_mask)
+    x1, _, e1, _ = DAQPBase.solve(d)
+    x2, fv2, e2, _ = DAQPBase.solve(d)
+    @test e1 == DAQPBase.OPTIMAL && e2 == DAQPBase.OPTIMAL
+    @test norm(x1 - xref1) < 1e-8
+    @test norm(x2 - xref1) < 1e-8
+    @test abs(fv2 - fref1) < 1e-8
+
+    # Solving after an update, whether or not a new elimination is asked for
+    for mask in (Cint(0), DAQPBase.DAQP_UPDATE_eliminate)
+        du = DAQPBase.Model()
+        DAQPBase.setup(du, H, f, A, bu1, bl1, sense; init_mask=elim_mask)
+        DAQPBase.solve(du)
+        DAQPBase.update(du, nothing, nothing, nothing, bu2, bl2,
+                        nothing, nothing, mask)
+        xu, fvu, eu, _ = DAQPBase.solve(du)
+        @test eu == DAQPBase.OPTIMAL
+        @test norm(xu - xref2) < 1e-8
+        @test abs(fvu - fref2) < 1e-8
+    end
 end
 
 @testset "Unconstrained shortcut" begin

@@ -28,6 +28,11 @@ extern "C" {
 #define DAQP_DEFAULT_REFACTOR_TOL 1e-9
 #define DAQP_DEFAULT_EPS_PROX 1e-6
 
+// Equality constraints are eliminated if there are sufficiently many of them
+// (neq > EQ_MIN_COUNT and EQ_MIN_RATIO*neq > n)
+#define DAQP_EQ_MIN_COUNT 5
+#define DAQP_EQ_MIN_RATIO 10
+
 
 // MACROS
 #define DAQP_ARSUM(x) ((x)*(x+1)/2)
@@ -52,6 +57,7 @@ extern "C" {
 #define DAQP_UPDATE_sense 16
 #define DAQP_UPDATE_hierarchy 32
 #define DAQP_UPDATE_unconstrained 64
+#define DAQP_UPDATE_eliminate 128
 
 // CONSTRAINT MASKS
 #define DAQP_ACTIVE 1

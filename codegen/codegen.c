@@ -222,6 +222,8 @@ void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work, const char* prefix){
         fprintf(f, "0, NULL,\n");
     // AVI
     fprintf(f, "NULL,\n"); // TODO: Generate for avi (also requires problem to be generated)
+    // Equality elimination (not supported in generated code)
+    fprintf(f, "NULL,\n");
     // Timer
     fprintf(f, "NULL,\n"); // Timer
     if(m > ms)

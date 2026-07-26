@@ -100,11 +100,11 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		daqp_dual_init_active(qp, (c_float *)mxGetPr(prhs[11]));
 	  } else if (nrhs > 10 && !mxIsEmpty(prhs[10])) {
 		daqp_primal_init_active(qp, (c_float *)mxGetPr(prhs[10]));
-	  }
-      int check_unconstrained = mxGetM(prhs[12]);
+      }
+      const int init_mask = (int)mxGetScalar(prhs[12]);
 
 	  c_float solve_time;
-	  error_flag = setup_daqp_main(qp,work,&solve_time,check_unconstrained);
+	  error_flag = setup_daqp_main(qp,work,&solve_time,init_mask);
 	  if(error_flag < 0){
 		free(work->qp);
 		work->qp = NULL;
@@ -132,11 +132,11 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  work->qp->sense= (int *)mxGetPr(prhs[7]);
 	  // Setup output
 #ifdef DAQP_SINGLE_PRECISION
-	  plhs[0] = mxCreateNumericMatrix((mwSize)work->n,1,mxSINGLE_CLASS,mxREAL); // x_star
-	  mxArray* lam = mxCreateNumericMatrix((mwSize)work->m,1,mxSINGLE_CLASS,mxREAL); // lambda
+	  plhs[0] = mxCreateNumericMatrix((mwSize)work->qp->n,1,mxSINGLE_CLASS,mxREAL); // x_star
+	  mxArray* lam = mxCreateNumericMatrix((mwSize)work->qp->m,1,mxSINGLE_CLASS,mxREAL); // lambda
 #else
-	  plhs[0] = mxCreateNumericMatrix((mwSize)work->n,1,mxDOUBLE_CLASS,mxREAL); // x_star
-	  mxArray* lam = mxCreateNumericMatrix((mwSize)work->m,1,mxDOUBLE_CLASS,mxREAL); // lambda
+	  plhs[0] = mxCreateNumericMatrix((mwSize)work->qp->n,1,mxDOUBLE_CLASS,mxREAL); // x_star
+	  mxArray* lam = mxCreateNumericMatrix((mwSize)work->qp->m,1,mxDOUBLE_CLASS,mxREAL); // lambda
 #endif
 	  plhs[2] = mxCreateNumericMatrix(1, 1, mxINT32_CLASS, mxREAL); //Exit flag
 

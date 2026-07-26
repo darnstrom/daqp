@@ -142,8 +142,8 @@ int daqp_get_branch_id(DAQPWorkspace* work){
 
         // A zero-dual binary constraint can lie at an endpoint without being
         // active. It is already integer feasible and does not need branching.
-
-        dist = 0.5*(work->dupper[id]-work->dlower[id])-(diff < 0 ? -diff : diff);
+        dist = 0.5*(work->dupper[id]-work->dlower[id])
+            -(diff < 0 ? -diff : diff);
         tol = work->settings->primal_tol;
         if(work->scaling != NULL) tol *= work->scaling[id];
         if(dist <= tol) continue;
@@ -181,7 +181,7 @@ void daqp_node_cleanup_workspace(int n_clean, DAQPWorkspace* work){
     // Reset workspace
     work->sing_ind=DAQP_EMPTY_IND;
     work->n_active=n_clean;
-    // Truncation cannot make a previously invalid cached prefix reusable.
+    // Only the retained prefix can still have a valid cached substitution.
     if(work->reuse_ind > n_clean)
         work->reuse_ind=n_clean;
 }

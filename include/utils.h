@@ -6,6 +6,7 @@ extern "C" {
 # endif // ifdef __cplusplus
 
 #include "daqp.h"
+#include "eq_elim.h"
 // Utils for transforming QP to LDP
 int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem *qp);
 int daqp_update_Rinv(DAQPWorkspace *work, c_float *H, int is_factored);

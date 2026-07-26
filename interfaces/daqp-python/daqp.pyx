@@ -43,7 +43,9 @@ cdef void _solve_warm_start(DAQPProblem* problem, DAQPSettings* settings,
         work.settings = settings
         setup_time_c = 0.0
         with nogil:
-            setup_flag = setup_daqp_main(problem, work, &setup_time_c,1)
+            setup_flag = setup_daqp_main(
+                problem, work, &setup_time_c,
+                DAQP_UPDATE_unconstrained | DAQP_UPDATE_eliminate)
         res.setup_time = setup_time_c
         res.exitflag  = setup_flag
         if setup_flag >= 0:
@@ -415,7 +417,8 @@ cdef class Model:
 
         # ---- call setup_daqp ----
         with nogil:
-            setup_flag = setup_daqp_main(&self._qp, self._work, &setup_time_c,0)
+            setup_flag = setup_daqp_main(
+                &self._qp, self._work, &setup_time_c, 0)
 
         if setup_flag < 0:
             # setup_daqp freed settings on failure; re-allocate and restore.
@@ -510,11 +513,11 @@ cdef class Model:
             raise RuntimeError("Model has not been set up. Call setup() first.")
 
         cdef int update_mask = 0
-        cdef int n  = self._work.n
-        cdef int m  = self._work.m
-        cdef int ms = self._work.ms
+        cdef int n  = self._qp.n
+        cdef int m  = self._qp.m
+        cdef int ms = self._qp.ms
         cdef int mA = m - ms
-        cdef int nh = self._work.nh
+        cdef int nh = self._qp.nh
         cdef int exitflag
 
         if H is not None:
@@ -522,49 +525,49 @@ cdef class Model:
             if H_arr.shape[0] == n and H_arr.shape[1] == n:
                 self._H = H_arr
                 self._qp.H = &self._H[0, 0]
-                update_mask |= 1   # DAQP_UPDATE_Rinv
+                update_mask |= DAQP_UPDATE_Rinv
 
         if A is not None:
             A_arr = np.ascontiguousarray(A, dtype=np.double)
             if A_arr.shape[0] == mA and A_arr.shape[1] == n:
                 self._A = A_arr
                 self._qp.A = &self._A[0, 0]
-                update_mask |= 2   # DAQP_UPDATE_M
+                update_mask |= DAQP_UPDATE_M
 
         if f is not None:
             f_arr = np.ascontiguousarray(f, dtype=np.double)
             if f_arr.shape[0] == n:
                 self._f = f_arr
                 self._qp.f = &self._f[0]
-                update_mask |= 4   # DAQP_UPDATE_v
+                update_mask |= DAQP_UPDATE_v
 
         if bupper is not None:
             bu_arr = np.ascontiguousarray(bupper, dtype=np.double)
             if bu_arr.shape[0] == m:
                 self._bupper = bu_arr
                 self._qp.bupper = &self._bupper[0]
-                update_mask |= 8   # DAQP_UPDATE_d
+                update_mask |= DAQP_UPDATE_d
 
         if blower is not None:
             bl_arr = np.ascontiguousarray(blower, dtype=np.double)
             if bl_arr.shape[0] == m:
                 self._blower = bl_arr
                 self._qp.blower = &self._blower[0]
-                update_mask |= 8   # DAQP_UPDATE_d
+                update_mask |= DAQP_UPDATE_d
 
         if sense is not None:
             s_arr = np.ascontiguousarray(sense, dtype=np.intc)
             if s_arr.shape[0] == m:
                 self._sense = s_arr
                 self._qp.sense = &self._sense[0]
-                update_mask |= 16  # DAQP_UPDATE_sense
+                update_mask |= DAQP_UPDATE_sense
 
         if break_points is not None:
             bp_arr = np.ascontiguousarray(break_points, dtype=np.intc)
             if bp_arr.shape[0] == nh:
                 self._break_points = bp_arr
                 self._qp.break_points = &self._break_points[0]
-                update_mask |= 32  # DAQP_UPDATE_hierarchy
+                update_mask |= DAQP_UPDATE_hierarchy
 
         with nogil:
             exitflag = daqp_update_ldp(update_mask, self._work, &self._qp)
