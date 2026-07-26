@@ -1,7 +1,90 @@
 #include "factorization.h"
 
+ // Necessary to retain accuracy when FAST_MATH is used 
+static c_float dot_row(const c_float* a, const c_float* b, const int n){
+    c_float s0 = 0, s1 = 0, s2 = 0, s3 = 0;
+    int i;
+    for(i = 0; i+3 < n; i += 4){
+        s0 += a[i]*b[i];
+        s1 += a[i+1]*b[i+1];
+        s2 += a[i+2]*b[i+2];
+        s3 += a[i+3]*b[i+3];
+    }
+    for(; i < n; i++) s0 += a[i]*b[i];
+    return (s0+s1)+(s2+s3);
+}
+
 c_float daqp_dot(const c_float* v1, const c_float* v2, const int n) {
     return daqp_dot_inline(v1, v2, n);
+}
+
+// r <-- r - sum_j y_j*M_j, over the active constraints
+static void subtract_active(DAQPWorkspace *work, const c_float* y, c_float* r){
+    const int n = work->n, ms = work->ms, na = work->n_active;
+    int i, j, id;
+    for(j = 0; j < na; j++){
+        const c_float yj = y[j];
+        if(yj == 0) continue;
+        id = work->WS[j];
+        if(id < ms){
+            if(work->Rinv == NULL) r[id] -= yj;
+            else{
+                const c_float* Rj = work->Rinv+DAQP_R_OFFSET(id,n);
+                for(i = id; i < n; i++) r[i] -= yj*Rj[i];
+            }
+        }
+        else{
+            const c_float* Mj = work->M+n*(id-ms);
+            for(i = 0; i < n; i++) r[i] -= yj*Mj[i];
+        }
+    }
+}
+
+/*
+ * The pivot of a new constraint is formed as ||m||^2-l'inv(D)l, which loses
+ * all significance when the constraint is nearly in the span of the active
+ * ones: the terms then cancel, and what remains are the errors that L and D
+ * have accumulated over the preceding updates (measured to reach 1e-5, while
+ * the pivot is compared against a tolerance of 1e-11).
+ *
+ * It is therefore recomputed as ||m-Mk'y||^2, the residual of the constraint
+ * against the active set, formed from the original constraints rather than
+ * from L and D. The residual is refined once, since the y that the drifted
+ * factorization provides does not minimize it. Squaring the residual only
+ * loses half as many digits as the cancellation does.
+ */
+static c_float daqp_pivot_from_residual(DAQPWorkspace *work, const int add_ind,
+        const int new_L_start){
+    const int n = work->n, ms = work->ms, na = work->n_active;
+    c_float* y = work->zldl; // Obsolete until the next CSP is formed
+    c_float* r = work->xldl; // Ditto, at the cost of the reuse in the CSP
+    c_float sum;
+    int i, j;
+
+    // y <-- L'\(l./D), the coefficients of the projection onto the active set
+    for(i = na-1; i >= 0; i--){
+        sum = work->L[new_L_start+i];
+        for(j = na-1; j > i; j--) sum -= work->L[DAQP_ARSUM(j)+i]*y[j];
+        y[i] = sum;
+    }
+    // r <-- m
+    if(add_ind < ms){
+        for(i = 0; i < n; i++) r[i] = 0;
+        if(work->Rinv == NULL) r[add_ind] = 1;
+        else{
+            const c_float* Ri = work->Rinv+DAQP_R_OFFSET(add_ind,n);
+            for(i = add_ind; i < n; i++) r[i] = Ri[i];
+        }
+    }
+    else{
+        const c_float* Mi = work->M+n*(add_ind-ms);
+        for(i = 0; i < n; i++) r[i] = Mi[i];
+    }
+    subtract_active(work,y,r);
+
+    for(i = 0, sum = 0; i < n; i++) sum += r[i]*r[i];
+    work->reuse_ind = 0; // xldl no longer holds the forward substitution
+    return sum;
 }
 
 void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind){
@@ -25,8 +108,7 @@ void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind){
     }
     if(Mi==NULL) sum = 1;
     else
-        for(i=start_col,sum=0;i<work->n;i++)
-            sum+=Mi[i]*Mi[i];
+        sum = dot_row(Mi+start_col,Mi+start_col,work->n-start_col);
 
 #ifdef SOFT_WEIGHTS
     if(DAQP_IS_SOFT(add_ind) && DAQP_IS_SLACK_FREE(add_ind)){
@@ -65,7 +147,7 @@ void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind){
         else if(Mi == NULL)
             sum = Mk[j];
         else
-            sum = daqp_dot_inline(Mk+j,Mi+j,work->n-j);
+            sum = dot_row(Mk+j,Mi+j,work->n-j);
 
         work->L[new_L_start+i] = sum;
     }
@@ -80,13 +162,22 @@ void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind){
 
     // Scale: l_i <-- l_i/d_i
     // Update d_new -= l'Dl
-    sum = work->D[work->n_active];
+    c_float mnorm2 = work->D[work->n_active];
+    sum = mnorm2;
     c_float tmp;
     for (i =0,disp=new_L_start; i<work->n_active;i++,disp++){
         tmp = work->L[disp];
         work->L[disp] /= work->D[i];
         sum -= tmp*work->L[disp];
     }
+    /*
+     * Below this the pivot consists of the rounding errors of the terms that
+     * were cancelled, which are orders of magnitude larger than the tolerance
+     * it is compared against. Recompute it from the residual, so that the
+     * dependence of the constraint is decided by the geometry.
+     */
+    if(sum < DAQP_REORTH_TOL*mnorm2 && ns_active == 0 && work->n_active > 0)
+        sum = daqp_pivot_from_residual(work,add_ind,new_L_start);
     work->D[work->n_active]=sum;
 
     // Check for singularity

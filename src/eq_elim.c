@@ -277,8 +277,9 @@ static void build_qr(DAQPWorkspace* work){
         eq->eq_ids[k++] = id;
     }
     eq->neq = k;
-    // Append the ids of the equalities that were not eliminated
-    for(i = eq->ms, j = 0; i < eq->m; i++){
+    // Append the ids of the equalities that were not eliminated. Both lists
+    // are ascending, since the candidates are factorized in order.
+    for(i = eq->ms, j = 0; i < eq->m && k < eq->ncand; i++){
         if(!IS_EQ_CAND(work,i)) continue;
         if(j < eq->neq && eq->eq_ids[j] == i) j++;
         else eq->eq_ids[k++] = i;
@@ -669,24 +670,37 @@ void daqp_eq_expand(DAQPWorkspace* work){
  * problem in the full space between its iterations. The reduction is then
  * prepared but not installed; daqp_prox applies it to each inner problem.
  */
-int daqp_eq_eliminate(DAQPWorkspace* work){
-    const int flag = daqp_eq_reduce(work,DAQP_UPDATE_M+DAQP_UPDATE_d);
+/*
+ * Form the constraints of the full problem, which the setup leaves to the
+ * elimination whenever one is expected, and put it in the workspace.
+ */
+static int daqp_eq_form_full(DAQPWorkspace* work){
     int error_flag;
+    daqp_eq_restore(work);
+    if(work->eq != NULL) work->eq->neq = 0; // Nothing to retrieve
+    if(work->qp == NULL || work->qp->A == NULL) return 0;
+    error_flag = daqp_update_M(work,work->qp->A,0);
+    if(error_flag < 0) return error_flag;
+    daqp_update_d(work,work->qp->bupper,work->qp->blower);
+    reset_daqp_workspace(work);
+    return daqp_activate_constraints(work);
+}
+
+int daqp_eq_eliminate(DAQPWorkspace* work){
+    int flag, error_flag;
+    /*
+     * Only the bounds are known to have changed here; daqp_update_ldp marks
+     * the factorization as invalid when the data it is formed from changes.
+     */
+    flag = daqp_eq_reduce(work,DAQP_UPDATE_d);
     if(flag <= 0){
-        if(work->eq != NULL) work->eq->neq = 0; // Nothing to retrieve
-        if(flag < 0) daqp_eq_restore(work);
-        /*
-         * The setup leaves forming the constraints to the elimination when one
-         * is expected, so form them here if no reduction was installed.
-         */
-        if(work->n_active == 0 && work->qp != NULL && work->qp->A != NULL){
-            error_flag = daqp_update_M(work,work->qp->A,0);
-            if(error_flag < 0) return error_flag;
-            daqp_update_d(work,work->qp->bupper,work->qp->blower);
-            reset_daqp_workspace(work);
-            error_flag = daqp_activate_constraints(work);
+        // The setup leaves forming the constraints to the elimination when one
+        // is expected, so form them here if no reduction was installed
+        if(daqp_eq_will_reduce(work)){
+            error_flag = daqp_eq_form_full(work);
             if(error_flag < 0) return error_flag;
         }
+        else if(work->eq != NULL) work->eq->neq = 0;
         return (flag < 0) ? flag : 0;
     }
     // Form the working set of the reduced problem

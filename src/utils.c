@@ -20,6 +20,10 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
 
     // The full LDP is updated; eliminating equalities is left to the caller
     daqp_eq_restore(work);
+    // An elimination is formed from Rinv and A, so it cannot be reused if
+    // either changes (neq == 0 marks the factorization as invalid)
+    if(work->eq != NULL && (mask&(DAQP_UPDATE_Rinv+DAQP_UPDATE_M)))
+        work->eq->neq = 0;
 
     // Add original qp to workspace
     work->qp = qp;
