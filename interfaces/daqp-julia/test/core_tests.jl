@@ -709,6 +709,62 @@ end
     @test unsafe_load(d_eq_test.work).n == n_eq_test - neq_test
 end
 
+@testset "Equality elimination workspace reuse" begin
+    # A reduction only forms the equality rows of the constraints, so a
+    # workspace whose result has been retrieved has to be given either a new
+    # reduction or the full constraints before it can be solved again.
+    Random.seed!(2024)
+    n, neq, mineq = 30, 20, 40
+    L = randn(n, n)
+    H = L'L / n + I
+    f = randn(n)
+    A = randn(neq + mineq, n)
+    sense = vcat(zeros(Cint, n), fill(Cint(DAQPBase.EQUALITY), neq),
+                 zeros(Cint, mineq))
+    bounds(xr) = (vcat(xr .+ rand(n), A[1:neq, :] * xr,
+                       A[neq+1:end, :] * xr .+ 0.3rand(mineq)),
+                  vcat(xr .- rand(n), A[1:neq, :] * xr, fill(-1e30, mineq)))
+    bu1, bl1 = bounds(randn(n))
+    bu2, bl2 = bounds(randn(n))
+
+    elim_mask = DAQPBase.DAQP_UPDATE_unconstrained | DAQPBase.DAQP_UPDATE_eliminate
+    xref1, fref1, eref1, _ = DAQPBase.quadprog(H, f, A, bu1, bl1, sense)
+    xref2, fref2, eref2, _ = DAQPBase.quadprog(H, f, A, bu2, bl2, sense)
+    @test eref1 == DAQPBase.OPTIMAL
+    @test eref2 == DAQPBase.OPTIMAL
+
+    # Solving the same workspace twice gives the same answer both times
+    d = DAQPBase.Model()
+    DAQPBase.setup(d, H, f, A, bu1, bl1, sense; init_mask=elim_mask)
+    x1, fv1, e1, _ = DAQPBase.solve(d)
+    x2, fv2, e2, _ = DAQPBase.solve(d)
+    @test e1 == DAQPBase.OPTIMAL && e2 == DAQPBase.OPTIMAL
+    @test norm(x1 - xref1) < 1e-8
+    @test norm(x2 - xref1) < 1e-8
+    @test abs(fv2 - fref1) < 1e-8
+
+    # Updating without asking for a new elimination solves in the full space
+    d_plain = DAQPBase.Model()
+    DAQPBase.setup(d_plain, H, f, A, bu1, bl1, sense; init_mask=elim_mask)
+    DAQPBase.solve(d_plain)
+    DAQPBase.update(d_plain, nothing, nothing, nothing, bu2, bl2)
+    xp, fvp, ep, _ = DAQPBase.solve(d_plain)
+    @test ep == DAQPBase.OPTIMAL
+    @test norm(xp - xref2) < 1e-8
+    @test abs(fvp - fref2) < 1e-8
+
+    # ... and asking for one again gives the same answer
+    d_elim = DAQPBase.Model()
+    DAQPBase.setup(d_elim, H, f, A, bu1, bl1, sense; init_mask=elim_mask)
+    DAQPBase.solve(d_elim)
+    DAQPBase.update(d_elim, nothing, nothing, nothing, bu2, bl2,
+                    nothing, nothing, DAQPBase.DAQP_UPDATE_eliminate)
+    xe, fve, ee, _ = DAQPBase.solve(d_elim)
+    @test ee == DAQPBase.OPTIMAL
+    @test norm(xe - xref2) < 1e-8
+    @test abs(fve - fref2) < 1e-8
+end
+
 @testset "Unconstrained shortcut" begin
     H = diagm(ones(10))
     f = zeros(10)

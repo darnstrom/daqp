@@ -665,7 +665,7 @@ void daqp_eq_expand(DAQPWorkspace* work){
  * Form the constraints of the full problem, which the setup leaves to the
  * elimination whenever one is expected, and put it in the workspace.
  */
-static int daqp_eq_form_full(DAQPWorkspace* work){
+int daqp_eq_form_full(DAQPWorkspace* work){
     int error_flag;
     daqp_eq_restore(work);
     if(work->eq != NULL) work->eq->neq = 0; // Nothing to retrieve
@@ -700,6 +700,20 @@ int daqp_eq_eliminate(DAQPWorkspace* work){
     if(error_flag < 0) return error_flag;
     if(work->n_prox > 0) daqp_eq_restore(work);
     return work->eq->neq;
+}
+
+/*
+ * Retrieving a result restores the full problem, whose constraints an
+ * elimination never forms, so a workspace that is solved again has to be given
+ * the reduction back. The proximal method applies the reduction to each of its
+ * inner problems itself, so it is left alone.
+ */
+int daqp_eq_reinstall(DAQPWorkspace* work){
+    int flag;
+    if(!DAQP_EQ_IS_FULL_UNFORMED(work) || work->eq->installed || work->n_prox > 0)
+        return 0;
+    flag = daqp_eq_eliminate(work);
+    return (flag < 0) ? flag : 0;
 }
 
 /*

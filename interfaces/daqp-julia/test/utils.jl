@@ -116,7 +116,8 @@ end
 ## Source files
 function get_local_sources(srcdir)
     # Get local source
-    daqp_dir = joinpath(dirname(@__FILE__), "..","..","..","..")
+    # <repo>/interfaces/daqp-julia/test -> <repo>
+    daqp_dir = joinpath(dirname(@__FILE__), "..","..","..")
     cfiles = ["daqp.c","auxiliary.c","factorization.c", "bnb.c", "hierarchical.c"]
     hfiles = ["daqp.h","auxiliary.h","factorization.h", "bnb.h", "hierarchical.h","constants.h", "types.h"]
     for cf in cfiles

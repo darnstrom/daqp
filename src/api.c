@@ -6,6 +6,8 @@
 
 // Solve problem from a given workspace and measure setup and solve time
 void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
+    // Put back an elimination that a previous solve retrieved
+    if((res->exitflag = daqp_eq_reinstall(work)) < 0) return;
 #ifdef PROFILING
     DAQPtimer timer;
     tic(&timer);
