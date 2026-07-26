@@ -102,7 +102,12 @@ int daqp_prox(DAQPWorkspace *work){
          * from the setup is reused and only the bounds are reformed.
          * ----------------------------------------------------------------*/
         is_reduced = 0;
-        if(daqp_eq_will_reduce(work)){
+        /*
+         * Only reduce if an elimination has been prepared (which allocates
+         * eq), so that a workspace that is solved without asking for one
+         * keeps working in the full space.
+         */
+        if(work->eq != NULL && daqp_eq_will_reduce(work)){
             const int elim_flag = daqp_eq_reduce(work, DAQP_UPDATE_d);
             if(elim_flag < 0) return elim_flag;
             is_reduced = (elim_flag > 0);

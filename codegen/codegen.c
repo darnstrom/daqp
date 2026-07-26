@@ -256,8 +256,7 @@ void write_daqp_settings_src(FILE*  f, DAQPSettings* settings, const char* prefi
 
     fprintf(f, "(c_float)%.20f,",  settings->sing_tol);
     fprintf(f, "(c_float)%.20f,",  settings->refactor_tol);
-    fprintf(f, "(c_float)%.20f,",  settings->time_limit);
-    fprintf(f, "%d",  0); // Equality elimination is not supported in generated code
+    fprintf(f, "(c_float)%.20f",  settings->time_limit);
     fprintf(f, "};\n\n");
 }
 

@@ -75,7 +75,7 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
           rho_soft = DAQP_DEFAULT_RHO_SOFT,
           rel_subopt = DAQP_DEFAULT_REL_SUBOPT, abs_subopt = DAQP_DEFAULT_ABS_SUBOPT,
           sing_tol = DAQP_DEFAULT_SING_TOL, refactor_tol = DAQP_DEFAULT_REFACTOR_TOL,
-          time_limit = 0, eq_elim = DAQP_DEFAULT_EQ_ELIM,
+          time_limit = 0,
           primal_start=None, dual_start=None):
     """
     Solve the quadratic program      minimize       0.5 x'*H*x + f' x
@@ -201,7 +201,7 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
     cdef DAQPSettings settings = [primal_tol, dual_tol, zero_tol, pivot_tol,
             progress_tol, cycle_tol, iter_limit, fval_bound,
             eps_prox, eta_prox, rho_soft, rel_subopt, abs_subopt, sing_tol, refactor_tol,
-            time_limit, eq_elim]
+            time_limit]
     cdef DAQPResult res = [&x[0], lam_ptr, 0, 0, 0, 0, 0, 0, 0]
 
     if primal_start is None and dual_start is None:
@@ -582,7 +582,7 @@ cdef class Model:
         ``pivot_tol``, ``progress_tol``, ``cycle_tol``, ``iter_limit``,
         ``fval_bound``, ``eps_prox``, ``eta_prox``, ``rho_soft``,
         ``rel_subopt``, ``abs_subopt``, ``sing_tol``, ``refactor_tol``,
-        ``time_limit``, ``eq_elim``.
+        ``time_limit``.
         """
         if self._work.settings == NULL:
             return {}
@@ -604,7 +604,6 @@ cdef class Model:
             'sing_tol':     s.sing_tol,
             'refactor_tol': s.refactor_tol,
             'time_limit':   s.time_limit,
-            'eq_elim':      s.eq_elim,
         }
 
     @settings.setter
@@ -629,7 +628,6 @@ cdef class Model:
         if 'sing_tol'     in new_settings: s.sing_tol     = new_settings['sing_tol']
         if 'refactor_tol' in new_settings: s.refactor_tol = new_settings['refactor_tol']
         if 'time_limit'   in new_settings: s.time_limit   = new_settings['time_limit']
-        if 'eq_elim'      in new_settings: s.eq_elim      = new_settings['eq_elim']
 
 
 @cython.boundscheck(False)

@@ -71,12 +71,6 @@ typedef struct{
     c_float sing_tol;
     c_float refactor_tol;
     c_float time_limit;
-
-    // Eliminate equality constraints through a QR factorization:
-    // 0 - never, 1 - when the constraints get cheaper to scan, 2 - always
-    // (2 also pays off when many active-set iterations are needed, which
-    //  cannot be determined before the problem is solved)
-    int eq_elim;
 }DAQPSettings;
 
 

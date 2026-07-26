@@ -125,7 +125,6 @@ static void apply_Q(const DAQPEqElim* eq, c_float* y){
  * -------------------------------------------------------------------------*/
 
 static int is_eq_elim_eligible(const DAQPWorkspace* work){
-    if(work->settings->eq_elim == 0) return 0;
     if(work->avi != NULL || work->bnb != NULL || work->nh > 1) return 0;
     if(work->qp == NULL || work->qp->A == NULL) return 0;
     /*
@@ -149,25 +148,17 @@ static int count_eq(const DAQPWorkspace* work){
 /*
  * Whether eliminating n_eq equalities is expected to pay off.
  *
- * Every iteration scans all constraints for the most violated one, which is
- * the dominant cost of a solve. The elimination reduces the length of the
- * rows from n to n-n_eq, but it also turns the simple bounds into general
- * constraints, which are cheaper to scan when they are kept as bounds.
- *
- * The elimination also removes the equalities from the working set, which
- * pays off when many active-set iterations are needed. How many that will be
- * is not known beforehand, so eq_elim > 1 skips the scan comparison.
+ * The reduction turns every simple bound into a general constraint. When the
+ * Hessian is diagonal a simple bound is a single lookup, so for a problem
+ * whose only general constraints are the equalities themselves the scan gets
+ * strictly more expensive. Such problems (multi-stage MPC, for instance) also
+ * tend to need very few active-set iterations, which is the other thing the
+ * reduction saves, so they are left alone.
  */
 static int is_eq_elim_worthwhile(const DAQPWorkspace* work, const int n_eq){
-    const int n = work->n, m = work->m, ms = work->ms;
-    c_float scan_full, scan_reduced;
-    if(n_eq <= DAQP_EQ_MIN_COUNT || DAQP_EQ_MIN_RATIO*n_eq <= n) return 0;
-    if(work->settings->eq_elim > 1) return 1; // Always eliminate
-    // A simple bound is a row of Rinv, or a unit vector for a diagonal Hessian
-    scan_full = (work->Rinv != NULL) ? (c_float)ms*n/2 : (c_float)ms;
-    scan_full += (c_float)(m-ms-n_eq)*n;
-    scan_reduced = (c_float)(m-n_eq)*(n-n_eq);
-    return scan_reduced < scan_full;
+    if(n_eq <= DAQP_EQ_MIN_COUNT || DAQP_EQ_MIN_RATIO*n_eq <= work->n) return 0;
+    if(work->RinvD != NULL && work->m == work->ms+n_eq) return 0;
+    return 1;
 }
 
 int daqp_eq_will_reduce(const DAQPWorkspace* work){
