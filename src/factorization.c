@@ -18,68 +18,6 @@ c_float daqp_dot(const c_float* v1, const c_float* v2, const int n) {
     return daqp_dot_inline(v1, v2, n);
 }
 
-// r <-- r - sum_j y_j*M_j, over the active constraints
-static void subtract_active(DAQPWorkspace *work, const c_float* y, c_float* r){
-    const int n = work->n, ms = work->ms, na = work->n_active;
-    int i, j, id;
-    for(j = 0; j < na; j++){
-        const c_float yj = y[j];
-        if(yj == 0) continue;
-        id = work->WS[j];
-        if(id < ms){
-            if(work->Rinv == NULL) r[id] -= yj;
-            else{
-                const c_float* Rj = work->Rinv+DAQP_R_OFFSET(id,n);
-                for(i = id; i < n; i++) r[i] -= yj*Rj[i];
-            }
-        }
-        else{
-            const c_float* Mj = work->M+n*(id-ms);
-            for(i = 0; i < n; i++) r[i] -= yj*Mj[i];
-        }
-    }
-}
-
-/*
- * The pivot ||m||^2-l'inv(D)l cancels when the constraint is nearly in the span
- * of the active ones, leaving only the errors that L and D have accumulated.
- * It is then recomputed as the residual ||m-Mk'y||^2, which is formed from the
- * original constraints and only loses half as many digits.
- */
-static c_float daqp_pivot_from_residual(DAQPWorkspace *work, const int add_ind,
-        const int new_L_start){
-    const int n = work->n, ms = work->ms, na = work->n_active;
-    c_float* y = work->zldl; // Obsolete until the next CSP is formed
-    c_float* r = work->xldl; // Ditto, at the cost of the reuse in the CSP
-    c_float sum;
-    int i, j;
-
-    // y <-- L'\(l./D), the coefficients of the projection onto the active set
-    for(i = na-1; i >= 0; i--){
-        sum = work->L[new_L_start+i];
-        for(j = na-1; j > i; j--) sum -= work->L[DAQP_ARSUM(j)+i]*y[j];
-        y[i] = sum;
-    }
-    // r <-- m
-    if(add_ind < ms){
-        for(i = 0; i < n; i++) r[i] = 0;
-        if(work->Rinv == NULL) r[add_ind] = 1;
-        else{
-            const c_float* Ri = work->Rinv+DAQP_R_OFFSET(add_ind,n);
-            for(i = add_ind; i < n; i++) r[i] = Ri[i];
-        }
-    }
-    else{
-        const c_float* Mi = work->M+n*(add_ind-ms);
-        for(i = 0; i < n; i++) r[i] = Mi[i];
-    }
-    subtract_active(work,y,r);
-
-    for(i = 0, sum = 0; i < n; i++) sum += r[i]*r[i];
-    work->reuse_ind = 0; // xldl no longer holds the forward substitution
-    return sum;
-}
-
 void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind){
     work->sing_ind = DAQP_EMPTY_IND;
     int i,j,disp,id;
@@ -155,19 +93,13 @@ void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind){
 
     // Scale: l_i <-- l_i/d_i
     // Update d_new -= l'Dl
-    c_float mnorm2 = work->D[work->n_active];
-    sum = mnorm2;
+    sum = work->D[work->n_active];
     c_float tmp;
     for (i =0,disp=new_L_start; i<work->n_active;i++,disp++){
         tmp = work->L[disp];
         work->L[disp] /= work->D[i];
         sum -= tmp*work->L[disp];
     }
-    // Cancellation error is larger than the pivot.
-    // Recompute it from the geometric residual
-    if(work->bnb == NULL && sum < DAQP_REORTH_TOL*mnorm2 &&
-            ns_active == 0 && work->n_active > 0)
-        sum = daqp_pivot_from_residual(work,add_ind,new_L_start);
     work->D[work->n_active]=sum;
 
     // Check for singularity
