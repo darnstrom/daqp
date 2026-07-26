@@ -146,14 +146,10 @@ static int count_eq(const DAQPWorkspace* work){
 }
 
 /*
- * Whether eliminating n_eq equalities is expected to pay off.
- *
- * The reduction turns every simple bound into a general constraint. When the
- * Hessian is diagonal a simple bound is a single lookup, so for a problem
- * whose only general constraints are the equalities themselves the scan gets
- * strictly more expensive. Such problems (multi-stage MPC, for instance) also
- * tend to need very few active-set iterations, which is the other thing the
- * reduction saves, so they are left alone.
+ * Whether eliminating n_eq equalities is expected to pay off. The reduction
+ * turns every simple bound into a general constraint, which is a loss when a
+ * diagonal Hessian makes a bound a single lookup and the equalities are the
+ * only general constraints (multi-stage MPC, for instance).
  */
 static int is_eq_elim_worthwhile(const DAQPWorkspace* work, const int n_eq){
     if(n_eq <= DAQP_EQ_MIN_COUNT || DAQP_EQ_MIN_RATIO*n_eq <= work->n) return 0;
@@ -652,19 +648,7 @@ void daqp_eq_expand(DAQPWorkspace* work){
     eq->expanded = 1;
 }
 
-/*
- * Eliminate the equality constraints of the problem that the workspace holds.
- * Returns the number of eliminated constraints (0 if it was left intact) or a
- * negative exit flag if the equality constraints cannot be satisfied.
- *
- * A singular Hessian is handled by the proximal method, which re-forms the
- * problem in the full space between its iterations. The reduction is then
- * prepared but not installed; daqp_prox applies it to each inner problem.
- */
-/*
- * Form the constraints of the full problem, which the setup leaves to the
- * elimination whenever one is expected, and put it in the workspace.
- */
+// Form the full constraints, which the setup leaves to the elimination
 int daqp_eq_form_full(DAQPWorkspace* work){
     int error_flag;
     daqp_eq_restore(work);
@@ -679,14 +663,11 @@ int daqp_eq_form_full(DAQPWorkspace* work){
 
 int daqp_eq_eliminate(DAQPWorkspace* work){
     int flag, error_flag;
-    /*
-     * Only the bounds are known to have changed here; daqp_update_ldp marks
-     * the factorization as invalid when the data it is formed from changes.
-     */
+    // Only the bounds are known to have changed; daqp_update_ldp invalidates
+    // the factorization when the data it is formed from changes
     flag = daqp_eq_reduce(work,DAQP_UPDATE_d);
     if(flag <= 0){
-        // The setup leaves forming the constraints to the elimination when one
-        // is expected, so form them here if no reduction was installed
+        // No reduction was installed, so the full constraints are still owed
         if(daqp_eq_will_reduce(work)){
             error_flag = daqp_eq_form_full(work);
             if(error_flag < 0) return error_flag;
@@ -702,16 +683,13 @@ int daqp_eq_eliminate(DAQPWorkspace* work){
     return work->eq->neq;
 }
 
-/*
- * Retrieving a result restores the full problem, whose constraints an
- * elimination never forms, so a workspace that is solved again has to be given
- * the reduction back. The proximal method applies the reduction to each of its
- * inner problems itself, so it is left alone.
- */
+// Retrieving a result restores a full problem whose constraints were never
+// formed, so put the reduction back before solving again. daqp_prox installs
+// the reduction on its own inner problems, so it is left alone.
 int daqp_eq_reinstall(DAQPWorkspace* work){
+    DAQPEqElim* eq = work->eq;
     int flag;
-    if(!DAQP_EQ_IS_FULL_UNFORMED(work) || work->eq->installed || work->n_prox > 0)
-        return 0;
+    if(eq == NULL || eq->neq == 0 || eq->installed || work->n_prox > 0) return 0;
     flag = daqp_eq_eliminate(work);
     return (flag < 0) ? flag : 0;
 }

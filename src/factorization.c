@@ -41,17 +41,10 @@ static void subtract_active(DAQPWorkspace *work, const c_float* y, c_float* r){
 }
 
 /*
- * The pivot of a new constraint is formed as ||m||^2-l'inv(D)l, which loses
- * all significance when the constraint is nearly in the span of the active
- * ones: the terms then cancel, and what remains are the errors that L and D
- * have accumulated over the preceding updates (measured to reach 1e-5, while
- * the pivot is compared against a tolerance of 1e-11).
- *
- * It is therefore recomputed as ||m-Mk'y||^2, the residual of the constraint
- * against the active set, formed from the original constraints rather than
- * from L and D. The residual is refined once, since the y that the drifted
- * factorization provides does not minimize it. Squaring the residual only
- * loses half as many digits as the cancellation does.
+ * The pivot ||m||^2-l'inv(D)l cancels when the constraint is nearly in the span
+ * of the active ones, leaving only the errors that L and D have accumulated.
+ * It is then recomputed as the residual ||m-Mk'y||^2, which is formed from the
+ * original constraints and only loses half as many digits.
  */
 static c_float daqp_pivot_from_residual(DAQPWorkspace *work, const int add_ind,
         const int new_L_start){

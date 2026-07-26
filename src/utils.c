@@ -165,7 +165,7 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
         return daqp_eq_eliminate(work);
 
     // An earlier elimination left the full constraints unformed
-    if(DAQP_EQ_IS_FULL_UNFORMED(work))
+    if(work->eq != NULL && work->eq->neq != 0)
         return daqp_eq_form_full(work);
 
     return 0;

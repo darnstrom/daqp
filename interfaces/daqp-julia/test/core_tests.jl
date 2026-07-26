@@ -736,33 +736,25 @@ end
     # Solving the same workspace twice gives the same answer both times
     d = DAQPBase.Model()
     DAQPBase.setup(d, H, f, A, bu1, bl1, sense; init_mask=elim_mask)
-    x1, fv1, e1, _ = DAQPBase.solve(d)
+    x1, _, e1, _ = DAQPBase.solve(d)
     x2, fv2, e2, _ = DAQPBase.solve(d)
     @test e1 == DAQPBase.OPTIMAL && e2 == DAQPBase.OPTIMAL
     @test norm(x1 - xref1) < 1e-8
     @test norm(x2 - xref1) < 1e-8
     @test abs(fv2 - fref1) < 1e-8
 
-    # Updating without asking for a new elimination solves in the full space
-    d_plain = DAQPBase.Model()
-    DAQPBase.setup(d_plain, H, f, A, bu1, bl1, sense; init_mask=elim_mask)
-    DAQPBase.solve(d_plain)
-    DAQPBase.update(d_plain, nothing, nothing, nothing, bu2, bl2)
-    xp, fvp, ep, _ = DAQPBase.solve(d_plain)
-    @test ep == DAQPBase.OPTIMAL
-    @test norm(xp - xref2) < 1e-8
-    @test abs(fvp - fref2) < 1e-8
-
-    # ... and asking for one again gives the same answer
-    d_elim = DAQPBase.Model()
-    DAQPBase.setup(d_elim, H, f, A, bu1, bl1, sense; init_mask=elim_mask)
-    DAQPBase.solve(d_elim)
-    DAQPBase.update(d_elim, nothing, nothing, nothing, bu2, bl2,
-                    nothing, nothing, DAQPBase.DAQP_UPDATE_eliminate)
-    xe, fve, ee, _ = DAQPBase.solve(d_elim)
-    @test ee == DAQPBase.OPTIMAL
-    @test norm(xe - xref2) < 1e-8
-    @test abs(fve - fref2) < 1e-8
+    # Solving after an update, whether or not a new elimination is asked for
+    for mask in (Cint(0), DAQPBase.DAQP_UPDATE_eliminate)
+        du = DAQPBase.Model()
+        DAQPBase.setup(du, H, f, A, bu1, bl1, sense; init_mask=elim_mask)
+        DAQPBase.solve(du)
+        DAQPBase.update(du, nothing, nothing, nothing, bu2, bl2,
+                        nothing, nothing, mask)
+        xu, fvu, eu, _ = DAQPBase.solve(du)
+        @test eu == DAQPBase.OPTIMAL
+        @test norm(xu - xref2) < 1e-8
+        @test abs(fvu - fref2) < 1e-8
+    end
 end
 
 @testset "Unconstrained shortcut" begin
