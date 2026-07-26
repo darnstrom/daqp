@@ -156,9 +156,8 @@ end
     x,_,_,info = DAQPBase.quadprog(H,f,A,bu,bl,sense)
     @test norm(x-[0;1;1]) < tol
 
-    # A binary constraint can be at a zero-dual endpoint without belonging to
-    # the active set. It must still be fixed explicitly so that BnB returns a
-    # stable binary active set.
+    # A binary constraint at a zero-dual endpoint is already integer feasible
+    # and should not create redundant branches.
     ndeg = 8
     Hdeg = Matrix{Float64}(I, ndeg, ndeg)
     fdeg = zeros(ndeg)
@@ -169,18 +168,17 @@ end
         Hdeg, fdeg, zeros(0, ndeg), bdeg_u, bdeg_l, sdeg)
     @test efdeg == DAQPBase.OPTIMAL
     @test norm(xdeg, Inf) < tol
-    @test ideg.nodes == 2 * ndeg + 1
+    @test ideg.nodes == 1
 
     # Cover the same zero-dual case for general binary constraints.
     xgen, _, efgen, igen = DAQPBase.quadprog(
         Hdeg, fdeg, Hdeg, bdeg_u, bdeg_l, sdeg)
     @test efgen == DAQPBase.OPTIMAL
     @test norm(xgen, Inf) < tol
-    @test igen.nodes == 2 * ndeg + 1
+    @test igen.nodes == 1
 
-    # BnB cleanup may shorten, but must never lengthen, the valid prefix of
-    # the cached triangular solve. Lengthening it can reuse stale xldl/zldl
-    # entries and produce a CSP that violates its own active equalities.
+    # Iterative refinement uses xldl/zldl as scratch and must invalidate the
+    # cached CSP substitution. Cleanup may then reuse an unchanged prefix.
     dreuse = DAQPBase.Model()
     Hreuse = Matrix{Float64}(I, 2, 2)
     Areuse = ones(1, 2)
@@ -189,15 +187,22 @@ end
     sreuse = Cint[DAQPBase.BINARY, DAQPBase.BINARY, DAQPBase.EQUALITY]
     DAQPBase.setup(
         dreuse, Hreuse, zeros(2), Areuse, bureuse, blreuse, sreuse)
+    DAQPBase.solve(dreuse)
     wsreuse = unsafe_load(Ptr{DAQPBase.Workspace}(dreuse.work))
-    @test wsreuse.n_active == 1
+    @test wsreuse.n_active > 0
     reuse_field = findfirst(==(:reuse_ind), fieldnames(DAQPBase.Workspace))
     reuse_offset = fieldoffset(DAQPBase.Workspace, reuse_field)
     reuse_ptr = Ptr{Cint}(Ptr{UInt8}(dreuse.work) + reuse_offset)
-    unsafe_store!(reuse_ptr, 0)
+    unsafe_store!(reuse_ptr, wsreuse.n_active)
+    ccall((:daqp_refine_active, DAQPBase.libdaqp), Cvoid,
+          (Ptr{DAQPBase.Workspace},), dreuse.work)
+    @test unsafe_load(Ptr{DAQPBase.Workspace}(dreuse.work)).reuse_ind == 0
+
+    unsafe_store!(reuse_ptr, wsreuse.n_active)
     ccall((:daqp_node_cleanup_workspace, DAQPBase.libdaqp), Cvoid,
           (Cint, Ptr{DAQPBase.Workspace}), wsreuse.n_active, dreuse.work)
-    @test unsafe_load(Ptr{DAQPBase.Workspace}(dreuse.work)).reuse_ind == 0
+    @test unsafe_load(Ptr{DAQPBase.Workspace}(dreuse.work)).reuse_ind ==
+          wsreuse.n_active
 
 end
 
