@@ -1,0 +1,169 @@
+name: Benchmark
+
+# Manually triggered: benchmarking is slow and its timings are noisy, so it runs
+# on request rather than on every push. Run it once the other CI workflows are
+# green -- there is no point benchmarking a commit that does not build or pass
+# its tests.
+on:
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "Pull request number to benchmark (leave empty to benchmark the selected branch against master)"
+        required: false
+        default: ""
+      suite:
+        description: "Benchmark suite: small, medium, large or all"
+        required: false
+        default: "medium"
+      threshold:
+        description: "Wall time regression threshold in percent (noisy measure)"
+        required: false
+        default: "25"
+      work_threshold:
+        description: "Iteration/node regression threshold in percent (exact measure)"
+        required: false
+        default: "5"
+
+concurrency:
+  group: benchmark-${{ github.event.inputs.pr || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  benchmark:
+    name: Regression check vs base
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      SUITE: ${{ github.event.inputs.suite }}
+      THRESHOLD: ${{ github.event.inputs.threshold }}
+      WORK_THRESHOLD: ${{ github.event.inputs.work_threshold }}
+      PR: ${{ github.event.inputs.pr }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so that the base commit can be checked out and built
+          fetch-depth: 0
+
+      - name: "Resolve commits to compare"
+        id: refs
+        run: |
+          set -euo pipefail
+          if [ -n "$PR" ]; then
+            base_ref=$(gh pr view "$PR" --json baseRefName -q .baseRefName)
+            git fetch --no-tags origin "pull/$PR/head"
+            git checkout --detach FETCH_HEAD
+            base_sha=$(git merge-base HEAD "origin/$base_ref")
+          else
+            base_sha=$(git merge-base HEAD origin/master)
+          fi
+          head_sha=$(git rev-parse HEAD)
+          if [ "$head_sha" = "$base_sha" ]; then
+            echo "::error::Head and base are the same commit ($head_sha) -- nothing to compare."
+            exit 1
+          fi
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+          echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
+          echo "Benchmarking $head_sha against $base_sha"
+
+      - name: "Create build directory and run CMake"
+        run: cmake -S . -B build -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DJULIA=ON
+
+      - name: "Build project"
+        run: cmake --build build --target all --config Release -- -j4
+
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+          arch: x64
+
+      - name: "Instantiate Julia project"
+        run: julia --color=yes --project=build/interfaces/daqp-julia -e "using Pkg; Pkg.instantiate()"
+
+      - name: "Benchmark against base"
+        id: bench
+        continue-on-error: true
+        env:
+          BASE_SHA: ${{ steps.refs.outputs.base_sha }}
+        run: |
+          bash interfaces/daqp-julia/test/benchmark_comparison_git.sh \
+            build/interfaces/daqp-julia \
+            "$BASE_SHA" \
+            "$SUITE" \
+            "$THRESHOLD" \
+            "$GITHUB_WORKSPACE/benchmark_results" \
+            1 \
+            "$WORK_THRESHOLD"
+
+      - name: "Write job summary"
+        if: always()
+        env:
+          HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
+          BASE_SHA: ${{ steps.refs.outputs.base_sha }}
+        run: |
+          {
+            echo "## DAQP benchmark: \`${HEAD_SHA:0:12}\` vs \`${BASE_SHA:0:12}\`"
+            echo ""
+            echo "Suite: \`$SUITE\` · time threshold: \`$THRESHOLD%\` · work threshold: \`$WORK_THRESHOLD%\`"
+            echo ""
+            if [ -f benchmark_results/comparison.txt ]; then
+              echo '```'
+              cat benchmark_results/comparison.txt
+              echo '```'
+            else
+              echo "The benchmark did not produce a comparison -- see the job log."
+            fi
+            echo ""
+            echo "_Timings come from a shared runner and are noisy; the iteration and node counts are exact, since both runs solve identical seeded problems._"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: "Upload benchmark results"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: |
+            benchmark_results/*.csv
+            benchmark_results/comparison.txt
+          if-no-files-found: warn
+
+      - name: "Comment results on the pull request"
+        if: always() && github.event.inputs.pr != ''
+        continue-on-error: true
+        env:
+          BASE_SHA: ${{ steps.refs.outputs.base_sha }}
+        run: |
+          {
+            echo "<!-- daqp-benchmark -->"
+            if [ "${{ steps.bench.outcome }}" = "success" ]; then
+              echo "### ✅ DAQP benchmark: no regression detected"
+            else
+              echo "### ⚠️ DAQP benchmark: possible regression"
+            fi
+            echo ""
+            echo "Compared against base \`${BASE_SHA:0:12}\` · suite \`$SUITE\` · time threshold \`$THRESHOLD%\` · work threshold \`$WORK_THRESHOLD%\`"
+            echo ""
+            echo "<details><summary>Full comparison</summary>"
+            echo ""
+            echo '```'
+            if [ -f benchmark_results/comparison.txt ]; then
+              cat benchmark_results/comparison.txt
+            else
+              echo "No comparison produced -- see the job log."
+            fi
+            echo '```'
+            echo ""
+            echo "</details>"
+            echo ""
+            echo "_Timings come from a shared runner and are noisy; the iteration and node counts are exact, since both runs solve identical seeded problems._"
+          } > comment.md
+          gh pr comment "$PR" --body-file comment.md --edit-last --create-if-none
+
+      - name: "Fail if a regression was detected"
+        if: steps.bench.outcome == 'failure'
+        run: |
+          echo "Performance regression detected -- see the job summary for details."
+          exit 1
