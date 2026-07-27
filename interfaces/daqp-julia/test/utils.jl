@@ -87,6 +87,84 @@ function generate_test_LP(n,m,ms)
     sense = zeros(Int32,m)
     return x,f,A,bupper,blower,sense
 end
+## Equality constrained QP
+"""
+    generate_test_QP_eq(n,m,ms,nActive,neq,kappa)
+
+Generate a QP with `neq` equality constraints and a known solution.
+
+`neq` of the constraints that are active at the optimum of the QP from
+`generate_test_QP` are turned into equalities by collapsing their bounds onto
+the active value. The multipliers of these constraints are nonnegative at the
+optimum, so removing the sign requirement on them leaves the KKT conditions
+satisfied and `xref` remains the solution.
+
+General constraints are preferred over simple bounds, so that the equality
+elimination in the solver operates on the rows of `A`.
+"""
+function generate_test_QP_eq(n,m,ms,nActive,neq,kappa)
+  neq <= nActive || error("generate_test_QP_eq requires neq <= nActive")
+  xref,H,f,A,bupper,blower,sense = generate_test_QP(n,m,ms,nActive,kappa)
+
+  # The first ms constraints are the simple bounds x[1:ms]; the rest are A*x
+  r = [xref[1:ms]; A*xref]
+  # Active constraints sit exactly on a bound, inactive ones are >= 0.01 away
+  is_active(i) = min(abs(r[i]-bupper[i]), abs(r[i]-blower[i])) <= 1e-6*(1+abs(r[i]))
+  # Prefer general constraints (i > ms) over simple bounds
+  active = [i for i in ms+1:m if is_active(i)]
+  append!(active, [i for i in 1:ms if is_active(i)])
+
+  length(active) >= neq ||
+    error("only found $(length(active)) active constraints, need $neq")
+
+  for i in active[1:neq]
+    # Collapse the bounds onto whichever one is active at xref
+    b = abs(r[i]-bupper[i]) <= abs(r[i]-blower[i]) ? bupper[i] : blower[i]
+    bupper[i] = b
+    blower[i] = b
+    sense[i] = Cint(DAQPBase.EQUALITY)
+  end
+
+  return xref,H,f,A,bupper,blower,sense
+end
+
+## MIQP
+"""
+    generate_test_MIQP(n,m,ms,nb)
+
+Generate a mixed-integer QP whose first `nb` variables are binary (requires
+`ms >= nb`, since the binary constraints are placed on simple bounds).
+
+The origin is feasible, and `f` is skewed towards the binary variables so that
+it is lucrative to leave it. A cardinality constraint caps how many binaries
+can be set, which makes the relaxation fractional and forces branch and bound
+to actually search instead of diving straight to an integer solution.
+
+Requires `m-ms >= 1` for the cardinality constraint.
+"""
+function generate_test_MIQP(n,m,ms,nb)
+  ms >= nb || error("generate_test_MIQP requires ms >= nb")
+  m-ms >= 1 || error("generate_test_MIQP requires at least one general constraint")
+  M = randn(n,n);
+  H = M'*M + I;                                # PD and reasonably conditioned
+  A = randn(m-ms,n);
+  bupper = 20*rand(m); blower = -20*rand(m);   # ensure that the origin is feasible
+  f = 100*randn(n); f[1:nb] .= -abs.(f[1:nb]); # make it lucrative to leave the origin
+  bupper[1:nb] .= 1.0;
+  blower[1:nb] .= 0.0;
+  sense = zeros(Cint,m);
+  sense[1:nb] .= Cint(DAQPBase.BINARY);
+
+  # Cardinality constraint sum(x[1:nb]) <= nb/2: the binaries compete, so the
+  # relaxation is fractional and the search has to branch and backtrack.
+  A[1,:] .= 0.0;
+  A[1,1:nb] .= 1.0;
+  bupper[ms+1] = floor(nb/2);
+  blower[ms+1] = -1e30;
+
+  return H,f,A,bupper,blower,sense
+end
+
 ## AVI
 function generate_test_avi(n,m)
     A = randn(m,n);

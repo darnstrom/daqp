@@ -50,11 +50,69 @@ function parse_float(s::Union{String, SubString})
     end
 end
 
+"""
+    pct_diff(base, curr)
+
+Percentage change from `base` to `curr` (positive = larger), or `nothing` if
+either value is missing or the baseline is zero.
+"""
+function pct_diff(base, curr)
+    (base === nothing || curr === nothing || base == 0) && return nothing
+    return ((curr - base) / base) * 100
+end
+
+"""
+    has_branching(entry)
+
+Whether the entry comes from a problem that actually branched. Only MIQPs visit
+more than one node, so this keeps the node counts out of the other reports.
+"""
+function has_branching(entry)
+    entry.base_nodes === nothing && return false
+    entry.curr_nodes === nothing && return false
+    return max(entry.base_nodes, entry.curr_nodes) > 1
+end
+
+"""
+    print_entry_details(e)
+
+Print the multi-line before/after breakdown used for regressions and improvements.
+"""
+function print_entry_details(e)
+    println("  $(e.desc)")
+    println("    Total: $(round(e.base_total*1000; digits=3)) ms → $(round(e.curr_total*1000; digits=3)) ms ($(round(e.pct_change; digits=1))%)")
+
+    setup_change = pct_diff(e.base_setup, e.curr_setup)
+    if setup_change !== nothing
+        println("    Setup: $(round(e.base_setup*1e6; digits=1))µs → $(round(e.curr_setup*1e6; digits=1))µs ($(round(setup_change; digits=1))%)")
+    end
+    solve_change = pct_diff(e.base_solve, e.curr_solve)
+    if solve_change !== nothing
+        println("    Solve: $(round(e.base_solve*1e6; digits=1))µs → $(round(e.curr_solve*1e6; digits=1))µs ($(round(solve_change; digits=1))%)")
+    end
+    iter_change = pct_diff(e.base_iters, e.curr_iters)
+    if iter_change !== nothing
+        println("    Iters: $(round(e.base_iters; digits=1)) → $(round(e.curr_iters; digits=1)) ($(round(iter_change; digits=1))%)")
+    end
+    node_change = pct_diff(e.base_nodes, e.curr_nodes)
+    if node_change !== nothing && has_branching(e)
+        println("    Nodes: $(round(e.base_nodes; digits=1)) → $(round(e.curr_nodes; digits=1)) ($(round(node_change; digits=1))%)")
+    end
+end
+
 function compare_benchmarks(baseline_file::String, current_file::String;
-                           regression_threshold::Float64=5.0)
+                           regression_threshold::Float64=5.0,
+                           work_threshold::Float64=5.0)
     """
     Compare two benchmark result files and report regressions.
-    regression_threshold: percentage slowdown to flag as regression (default 5%)
+
+    regression_threshold: percentage slowdown in wall time to flag as a
+                          regression (default 5%). Timings on shared machines
+                          are noisy, so this is the coarse criterion.
+    work_threshold:       percentage increase in iterations or branch and bound
+                          nodes to flag as a regression (default 5%). Both runs
+                          solve identical problems from a seeded generator, so
+                          these counts carry no measurement noise at all.
     """
 
     baseline = load_benchmarks(baseline_file)
@@ -69,10 +127,12 @@ function compare_benchmarks(baseline_file::String, current_file::String;
     println("="^70)
     println("Baseline: $baseline_file")
     println("Current:  $current_file")
-    println("Regression threshold: $regression_threshold%\n")
+    println("Time regression threshold: $regression_threshold%")
+    println("Work (iterations/nodes) regression threshold: $work_threshold%\n")
 
     # Track statistics
     regressions = []
+    work_regressions = []
     improvements = []
     unchanged = []
     missing_current = []
@@ -97,6 +157,9 @@ function compare_benchmarks(baseline_file::String, current_file::String;
         curr_total = parse_float(curr_row["total_time_median_s"])
         base_iters = parse_float(base_row["iter_median"])
         curr_iters = parse_float(curr_row["iter_median"])
+        # nodes_median is absent from CSVs produced before MIQPs were benchmarked
+        base_nodes = parse_float(get(base_row, "nodes_median", ""))
+        curr_nodes = parse_float(get(curr_row, "nodes_median", ""))
 
         # Calculate percentage change (positive = slower)
         if base_total === nothing || curr_total === nothing
@@ -107,48 +170,35 @@ function compare_benchmarks(baseline_file::String, current_file::String;
 
         problem_desc = "$(base_row["problem_type"]): n=$(base_row["n_variables"]), m=$(base_row["n_constraints"])"
 
+        entry = (
+            problem_id=problem_id,
+            desc=problem_desc,
+            base_setup=base_setup,
+            curr_setup=curr_setup,
+            base_solve=base_solve,
+            curr_solve=curr_solve,
+            base_total=base_total,
+            curr_total=curr_total,
+            pct_change=pct_change,
+            base_iters=base_iters,
+            curr_iters=curr_iters,
+            base_nodes=base_nodes,
+            curr_nodes=curr_nodes
+        )
+
+        iter_change = pct_diff(base_iters, curr_iters)
+        node_change = pct_diff(base_nodes, curr_nodes)
+        if (iter_change !== nothing && iter_change > work_threshold) ||
+           (has_branching(entry) && node_change !== nothing && node_change > work_threshold)
+            push!(work_regressions, entry)
+        end
+
         if pct_change > regression_threshold
-            push!(regressions, (
-                problem_id=problem_id,
-                desc=problem_desc,
-                base_setup=base_setup,
-                curr_setup=curr_setup,
-                base_solve=base_solve,
-                curr_solve=curr_solve,
-                base_total=base_total,
-                curr_total=curr_total,
-                pct_change=pct_change,
-                base_iters=base_iters,
-                curr_iters=curr_iters
-            ))
+            push!(regressions, entry)
         elseif pct_change < -regression_threshold
-            push!(improvements, (
-                problem_id=problem_id,
-                desc=problem_desc,
-                base_setup=base_setup,
-                curr_setup=curr_setup,
-                base_solve=base_solve,
-                curr_solve=curr_solve,
-                base_total=base_total,
-                curr_total=curr_total,
-                pct_change=pct_change,
-                base_iters=base_iters,
-                curr_iters=curr_iters
-            ))
+            push!(improvements, entry)
         else
-            push!(unchanged, (
-                problem_id=problem_id,
-                desc=problem_desc,
-                base_setup=base_setup,
-                curr_setup=curr_setup,
-                base_solve=base_solve,
-                curr_solve=curr_solve,
-                base_total=base_total,
-                curr_total=curr_total,
-                pct_change=pct_change,
-                base_iters=base_iters,
-                curr_iters=curr_iters
-            ))
+            push!(unchanged, entry)
         end
     end
 
@@ -164,23 +214,7 @@ function compare_benchmarks(baseline_file::String, current_file::String;
         println("⚠️  PERFORMANCE REGRESSIONS (>$(regression_threshold)% slower):")
         println(repeat("-", 70))
         for reg in sort(regressions, by=x -> -x.pct_change)
-            println("  $(reg.desc)")
-            baseline_total_ms = reg.base_total * 1000
-            current_total_ms = reg.curr_total * 1000
-            println("    Total: $(round(baseline_total_ms; digits=3)) ms → $(round(current_total_ms; digits=3)) ms ($(round(reg.pct_change; digits=1))%)")
-
-            if reg.base_setup !== nothing && reg.curr_setup !== nothing
-                setup_change = ((reg.curr_setup - reg.base_setup) / reg.base_setup) * 100
-                println("    Setup: $(round(reg.base_setup*1e6; digits=1))µs → $(round(reg.curr_setup*1e6; digits=1))µs ($(round(setup_change; digits=1))%)")
-            end
-            if reg.base_solve !== nothing && reg.curr_solve !== nothing
-                solve_change = ((reg.curr_solve - reg.base_solve) / reg.base_solve) * 100
-                println("    Solve: $(round(reg.base_solve*1e6; digits=1))µs → $(round(reg.curr_solve*1e6; digits=1))µs ($(round(solve_change; digits=1))%)")
-            end
-            if reg.base_iters !== nothing && reg.curr_iters !== nothing
-                iter_change = ((reg.curr_iters - reg.base_iters) / reg.base_iters) * 100
-                println("    Iters: $(round(reg.base_iters; digits=1)) → $(round(reg.curr_iters; digits=1)) ($(round(iter_change; digits=1))%)")
-            end
+            print_entry_details(reg)
         end
         println()
     end
@@ -189,23 +223,7 @@ function compare_benchmarks(baseline_file::String, current_file::String;
         println("✓ PERFORMANCE IMPROVEMENTS (>$(regression_threshold)% faster):")
         println(repeat("-", 70))
         for imp in sort(improvements, by=x -> x.pct_change)
-            println("  $(imp.desc)")
-            baseline_total_ms = imp.base_total * 1000
-            current_total_ms = imp.curr_total * 1000
-            println("    Total: $(round(baseline_total_ms; digits=3)) ms → $(round(current_total_ms; digits=3)) ms ($(round(imp.pct_change; digits=1))%)")
-
-            if imp.base_setup !== nothing && imp.curr_setup !== nothing
-                setup_change = ((imp.curr_setup - imp.base_setup) / imp.base_setup) * 100
-                println("    Setup: $(round(imp.base_setup*1e6; digits=1))µs → $(round(imp.curr_setup*1e6; digits=1))µs ($(round(setup_change; digits=1))%)")
-            end
-            if imp.base_solve !== nothing && imp.curr_solve !== nothing
-                solve_change = ((imp.curr_solve - imp.base_solve) / imp.base_solve) * 100
-                println("    Solve: $(round(imp.base_solve*1e6; digits=1))µs → $(round(imp.curr_solve*1e6; digits=1))µs ($(round(solve_change; digits=1))%)")
-            end
-            if imp.base_iters !== nothing && imp.curr_iters !== nothing
-                iter_change = ((imp.curr_iters - imp.base_iters) / imp.base_iters) * 100
-                println("    Iters: $(round(imp.base_iters; digits=1)) → $(round(imp.curr_iters; digits=1)) ($(round(iter_change; digits=1))%)")
-            end
+            print_entry_details(imp)
         end
         println()
     end
@@ -215,23 +233,45 @@ function compare_benchmarks(baseline_file::String, current_file::String;
         println(repeat("-", 70))
         for unch in sort(unchanged, by=x -> abs(x.pct_change), rev=true)
             time_str = "$(round(unch.pct_change; digits=2))%"
-            details = []
+            details = String[]
 
-            if unch.base_setup !== nothing && unch.curr_setup !== nothing
-                setup_change = ((unch.curr_setup - unch.base_setup) / unch.base_setup) * 100
+            setup_change = pct_diff(unch.base_setup, unch.curr_setup)
+            if setup_change !== nothing
                 push!(details, "Setup: $(round(setup_change; digits=1))%")
             end
-            if unch.base_solve !== nothing && unch.curr_solve !== nothing
-                solve_change = ((unch.curr_solve - unch.base_solve) / unch.base_solve) * 100
+            solve_change = pct_diff(unch.base_solve, unch.curr_solve)
+            if solve_change !== nothing
                 push!(details, "Solve: $(round(solve_change; digits=1))%")
             end
-            if unch.base_iters !== nothing && unch.curr_iters !== nothing
-                iter_change = ((unch.curr_iters - unch.base_iters) / unch.base_iters) * 100
+            iter_change = pct_diff(unch.base_iters, unch.curr_iters)
+            if iter_change !== nothing
                 push!(details, "Iters: $(round(iter_change; digits=1))%")
+            end
+            node_change = pct_diff(unch.base_nodes, unch.curr_nodes)
+            if node_change !== nothing && has_branching(unch)
+                push!(details, "Nodes: $(round(node_change; digits=1))%")
             end
 
             detail_str = isempty(details) ? "" : " | " * join(details, ", ")
             println("  $(unch.desc): $(time_str)$(detail_str)")
+        end
+        println()
+    end
+
+    if !isempty(work_regressions)
+        println("⚠️  MORE WORK PER SOLVE (>$(work_threshold)% more iterations/nodes):")
+        println(repeat("-", 70))
+        println("  These counts are exact -- both runs solve identical problems.")
+        for wr in sort(work_regressions, by=x -> -something(pct_diff(x.base_iters, x.curr_iters), 0.0))
+            println("  $(wr.desc)")
+            iter_change = pct_diff(wr.base_iters, wr.curr_iters)
+            if iter_change !== nothing
+                println("    Iters: $(round(wr.base_iters; digits=1)) → $(round(wr.curr_iters; digits=1)) ($(round(iter_change; digits=1))%)")
+            end
+            node_change = pct_diff(wr.base_nodes, wr.curr_nodes)
+            if node_change !== nothing && has_branching(wr)
+                println("    Nodes: $(round(wr.base_nodes; digits=1)) → $(round(wr.curr_nodes; digits=1)) ($(round(node_change; digits=1))%)")
+            end
         end
         println()
     end
@@ -257,15 +297,19 @@ function compare_benchmarks(baseline_file::String, current_file::String;
     # Summary
     println("="^70)
     println("SUMMARY:")
-    println("  Total compared: $(length(unchanged) + length(regressions) + length(improvements))")
-    println("  Regressions:    $(length(regressions))")
-    println("  Improvements:   $(length(improvements))")
-    println("  Unchanged:      $(length(unchanged))")
-    println("  Missing:        $(length(missing_current))")
-    println("  New:            $(length(new_in_current))")
+    println("  Total compared:  $(length(unchanged) + length(regressions) + length(improvements))")
+    println("  Time regressions: $(length(regressions))")
+    println("  Work regressions: $(length(work_regressions))")
+    println("  Improvements:     $(length(improvements))")
+    println("  Unchanged:        $(length(unchanged))")
+    println("  Missing:          $(length(missing_current))")
+    println("  New:              $(length(new_in_current))")
 
-    if !isempty(regressions)
-        println("\n⚠️  WARNING: $(length(regressions)) performance regression(s) detected!")
+    if !isempty(regressions) || !isempty(work_regressions)
+        msgs = String[]
+        isempty(regressions)      || push!(msgs, "$(length(regressions)) time regression(s)")
+        isempty(work_regressions) || push!(msgs, "$(length(work_regressions)) work regression(s)")
+        println("\n⚠️  WARNING: " * join(msgs, " and ") * " detected!")
         return false
     else
         println("\n✓ No regressions detected.")
@@ -312,6 +356,10 @@ if abspath(PROGRAM_FILE) == @__FILE__
         Usage:
             julia compare_benchmarks.jl baseline.csv current.csv
             julia compare_benchmarks.jl --baseline baseline.csv current.csv --threshold 5
+            julia compare_benchmarks.jl baseline.csv current.csv --threshold 25 --work-threshold 5
+
+        --threshold       percentage slowdown in wall time to flag (noisy measure)
+        --work-threshold  percentage increase in iterations/nodes to flag (exact measure)
         """)
         exit(1)
     end
@@ -319,6 +367,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     local baseline_file = ""
     local current_file = ""
     local threshold = 5.0
+    local work_threshold = 5.0
 
     local i = 1
     while i <= length(ARGS)
@@ -327,6 +376,9 @@ if abspath(PROGRAM_FILE) == @__FILE__
             i += 2
         elseif ARGS[i] == "--threshold" && i < length(ARGS)
             threshold = parse(Float64, ARGS[i+1])
+            i += 2
+        elseif ARGS[i] == "--work-threshold" && i < length(ARGS)
+            work_threshold = parse(Float64, ARGS[i+1])
             i += 2
         elseif baseline_file == ""
             baseline_file = ARGS[i]
@@ -358,6 +410,8 @@ if abspath(PROGRAM_FILE) == @__FILE__
     print_benchmark_info(baseline_file)
     print_benchmark_info(current_file)
 
-    success = compare_benchmarks(baseline_file, current_file; regression_threshold=threshold)
+    success = compare_benchmarks(baseline_file, current_file;
+                                 regression_threshold=threshold,
+                                 work_threshold=work_threshold)
     exit(success ? 0 : 1)
 end
