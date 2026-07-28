@@ -14,6 +14,7 @@ Usage:
     julia benchmark.jl                          # Run benchmarks with default settings
     julia benchmark.jl --output results.csv    # Specify output file
     julia benchmark.jl --suite small            # Run only small problems
+    julia benchmark.jl --problem-types qp,avi   # Select benchmark families
     julia benchmark.jl --prox                   # Run semi-proximal vs full-proximal comparison
 """
 
@@ -462,10 +463,24 @@ function print_stats(stats; show_nodes=false)
     println(line)
 end
 
-function run_benchmarks(; suite="all", output_file="daqp_benchmark_results.csv", use_local=false)
+const BENCHMARK_TYPES = ["qp", "lp", "eq", "miqp", "avi"]
+
+function parse_problem_types(value)
+    selected = Set(lowercase.(strip.(split(value, ","))))
+    unknown = setdiff(selected, Set(BENCHMARK_TYPES))
+    isempty(unknown) ||
+        error("Unknown problem type(s): $(join(sort(collect(unknown)), ", ")). " *
+              "Must be a comma-separated subset of: $(join(BENCHMARK_TYPES, ", "))")
+    isempty(selected) && error("At least one problem type must be selected")
+    return selected
+end
+
+function run_benchmarks(; suite="all", output_file="daqp_benchmark_results.csv",
+                        use_local=false, problem_types=join(BENCHMARK_TYPES, ","))
     """
     Run all benchmarks and save results to CSV.
     suite: "small", "medium", "large", or "all"
+    problem_types: comma-separated subset of "qp", "lp", "eq", "miqp", "avi"
     """
 
     # Use local libdaqp if available
@@ -498,68 +513,80 @@ function run_benchmarks(; suite="all", output_file="daqp_benchmark_results.csv",
 
     timestamp = string(now())
     version = string(pkgversion(DAQPBase))
+    selected_types = parse_problem_types(problem_types)
 
     @info "Starting DAQP performance benchmarks..."
     @info "Running suite: $suite"
+    @info "Problem types: $(join(sort(collect(selected_types)), ", "))"
 
     # Run QP benchmarks
-    println("\n=== Quadratic Programming Benchmarks ===")
-    for (i, (n, m, ms, nAct, kappa)) in enumerate(sizes_to_run)
-        problem_id = "qp_$(n)_$(m)_$(ms)_$(nAct)_$(Int(log10(kappa)))"
-        println("  [$i/$(length(sizes_to_run))] QP: n=$n, m=$m, ms=$ms, nAct=$nAct, κ=$kappa")
+    if "qp" in selected_types
+        println("\n=== Quadratic Programming Benchmarks ===")
+        for (i, (n, m, ms, nAct, kappa)) in enumerate(sizes_to_run)
+            problem_id = "qp_$(n)_$(m)_$(ms)_$(nAct)_$(Int(log10(kappa)))"
+            println("  [$i/$(length(sizes_to_run))] QP: n=$n, m=$m, ms=$ms, nAct=$nAct, κ=$kappa")
 
-        stats = benchmark_qp(n, m, ms, nAct, kappa)
-        push!(csv_lines, benchmark_csv_row(timestamp, version, "QP", problem_id,
-                                           n, m, ms, kappa, stats))
-        print_stats(stats)
+            stats = benchmark_qp(n, m, ms, nAct, kappa)
+            push!(csv_lines, benchmark_csv_row(timestamp, version, "QP", problem_id,
+                                               n, m, ms, kappa, stats))
+            print_stats(stats)
+        end
     end
 
     # Run LP benchmarks
-    println("\n=== Linear Programming Benchmarks ===")
-    for (i, (n, m, ms, _, _)) in enumerate(sizes_to_run)
-        problem_id = "lp_$(n)_$(m)_$(ms)"
-        println("  [$i/$(length(sizes_to_run))] LP: n=$n, m=$m, ms=$ms")
+    if "lp" in selected_types
+        println("\n=== Linear Programming Benchmarks ===")
+        for (i, (n, m, ms, _, _)) in enumerate(sizes_to_run)
+            problem_id = "lp_$(n)_$(m)_$(ms)"
+            println("  [$i/$(length(sizes_to_run))] LP: n=$n, m=$m, ms=$ms")
 
-        stats = benchmark_lp(n, m, ms)
-        push!(csv_lines, benchmark_csv_row(timestamp, version, "LP", problem_id,
-                                           n, m, ms, "", stats))
-        print_stats(stats)
+            stats = benchmark_lp(n, m, ms)
+            push!(csv_lines, benchmark_csv_row(timestamp, version, "LP", problem_id,
+                                               n, m, ms, "", stats))
+            print_stats(stats)
+        end
     end
 
     # Run equality constrained QP benchmarks
-    println("\n=== Equality Constrained QP Benchmarks ===")
-    for (i, (n, m, ms, nAct, neq, kappa)) in enumerate(eq_sizes_to_run)
-        problem_id = "eqqp_$(n)_$(m)_$(ms)_$(nAct)_$(neq)"
-        println("  [$i/$(length(eq_sizes_to_run))] EQ-QP: n=$n, m=$m, ms=$ms, nAct=$nAct, neq=$neq")
+    if "eq" in selected_types
+        println("\n=== Equality Constrained QP Benchmarks ===")
+        for (i, (n, m, ms, nAct, neq, kappa)) in enumerate(eq_sizes_to_run)
+            problem_id = "eqqp_$(n)_$(m)_$(ms)_$(nAct)_$(neq)"
+            println("  [$i/$(length(eq_sizes_to_run))] EQ-QP: n=$n, m=$m, ms=$ms, nAct=$nAct, neq=$neq")
 
-        stats = benchmark_eq_qp(n, m, ms, nAct, neq, kappa)
-        push!(csv_lines, benchmark_csv_row(timestamp, version, "EQ-QP", problem_id,
-                                           n, m, ms, kappa, stats))
-        print_stats(stats)
+            stats = benchmark_eq_qp(n, m, ms, nAct, neq, kappa)
+            push!(csv_lines, benchmark_csv_row(timestamp, version, "EQ-QP", problem_id,
+                                               n, m, ms, kappa, stats))
+            print_stats(stats)
+        end
     end
 
     # Run mixed-integer QP benchmarks
-    println("\n=== Mixed-Integer QP (branch and bound) Benchmarks ===")
-    for (i, (n, m, ms, nb)) in enumerate(miqp_sizes_to_run)
-        problem_id = "miqp_$(n)_$(m)_$(ms)_$(nb)"
-        println("  [$i/$(length(miqp_sizes_to_run))] MIQP: n=$n, m=$m, ms=$ms, nb=$nb")
+    if "miqp" in selected_types
+        println("\n=== Mixed-Integer QP (branch and bound) Benchmarks ===")
+        for (i, (n, m, ms, nb)) in enumerate(miqp_sizes_to_run)
+            problem_id = "miqp_$(n)_$(m)_$(ms)_$(nb)"
+            println("  [$i/$(length(miqp_sizes_to_run))] MIQP: n=$n, m=$m, ms=$ms, nb=$nb")
 
-        stats = benchmark_miqp(n, m, ms, nb)
-        push!(csv_lines, benchmark_csv_row(timestamp, version, "MIQP", problem_id,
-                                           n, m, ms, "", stats))
-        print_stats(stats; show_nodes=true)
+            stats = benchmark_miqp(n, m, ms, nb)
+            push!(csv_lines, benchmark_csv_row(timestamp, version, "MIQP", problem_id,
+                                               n, m, ms, "", stats))
+            print_stats(stats; show_nodes=true)
+        end
     end
 
     # Run AVI benchmarks
-    println("\n=== Affine Variational Inequality Benchmarks ===")
-    for (i, (n, m)) in enumerate(avi_sizes_to_run)
-        problem_id = "avi_$(n)_$(m)"
-        println("  [$i/$(length(avi_sizes_to_run))] AVI: n=$n, m=$m")
+    if "avi" in selected_types
+        println("\n=== Affine Variational Inequality Benchmarks ===")
+        for (i, (n, m)) in enumerate(avi_sizes_to_run)
+            problem_id = "avi_$(n)_$(m)"
+            println("  [$i/$(length(avi_sizes_to_run))] AVI: n=$n, m=$m")
 
-        stats = benchmark_avi(n, m)
-        push!(csv_lines, benchmark_csv_row(timestamp, version, "AVI", problem_id,
-                                           n, m, 0, "", stats))
-        print_stats(stats)
+            stats = benchmark_avi(n, m)
+            push!(csv_lines, benchmark_csv_row(timestamp, version, "AVI", problem_id,
+                                               n, m, 0, "", stats))
+            print_stats(stats)
+        end
     end
 
     # Save to CSV
@@ -578,6 +605,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     local output_file = "daqp_benchmark_results.csv"
     local use_local = false
     local run_prox = false
+    local problem_types = join(BENCHMARK_TYPES, ",")
     local i = 1
     while i <= length(ARGS)
         if ARGS[i] == "--output" && i < length(ARGS)
@@ -585,6 +613,9 @@ if abspath(PROGRAM_FILE) == @__FILE__
             i += 2
         elseif ARGS[i] == "--suite" && i < length(ARGS)
             suite = ARGS[i+1]
+            i += 2
+        elseif ARGS[i] == "--problem-types" && i < length(ARGS)
+            problem_types = ARGS[i+1]
             i += 2
         elseif ARGS[i] == "--local"
             use_local = true
@@ -600,6 +631,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     if run_prox
         run_prox_benchmark(; output_file="prox_comparison.csv", use_local=use_local)
     else
-        run_benchmarks(; suite=suite, output_file=output_file, use_local=use_local)
+        run_benchmarks(; suite=suite, output_file=output_file, use_local=use_local,
+                       problem_types=problem_types)
     end
 end
