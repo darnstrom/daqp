@@ -11,35 +11,80 @@ on:
         description: "Pull request number to benchmark (leave empty to benchmark the selected branch against master)"
         required: false
         default: ""
+        type: string
       suite:
-        description: "Benchmark suite: small, medium, large or all"
-        required: false
+        description: "Synthetic benchmark size"
+        required: true
         default: "medium"
+        type: choice
+        options:
+          - small
+          - medium
+          - large
+          - all
+      qp:
+        description: "Quadratic programs"
+        required: true
+        default: true
+        type: boolean
+      lp:
+        description: "Linear programs"
+        required: true
+        default: true
+        type: boolean
+      miqp:
+        description: "Mixed-integer quadratic programs"
+        required: true
+        default: true
+        type: boolean
+      avi:
+        description: "Affine variational inequalities"
+        required: true
+        default: true
+        type: boolean
+      equality:
+        description: "Equality-constrained quadratic programs"
+        required: true
+        default: true
+        type: boolean
+      maros_meszaros:
+        description: "Maros–Mészáros dense and positive-definite subsets"
+        required: true
+        default: false
+        type: boolean
       threshold:
         description: "Wall time regression threshold in percent (noisy measure)"
-        required: false
-        default: "25"
+        required: true
+        default: 25
+        type: number
       work_threshold:
         description: "Iteration/node regression threshold in percent (exact measure)"
-        required: false
-        default: "5"
+        required: true
+        default: 5
+        type: number
 
 concurrency:
-  group: benchmark-${{ github.event.inputs.pr || github.ref }}
+  group: benchmark-${{ inputs.pr || github.ref }}
   cancel-in-progress: true
 
 jobs:
   benchmark:
-    name: Regression check vs base
+    name: Synthetic regression check vs base
+    if: inputs.qp || inputs.lp || inputs.miqp || inputs.avi || inputs.equality
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: write
     env:
-      SUITE: ${{ github.event.inputs.suite }}
-      THRESHOLD: ${{ github.event.inputs.threshold }}
-      WORK_THRESHOLD: ${{ github.event.inputs.work_threshold }}
-      PR: ${{ github.event.inputs.pr }}
+      SUITE: ${{ inputs.suite }}
+      THRESHOLD: ${{ inputs.threshold }}
+      WORK_THRESHOLD: ${{ inputs.work_threshold }}
+      PR: ${{ inputs.pr }}
+      RUN_QP: ${{ inputs.qp }}
+      RUN_LP: ${{ inputs.lp }}
+      RUN_MIQP: ${{ inputs.miqp }}
+      RUN_AVI: ${{ inputs.avi }}
+      RUN_EQ: ${{ inputs.equality }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
@@ -83,6 +128,16 @@ jobs:
       - name: "Instantiate Julia project"
         run: julia --color=yes --project=build/interfaces/daqp-julia -e "using Pkg; Pkg.instantiate()"
 
+      - name: "Select synthetic problem types"
+        run: |
+          problem_types=()
+          [ "$RUN_QP" = "true" ] && problem_types+=(qp)
+          [ "$RUN_LP" = "true" ] && problem_types+=(lp)
+          [ "$RUN_MIQP" = "true" ] && problem_types+=(miqp)
+          [ "$RUN_AVI" = "true" ] && problem_types+=(avi)
+          [ "$RUN_EQ" = "true" ] && problem_types+=(eq)
+          (IFS=,; echo "PROBLEM_TYPES=${problem_types[*]}") >> "$GITHUB_ENV"
+
       - name: "Benchmark against base"
         id: bench
         continue-on-error: true
@@ -96,7 +151,8 @@ jobs:
             "$THRESHOLD" \
             "$GITHUB_WORKSPACE/benchmark_results" \
             1 \
-            "$WORK_THRESHOLD"
+            "$WORK_THRESHOLD" \
+            "$PROBLEM_TYPES"
 
       - name: "Write job summary"
         if: always()
@@ -107,7 +163,7 @@ jobs:
           {
             echo "## DAQP benchmark: \`${HEAD_SHA:0:12}\` vs \`${BASE_SHA:0:12}\`"
             echo ""
-            echo "Suite: \`$SUITE\` · time threshold: \`$THRESHOLD%\` · work threshold: \`$WORK_THRESHOLD%\`"
+            echo "Suite: \`$SUITE\` · problem types: \`$PROBLEM_TYPES\` · time threshold: \`$THRESHOLD%\` · work threshold: \`$WORK_THRESHOLD%\`"
             echo ""
             if [ -f benchmark_results/comparison.txt ]; then
               echo '```'
@@ -131,7 +187,7 @@ jobs:
           if-no-files-found: warn
 
       - name: "Comment results on the pull request"
-        if: always() && github.event.inputs.pr != ''
+        if: always() && inputs.pr != ''
         continue-on-error: true
         env:
           BASE_SHA: ${{ steps.refs.outputs.base_sha }}
@@ -144,7 +200,7 @@ jobs:
               echo "### ⚠️ DAQP benchmark: possible regression"
             fi
             echo ""
-            echo "Compared against base \`${BASE_SHA:0:12}\` · suite \`$SUITE\` · time threshold \`$THRESHOLD%\` · work threshold \`$WORK_THRESHOLD%\`"
+            echo "Compared against base \`${BASE_SHA:0:12}\` · suite \`$SUITE\` · problem types \`$PROBLEM_TYPES\` · time threshold \`$THRESHOLD%\` · work threshold \`$WORK_THRESHOLD%\`"
             echo ""
             echo "<details><summary>Full comparison</summary>"
             echo ""
@@ -161,6 +217,132 @@ jobs:
             echo "_Timings come from a shared runner and are noisy; the iteration and node counts are exact, since both runs solve identical seeded problems._"
           } > comment.md
           gh pr comment "$PR" --body-file comment.md --edit-last --create-if-none
+
+      - name: "Fail if a regression was detected"
+        if: steps.bench.outcome == 'failure'
+        run: |
+          echo "Performance regression detected -- see the job summary for details."
+          exit 1
+
+  maros-meszaros:
+    name: Maros–Mészáros regression check vs base
+    if: inputs.maros_meszaros
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      THRESHOLD: ${{ inputs.threshold }}
+      PR: ${{ inputs.pr }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: "Resolve commits to compare"
+        id: refs
+        run: |
+          set -euo pipefail
+          if [ -n "$PR" ]; then
+            base_ref=$(gh pr view "$PR" --json baseRefName -q .baseRefName)
+            git fetch --no-tags origin "pull/$PR/head"
+            git checkout --detach FETCH_HEAD
+            base_sha=$(git merge-base HEAD "origin/$base_ref")
+          else
+            base_sha=$(git merge-base HEAD origin/master)
+          fi
+          head_sha=$(git rev-parse HEAD)
+          if [ "$head_sha" = "$base_sha" ]; then
+            echo "::error::Head and base are the same commit ($head_sha) -- nothing to compare."
+            exit 1
+          fi
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+          echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
+
+      - name: "Build current DAQP"
+        run: |
+          cmake -S . -B build -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DJULIA=ON
+          cmake --build build --target all --config Release -- -j4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: "Install benchmark data dependencies"
+        run: python -m pip install "numpy<3" "scipy<2" "qpbenchmark==2.5.0"
+
+      - name: "Check out Maros–Mészáros problems"
+        uses: actions/checkout@v4
+        with:
+          repository: qpsolvers/maros_meszaros_qpbenchmark
+          ref: 0cae37f473c2fd0a762e537a61bd4db5b31ff00c
+          path: maros_meszaros_qpbenchmark
+
+      - name: "Benchmark dense subsets against base"
+        id: bench
+        continue-on-error: true
+        env:
+          BASE_SHA: ${{ steps.refs.outputs.base_sha }}
+        run: |
+          bash .github/benchmarks/maros_meszaros_comparison_git.sh \
+            build \
+            "$BASE_SHA" \
+            maros_meszaros_qpbenchmark/data \
+            "$GITHUB_WORKSPACE/maros_meszaros_results" \
+            "$THRESHOLD" \
+            3
+
+      - name: "Write job summary"
+        if: always()
+        env:
+          HEAD_SHA: ${{ steps.refs.outputs.head_sha }}
+          BASE_SHA: ${{ steps.refs.outputs.base_sha }}
+        run: |
+          {
+            echo "## DAQP Maros–Mészáros benchmark: \`${HEAD_SHA:0:12}\` vs \`${BASE_SHA:0:12}\`"
+            echo ""
+            if [ -f maros_meszaros_results/comparison.md ]; then
+              cat maros_meszaros_results/comparison.md
+            else
+              echo "The benchmark did not produce a comparison -- see the job log."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: "Upload Maros–Mészáros results"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maros-meszaros-results
+          path: |
+            maros_meszaros_results/*.csv
+            maros_meszaros_results/comparison.md
+          if-no-files-found: warn
+
+      - name: "Comment results on the pull request"
+        if: always() && inputs.pr != ''
+        continue-on-error: true
+        env:
+          BASE_SHA: ${{ steps.refs.outputs.base_sha }}
+        run: |
+          {
+            echo "<!-- daqp-maros-meszaros-benchmark -->"
+            if [ "${{ steps.bench.outcome }}" = "success" ]; then
+              echo "### ✅ DAQP Maros–Mészáros benchmark: no regression detected"
+            else
+              echo "### ⚠️ DAQP Maros–Mészáros benchmark: possible regression"
+            fi
+            echo ""
+            echo "Compared against base \`${BASE_SHA:0:12}\` · time threshold \`$THRESHOLD%\`"
+            echo ""
+            if [ -f maros_meszaros_results/comparison.md ]; then
+              cat maros_meszaros_results/comparison.md
+            else
+              echo "No comparison produced -- see the job log."
+            fi
+          } > maros_comment.md
+          gh pr comment "$PR" --body-file maros_comment.md --edit-last --create-if-none
 
       - name: "Fail if a regression was detected"
         if: steps.bench.outcome == 'failure'

@@ -9,7 +9,7 @@
 # exact same problems and the CSV problem_ids line up.
 #
 # Usage:
-#   benchmark_comparison_git.sh <julia_project> [ref] [suite] [threshold] [outdir] [fail_on_regression] [work_threshold]
+#   benchmark_comparison_git.sh <julia_project> [ref] [suite] [threshold] [outdir] [fail_on_regression] [work_threshold] [problem_types]
 
 set -e
 
@@ -20,6 +20,7 @@ REGRESSION_THRESHOLD="${4:-5}"
 OUTPUT_DIR="${5:-.}"
 FAIL_ON_REGRESSION="${6:-1}"
 WORK_THRESHOLD="${7:-5}"
+PROBLEM_TYPES="${8:-qp,lp,eq,miqp,avi}"
 
 # Convert to absolute paths
 JULIA_PROJECT="$(cd "$JULIA_PROJECT" && pwd)"
@@ -39,6 +40,7 @@ echo "=========================================="
 echo "Julia project: $JULIA_PROJECT"
 echo "Baseline ref: $GIT_REF"
 echo "Benchmark suite: $BENCHMARK_SUITE"
+echo "Problem types: $PROBLEM_TYPES"
 echo "Time regression threshold: $REGRESSION_THRESHOLD%"
 echo "Work regression threshold: $WORK_THRESHOLD%"
 echo "Output directory: $OUTPUT_DIR"
@@ -59,6 +61,7 @@ fi
 
 julia --project="$JULIA_PROJECT" "$BENCHMARK_SCRIPT" \
     --suite "$BENCHMARK_SUITE" \
+    --problem-types "$PROBLEM_TYPES" \
     --output "$OUTPUT_DIR/current_dev.csv" \
     --local \
     2>&1 | grep -E "(Starting|Mean|Results|Using)" || true
@@ -137,6 +140,7 @@ cd "$REPO_ROOT"
 echo "Step 3: Running benchmarks with baseline $GIT_REF..."
 julia --project="$JULIA_PROJECT" "$BENCHMARK_SCRIPT" \
     --suite "$BENCHMARK_SUITE" \
+    --problem-types "$PROBLEM_TYPES" \
     --output "$OUTPUT_DIR/old_version.csv" \
     --local \
     2>&1 | grep -E "(Starting|Mean|Results|Using)" || true
