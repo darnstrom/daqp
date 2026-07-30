@@ -23,7 +23,7 @@ void EigenDAQPResult::resize_primal(int n) {
 void EigenDAQPResult::resize_dual(int m) {
     lam_.resize(m);
     lam = lam_.data();
-    slack_.resize(m);
+    slack_.setZero(m);
 }
 
 Eigen::VectorXd const& EigenDAQPResult::get_primal() const {
@@ -318,7 +318,9 @@ EigenDAQPResult const& DAQP::solve(Eigen::Matrix<double, Eigen::Dynamic, Eigen::
     Eigen::VectorXd f(0);
     Eigen::VectorXi sense(0);
     update(H, f, A, bu, bl, sense, break_points, DAQP_UPDATE_M + DAQP_UPDATE_d + DAQP_UPDATE_sense + DAQP_UPDATE_hierarchy);
-    return solve();
+    solve();
+    get_slack(); // ensure slack is populated before caller copies the result
+    return result_;
 }
 
 
