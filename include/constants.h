@@ -11,6 +11,17 @@ extern "C" {
 #define DAQP_UNCONSTRAINED_OPTIMAL -2
 #define DAQP_INF ((c_float)1e30)
 
+// PRECISION-DEPENDENT TOLERANCES
+#ifdef DAQP_SINGLE_PRECISION
+#define DAQP_LU_SING_TOL   ((c_float)1e-6)  // pivot magnitude below this is singular (daqp_lu)
+#define DAQP_INIT_PRIM_TOL ((c_float)1e-5)  // slack "on bound" band for primal warm start
+#define DAQP_INIT_DUAL_TOL ((c_float)1e-6)  // multiplier sign threshold for dual warm start
+#else
+#define DAQP_LU_SING_TOL   ((c_float)1e-12)
+#define DAQP_INIT_PRIM_TOL ((c_float)1e-9)
+#define DAQP_INIT_DUAL_TOL ((c_float)1e-12)
+#endif
+
 // DEFAULT SETTINGS
 #define DAQP_DEFAULT_PRIM_TOL 1e-6
 #define DAQP_DEFAULT_DUAL_TOL 1e-12
