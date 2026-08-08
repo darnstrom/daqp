@@ -53,17 +53,18 @@ void daqp_compute_primal_and_fval(DAQPWorkspace *work){
     //u[m] <-- Mk'*lam_star (zero if empty set)
     for(i=0;i<work->n_active;i++){
         id = work->WS[i];
+        const c_float li = work->lam_star[i]; // hoist: invariant across the inner loop
         if(id < work->ms){
             // Simple constraint
             if(work->Rinv!=NULL){ // Hessian is not identity
                 for(j=id, disp=DAQP_R_OFFSET(id,work->n);j<work->n;++j)
-                    work->u[j]-=work->Rinv[disp+j]*work->lam_star[i];
+                    work->u[j]-=work->Rinv[disp+j]*li;
             }
-            else work->u[id]-=work->lam_star[i]; // Hessian is identity
+            else work->u[id]-=li; // Hessian is identity
         }
         else{ // General constraint
             for(j=0,disp=work->n*(id-work->ms);j<work->n;j++)
-                work->u[j]-=work->M[disp++]*work->lam_star[i];
+                work->u[j]-=work->M[disp++]*li;
         }
         if(DAQP_IS_SOFT(id)){
 #ifdef SOFT_WEIGHTS
