@@ -181,6 +181,7 @@ function avi(H::Matrix{Float64},f::Vector{Float64},
         A::Matrix{Float64},bupper::Vector{Float64},blower::Vector{Float64}=Float64[],sense::Vector{Cint}=Cint[];A_rowmaj=false,settings=nothing, primal_start::Vector{Cdouble}=Cdouble[],
         dual_start::Vector{Cdouble}=Cdouble[])
     d = DAQPBase.Model()
+    !isnothing(settings) && DAQPBase.settings(d,settings)
     exitflag,setup_time = DAQPBase.setup(d,QPj(H,f,A,bupper,blower,sense;A_rowmaj,is_avi=true);
         primal_start,dual_start,init_mask=DAQP_UPDATE_eliminate)
     return  DAQPBase.solve(d;setup_time);
