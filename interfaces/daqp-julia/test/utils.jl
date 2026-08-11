@@ -179,7 +179,7 @@ function generate_test_avi(n,m)
     M,N = rand(n,n),randn(n,n)
     sym = M'*M
     asym = N-N'
-    H = sym/norm(sym) + asym/(asym)
+    H = sym/norm(sym) + asym/norm(asym)
 
     # f to satisfy stationarity
     f = -H*x-A[AS,:]'*λ[AS]
