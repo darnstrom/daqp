@@ -58,12 +58,17 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
         if(work->avi == NULL)
             error_flag = daqp_update_Rinv(work, qp->H, qp->problem_type==2 ? 1 : 0);
         else{
-            daqp_update_avi(work->avi,qp);
-            // Early unconstrained check for AVI: skip Cholesky if x=-H^{-1}f is feasible
-            int avi_unc = daqp_check_unconstrained(work,mask);
-            if(avi_unc == DAQP_UNCONSTRAINED_OPTIMAL) return 0;
-            daqp_lu(work->avi->H_rho, work->avi->P_H2, work->n);
-            error_flag = daqp_update_Rinv(work, work->avi->Hs_rho,0);
+            daqp_update_avi(work->avi,qp,work->settings->zero_tol);
+            if(work->avi->is_symmetric){
+                error_flag = daqp_update_Rinv(work,qp->H,0);
+            }
+            else{
+                // Early unconstrained check for AVI: skip Cholesky if x=-H^{-1}f is feasible
+                int avi_unc = daqp_check_unconstrained(work,mask);
+                if(avi_unc == DAQP_UNCONSTRAINED_OPTIMAL) return 0;
+                daqp_lu(work->avi->H_rho, work->avi->P_H2, work->n);
+                error_flag = daqp_update_Rinv(work, work->avi->Hs_rho,0);
+            }
         }
         if(error_flag<0)
             return error_flag;
@@ -74,7 +79,8 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
         daqp_update_v(qp->f,work,mask);
     }
 
-    int unconstrained_flag = (work->avi != NULL) ? 1 : daqp_check_unconstrained(work,mask);
+    int unconstrained_flag = (work->avi != NULL && !work->avi->is_symmetric)
+                             ? 1 : daqp_check_unconstrained(work,mask);
     if(unconstrained_flag == DAQP_UNCONSTRAINED_OPTIMAL) return 0;
 
     /*
@@ -579,7 +585,7 @@ int daqp_check_unconstrained(DAQPWorkspace* work, const int mask){
     // Compute x_unc stored temporarily in work->x.
     swp_ptr = work->x; work->u = work->xold; work->x = work->xold; work->xold = swp_ptr;
 
-    if(work->avi != NULL){
+    if(work->avi != NULL && !work->avi->is_symmetric){
         // AVI: unconstrained solution is x = -H^{-1} f
         if(work->qp->f != NULL)
             daqp_lu_solve(work->avi->LU_H, work->avi->P_H, work->qp->f, work->x, n);
@@ -632,7 +638,7 @@ int daqp_check_unconstrained(DAQPWorkspace* work, const int mask){
     return 1;
 }
 
-int daqp_update_avi(DAQPAVI* avi, DAQPProblem* p){
+int daqp_update_avi(DAQPAVI* avi, DAQPProblem* p, c_float zero_tol){
     const int n = p->n;
     // Setup matrices Hsym, Hs_rho, and H_rho, LU_H
     int i,j,disp;
@@ -640,10 +646,15 @@ int daqp_update_avi(DAQPAVI* avi, DAQPProblem* p){
     c_float min_diag = DAQP_INF;
     c_float max_row_sum = 0.0;
     c_float fro_norm_sq = 0.0;
+    c_float max_asymmetry = 0.0;
     avi->rho = 0.0;
     for (i = 0, disp=0; i < n; i++) {
         c_float row_sum = 0.0;
         for (j = 0; j < n; j++, disp++) {
+            if(j > i){
+                c_float asymmetry = fabs(p->H[disp] - p->H[j * n + i]);
+                if(asymmetry > max_asymmetry) max_asymmetry = asymmetry;
+            }
             val = (p->H[disp] + p->H[j * n + i]) * 0.5;
             avi->Hsym[disp] = val;
             avi->Hs_rho[disp] = val;
@@ -655,6 +666,11 @@ int daqp_update_avi(DAQPAVI* avi, DAQPProblem* p){
         }
         if(row_sum > max_row_sum) max_row_sum = row_sum;
     }
+    c_float hessian_scale = sqrt(fro_norm_sq);
+    if(hessian_scale < 1.0) hessian_scale = 1.0;
+    avi->is_symmetric = max_asymmetry <= zero_tol * hessian_scale;
+    if(avi->is_symmetric) return 1;
+
     // Regularization
     if(min_diag > 0.0 && max_row_sum > 0.0)
         avi->rho = sqrt(min_diag * max_row_sum);
