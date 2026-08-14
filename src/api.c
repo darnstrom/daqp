@@ -16,7 +16,7 @@ void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
     if(work->sing_ind != DAQP_UNCONSTRAINED_OPTIMAL){
         // Select algorithm
         if(work->n_prox==0){
-            if(work->avi == NULL){
+            if(work->avi == NULL || work->avi->is_symmetric){
                 if(work->bnb != NULL)
                     res->exitflag = daqp_bnb(work);
                 else if(work->nh > 1)
@@ -369,6 +369,8 @@ void allocate_daqp_ldp(DAQPWorkspace *work, int n, int m, int ms, int alloc_R, i
 #endif
 }
 void allocate_daqp_avi(DAQPAVI* avi, const int n){
+    avi->is_symmetric = 0;
+
     // Allocate matrices
     avi->Hsym = malloc(n*n*sizeof(c_float));
     avi->Hs_rho = malloc(n*n*sizeof(c_float));
@@ -462,7 +464,9 @@ void daqp_extract_result(DAQPResult* res, DAQPWorkspace* work){
     }
 
     // Shift back function value
-    if(work->v != NULL && work->avi == NULL && (work->Rinv != NULL || work->RinvD != NULL)){ // QP
+    if(work->v != NULL &&
+            (work->avi == NULL || work->avi->is_symmetric) &&
+            (work->Rinv != NULL || work->RinvD != NULL)){ // QP or symmetric AVI
         res->fval = work->fval;
         for(i=0;i<work->n;i++) res->fval-=work->v[i]*work->v[i];
         res->fval *=0.5;

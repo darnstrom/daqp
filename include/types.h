@@ -99,6 +99,8 @@ typedef struct{
 }DAQPBnB;
 
 typedef struct{
+    int is_symmetric;
+
     c_float* Hsym;
     c_float* Hs_rho;
     c_float* H_rho;

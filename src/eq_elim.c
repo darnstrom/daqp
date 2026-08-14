@@ -125,7 +125,8 @@ static void apply_Q(const DAQPEqElim* eq, c_float* y){
  * -------------------------------------------------------------------------*/
 
 static int is_eq_elim_eligible(const DAQPWorkspace* work){
-    if(work->avi != NULL || work->bnb != NULL || work->nh > 1) return 0;
+    if((work->avi != NULL && !work->avi->is_symmetric) ||
+            work->bnb != NULL || work->nh > 1) return 0;
     if(work->qp == NULL || work->qp->A == NULL) return 0;
     /*
      * A singular Hessian is handled by the proximal method, which solves a

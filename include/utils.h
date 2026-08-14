@@ -19,7 +19,7 @@ void daqp_normalize_Rinv(DAQPWorkspace *work);
 int daqp_normalize_M(DAQPWorkspace *work);
 int daqp_check_unconstrained(DAQPWorkspace* work, const int mask);
 
-int daqp_update_avi(DAQPAVI *avi, DAQPProblem *problem);
+int daqp_update_avi(DAQPAVI *avi, DAQPProblem *problem, c_float zero_tol);
 int daqp_lu(c_float* A, int* P, int n);
 void daqp_lu_solve(c_float* LU, int* P, c_float* b, c_float* x, int n);
 

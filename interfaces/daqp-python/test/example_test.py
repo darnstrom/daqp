@@ -25,6 +25,47 @@ class Testing(unittest.TestCase):
         xstar, fval, exitflag, lam = daqp.solve(H, f, A, bupper, blower, sense)
         self.assertEqual(exitflag, 1)
 
+    def test_symmetric_avi_uses_qp_fast_path(self):
+        """An ill-conditioned symmetric AVI is solved as its equivalent QP."""
+        Q = np.array([[1.0, 1.0], [-1.0, 1.0]], dtype=c_double) / np.sqrt(2.0)
+        H = Q @ np.diag([1.0e-6, 1.0e6]) @ Q.T
+        f = np.array([1.0, 2.0], dtype=c_double)
+        A = np.eye(2, dtype=c_double)
+        bupper = np.ones(2, dtype=c_double)
+        blower = -np.ones(2, dtype=c_double)
+        sense = np.zeros(2, dtype=c_int)
+
+        x_qp, _, flag_qp, _ = daqp.solve(
+            H, f, A, bupper, blower, sense, iter_limit=10)
+        x_avi, _, flag_avi, _ = daqp.solve(
+            H, f, A, bupper, blower, sense, is_avi=True, iter_limit=10)
+
+        self.assertEqual(flag_qp, 1)
+        self.assertEqual(flag_avi, 1)
+        np.testing.assert_allclose(x_avi, x_qp, atol=1.0e-8)
+
+    def test_avi_model_dispatches_on_symmetry(self):
+        """Persistent AVI models select the QP or DR path during setup."""
+        H_symmetric = np.array([[2.0, 0.5], [0.5, 1.0]], dtype=c_double)
+        H_asymmetric = np.array([[2.0, 1.0], [0.0, 1.0]], dtype=c_double)
+        f = np.array([1.0, 2.0], dtype=c_double)
+        A = np.eye(2, dtype=c_double)
+        bupper = np.ones(2, dtype=c_double)
+        blower = -np.ones(2, dtype=c_double)
+        sense = np.zeros(2, dtype=c_int)
+
+        for H in (H_symmetric, H_asymmetric, H_symmetric):
+            model = daqp.Model()
+            setup_flag, _ = model.setup(
+                H, f, A, bupper, blower, sense, is_avi=True)
+            self.assertEqual(setup_flag, 1)
+            x_model, _, flag_model, _ = model.solve()
+            x_ref, _, flag_ref, _ = daqp.solve(
+                H, f, A, bupper, blower, sense, is_avi=True)
+            self.assertEqual(flag_model, 1)
+            self.assertEqual(flag_ref, 1)
+            np.testing.assert_allclose(x_model, x_ref, atol=1.0e-8)
+
     def test_warm_start_dual(self):
         """Dual warm start produces the same optimal solution as a cold start."""
         H = np.array([[1.0, 0.0], [0.0, 1.0]], dtype=c_double)
