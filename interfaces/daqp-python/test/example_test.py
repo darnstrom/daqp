@@ -66,6 +66,30 @@ class Testing(unittest.TestCase):
             self.assertEqual(flag_ref, 1)
             np.testing.assert_allclose(x_model, x_ref, atol=1.0e-8)
 
+    def test_ill_conditioned_asymmetric_avi(self):
+        """An asymmetric AVI remains accurate with a hidden weak direction."""
+        Q = np.array([[1.0, 1.0], [-1.0, 1.0]], dtype=c_double) / np.sqrt(2.0)
+        H = Q @ np.diag([1.0e-6, 1.0]) @ Q.T
+        H += np.array([[0.0, 1.0e-7], [-1.0e-7, 0.0]], dtype=c_double)
+        f = np.array([0.75, -0.25], dtype=c_double)
+        A = np.eye(2, dtype=c_double)
+        bupper = np.ones(2, dtype=c_double)
+        blower = -np.ones(2, dtype=c_double)
+        sense = np.zeros(2, dtype=c_int)
+
+        x, _, flag, _ = daqp.solve(
+            H, f, A, bupper, blower, sense, is_avi=True)
+
+        self.assertEqual(flag, 1)
+        residual = H @ x + f
+        for xi, ri in zip(x, residual):
+            if xi <= -1.0 + 1.0e-7:
+                self.assertGreaterEqual(ri, -1.0e-7)
+            elif xi >= 1.0 - 1.0e-7:
+                self.assertLessEqual(ri, 1.0e-7)
+            else:
+                self.assertAlmostEqual(ri, 0.0, delta=1.0e-7)
+
     def test_warm_start_dual(self):
         """Dual warm start produces the same optimal solution as a cold start."""
         H = np.array([[1.0, 0.0], [0.0, 1.0]], dtype=c_double)
