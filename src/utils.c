@@ -3,12 +3,55 @@
 #include <math.h>
 #include <stdio.h>
 
+#ifndef DAQP_AVI_PIVOT_TRIGGER
+#define DAQP_AVI_PIVOT_TRIGGER ((c_float)0.05)
+#endif
+#ifndef DAQP_AVI_RETRY_RHO_REDUCTION
+#define DAQP_AVI_RETRY_RHO_REDUCTION ((c_float)16.0)
+#endif
+
 static c_float proximal_regularization_scaled(
         const DAQPWorkspace *work, c_float hessian_scale){
     c_float eps = work->settings->eps_prox;
     c_float floor = sqrt(work->settings->zero_tol)*hessian_scale;
     if(eps > 0.0 && eps < floor) eps = floor;
     return eps;
+}
+
+static void daqp_install_avi_rho(
+        DAQPAVI* avi, const DAQPProblem* p, c_float rho){
+    int i,j,disp;
+    const int n = p->n;
+    avi->rho = rho;
+    for(i = 0, disp = 0; i < n; i++){
+        for(j = 0; j < n; j++, disp++){
+            avi->Hs_rho[disp] = avi->Hsym[disp];
+            avi->H_rho[disp] = p->H[disp];
+        }
+        avi->Hs_rho[i*n+i] += rho;
+        avi->H_rho[i*n+i] += rho;
+    }
+}
+
+int daqp_retry_avi_with_reduced_rho(DAQPWorkspace* work){
+    DAQPAVI* avi = work->avi;
+    c_float retry_rho;
+    int error_flag;
+
+    if(avi == NULL || !avi->retry_rho_needed) return 0;
+    if(DAQP_IS_REDUCED(work)) return 0;
+    avi->retry_rho_needed = 0; // At most one retry per setup
+    retry_rho = avi->rho/DAQP_AVI_RETRY_RHO_REDUCTION;
+    daqp_install_avi_rho(avi,work->qp,retry_rho);
+    daqp_lu(avi->H_rho,avi->P_H2,work->n);
+    error_flag = daqp_update_Rinv(work,avi->Hs_rho,0);
+    if(error_flag < 0) return error_flag;
+    daqp_update_v(work->qp->f,work,DAQP_UPDATE_Rinv);
+    error_flag = daqp_update_M(work,work->qp->A,DAQP_UPDATE_Rinv);
+    if(error_flag < 0) return error_flag;
+    daqp_normalize_Rinv(work);
+    daqp_update_d(work,work->qp->bupper,work->qp->blower);
+    return 1;
 }
 
 int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
@@ -648,6 +691,7 @@ int daqp_update_avi(DAQPAVI* avi, DAQPProblem* p, c_float zero_tol){
     c_float fro_norm_sq = 0.0;
     c_float max_asymmetry = 0.0;
     avi->rho = 0.0;
+    avi->retry_rho_needed = 0;
     for (i = 0, disp=0; i < n; i++) {
         c_float row_sum = 0.0;
         for (j = 0; j < n; j++, disp++) {
@@ -671,19 +715,28 @@ int daqp_update_avi(DAQPAVI* avi, DAQPProblem* p, c_float zero_tol){
     avi->is_symmetric = max_asymmetry <= zero_tol * hessian_scale;
     if(avi->is_symmetric) return 1;
 
-    // Regularization
+    // Detect possible problematic rho from LU pivots
+    int lu_status = daqp_lu(avi->LU_H, avi->P_H, n);
+    if(lu_status == 0 && min_diag > 0.0){
+        c_float min_lu_pivot = DAQP_INF;
+        for(i = 0; i < n; i++){
+            c_float pivot = fabs(avi->LU_H[i*n+i]);
+            if(pivot < min_lu_pivot) min_lu_pivot = pivot;
+        }
+        if(min_lu_pivot < DAQP_AVI_PIVOT_TRIGGER * min_diag)
+            avi->retry_rho_needed = 1;
+    }
+
+    // Start with default step length heuristic
     if(min_diag > 0.0 && max_row_sum > 0.0)
         avi->rho = sqrt(min_diag * max_row_sum);
     else
         avi->rho = sqrt(fro_norm_sq)/2;
-    for(i=0,disp=0; i<n;i++){
+    for(i = 0, disp = 0; i < n; i++, disp += n+1){
         avi->Hs_rho[disp] += avi->rho;
         avi->H_rho[disp] += avi->rho;
-        disp += n+1;
     }
 
-    // Factorize H and H_rho
-    daqp_lu(avi->LU_H, avi->P_H, n);
     // H_rho factorization deferred until needed (skipped if unconstrained optimal)
     return 1;
 }

@@ -100,6 +100,7 @@ typedef struct{
 
 typedef struct{
     int is_symmetric;
+    int retry_rho_needed;
 
     c_float* Hsym;
     c_float* Hs_rho;

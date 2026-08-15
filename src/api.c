@@ -370,6 +370,9 @@ void allocate_daqp_ldp(DAQPWorkspace *work, int n, int m, int ms, int alloc_R, i
 }
 void allocate_daqp_avi(DAQPAVI* avi, const int n){
     avi->is_symmetric = 0;
+    avi->retry_rho_needed = 0;
+    avi->rho = 0.0;
+
 
     // Allocate matrices
     avi->Hsym = malloc(n*n*sizeof(c_float));

@@ -12,6 +12,7 @@ int daqp_solve_avi(DAQPWorkspace *work) {
     int tot_iter = 0;
     int counter = 0;
     int terminate_limit = 5;
+    int retry_requested = 0;
     c_float minimum_newton_residual = DAQP_INF;
 
     // Initial avi iterate
@@ -51,6 +52,11 @@ int daqp_solve_avi(DAQPWorkspace *work) {
             // If no decrease since last Newton iterate -> revert Newton step
             if(sum > minimum_newton_residual){
                 for(i = 0; i < n; i++) work->avi->x[i] = work->xold[i];
+                if(terminate_limit == 30 && avi->retry_rho_needed &&
+                   !DAQP_IS_REDUCED(work)){
+                    retry_requested = 1;
+                    break;
+                }
                 terminate_limit += 5; // Increase terminate limit to give DR more time to converge
                 if(terminate_limit > 30) terminate_limit = 30;
             }
@@ -94,6 +100,20 @@ int daqp_solve_avi(DAQPWorkspace *work) {
             }
         }
         daqp_lu_solve(avi->H_rho, avi->P_H2, avi->xtemp, avi->x, n);
+    }
+    if(retry_requested){
+        int original_limit = work->settings->iter_limit;
+        int retry_flag = daqp_retry_avi_with_reduced_rho(work);
+        if(retry_flag < 0) return retry_flag;
+        if(retry_flag > 0 && k+1 < original_limit){
+            work->settings->iter_limit = original_limit-(k+1);
+            retry_flag = daqp_solve_avi(work);
+            work->settings->iter_limit = original_limit;
+            work->iterations += tot_iter;
+            return retry_flag;
+        }
+        work->iterations = tot_iter;
+        return DAQP_EXIT_ITERLIMIT;
     }
     if(k==work->settings->iter_limit) exitflag = -4;
     work->iterations = tot_iter;
