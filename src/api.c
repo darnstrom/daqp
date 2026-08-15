@@ -373,6 +373,7 @@ void allocate_daqp_avi(DAQPAVI* avi, const int n){
     avi->retry_rho_needed = 0;
     avi->rho = 0.0;
 
+
     // Allocate matrices
     avi->Hsym = malloc(n*n*sizeof(c_float));
     avi->Hs_rho = malloc(n*n*sizeof(c_float));

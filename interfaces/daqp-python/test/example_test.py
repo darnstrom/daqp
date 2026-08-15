@@ -89,7 +89,7 @@ class Testing(unittest.TestCase):
                 self.assertLessEqual(ri, 1.0e-7)
             else:
                 self.assertAlmostEqual(ri, 0.0, delta=1.0e-7)
-
+                
     def test_warm_start_dual(self):
         """Dual warm start produces the same optimal solution as a cold start."""
         H = np.array([[1.0, 0.0], [0.0, 1.0]], dtype=c_double)
