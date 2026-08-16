@@ -179,8 +179,14 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
     // Update hierarchy
     if(mask&DAQP_UPDATE_hierarchy){
         work->nh = qp->nh;
-        work->break_points = qp->break_points;
+        work->break_points = (qp->nh > 1) ? qp->break_points : NULL;
     }
+
+    // Hierarchies not allowed for prox + avi
+    if(DAQP_IS_HIERARCHICAL(work) &&
+            (work->n_prox > 0 ||
+             (work->avi != NULL && !work->avi->is_symmetric)))
+        return DAQP_EXIT_UNSUPPORTED;
 
     // The working set refers to the reduced LDP if one was installed
     if(was_reduced) do_activate = 1;

@@ -15,6 +15,7 @@ int daqp_solve_avi(DAQPWorkspace *work) {
     int retry_requested = 0;
     c_float minimum_newton_residual = DAQP_INF;
 
+    // nh act as a counter for outer iterations
     work->nh = 0;
 
     // Initial avi iterate

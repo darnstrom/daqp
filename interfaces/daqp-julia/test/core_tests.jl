@@ -362,6 +362,53 @@ end
 
 end
 
+# Only daqp_hiqp can handle a hierarchy
+@testset "Hierarchical dispatch guard" begin
+    A = [1.0 1 1; 1 -1 0; 3 1 -1]
+    bu = [ones(3);1;0.5;20]
+    bl = [-ones(3);-1e30;0.5;10]
+    sense = zeros(Cint,6)
+    Hsing = [1.0 0 0; 0 1 0; 0 0 0]
+    Hpd   = [2.0 0 0; 0 2 0; 0 0 2]
+    bps   = [3;4;5;6]
+
+    # Rejected up front, before any solve is attempted
+    d = DAQPBase.Model()
+    exitflag,_ = DAQPBase.setup(d,Hsing,zeros(3),A,bu,bl,sense;break_points = bps)
+    @test exitflag == DAQPBase.UNSUPPORTED
+    @test !d.has_model
+
+    # A hierarchy with a positive definite Hessian is unaffected
+    d = DAQPBase.Model()
+    exitflag,_ = DAQPBase.setup(d,Hpd,zeros(3),A,bu,bl,sense;break_points = bps)
+    @test exitflag >= 0
+    x,fval,exitflag,info = solve(d)
+    @test exitflag > 0
+    @test info.nodes == 1
+    @test unsafe_load(d.work).nh == 4
+
+    # An update that turns the Hessian singular must report it too. Nothing
+    # downstream re-checks, so the caller is expected to act on the flag
+    # rather than solve a workspace that was rejected.
+    @test DAQPBase.update(d,Hsing,nothing,nothing,nothing,nothing) == DAQPBase.UNSUPPORTED
+
+    # The rejection must leave nh/break_points intact -- they outlive the
+    # solve (later solves, codegen), so nothing may overwrite them on the way.
+    @test unsafe_load(d.work).nh == 4
+    srcdir = tempname()
+    DAQPBase.codegen(d,dir=srcdir)
+    @test occursin("DAQP_HIERARCHICAL", read(joinpath(srcdir,"daqp_workspace.h"),String))
+    @test occursin("break_points[4]", read(joinpath(srcdir,"daqp_workspace.c"),String))
+    rm(srcdir,recursive=true)
+
+    # A hierarchy paired with a non-symmetric AVI is rejected the same way
+    d = DAQPBase.Model()
+    Hns = [2.0 1 0; -1 2 0; 0 0 2]
+    exitflag,_ = DAQPBase.setup(d,Hns,zeros(3),A,bu,bl,sense;break_points = bps, is_avi=true)
+    @test exitflag == DAQPBase.UNSUPPORTED
+    @test !d.has_model
+end
+
 @testset "Trivial infeasible" begin
     H = [6.837677669279314 1.3993262799977795 1.9781574256330445 0.7988389688453156;
          1.3993262799977795 4.91607513347457 0.8347008717503388 0.964319980996552;

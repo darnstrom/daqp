@@ -215,7 +215,8 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  work->qp->sense= (int *)mxGetPr(prhs[7]);
 	  // Update LDP with new QP data
 	  const int update_mask = (int)mxGetScalar(prhs[8]);
-	  daqp_update_ldp(update_mask,work,work->qp);
+	  const int error_flag = daqp_update_ldp(update_mask,work,work->qp);
+	  plhs[0] = mxCreateDoubleScalar(error_flag);
 	}
     else if (!strcmp("codegen", cmd)) {
         char fname[64];

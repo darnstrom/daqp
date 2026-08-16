@@ -29,6 +29,7 @@ int daqp_prox(DAQPWorkspace *work){
     c_float eta = work->settings->eta_prox;
     c_float eps;
 
+    // nh act as a counter for outer iterations
     work->nh = 0;
 
     // The outer iteration works in the full space; the elimination is applied

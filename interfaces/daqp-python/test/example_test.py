@@ -497,6 +497,42 @@ class TestSemiProximal(unittest.TestCase):
         self.assertLessEqual(info_force['nodes'], info_force['iterations'])
         np.testing.assert_allclose(x_force, x_ref, atol=1e-6)
 
+    def test_single_break_point_stays_non_hierarchical(self):
+        """A lone break point must not turn into a hierarchy across solves.
+
+        Fewer than two levels is no hierarchy, so installing the array must
+        drop it: break_points != NULL is what marks nh as describing a
+        hierarchy, and the proximal loop reports its outer-iteration count
+        through nh once it does not. Keeping a one-entry array here would let
+        that count be read back as a hierarchy on the next solve.
+        """
+        H = np.array([[4.0, 1.0], [1.0, 3.0]], dtype=c_double)
+        f = np.array([1.0, 2.0], dtype=c_double)
+        A = np.array([[1.0, 1.0]], dtype=c_double)
+        bupper = np.array([5.0, 5.0, 5.0], dtype=c_double)
+        blower = np.array([-5.0, -5.0, -5.0], dtype=c_double)
+        sense = np.array([0, 0, 0], dtype=c_int)
+        break_points = np.array([3], dtype=np.intc)
+
+        d = daqp.Model()
+        d.settings = {'eps_prox': 1e-2}
+        setup_flag, _ = d.setup(
+            H, f, A, bupper, blower, sense, break_points=break_points)
+        self.assertGreaterEqual(setup_flag, 0)
+        self.assertEqual(d.update(break_points=break_points), 0)
+
+        x1, _, flag1, info1 = d.solve()
+        self.assertEqual(flag1, 1)
+        self.assertGreater(info1['iterations'], 1)
+        # nh is free to count outer iterations here, so it must report them
+        self.assertGreater(info1['nodes'], 1)
+        self.assertLessEqual(info1['nodes'], info1['iterations'])
+
+        # The second solve must not see a hierarchy fabricated by the first.
+        x2, _, flag2, _ = d.solve()
+        self.assertEqual(flag2, 1)
+        np.testing.assert_allclose(x1, x2, atol=1e-9)
+
     def test_consistent_redundant_equalities_are_ignored(self):
         """Dependent consistent equalities do not make setup fail."""
         H = np.eye(2, dtype=c_double)
