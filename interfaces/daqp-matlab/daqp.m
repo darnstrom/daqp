@@ -195,7 +195,7 @@ classdef daqp< handle
             % TODO: update workspace
             this
         end
-        function update(this,H,f,A,bupper,blower,sense)
+        function exitflag = update(this,H,f,A,bupper,blower,sense)
             update_mask = int32(0);
             if(size(H,1)==this.n && size(H,2) == this.n)
                 this.H = H;
@@ -218,7 +218,7 @@ classdef daqp< handle
                 this.sense = int32(sense);
                 update_mask = update_mask+16;
             end
-            daqpmex('update', this.work_ptr,...
+            exitflag = daqpmex('update', this.work_ptr,...
                 this.H,this.f,this.A,this.bupper,this.blower,this.sense,...
                 update_mask);
         end

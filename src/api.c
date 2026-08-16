@@ -6,6 +6,7 @@
 
 // Solve problem from a given workspace and measure setup and solve time
 void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
+    if(work->break_points == NULL) work->nh = 1;
     // Put back an elimination that a previous solve retrieved
     if((res->exitflag = daqp_eq_reinstall(work)) < 0) return;
 #ifdef PROFILING
@@ -19,7 +20,7 @@ void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
             if(work->avi == NULL || work->avi->is_symmetric){
                 if(work->bnb != NULL)
                     res->exitflag = daqp_bnb(work);
-                else if(work->nh > 1)
+                else if(DAQP_IS_HIERARCHICAL(work))
                     res->exitflag = daqp_hiqp(work,res->lam);
                 else
                     res->exitflag = daqp_ldp(work);
@@ -329,7 +330,7 @@ void allocate_daqp_workspace(DAQPWorkspace *work, int n, int ns){
 #endif
 
     work->bnb = NULL;
-    work->nh = 0;
+    work->nh = 1;
     work->break_points = NULL;
     work->avi = NULL;
     work->eq = NULL;
@@ -459,7 +460,7 @@ void daqp_extract_result(DAQPResult* res, DAQPWorkspace* work){
     // Extract dual solution for ordinary QPs. Hierarchical QPs populate the
     // output duals in daqp_hiqp(), where they represent the soft-level
     // penalties used by the public interfaces.
-    if(res->lam != NULL && work->nh < 2){
+    if(res->lam != NULL && !DAQP_IS_HIERARCHICAL(work)){
         for(i=0;i<work->m;i++)
             res->lam[i] = 0;
         for(i=0;i<work->n_active;i++)
@@ -482,7 +483,12 @@ void daqp_extract_result(DAQPResult* res, DAQPWorkspace* work){
     // info
     res->soft_slack = work->soft_slack;
     res->iter = work->iterations;
-    res->nodes = (work->bnb == NULL) ? 1 : work->bnb->nodecount;
+    if(work->bnb != NULL)
+        res->nodes = work->bnb->nodecount;
+    else if(DAQP_IS_HIERARCHICAL(work))
+        res->nodes = 1;
+    else
+        res->nodes = work->nh;
 
     // Expand a reduced equality-eliminated result and restore the full LDP.
     daqp_eq_retrieve(res,work);

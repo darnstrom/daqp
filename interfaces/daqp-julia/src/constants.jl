@@ -33,6 +33,7 @@ const  ITERLIMIT      = -4
 const  NONCONVEX      = -5
 const  OVERDETERMINED = -6
 const  TIMELIMIT      = -7
+const  UNSUPPORTED    = -8
 
 const flag2status= Dict{Int,Symbol}(3 => :Constrained_Point,
                                     2 => :Soft_Optimal,
@@ -43,4 +44,5 @@ const flag2status= Dict{Int,Symbol}(3 => :Constrained_Point,
                                    -4 => :Iteration_Limit,
                                    -5 => :Nonconvex_Problem,
                                    -6 => :Initial_Overdetermined,
-                                   -7 => :Time_Limit)
+                                   -7 => :Time_Limit,
+                                   -8 => :Unsupported_Problem)

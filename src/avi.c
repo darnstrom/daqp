@@ -15,12 +15,16 @@ int daqp_solve_avi(DAQPWorkspace *work) {
     int retry_requested = 0;
     c_float minimum_newton_residual = DAQP_INF;
 
+    // nh act as a counter for outer iterations
+    work->nh = 0;
+
     // Initial avi iterate
     for(i=0; i < work->n; i++) work->avi->x[i] = work->x[i];
 
     // Start the iterations
     // TODO iter_limit should be the for tot_iter...
     for (k = 0; k < work->settings->iter_limit; k++) {
+        work->nh++;
         // Compute xtemp = H*x + f - (Hsym + I)x
         for(i=0, disp=0; i < work->n; i++){
             sum = sum2 = 0.0;
@@ -103,6 +107,7 @@ int daqp_solve_avi(DAQPWorkspace *work) {
     }
     if(retry_requested){
         int original_limit = work->settings->iter_limit;
+        int previous_outer_iterations = work->nh;
         int retry_flag = daqp_retry_avi_with_reduced_rho(work);
         if(retry_flag < 0) return retry_flag;
         if(retry_flag > 0 && k+1 < original_limit){
@@ -110,6 +115,7 @@ int daqp_solve_avi(DAQPWorkspace *work) {
             retry_flag = daqp_solve_avi(work);
             work->settings->iter_limit = original_limit;
             work->iterations += tot_iter;
+            work->nh += previous_outer_iterations;
             return retry_flag;
         }
         work->iterations = tot_iter;

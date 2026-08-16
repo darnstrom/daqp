@@ -263,6 +263,9 @@ typedef struct{
     c_float *Mu;
 }DAQPWorkspace;
 
+#define DAQP_IS_HIERARCHICAL(work) \
+    ((work)->break_points != NULL && (work)->nh > 1)
+
 # ifdef __cplusplus
 }
 # endif // ifdef __cplusplus

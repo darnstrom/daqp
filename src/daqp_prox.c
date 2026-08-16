@@ -29,6 +29,9 @@ int daqp_prox(DAQPWorkspace *work){
     c_float eta = work->settings->eta_prox;
     c_float eps;
 
+    // nh act as a counter for outer iterations
+    work->nh = 0;
+
     // The outer iteration works in the full space; the elimination is applied
     // to each inner least-distance problem below
     daqp_eq_restore(work);
@@ -122,6 +125,7 @@ int daqp_prox(DAQPWorkspace *work){
          * Solve the (regularised) least-distance problem
          * ----------------------------------------------------------------*/
         work->u = work->x;
+        work->nh++;
         exitflag = daqp_ldp(work);
 
         total_iter += work->iterations;

@@ -9,7 +9,7 @@ int daqp_hiqp(DAQPWorkspace *work, c_float *lambda){
     int exitflag=0;
 
     // If only one hiearchy -> just solve normal LDP
-    if( work->nh < 2) return daqp_ldp(work);
+    if(!DAQP_IS_HIERARCHICAL(work)) return daqp_ldp(work);
 
     // Reset lambda for output
     if(lambda != NULL) for(i=0;i<work->m;i++) lambda[i]=0;

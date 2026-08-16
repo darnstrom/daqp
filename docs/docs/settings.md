@@ -49,6 +49,7 @@ Table of contents
 |-5|Nonconvex problem|
 |-6|Initial working set overdetermined|
 |-7|Time limit reached|
+|-8|Unsupported problem|
 
 ## Constraint classification
 The type of a constraint is classified through an integer value (called sense), where the bits in this integer encode different properties: 
