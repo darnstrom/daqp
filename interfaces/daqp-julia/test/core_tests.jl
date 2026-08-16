@@ -420,8 +420,9 @@ end
     # Test avi interface by passing settings
     xref,H,f,A,b = generate_test_avi(n,m)
     s = settings(DAQPBase.Model(), Dict(:iter_limit => 1))
-    _,_,exitflag,_ = DAQPBase.avi(H,f,A,b; settings=s)
+    _,_,exitflag,info = DAQPBase.avi(H,f,A,b; settings=s)
     @test exitflag == DAQPBase.ITERLIMIT
+    @test info.nodes == 1
 
     # Test that update does not cause a segfault for AVIs
     n = 10; m = 50

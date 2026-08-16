@@ -55,7 +55,7 @@ void render_daqp_workspace(DAQPWorkspace* work, const char *fname, const char *d
     }
 
     // Write Hierarchical
-    if(work->nh > 1 ){
+    if(DAQP_IS_HIERARCHICAL(work)){
         fprintf(fh, "#define DAQP_HIERARCHICAL\n");
         fprintf(fh, "extern int %sbreak_points[%d];\n", prefix, work->nh);
         char varname[256];
@@ -88,7 +88,7 @@ void write_daqp_workspace_h(FILE *f, DAQPWorkspace* work, const char* prefix){
     const int ms = work->ms;
     int ntot = n;
     // Account for soft constraints
-    if(work->nh > 1){
+    if(DAQP_IS_HIERARCHICAL(work)){
         int ns = 0, start=0;
         for(i = 0; i < work->nh; i++){
             ns = (ns  > work->break_points[i]-start) ? ns : work->break_points[i]-start;
@@ -216,7 +216,7 @@ void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work, const char* prefix){
     else
         fprintf(f, "&%sbnb_work,\n", prefix);
     // Hierarhical
-    if(work->nh > 1)
+    if(DAQP_IS_HIERARCHICAL(work))
         fprintf(f, "%d,%sbreak_points,\n", work->nh, prefix);
     else
         fprintf(f, "0, NULL,\n");

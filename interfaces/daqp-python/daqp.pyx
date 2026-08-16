@@ -156,7 +156,7 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
            * setup_time : Time for settings up the problem
            * solve_time : Time for solving the problem
            * iterations : Number of performed iterations
-           * nodes      : Explored nodes in branch-and-bound tree
+           * nodes      : Explored BnB nodes, or outer iterations for proximal/AVI solves
            * lam        : Optimal dual solution
     """
 

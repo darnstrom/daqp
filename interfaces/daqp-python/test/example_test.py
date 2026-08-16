@@ -493,6 +493,8 @@ class TestSemiProximal(unittest.TestCase):
         self.assertEqual(flag_ref, 1)
         self.assertEqual(flag_force, 1)
         self.assertGreater(info_force['iterations'], 1)
+        self.assertGreater(info_force['nodes'], 1)
+        self.assertLessEqual(info_force['nodes'], info_force['iterations'])
         np.testing.assert_allclose(x_force, x_ref, atol=1e-6)
 
     def test_consistent_redundant_equalities_are_ignored(self):

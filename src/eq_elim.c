@@ -126,7 +126,7 @@ static void apply_Q(const DAQPEqElim* eq, c_float* y){
 
 static int is_eq_elim_eligible(const DAQPWorkspace* work){
     if((work->avi != NULL && !work->avi->is_symmetric) ||
-            work->bnb != NULL || work->nh > 1) return 0;
+            work->bnb != NULL || DAQP_IS_HIERARCHICAL(work)) return 0;
     if(work->qp == NULL || work->qp->A == NULL) return 0;
     /*
      * A singular Hessian is handled by the proximal method, which solves a
@@ -705,7 +705,8 @@ void daqp_eq_retrieve(DAQPResult* res, DAQPWorkspace* work){
     int i, j;
     if(eq == NULL || eq->neq == 0) return;
     if(eq->installed) expand_solution(work,work->u,eq->tmp);
-    if((eq->installed || eq->expanded) && res->lam != NULL && work->nh < 2){
+    if((eq->installed || eq->expanded) && res->lam != NULL &&
+            !DAQP_IS_HIERARCHICAL(work)){
         // Scatter the multipliers onto the constraints of the original problem
         const int m_r = eq->m_r;
         for(i = eq->m; i > m_r; ) res->lam[--i] = 0;
@@ -728,7 +729,7 @@ void daqp_eq_retrieve(DAQPResult* res, DAQPWorkspace* work){
         res->fval *= 0.5;
     }
     eq->expanded = 0;
-    if(res->lam != NULL && work->nh < 2){
+    if(res->lam != NULL && !DAQP_IS_HIERARCHICAL(work)){
         compute_lam_eq(work,res->lam);
         for(i = 0; i < eq->neq; i++) res->lam[eq->eq_ids[i]] = eq->lam_eq[i];
         for(i = 0; i < eq->ndrop; i++) res->lam[eq->drop_ids[i]] = 0;

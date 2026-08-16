@@ -192,7 +192,7 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
     }
     if(do_activate == 1){
         reset_daqp_workspace(work);
-        if(work->nh < 2)
+        if(!DAQP_IS_HIERARCHICAL(work))
             error_flag = daqp_activate_constraints(work);
         else{// Activate the first level (since those constraints are hard)
             int m_tmp = work->m;
@@ -613,7 +613,7 @@ int daqp_check_unconstrained(DAQPWorkspace* work, const int mask){
     int i;
     if ((mask&DAQP_UPDATE_unconstrained)==0) return 0;
     if ((mask&(DAQP_UPDATE_Rinv+DAQP_UPDATE_M+DAQP_UPDATE_v+DAQP_UPDATE_d)) == 0) return 0; // Nothing to update
-    if (work->bnb != NULL || work->nh > 1 || work->n_prox >0) return 0; // Not a standard QP/AVI
+    if (work->bnb != NULL || DAQP_IS_HIERARCHICAL(work) || work->n_prox >0) return 0; // Not a standard QP/AVI
     for(i = 0; i < work->m; i++) if(work->sense[i]&(DAQP_ACTIVE + DAQP_IMMUTABLE)) return 0; // No equalities
 
     // Check if unconstrained optimum is primal feasible.
