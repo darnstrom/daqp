@@ -26,7 +26,7 @@ extern "C" {
 #define DAQP_DEFAULT_ABS_SUBOPT 0
 #define DAQP_DEFAULT_SING_TOL (3.7e-11)
 #define DAQP_DEFAULT_REFACTOR_TOL 1e-9
-#define DAQP_DEFAULT_EPS_PROX 1e-6
+#define DAQP_DEFAULT_EPS_PROX (-1e-6)
 
 // Equality constraints are eliminated if there are sufficiently many of them
 // (neq > EQ_MIN_COUNT and EQ_MIN_RATIO*neq > n)

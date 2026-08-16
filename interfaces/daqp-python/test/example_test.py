@@ -381,10 +381,10 @@ class TestModel(unittest.TestCase):
 
 
 class TestSemiProximal(unittest.TestCase):
-    """Tests for the semi-proximal method (eps_prox > 0)."""
+    """Tests for automatic and forced proximal modes."""
 
     def test_pd_hessian_n_prox_zero(self):
-        """PD Hessian with eps_prox > 0: no direction needs regularisation (n_prox=0)."""
+        """Automatic mode leaves a positive-definite Hessian unshifted."""
         H = np.array([[1.0, 0.0], [0.0, 1.0]], dtype=c_double)
         f = np.array([1.0, 1.0], dtype=c_double)
         A = np.zeros((0, 2), dtype=c_double)
@@ -393,7 +393,7 @@ class TestSemiProximal(unittest.TestCase):
         sense = np.array([0, 0], dtype=c_int)
 
         d = daqp.Model()
-        d.settings = {'eps_prox': 1e-4}
+        d.settings = {'eps_prox': -1e-4}
         d.setup(H, f, A, bupper, blower, sense)
         x, fval, ef, info = d.solve()
 
@@ -412,7 +412,7 @@ class TestSemiProximal(unittest.TestCase):
         sense = np.array([0, 0], dtype=c_int)
 
         d = daqp.Model()
-        d.settings = {'eps_prox': 1e-3}
+        d.settings = {'eps_prox': -1e-3}
         d.setup(H, f, A, bupper, blower, sense)
         x, fval, ef, info = d.solve()
 
@@ -433,13 +433,27 @@ class TestSemiProximal(unittest.TestCase):
         sense = np.array([0, 0], dtype=c_int)
 
         d = daqp.Model()
-        d.settings = {'eps_prox': 1e-2}
+        d.settings = {'eps_prox': -1e-2}
         d.setup(H, f, A, bupper, blower, sense)
         x, fval, ef, info = d.solve()
 
         self.assertGreater(ef, 0)
         # Regularised problem: min eps/2*||x||^2 + f'*x  -> x* = -f/eps (clipped to bounds)
         np.testing.assert_allclose(x, [-3.0, -3.0], atol=1e-3)
+
+    def test_zero_eps_disables_proximal_regularization(self):
+        """A singular Hessian is rejected when eps_prox is exactly zero."""
+        H = np.diag([1.0, 0.0]).astype(c_double)
+        f = np.ones(2, dtype=c_double)
+        A = np.zeros((0, 2), dtype=c_double)
+        bupper = np.ones(2, dtype=c_double)
+        blower = -bupper
+        sense = np.zeros(2, dtype=c_int)
+
+        _, _, exitflag, _ = daqp.solve(
+            H, f, A, bupper, blower, sense, eps_prox=0.0)
+
+        self.assertEqual(exitflag, -5)
 
     def test_pd_hessian_matches_no_prox(self):
         """With a PD Hessian, eps_prox > 0 still gives the correct solution."""
@@ -461,6 +475,25 @@ class TestSemiProximal(unittest.TestCase):
         x_prox, _, ef_prox, _ = d.solve()
         self.assertEqual(ef_prox, 1)
         np.testing.assert_allclose(x_prox, x_ref, atol=1e-3)
+
+    def test_positive_eps_forces_full_proximal(self):
+        """Positive eps_prox forces the full shift and preserves the QP solution."""
+        H = np.array([[4.0, 1.0], [1.0, 3.0]], dtype=c_double)
+        f = np.array([1.0, 2.0], dtype=c_double)
+        A = np.zeros((0, 2), dtype=c_double)
+        bupper = np.array([5.0, 5.0], dtype=c_double)
+        blower = np.array([-5.0, -5.0], dtype=c_double)
+        sense = np.array([0, 0], dtype=c_int)
+
+        x_ref, _, flag_ref, _ = daqp.solve(
+            H, f, A, bupper, blower, sense)
+        x_force, _, flag_force, info_force = daqp.solve(
+            H, f, A, bupper, blower, sense, eps_prox=1e-2)
+
+        self.assertEqual(flag_ref, 1)
+        self.assertEqual(flag_force, 1)
+        self.assertGreater(info_force['iterations'], 1)
+        np.testing.assert_allclose(x_force, x_ref, atol=1e-6)
 
     def test_consistent_redundant_equalities_are_ignored(self):
         """Dependent consistent equalities do not make setup fail."""

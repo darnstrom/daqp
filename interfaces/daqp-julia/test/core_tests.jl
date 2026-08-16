@@ -449,6 +449,17 @@ end
     x,fval,exitflag,info = solve(d)
     @test norm(xref-x) < tol;
 
+    # A supplied Cholesky factor certifies positive definiteness, so even a
+    # positive eps_prox must not select the proximal solver.
+    d_force = DAQPBase.Model()
+    DAQPBase.settings(d_force, Dict(:eps_prox => 1e-3))
+    setup(d_force,C,f,A,bupper,blower,sense)
+    ws_force = unsafe_load(Ptr{DAQPBase.Workspace}(d_force.work))
+    @test ws_force.n_prox == 0
+    x_force,_,exitflag_force,_ = solve(d_force)
+    @test exitflag_force == DAQPBase.OPTIMAL
+    @test norm(xref-x_force) < tol
+
     # Test diagonal
     H = diagm(rand(n))
     C = cholesky(H)
@@ -555,8 +566,8 @@ end
     xref2,fval_ref,ef_ref,_ = quadprog(H,f,A,bupper,blower,sense)
     @test ef_ref == DAQPBase.OPTIMAL
 
-    # With eps_prox > 0 on PD H: solver should still reach the optimum.
-    s_prox = settings(DAQPBase.Model(), Dict(:eps_prox => 1e-4))
+    # With eps_prox < 0, automatic mode leaves a PD Hessian unshifted.
+    s_prox = settings(DAQPBase.Model(), Dict(:eps_prox => -1e-4))
     x_prox,_,ef_prox,_ = quadprog(H,f,A,bupper,blower,sense; settings=s_prox)
     @test ef_prox == DAQPBase.OPTIMAL
     @test norm(xref2 - x_prox) < tol
@@ -564,7 +575,7 @@ end
     # Check that the Workspace struct layout is correct by reading n_prox via
     # unsafe_load -- it must be 0 for a PD Hessian (no regularisation needed).
     d = DAQPBase.Model()
-    DAQPBase.settings(d, Dict(:eps_prox => 1e-4))
+    DAQPBase.settings(d, Dict(:eps_prox => -1e-4))
     DAQPBase.setup(d, H, f, A, bupper, blower, sense)
     p = d.work  # raw workspace pointer (Ptr{Cvoid})
     ws = unsafe_load(Ptr{DAQPBase.Workspace}(p))
@@ -592,7 +603,7 @@ end
     sense_sing = zeros(Cint, 2)
 
     d2 = DAQPBase.Model()
-    DAQPBase.settings(d2, Dict(:eps_prox => 1e-3))
+    DAQPBase.settings(d2, Dict(:eps_prox => -1e-3))
     DAQPBase.setup(d2, H_sing, f_sing, A_sing, bu_sing, bl_sing, sense_sing)
     ws2 = unsafe_load(Ptr{DAQPBase.Workspace}(d2.work))
     @test ws2.n_prox == 1   # only x2 direction needed regularisation
@@ -618,7 +629,7 @@ end
     sense_dense = zeros(Cint, 3)
 
     d_dense = DAQPBase.Model()
-    DAQPBase.settings(d_dense, Dict(:eps_prox => 1e-8))
+    DAQPBase.settings(d_dense, Dict(:eps_prox => -1e-8))
     DAQPBase.setup(d_dense, H_dense, f_dense, A_dense, bu_dense, bl_dense,
                    sense_dense)
     ws_dense = unsafe_load(Ptr{DAQPBase.Workspace}(d_dense.work))
@@ -628,7 +639,7 @@ end
     # change when only the requested feasibility tolerance changes.
     d_dense_loose = DAQPBase.Model()
     DAQPBase.settings(d_dense_loose,
-                      Dict(:eps_prox => 1e-8, :primal_tol => 1e-3))
+                      Dict(:eps_prox => -1e-8, :primal_tol => 1e-3))
     DAQPBase.setup(d_dense_loose, H_dense, f_dense, A_dense, bu_dense,
                    bl_dense, sense_dense)
     x_dense,_,ef_dense,_ = DAQPBase.solve(d_dense)
@@ -660,7 +671,7 @@ end
     sense_zero = zeros(Cint, n3)
 
     d3 = DAQPBase.Model()
-    DAQPBase.settings(d3, Dict(:eps_prox => 1e-2))
+    DAQPBase.settings(d3, Dict(:eps_prox => -1e-2))
     DAQPBase.setup(d3, H_zero, f_zero, A_zero, bu_zero, bl_zero, sense_zero)
     ws3 = unsafe_load(Ptr{DAQPBase.Workspace}(d3.work))
     @test ws3.n_prox == n3
