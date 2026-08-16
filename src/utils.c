@@ -13,6 +13,7 @@
 static c_float proximal_regularization_scaled(
         const DAQPWorkspace *work, c_float hessian_scale){
     c_float eps = work->settings->eps_prox;
+    if(eps < 0.0) eps = -eps; // Negative eps_prox selects automatic mode.
     c_float floor = sqrt(work->settings->zero_tol)*hessian_scale;
     if(eps > 0.0 && eps < floor) eps = floor;
     return eps;
@@ -79,7 +80,7 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
     // Reset sing_ind flag (re-evaluated below whenever relevant data changes)
     work->sing_ind = DAQP_EMPTY_IND;
 
-    /** Update constraint sense **/
+    // Update constraint sense
     if(mask&DAQP_UPDATE_sense){
         if(work->qp->sense == NULL) // Assume all constraints are "normal" inequality constraints
             for(i=0;i<work->m;i++) work->sense[i] = 0;
@@ -96,7 +97,7 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
         if(error_flag==1) do_activate = 1;
     }
 
-    /** Update Rinv **/
+    // Update Rinv
     if(mask&DAQP_UPDATE_Rinv){
         if(work->avi == NULL)
             error_flag = daqp_update_Rinv(work, qp->H, qp->problem_type==2 ? 1 : 0);
@@ -117,7 +118,7 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
             return error_flag;
     }
 
-    /** Update v (moved before M to enable early-exit check below) **/
+    // Update v (moved before M to enable early-exit check below)
     if(mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_v){
         daqp_update_v(qp->f,work,mask);
     }
@@ -126,10 +127,7 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
                              ? 1 : daqp_check_unconstrained(work,mask);
     if(unconstrained_flag == DAQP_UNCONSTRAINED_OPTIMAL) return 0;
 
-    /*
-     * Update M. Only the equality rows are needed if the constraints are about
-     * to be eliminated, and those are formed by the elimination itself.
-     */
+    // Update M. Only the equality rows are needed if the constraints are eliminated 
     if(mask&DAQP_UPDATE_eliminate && daqp_eq_will_reduce(work)){
         reset_daqp_workspace(work); // M is not formed
         skip_constraints = 1;
@@ -145,7 +143,7 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
         daqp_normalize_Rinv(work);
     }
 
-    /** Update d **/
+    // Update d
     if(skip_constraints){
         // Formed together with the reduced constraints by the elimination
     }
@@ -178,7 +176,7 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
     }
 #endif
 
-    /** Update hierarchy **/
+    // Update hierarchy
     if(mask&DAQP_UPDATE_hierarchy){
         work->nh = qp->nh;
         work->break_points = qp->break_points;
@@ -187,11 +185,7 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
     // The working set refers to the reduced LDP if one was installed
     if(was_reduced) do_activate = 1;
 
-    /*
-     * Make sure activate constraints are activated. Equality constraints are
-     * always active, so forming the working set here is wasted work if they
-     * are eliminated afterwards; daqp_eq_eliminate then forms it instead.
-     */
+    // Make sure activate constraints are activated.
     if(do_activate == 1 && skip_constraints){
         reset_daqp_workspace(work);
         do_activate = 0;
@@ -230,6 +224,11 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
     int regularize_all = 0;
     int regularization_tries = 0;
 
+    const int force_prox = work->settings->eps_prox > 0.0 && !is_factored
+        && (work->avi == NULL || work->avi->is_symmetric);
+
+    if(force_prox) regularize_all = 1;
+
 
     // Reset the semi-proximal mask for this factorization
     if(work->prox_mask != NULL){
@@ -237,9 +236,7 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
     }
     work->n_prox = 0;
 
-    // Check if Diagonal — for unfactored H scan only the upper-triangle
-    // off-diagonals of the n×n row-major matrix (O(n²/2) reads), skipping
-    // the packing step entirely when H is diagonal.
+    // Check if Diagonal
     int is_diagonal = 1;
     if(!is_factored){
         for(i = 0, disp = 1; i < n && is_diagonal; i++, disp += i+1){
@@ -261,10 +258,27 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
         }
     }
 
+    if(force_prox){
+        if(!is_factored && !is_diagonal){
+            hessian_scale = 0.0;
+            for(i = 0; i < n; i++){
+                c_float abs_diag = H[i*n+i];
+                if(abs_diag < 0.0) abs_diag = -abs_diag;
+                if(abs_diag > hessian_scale) hessian_scale = abs_diag;
+            }
+        }
+        eps = proximal_regularization_scaled(work, hessian_scale);
+        if(eps <= 0.0) return DAQP_EXIT_NONCONVEX;
+        work->n_prox = n;
+        if(work->prox_mask != NULL)
+            for(i = 0; i < n; i++) work->prox_mask[i] = 1;
+    }
+
     // Diagonal Case — for unfactored H read diagonals directly (no packing needed).
     if(is_diagonal){
-        if(!is_factored && hessian_scale > 0){
-            factor_tol = zero_tol * hessian_scale;
+        if(!is_factored){
+            if(hessian_scale > 0)
+                factor_tol = zero_tol * hessian_scale;
             eps = proximal_regularization_scaled(work, hessian_scale);
         }
         if(work->Rinv != NULL){ work->RinvD = work->Rinv; work->Rinv = NULL; }
@@ -273,19 +287,17 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
             if(is_factored){ Hi = H[disp]; disp += n-i; }
             else            { Hi = H[i*n+i]; }
             if(!is_factored){
-                if(Hi <= factor_tol){
-                    if(work->prox_mask != NULL) work->prox_mask[i] = 1;
-                    work->n_prox++;
+                if(force_prox || Hi <= factor_tol){
+                    if(!force_prox){
+                        if(work->prox_mask != NULL) work->prox_mask[i] = 1;
+                        work->n_prox++;
+                    }
                     Hi += eps;
                 }
                 if(Hi <= zero_tol) return DAQP_EXIT_NONCONVEX;
                 Hi = sqrt(Hi);
             } else {
-                if(Hi <= factor_tol){
-                    if(work->prox_mask != NULL) work->prox_mask[i] = 1;
-                    work->n_prox++;
-                    Hi = sqrt(Hi*Hi + eps); // Regularization for factors
-                }
+                if(Hi <= zero_tol) return DAQP_EXIT_NONCONVEX;
             }
             work->RinvD[i] = 1/Hi;
             if(work->scaling != NULL && i < work->ms) work->scaling[i] = Hi;
@@ -308,6 +320,7 @@ pack_hessian:
     // Cholesky.
     if(is_factored){
         for(i=0, disp=0; i<n; i++){
+            if(H[disp] <= zero_tol) return DAQP_EXIT_NONCONVEX;
             work->Rinv[disp] = 1/H[disp]; // Store 1/rii
             for(j=1, disp++; j<n-i; j++, disp++)
                 work->Rinv[disp] = H[disp];
@@ -334,19 +347,10 @@ pack_hessian:
          // A successful unregularized Cholesky factorization represents a
          // positive-definite Hessian down to zero_tol relative pivots.
          // Once a singular Hessian has been shifted, be more conservative 
-        if(min_pivot <= (regularize_all ? sqrt(zero_tol) : zero_tol)*max_pivot){
+        if(min_pivot <= (regularize_all && !force_prox ? sqrt(zero_tol) : zero_tol)*max_pivot){
 regularize_hessian:
-            /*
-             * A shift on failed pivots alone is not a robust
-             * regularization for a dense PSD matrix.  The selected
-             * coordinate axes can be almost orthogonal to the nullspace,
-             * leaving H + eps*diag(mask) nearly singular even for a
-             * large eps.  Restart with H + eps*I instead.  Compute the
-             * scale only on this exceptional path.
-             */
             if(regularize_all){
-                if(eps <= 0 || regularization_tries++ >= 16)
-                    return DAQP_EXIT_NONCONVEX;
+                if(eps <= 0 || regularization_tries++ >= 16) return DAQP_EXIT_NONCONVEX;
                 eps *= 2.0;
             }
             else{
@@ -388,6 +392,7 @@ c_float daqp_get_proximal_regularization(const DAQPWorkspace *work){
         return 0.0;
 
     eps = work->settings->eps_prox;
+    if(eps < 0.0) eps = -eps;
     if(work->RinvD != NULL){
         // Diagonal regularization has no retry loop, so reproduce its
         // scale-based floor directly. Avoid subtracting nearly equal large
@@ -403,13 +408,7 @@ c_float daqp_get_proximal_regularization(const DAQPWorkspace *work){
         return eps;
     }
 
-    /*
-     * Dense singular Hessians are shifted by eps*I. Before normalization,
-     * Rinv[0] = 1/sqrt(H[0,0] + eps). Simple-bound normalization scales
-     * that row, with the scale retained in scaling[0]. Recover the retry
-     * level from that pivot, but return the exact base*2^k value produced
-     * by factorization.
-     */
+    // Handle eps-shift correctly for simple bounds
     rinv = work->Rinv[0];
     if(work->ms > 0)
         rinv /= work->scaling[0];

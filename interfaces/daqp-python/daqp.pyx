@@ -103,8 +103,8 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
     ---
     H :
         Cost matrix (should be positive definite).
-        For a singular cost matrix, e.g. for LPs, use a positive value for the setting eps_prox
-        (see information of how to change settings below)
+        For singular Hessians, a negative eps_prox enables automatic regularization
+        and positive eps_prox forces full proximal regularization.
     f :
         Cost vector.
     A :
@@ -139,7 +139,7 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
        * iter_limit : Maximum numer of allowed iterations
        * primal_tol : Primal feasibility tolerance
        * dual_tol   : Dual feasibility tolerance
-       * eps_pro x  : Regularization used for proximal-point iterations
+       * eps_prox   : Negative selects automatic, zero disables, positive forces
     See <https://darnstrom.github.io/daqp/parameters>`_ for all available settings.
 
     Returns
@@ -375,10 +375,8 @@ cdef class Model:
 
         # ---- pre-allocate settings with user values so setup_daqp sees them ----
         # This is critical: daqp_update_Rinv (called inside setup_daqp) reads
-        # eps_prox from settings to decide which Cholesky diagonals need
-        # regularisation.  If settings were NULL or held default (eps_prox=0)
-        # when the Cholesky runs, a singular Hessian would be rejected as
-        # non-convex even when the caller supplied a non-zero eps_prox.
+        # eps_prox from settings to select automatic, disabled, or forced
+        # regularisation before the Cholesky factorization is attempted.
         allocate_daqp_settings(self._work)   # fresh allocation, defaults
         if restore_settings:
             self._work.settings[0] = old_settings_val  # apply user values NOW
