@@ -370,7 +370,7 @@ function update(daqp::DAQPBase.Model, H,f,A,bupper,blower,sense=nothing,break_po
         update_mask |= DAQP_UPDATE_sense
     end
 
-    if(!isnothing(break_points) && length(break_points)== work.nh)
+    if(!isnothing(break_points) && length(break_points)== qp.nh)
         daqp.qpj.break_points .= break_points
         update_mask |= DAQP_UPDATE_hierarchy
     end
