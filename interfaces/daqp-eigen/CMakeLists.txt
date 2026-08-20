@@ -5,6 +5,7 @@ find_package(Eigen3 3.4.0 REQUIRED NO_MODULE)
 include(GNUInstallDirs)
 
 add_library(${PROJECT_NAME} SHARED daqp.cpp)
+add_library(daqp::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
 target_include_directories(${PROJECT_NAME} PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>
