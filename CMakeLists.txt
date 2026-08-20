@@ -70,12 +70,14 @@ endif()
 
 
 add_library(daqpstat STATIC ${daqp_src} ${daqp_headers} ${daqp_codegen_src} ${daqp_codegen_headers})
+add_library(daqp::daqpstat ALIAS daqpstat)
 target_include_directories(daqpstat PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
 add_library(daqp SHARED ${daqp_src} ${daqp_headers} ${daqp_codegen_src} ${daqp_codegen_headers})
+add_library(daqp::daqp ALIAS daqp)
 target_include_directories(daqp PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>
@@ -128,7 +130,7 @@ if(JULIA)
     if(TEST)
         add_test(NAME Julia COMMAND sh -c "julia --color=yes --project=${CMAKE_CURRENT_BINARY_DIR}/interfaces/daqp-julia -e \"using Pkg; Pkg.test()\"")
     endif()
-    
+
     if(BENCHMARK)
         # Add benchmark comparison test (git-based)
         add_test(
