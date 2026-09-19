@@ -232,23 +232,35 @@ typedef struct{
     // Soft constraint
     c_float soft_slack;
 #ifdef SOFT_WEIGHTS
-    // True when at least one soft side has a nonzero slack lower bound.
-    // When false, the ordinary L2 dual-feasibility test can be used.
-    int has_l1_soft;
-    // NULL pointers select d_ls=d_us=0 and
-    // rho_ls=rho_us=settings->rho_soft without allocating arrays.
-    // Call daqp_allocate_soft_weights to materialize per-constraint values.
-    // The softened objective is given by
-    //    min  0.5 x'*H*x + f'x + 0.5 su'su + 0.5 sl'sl,
-    // and the softened constraints are given by (similarly for simple bounds)
-    //    lbA-rho_ls*sl <= A*x <= ubA+rho_us*su,
-    // with the bounds sl >= d_ls, su >= d_us.
-    // The bounds are assumed to include the contribution from d_ls/d_us,
-    // since the slacks start active at their bounds.
-    c_float *d_ls;
-    c_float *d_us;
-    c_float *rho_ls;
+    /* Per-constraint penalties for the soft constraints. For
+     *
+     *     blower - sl <= A*x <= bupper + su,    sl,su >= 0,
+     *
+     * the objective is augmented with
+     *
+     *     w_ls*sl + sl^2/(2*rho_ls)   and   w_us*su + su^2/(2*rho_us),
+     *
+     * that is, w is the linear (L1) weight and rho is the *reciprocal* of the
+     * quadratic (L2) weight. Zero selects the default: no linear weight and
+     * the quadratic weight settings->rho_soft, which is what all soft
+     * constraints use when SOFT_WEIGHTS is disabled. The weights are given in
+     * the scale of the original problem and may be set at any point before a
+     * solve.
+     *
+     * Translating a formulation with a linear term and a nominal slack bound
+     * (as in acados), min ... + z*s + 0.5*Z*s^2 s.t. A*x <= bupper + s, s >= d,
+     * amounts to
+     *
+     *     bupper += d,   w_us = max(0, z + Z*d),   rho_us = 1/Z,
+     *
+     * since substituting s = d + su removes the nominal bound from the slack
+     * (the max only guards against a negative linear weight, which would make
+     * the slack unbounded).
+     */
+    c_float *rho_ls; // Reciprocal quadratic weight (default settings->rho_soft)
     c_float *rho_us;
+    c_float *w_ls; // Linear weight (default 0)
+    c_float *w_us;
 #endif
 
     // Settings

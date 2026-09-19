@@ -7,19 +7,6 @@
 // Solve problem from a given workspace and measure setup and solve time
 void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
     if(work->break_points == NULL) work->nh = 1;
-#ifdef SOFT_WEIGHTS
-    // A nonzero slack lower bound introduces the additional L1 breakpoint.
-    // Otherwise the ordinary (and cheaper) L2 blocking test is sufficient,
-    // also when the quadratic slack weights differ between constraints.
-    work->has_l1_soft = 0;
-    for(int i = 0; work->d_ls != NULL && i < work->m; i++){
-        if(DAQP_IS_SOFT(i) &&
-                (work->d_ls[i] != 0 || work->d_us[i] != 0)){
-            work->has_l1_soft = 1;
-            break;
-        }
-    }
-#endif
     // Put back an elimination that a previous solve retrieved
     if((res->exitflag = daqp_eq_reinstall(work)) < 0) return;
 #ifdef PROFILING
@@ -276,13 +263,11 @@ void free_daqp_ldp(DAQPWorkspace *work){
     }
 
 #ifdef SOFT_WEIGHTS
-    if(work->d_ls != NULL){
-        free(work->d_ls);
-    }
-    work->d_ls = NULL;
-    work->d_us = NULL;
+    if(work->rho_ls != NULL) free(work->rho_ls); // Single block for all weights
     work->rho_ls = NULL;
     work->rho_us = NULL;
+    work->w_ls = NULL;
+    work->w_us = NULL;
 #endif
 
     work->sense = NULL;
@@ -337,11 +322,10 @@ void allocate_daqp_workspace(DAQPWorkspace *work, int n, int ns){
     work->n_prox = 0;
 
 #ifdef SOFT_WEIGHTS
-    work->has_l1_soft = 0;
-    work->d_ls= NULL;
-    work->d_us= NULL;
     work->rho_ls= NULL;
     work->rho_us= NULL;
+    work->w_ls= NULL;
+    work->w_us= NULL;
 #endif
 
     work->bnb = NULL;
@@ -370,26 +354,17 @@ void allocate_daqp_ldp(DAQPWorkspace *work, int n, int m, int ms, int alloc_R, i
     // Allocate memory for v
     work->v = (alloc_v == 1) ? malloc(n*sizeof(c_float)) :  NULL;
 
-}
-
 #ifdef SOFT_WEIGHTS
-int daqp_allocate_soft_weights(DAQPWorkspace *work){
-    if(work->d_ls != NULL || work->m <= 0) return 1;
-
-    // One allocation keeps materializing custom weights inexpensive. Until
-    // this is called, NULL represents d=0 and the scalar settings->rho_soft.
-    work->d_ls = calloc(4*work->m,sizeof(c_float));
-    if(work->d_ls == NULL) return 0;
-    work->d_us = work->d_ls + work->m;
-    work->rho_ls = work->d_ls + 2*work->m;
-    work->rho_us = work->d_ls + 3*work->m;
-    for(int i = 0; i < work->m; i++){
-        work->rho_ls[i] = work->settings->rho_soft;
-        work->rho_us[i] = work->settings->rho_soft;
+    // Weights of the soft constraints (one block). Zero means default,
+    // i.e., no linear weight and the quadratic weight in settings.
+    work->rho_ls = (m > 0) ? calloc(4*m,sizeof(c_float)) : NULL;
+    if(work->rho_ls != NULL){
+        work->rho_us = work->rho_ls + m;
+        work->w_ls = work->rho_ls + 2*m;
+        work->w_us = work->rho_ls + 3*m;
     }
-    return 1;
-}
 #endif
+}
 
 void allocate_daqp_avi(DAQPAVI* avi, const int n){
     avi->is_symmetric = 0;

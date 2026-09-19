@@ -18,7 +18,7 @@ c_float daqp_dot(const c_float* v1, const c_float* v2, const int n) {
     return daqp_dot_inline(v1, v2, n);
 }
 
-void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind){
+void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind, const c_float rho){
     work->sing_ind = DAQP_EMPTY_IND;
     int i,j,disp,id;
     int new_L_start= DAQP_ARSUM(work->n_active);
@@ -41,16 +41,10 @@ void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind){
     else
         sum = dot_row(Mi+start_col,Mi+start_col,work->n-start_col);
 
-#ifdef SOFT_WEIGHTS
-    if(DAQP_IS_SOFT(add_ind) &&
-            (!work->has_l1_soft || DAQP_IS_SLACK_FREE(add_ind))){
-        sum += work->rho_ls == NULL
-            ? work->settings->rho_soft
-            : (DAQP_IS_LOWER(add_ind) ? work->rho_ls[add_ind] : work->rho_us[add_ind]);
-#else
-    if(DAQP_IS_SOFT(add_ind)){
-        sum+=work->settings->rho_soft;
-#endif
+    // A soft constraint with a nonzero slack contributes its reciprocal
+    // quadratic weight to the diagonal of the dual Hessian
+    if(DAQP_IS_SOFT(add_ind) && DAQP_IS_SLACK_FREE(add_ind)){
+        sum += rho;
         ns_active++;
     }
 
@@ -61,12 +55,7 @@ void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind){
     // store l <-- Mk* m
     for(i=0;i<work->n_active;i++){
         id = work->WS[i];
-#ifdef SOFT_WEIGHTS
-        if(DAQP_IS_SOFT(id) &&
-                (!work->has_l1_soft || DAQP_IS_SLACK_FREE(id))) ns_active++;
-#else
-        if(DAQP_IS_SOFT(id)) ns_active++;
-#endif
+        if(DAQP_IS_SOFT(id) && DAQP_IS_SLACK_FREE(id)) ns_active++;
         // Use Rinv or M for Mk depending on if k is simple bound or not 
         if(id < work->ms){ 
             Mk = (work->Rinv) ? work->Rinv+DAQP_R_OFFSET(id,work->n): NULL;

@@ -1,5 +1,94 @@
 #include "auxiliary.h"
 #include "factorization.h"
+
+/* Soft constraints
+ * ================
+ * A constraint marked DAQP_SOFT may be violated at the cost of the penalty
+ * documented for rho_ls/w_ls in types.h. In the dual, such a constraint
+ * contributes 0.5*rho*(|lam|-w)_+^2, so its slack is zero while |lam| <= w and
+ * equals rho*(|lam|-w) beyond that. The two regimes are tracked by
+ * DAQP_SLACK_FIXED/DAQP_SLACK_FREE: only the free regime adds rho to the
+ * diagonal of the dual Hessian and shifts the dual linear term by rho*w. The
+ * penalty is continuously differentiable, so |lam| passing w is an ordinary
+ * blocking event, handled like a constraint leaving the working set (see
+ * daqp_remove_blocking).
+ */
+#ifdef SOFT_WEIGHTS
+// The weights are indexed by the constraints of the original problem, which
+// are renumbered if equalities have been eliminated (work->scaling, in
+// contrast, always refers to the problem that is currently installed).
+static inline int daqp_soft_ind(DAQPWorkspace *work, const int id){
+    return (work->eq != NULL && work->eq->installed) ? work->eq->map[id] : id;
+}
+
+// Reciprocal quadratic weight of the active side of constraint id
+// (zero selects the default weight settings->rho_soft, which is given
+// directly in the normalized formulation that the solver works with)
+static inline c_float daqp_soft_rho(DAQPWorkspace *work, const int id){
+    const int i = daqp_soft_ind(work,id);
+    const c_float rho = DAQP_IS_LOWER(id) ? work->rho_ls[i] : work->rho_us[i];
+    if(rho == 0) return work->settings->rho_soft;
+    if(work->scaling == NULL) return rho;
+    return rho*work->scaling[id]*work->scaling[id];
+}
+
+// Linear weight of the active side of constraint id, i.e. the magnitude that
+// the multiplier has to exceed before the slack becomes nonzero.
+static inline c_float daqp_soft_w(DAQPWorkspace *work, const int id){
+    const int i = daqp_soft_ind(work,id);
+    const c_float w = DAQP_IS_LOWER(id) ? work->w_ls[i] : work->w_us[i];
+    if(work->scaling == NULL) return w;
+    return w/work->scaling[id];
+}
+
+// Shift of the dual linear term of a soft constraint
+// (only nonzero for a free slack with w > 0)
+static inline c_float daqp_soft_shift(DAQPWorkspace *work, const int id){
+    if(DAQP_IS_SLACK_FIXED(id)) return 0;
+    const c_float shift = daqp_soft_rho(work,id)*daqp_soft_w(work,id);
+    return DAQP_IS_LOWER(id) ? -shift : shift;
+}
+
+// Contribution to the objective from the slack of constraint id
+static inline c_float daqp_soft_penalty(DAQPWorkspace *work, const int id,
+        const c_float lam){
+    if(DAQP_IS_SLACK_FIXED(id)) return 0; // The slack is zero
+    const c_float w = daqp_soft_w(work,id);
+    return daqp_soft_rho(work,id)*(lam*lam-w*w);
+}
+
+// Mark whether the slack of the constraint is zero or not, given its
+// multiplier (the state of a hard constraint is never read)
+static inline void daqp_set_slack_state(DAQPWorkspace *work, const int id,
+        const c_float lam){
+    if(!DAQP_IS_SOFT(id)) return;
+    const c_float w = daqp_soft_w(work,id);
+    if(w > 0 && (DAQP_IS_LOWER(id) ? -lam : lam) < w)
+        DAQP_SET_SLACK_FIXED(id);
+    else
+        DAQP_SET_SLACK_FREE(id);
+}
+#else
+// Without per-constraint weights all slacks are free and w is zero, which
+// reduces the solver to the ordinary quadratic penalty (the branches that
+// are specific to the soft weights are removed by the compiler).
+#define daqp_soft_rho(work,id) ((work)->settings->rho_soft)
+#define daqp_soft_w(work,id) ((c_float)0)
+#define daqp_soft_shift(work,id) ((c_float)0)
+#define daqp_set_slack_state(work,id,lam) ((void)0)
+#endif
+
+// Slack of the soft constraint that is active at working set index i
+c_float daqp_soft_slack(DAQPWorkspace *work, const int i){
+    const int id = work->WS[i];
+    (void)id; // Only used when the constraints have individual weights
+    if(DAQP_IS_SLACK_FIXED(id)) return 0;
+    return work->lam_star[i]*daqp_soft_rho(work,id) - daqp_soft_shift(work,id);
+}
+
+// Add a constraint that keeps the slack state that is already marked in sense
+static void daqp_add_constraint_keep_slack(DAQPWorkspace *work,
+        const int add_ind, c_float lam);
 void daqp_remove_constraint(DAQPWorkspace* work, const int rm_ind){
     int i;
     // Update data structures
@@ -24,18 +113,11 @@ void daqp_remove_constraint(DAQPWorkspace* work, const int rm_ind){
         daqp_pivot_last(work);
     }
 }
-void daqp_add_constraint(DAQPWorkspace *work, const int add_ind, c_float lam){
+static void daqp_add_constraint_keep_slack(DAQPWorkspace *work,
+        const int add_ind, c_float lam){
     // Update data structures
     DAQP_SET_ACTIVE(add_ind);
-#ifdef SOFT_WEIGHTS
-    if(!work->has_l1_soft ||
-            (DAQP_IS_LOWER(add_ind) && lam <= -work->d_ls[add_ind]) ||
-            (!DAQP_IS_LOWER(add_ind) && lam >= work->d_us[add_ind]))
-        DAQP_SET_SLACK_FREE(add_ind);
-    else
-        DAQP_SET_SLACK_FIXED(add_ind);
-#endif
-    daqp_update_LDL_add(work, add_ind);
+    daqp_update_LDL_add(work, add_ind, daqp_soft_rho(work,add_ind));
     work->WS[work->n_active] = add_ind;
     work->lam[work->n_active] = lam;
     work->n_active++;
@@ -44,12 +126,14 @@ void daqp_add_constraint(DAQPWorkspace *work, const int add_ind, c_float lam){
     daqp_pivot_last(work);
 }
 
+void daqp_add_constraint(DAQPWorkspace *work, const int add_ind, c_float lam){
+    daqp_set_slack_state(work,add_ind,lam);
+    daqp_add_constraint_keep_slack(work,add_ind,lam);
+}
+
 void daqp_compute_primal_and_fval(DAQPWorkspace *work){
     int i,j,disp,id;
     c_float fval=0;
-#ifdef SOFT_WEIGHTS
-    const int uniform_soft_weight = work->rho_ls == NULL;
-#endif
     // Reset u & soft slack
     for(j=0;j<work->n;j++)
         work->u[j]=0;
@@ -72,22 +156,14 @@ void daqp_compute_primal_and_fval(DAQPWorkspace *work){
         }
         if(DAQP_IS_SOFT(id)){
 #ifdef SOFT_WEIGHTS
-            if(uniform_soft_weight)
-                fval += work->lam_star[i] * work->lam_star[i];
-            else if(DAQP_IS_LOWER(id))
-                fval += work->lam_star[i] * work->lam_star[i] * work->rho_ls[id];
-            else
-                fval += work->lam_star[i] * work->lam_star[i] * work->rho_us[id];
+            fval += daqp_soft_penalty(work,id,li);
 #else
-            fval+= work->lam_star[i]*work->lam_star[i];
+            fval += li*li;
 #endif
         }
     }
-#ifdef SOFT_WEIGHTS
-    if(uniform_soft_weight)
-        fval *= work->settings->rho_soft;
-#else
-    // Check for progress
+#ifndef SOFT_WEIGHTS
+    // All soft constraints have the same weight
     fval=fval*work->settings->rho_soft;
 #endif
     work->soft_slack=fval;// XXX: keep this for now to return SOFT_OPTIMAL
@@ -205,130 +281,79 @@ void daqp_compute_Mu(DAQPWorkspace *work){
     for(; row<rows; row++)
         work->Mu[row] = daqp_dot_inline(work->M+row*n,work->u,n);
 }
-static int daqp_remove_blocking_l2(DAQPWorkspace *work){
-    int i,rm_ind = DAQP_EMPTY_IND;
-    c_float alpha=DAQP_INF;
-    c_float alpha_cand;
-    const c_float dual_tol = work->settings->dual_tol;
-    for(i=0;i<work->n_active;i++){
-        if(DAQP_IS_IMMUTABLE(work->WS[i])) continue;
-        if(DAQP_IS_LOWER(work->WS[i])){
-            if(work->lam_star[i]<dual_tol) continue; //lam <= 0 for lower -> dual feasible
-        }
-        else if(work->lam_star[i]>-dual_tol) continue; //lam* >= 0 for upper-> dual feasible
-
-        if(work->sing_ind == DAQP_EMPTY_IND)
-            alpha_cand= -work->lam[i]/(work->lam_star[i]-work->lam[i]);
-        else
-            alpha_cand= -work->lam[i]/work->lam_star[i];
-        if(alpha_cand < alpha){
-            alpha = alpha_cand;
-            rm_ind = i;
-        }
-    }
-    if(rm_ind == DAQP_EMPTY_IND) return 0; // Either dual feasible or primal infeasible
-    // If blocking constraint -> update lambda
-    if(work->sing_ind == DAQP_EMPTY_IND)
-        for(i=0;i<work->n_active;i++)
-            work->lam[i]+=alpha*(work->lam_star[i]-work->lam[i]);
-    else
-        for(i=0;i<work->n_active;i++)
-            work->lam[i]+=alpha*work->lam_star[i];
-
-    // Remove the constraint from the working set and update LDL
-    work->sing_ind=DAQP_EMPTY_IND;
-    daqp_remove_constraint(work,rm_ind);
-    return 1;
-}
-
-#ifdef SOFT_WEIGHTS
-static int daqp_remove_blocking_mixed(DAQPWorkspace *work){
+/* Take the step lam <- lam + alpha*(lam_star-lam) (lam + alpha*lam_star if the
+ * CSP is singular) and stop at the first event that invalidates the current
+ * subproblem: a multiplier reaching zero, in which case the constraint leaves
+ * the working set, or the multiplier of a soft constraint passing its linear
+ * weight w, in which case its slack switches between zero and nonzero (the
+ * constraint then stays in the working set, but with a different penalty).
+ * Returns 0 if no such event occurs, i.e., if the full step can be taken.
+ */
+int daqp_remove_blocking(DAQPWorkspace *work){
     int i, ind, rm_ind = DAQP_EMPTY_IND;
-    c_float alpha = DAQP_INF;
-    c_float alpha_cand, lam_slack;
+    const int singular = work->sing_ind != DAQP_EMPTY_IND;
     const c_float dual_tol = work->settings->dual_tol;
-    c_float p;
+    c_float alpha = DAQP_INF, alpha_cand, y, ystar, p, w, target, rm_target = 0;
+
     for(i = 0; i < work->n_active; i++){
         ind = work->WS[i];
         if(DAQP_IS_IMMUTABLE(ind)) continue;
-        lam_slack = work->lam[i];
-        p = work->sing_ind == DAQP_EMPTY_IND
-            ? work->lam_star[i] - work->lam[i]
-            : work->lam_star[i];
-        if(DAQP_IS_LOWER(ind)){
-            if(DAQP_IS_SLACK_FREE(ind)){
-                lam_slack += work->d_ls[ind];
-                if(p < dual_tol || work->lam_star[i] <= -work->d_ls[ind] + dual_tol)
-                    continue;
-            }
-            else{
-                if(work->lam_star[i] <= dual_tol &&
-                        work->lam_star[i] + dual_tol >= -work->d_ls[ind] &&
-                        work->sing_ind == DAQP_EMPTY_IND)
-                    continue;
-                if(p < 0)
-                    lam_slack += work->d_ls[ind];
-            }
-        }
-        else{
-            if(DAQP_IS_SLACK_FREE(ind)){
-                lam_slack -= work->d_us[ind];
-                if(p > -dual_tol || work->lam_star[i] >= work->d_us[ind])
-                    continue;
-            }
-            else{
-                if(work->lam_star[i] >= -dual_tol &&
-                        work->lam_star[i] <= dual_tol + work->d_us[ind] &&
-                        work->sing_ind == DAQP_EMPTY_IND)
-                    continue;
-                if(p > 0)
-                    lam_slack -= work->d_us[ind];
-            }
-        }
+        // Fold the sign of the multiplier (dual feasibility <=> y >= 0).
+        // ystar is the end point of the step, or its direction if singular.
+        const int lower = DAQP_IS_LOWER(ind);
+        ystar = lower ? -work->lam_star[i] : work->lam_star[i];
+        w = DAQP_IS_SOFT(ind) ? daqp_soft_w(work,ind) : 0;
+        target = DAQP_IS_SLACK_FIXED(ind) ? 0 : w; // w == 0 -> ordinary removal
 
-        alpha_cand = -lam_slack / p;
-        if(alpha_cand < 0)
-            alpha_cand = 0;
+        if(ystar < (singular ? 0 : target) - dual_tol){
+            // Blocked from below: the constraint leaves the working set
+            // (target == 0), or its nonzero slack returns to zero (target == w)
+        }
+        else if(w > 0 && DAQP_IS_SLACK_FIXED(ind) &&
+                ystar > (singular ? 0 : w) + dual_tol)
+            target = w; // A zero slack is released
+        else continue;
+
+        y = lower ? -work->lam[i] : work->lam[i];
+        p = singular ? ystar : ystar-y;
+        alpha_cand = (target-y)/p;
+        if(target != 0 && alpha_cand < 0) alpha_cand = 0;
         if(alpha_cand < alpha){
             alpha = alpha_cand;
             rm_ind = i;
+            rm_target = target;
         }
     }
-    if(rm_ind == DAQP_EMPTY_IND) return 0;
+    if(rm_ind == DAQP_EMPTY_IND) return 0; // Either dual feasible or primal infeasible
 
-    // Step just past the slack-bound transition. This lets the constraint be
-    // reactivated with the correct fixed/free state below.
-    alpha *= 1.001;
-    if(work->sing_ind == DAQP_EMPTY_IND)
+    // A zero-length transition when the CSP is singular cannot make progress:
+    // the zero slack is what makes the working set rank deficient, so the
+    // constraint is removed from the working set instead.
+    if(singular && alpha <= 0) rm_target = 0;
+
+    // Update lambda
+    if(singular)
         for(i = 0; i < work->n_active; i++)
-            work->lam[i] += alpha * (work->lam_star[i] - work->lam[i]);
+            work->lam[i] += alpha*work->lam_star[i];
     else
         for(i = 0; i < work->n_active; i++)
-            work->lam[i] += alpha * work->lam_star[i];
+            work->lam[i] += alpha*(work->lam_star[i]-work->lam[i]);
 
+    // Remove the constraint from the working set and update LDL
     work->sing_ind = DAQP_EMPTY_IND;
     ind = work->WS[rm_ind];
-    lam_slack = work->lam[rm_ind];
-    daqp_remove_constraint(work, rm_ind);
-    if(!DAQP_IS_SOFT(ind) || work->sing_ind != DAQP_EMPTY_IND) return 1;
-    if((DAQP_IS_LOWER(ind) && lam_slack > 0) ||
-            (!DAQP_IS_LOWER(ind) && lam_slack < 0))
-        return 1;
+    daqp_remove_constraint(work,rm_ind);
 
-    daqp_add_constraint(work, ind, lam_slack);
+    // A slack that reached its breakpoint switches state and is put back with
+    // its new penalty (the state is still the one it had during the step)
+    if(rm_target != 0 && work->sing_ind == DAQP_EMPTY_IND){
+        if(DAQP_IS_SLACK_FIXED(ind)) DAQP_SET_SLACK_FREE(ind);
+        else DAQP_SET_SLACK_FIXED(ind);
+        daqp_add_constraint_keep_slack(work,ind,
+                DAQP_IS_LOWER(ind) ? -rm_target : rm_target);
+    }
     return 1;
 }
-
-int daqp_remove_blocking(DAQPWorkspace *work){
-    return work->has_l1_soft
-        ? daqp_remove_blocking_mixed(work)
-        : daqp_remove_blocking_l2(work);
-}
-#else
-int daqp_remove_blocking(DAQPWorkspace *work){
-    return daqp_remove_blocking_l2(work);
-}
-#endif
 
 void daqp_compute_CSP(DAQPWorkspace *work){
     int i,j,disp,start_disp;
@@ -336,22 +361,12 @@ void daqp_compute_CSP(DAQPWorkspace *work){
     // Forward substitution (xi <-- L\d)
     for(i=work->reuse_ind,disp=DAQP_ARSUM(work->reuse_ind); i<work->n_active; i++){
         // Setup RHS
-        if(DAQP_IS_LOWER(work->WS[i])){
-            sum = -work->dlower[work->WS[i]];
+        const int id = work->WS[i];
+        sum = DAQP_IS_LOWER(id) ? -work->dlower[id] : -work->dupper[id];
 #ifdef SOFT_WEIGHTS
-            if(work->has_l1_soft && DAQP_IS_SOFT(work->WS[i]) &&
-                    DAQP_IS_SLACK_FREE(work->WS[i]))
-                sum -= work->d_ls[work->WS[i]] * work->rho_ls[work->WS[i]];
+        // Linear weight of a nonzero slack
+        if(DAQP_IS_SOFT(id)) sum += daqp_soft_shift(work,id);
 #endif
-        }
-        else{
-            sum = -work->dupper[work->WS[i]];
-#ifdef SOFT_WEIGHTS
-            if(work->has_l1_soft && DAQP_IS_SOFT(work->WS[i]) &&
-                    DAQP_IS_SLACK_FREE(work->WS[i]))
-                sum += work->d_us[work->WS[i]] * work->rho_us[work->WS[i]];
-#endif
-        }
         for(j=0; j<i; j++)
             sum -= work->L[disp++]*work->xldl[j];
         disp++; //Skip 1 in L
@@ -412,7 +427,8 @@ void daqp_pivot_last(DAQPWorkspace *work){
 
         if(work->sing_ind!=DAQP_EMPTY_IND) return; // Abort if D becomes singular
 
-        daqp_add_constraint(work,ind_old,lam_old);
+        // Reordering only: the slack state of the constraint is unchanged
+        daqp_add_constraint_keep_slack(work,ind_old,lam_old);
     }
 }
 
@@ -422,31 +438,11 @@ int daqp_activate_constraints(DAQPWorkspace *work){
     int i;
     for(i =0;i<work->m;i++){
         if(DAQP_IS_ACTIVE(i)){
-#ifdef SOFT_WEIGHTS
-            if(work->has_l1_soft){
-                if(DAQP_IS_LOWER(i)){
-                    if(DAQP_IS_SLACK_FREE(i))
-                        daqp_add_constraint(work, i, -(work->d_ls[i] + 1));
-                    else
-                        daqp_add_constraint(work, i, -0.9 * work->d_ls[i]);
-                }
-                else{
-                    if(DAQP_IS_SLACK_FREE(i))
-                        daqp_add_constraint(work, i, work->d_us[i] + 1);
-                    else
-                        daqp_add_constraint(work, i, 0.9 * work->d_us[i]);
-                }
-            }
-            else if(DAQP_IS_LOWER(i))
-                daqp_add_constraint(work,i, -1.0);
-            else
-                daqp_add_constraint(work,i, 1.0);
-#else
-            if(DAQP_IS_LOWER(i))
-                daqp_add_constraint(work,i, -1.0);
-            else
-                daqp_add_constraint(work,i, 1.0);
-#endif
+            // Pick a multiplier that reproduces the marked slack state
+            c_float lam = 1.0;
+            const c_float w = DAQP_IS_SOFT(i) ? daqp_soft_w(work,i) : 0;
+            if(w > 0) lam = DAQP_IS_SLACK_FREE(i) ? w+1 : 0.9*w;
+            daqp_add_constraint(work,i, DAQP_IS_LOWER(i) ? -lam : lam);
         }
         if(work->sing_ind != DAQP_EMPTY_IND){
             int last_ind = work->WS[work->n_active-1];
@@ -548,18 +544,13 @@ void daqp_refine_active(DAQPWorkspace *work){
         }
         d = DAQP_IS_LOWER(id) ? work->dlower[id] : work->dupper[id];
         work->xldl[i] = Mu - d; // RHS: +r[i] (positive, so L*D*L'*dlam=r gives u-=M'*dlam zeroes residual)
-        // For free soft slacks the CSP system has a diagonal reciprocal-weight
-        // term. Account for it (and for a nonzero slack lower bound) when
-        // forming the refinement residual.
+        // For a nonzero soft slack the CSP system has a diagonal
+        // reciprocal-weight term. Account for it (and for the linear weight)
+        // when forming the refinement residual.
 #ifdef SOFT_WEIGHTS
-        if(DAQP_IS_SOFT(id) && DAQP_IS_SLACK_FREE(id)){
-            c_float rho = work->rho_ls == NULL
-                ? work->settings->rho_soft
-                : (DAQP_IS_LOWER(id) ? work->rho_ls[id] : work->rho_us[id]);
-            c_float d_slack = work->d_ls == NULL ? 0
-                : (DAQP_IS_LOWER(id) ? work->d_ls[id] : -work->d_us[id]);
-            work->xldl[i] -= rho * (work->lam_star[i] + d_slack);
-        }
+        if(DAQP_IS_SOFT(id) && DAQP_IS_SLACK_FREE(id))
+            work->xldl[i] -= daqp_soft_rho(work,id)*work->lam_star[i]
+                - daqp_soft_shift(work,id);
 #else
         if(DAQP_IS_SOFT(id))
             work->xldl[i] -= work->settings->rho_soft * work->lam_star[i];

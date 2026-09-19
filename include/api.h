@@ -40,11 +40,6 @@ int setup_daqp_avi(DAQPAVI* avi, DAQPProblem* p, DAQPWorkspace* work, c_float* s
 void allocate_daqp_settings(DAQPWorkspace *work);
 void allocate_daqp_workspace(DAQPWorkspace *work, int n, int ns);
 void allocate_daqp_ldp(DAQPWorkspace *work, int n, int m, int ms, int alloc_R, int alloc_v);
-#ifdef SOFT_WEIGHTS
-// Materialize optional per-constraint soft weights after setup_daqp().
-// The arrays are initialized to d=0 and rho=settings->rho_soft.
-int daqp_allocate_soft_weights(DAQPWorkspace *work);
-#endif
 void allocate_daqp_avi(DAQPAVI *avi, int n);
 
 void free_daqp_ldp(DAQPWorkspace *work);

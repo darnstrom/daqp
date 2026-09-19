@@ -88,12 +88,19 @@ extern "C" {
 #define DAQP_BINARY 16
 #define DAQP_IS_BINARY(x) (work->sense[x]&16)
 
-// marks that the soft slack is at its lower bound (d_ls or d_us)
+// marks that the slack of a soft constraint is zero (see auxiliary.c)
 #define DAQP_SLACK_FIXED 32
+#ifdef SOFT_WEIGHTS
 #define DAQP_IS_SLACK_FIXED(x) (work->sense[x]&32)
 #define DAQP_IS_SLACK_FREE(x) ((work->sense[x]&32)==0)
 #define DAQP_SET_SLACK_FIXED(x) (work->sense[x]|=32)
 #define DAQP_SET_SLACK_FREE(x) (work->sense[x]&=~32)
+#else // Without soft weights the slack of an active soft constraint is free
+#define DAQP_IS_SLACK_FIXED(x) 0
+#define DAQP_IS_SLACK_FREE(x) 1
+#define DAQP_SET_SLACK_FIXED(x) ((void)0)
+#define DAQP_SET_SLACK_FREE(x) ((void)0)
+#endif
 
 # ifdef __cplusplus
 }
