@@ -42,8 +42,11 @@ void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind){
         sum = dot_row(Mi+start_col,Mi+start_col,work->n-start_col);
 
 #ifdef SOFT_WEIGHTS
-    if(DAQP_IS_SOFT(add_ind) && DAQP_IS_SLACK_FREE(add_ind)){
-        sum+= DAQP_IS_LOWER(add_ind) ? work->rho_ls[add_ind] : work->rho_us[add_ind];
+    if(DAQP_IS_SOFT(add_ind) &&
+            (!work->has_l1_soft || DAQP_IS_SLACK_FREE(add_ind))){
+        sum += work->rho_ls == NULL
+            ? work->settings->rho_soft
+            : (DAQP_IS_LOWER(add_ind) ? work->rho_ls[add_ind] : work->rho_us[add_ind]);
 #else
     if(DAQP_IS_SOFT(add_ind)){
         sum+=work->settings->rho_soft;
@@ -59,7 +62,8 @@ void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind){
     for(i=0;i<work->n_active;i++){
         id = work->WS[i];
 #ifdef SOFT_WEIGHTS
-        if(DAQP_IS_SOFT(id) && DAQP_IS_SLACK_FREE(id)) ns_active++;
+        if(DAQP_IS_SOFT(id) &&
+                (!work->has_l1_soft || DAQP_IS_SLACK_FREE(id))) ns_active++;
 #else
         if(DAQP_IS_SOFT(id)) ns_active++;
 #endif

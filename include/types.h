@@ -232,6 +232,12 @@ typedef struct{
     // Soft constraint
     c_float soft_slack;
 #ifdef SOFT_WEIGHTS
+    // True when at least one soft side has a nonzero slack lower bound.
+    // When false, the ordinary L2 dual-feasibility test can be used.
+    int has_l1_soft;
+    // NULL pointers select d_ls=d_us=0 and
+    // rho_ls=rho_us=settings->rho_soft without allocating arrays.
+    // Call daqp_allocate_soft_weights to materialize per-constraint values.
     // The softened objective is given by
     //    min  0.5 x'*H*x + f'x + 0.5 su'su + 0.5 sl'sl,
     // and the softened constraints are given by (similarly for simple bounds)

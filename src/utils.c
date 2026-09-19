@@ -168,6 +168,7 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
     // normalized dual formulation.
     if(work->d_ls != NULL && work->scaling != NULL){
         for(i = 0; i < work->m; i++){
+            if(!DAQP_IS_SOFT(i)) continue;
             work->d_ls[i] /= work->scaling[i];
             work->d_us[i] /= work->scaling[i];
             work->rho_ls[i] *= work->scaling[i] * work->scaling[i];
