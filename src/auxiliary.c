@@ -25,6 +25,7 @@ static inline int daqp_soft_ind(DAQPWorkspace *work, const int id){
 // (zero selects the default weight settings->rho_soft, which is given
 // directly in the normalized formulation that the solver works with)
 static inline c_float daqp_soft_rho(DAQPWorkspace *work, const int id){
+    if(work->rho_ls == NULL) return work->settings->rho_soft; // No weights set
     const int i = daqp_soft_ind(work,id);
     const c_float rho = DAQP_IS_LOWER(id) ? work->rho_ls[i] : work->rho_us[i];
     if(rho == 0) return work->settings->rho_soft;
@@ -35,6 +36,7 @@ static inline c_float daqp_soft_rho(DAQPWorkspace *work, const int id){
 // Linear weight of the active side of constraint id, i.e. the magnitude that
 // the multiplier has to exceed before the slack becomes nonzero.
 static inline c_float daqp_soft_w(DAQPWorkspace *work, const int id){
+    if(work->w_ls == NULL) return 0; // No weights set
     const int i = daqp_soft_ind(work,id);
     const c_float w = DAQP_IS_LOWER(id) ? work->w_ls[i] : work->w_us[i];
     if(work->scaling == NULL) return w;
@@ -78,6 +80,24 @@ static inline void daqp_set_slack_state(DAQPWorkspace *work, const int id,
 #define daqp_set_slack_state(work,id,lam) ((void)0)
 #endif
 
+/* Largest slack among the active soft constraints, i.e. the largest amount by
+ * which a soft constraint is violated, in the units of the original problem.
+ * This is what decides whether the solution required softening, so it is only
+ * needed once a solution has been found. */
+c_float daqp_max_soft_slack(DAQPWorkspace *work){
+    int i;
+    c_float smax = 0;
+    for(i = 0; i < work->n_active; i++){
+        const int id = work->WS[i];
+        if(!DAQP_IS_SOFT(id)) continue;
+        c_float s = daqp_soft_slack(work,i);
+        if(s < 0) s = -s;
+        if(work->scaling != NULL) s /= work->scaling[id]; // Undo the normalization
+        if(s > smax) smax = s;
+    }
+    return smax;
+}
+
 // Slack of the soft constraint that is active at working set index i
 c_float daqp_soft_slack(DAQPWorkspace *work, const int i){
     const int id = work->WS[i];
@@ -117,7 +137,8 @@ static void daqp_add_constraint_keep_slack(DAQPWorkspace *work,
         const int add_ind, c_float lam){
     // Update data structures
     DAQP_SET_ACTIVE(add_ind);
-    daqp_update_LDL_add(work, add_ind, daqp_soft_rho(work,add_ind));
+    daqp_update_LDL_add(work, add_ind,
+            DAQP_IS_SOFT(add_ind) ? daqp_soft_rho(work,add_ind) : 0);
     work->WS[work->n_active] = add_ind;
     work->lam[work->n_active] = lam;
     work->n_active++;
@@ -134,10 +155,9 @@ void daqp_add_constraint(DAQPWorkspace *work, const int add_ind, c_float lam){
 void daqp_compute_primal_and_fval(DAQPWorkspace *work){
     int i,j,disp,id;
     c_float fval=0;
-    // Reset u & soft slack
+    // Reset u
     for(j=0;j<work->n;j++)
         work->u[j]=0;
-    work->soft_slack = 0;
     //u[m] <-- Mk'*lam_star (zero if empty set)
     for(i=0;i<work->n_active;i++){
         id = work->WS[i];
@@ -166,7 +186,6 @@ void daqp_compute_primal_and_fval(DAQPWorkspace *work){
     // All soft constraints have the same weight
     fval=fval*work->settings->rho_soft;
 #endif
-    work->soft_slack=fval;// XXX: keep this for now to return SOFT_OPTIMAL
     for(j=0;j<work->n;j++)
         fval+=work->u[j]*work->u[j];
     work->fval = fval;
@@ -293,7 +312,7 @@ int daqp_remove_blocking(DAQPWorkspace *work){
     int i, ind, rm_ind = DAQP_EMPTY_IND;
     const int singular = work->sing_ind != DAQP_EMPTY_IND;
     const c_float dual_tol = work->settings->dual_tol;
-    c_float alpha = DAQP_INF, alpha_cand, y, ystar, p, w, target, rm_target = 0;
+    c_float alpha = DAQP_INF, alpha_cand, y, ystar, p, target, rm_target = 0;
 
     for(i = 0; i < work->n_active; i++){
         ind = work->WS[i];
@@ -302,17 +321,25 @@ int daqp_remove_blocking(DAQPWorkspace *work){
         // ystar is the end point of the step, or its direction if singular.
         const int lower = DAQP_IS_LOWER(ind);
         ystar = lower ? -work->lam_star[i] : work->lam_star[i];
-        w = DAQP_IS_SOFT(ind) ? daqp_soft_w(work,ind) : 0;
-        target = DAQP_IS_SLACK_FIXED(ind) ? 0 : w; // w == 0 -> ordinary removal
 
-        if(ystar < (singular ? 0 : target) - dual_tol){
-            // Blocked from below: the constraint leaves the working set
-            // (target == 0), or its nonzero slack returns to zero (target == w)
+        if(!DAQP_IS_SOFT(ind)){ // Only blocked when the multiplier reaches zero
+            if(ystar >= -dual_tol) continue;
+            target = 0;
         }
-        else if(w > 0 && DAQP_IS_SLACK_FIXED(ind) &&
-                ystar > (singular ? 0 : w) + dual_tol)
-            target = w; // A zero slack is released
-        else continue;
+        else{
+            // The slack switches state when the multiplier passes the linear
+            // weight, so the multiplier is confined to [0,w] or to [w,inf)
+            const c_float w = daqp_soft_w(work,ind);
+            target = DAQP_IS_SLACK_FIXED(ind) ? 0 : w;
+            if(ystar < (singular ? 0 : target) - dual_tol){
+                // Blocked from below: the constraint leaves the working set
+                // (target == 0), or its nonzero slack returns to zero
+            }
+            else if(w > 0 && DAQP_IS_SLACK_FIXED(ind) &&
+                    ystar > (singular ? 0 : w) + dual_tol)
+                target = w; // A zero slack is released
+            else continue;
+        }
 
         y = lower ? -work->lam[i] : work->lam[i];
         p = singular ? ystar : ystar-y;
@@ -606,8 +633,18 @@ void daqp_refine_active(DAQPWorkspace *work){
         }
     }
 
-    // Recompute fval = soft_slack + ||u||^2 since u changed.
-    c_float fval = work->soft_slack;
+    // Recompute fval since both u and lam_star changed
+    c_float fval = 0;
+    for(i=0; i<work->n_active; i++){
+        id = work->WS[i];
+        if(DAQP_IS_SOFT(id)){
+#ifdef SOFT_WEIGHTS
+            fval += daqp_soft_penalty(work,id,work->lam_star[i]);
+#else
+            fval += work->lam_star[i]*work->lam_star[i]*work->settings->rho_soft;
+#endif
+        }
+    }
     for(j=0; j<work->n; j++)
         fval += work->u[j] * work->u[j];
     work->fval = fval;

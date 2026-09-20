@@ -320,8 +320,11 @@ void allocate_daqp_workspace(DAQPWorkspace *work, int n, int ns){
 
     work->prox_mask = calloc(work->n, sizeof(int)); // all zeros initially
     work->n_prox = 0;
+    work->soft_slack = 0;
 
 #ifdef SOFT_WEIGHTS
+    // Only touched when the weights are used, so that a workspace allocated
+    // by a caller that predates them is not written out of bounds
     work->rho_ls= NULL;
     work->rho_us= NULL;
     work->w_ls= NULL;

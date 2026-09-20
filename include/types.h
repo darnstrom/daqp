@@ -229,39 +229,8 @@ typedef struct{
     int  n_prox; // Number of directions that needed regularization
 
 
-    // Soft constraint
+    // Largest violation of a soft constraint in the returned solution
     c_float soft_slack;
-#ifdef SOFT_WEIGHTS
-    /* Per-constraint penalties for the soft constraints. For
-     *
-     *     blower - sl <= A*x <= bupper + su,    sl,su >= 0,
-     *
-     * the objective is augmented with
-     *
-     *     w_ls*sl + sl^2/(2*rho_ls)   and   w_us*su + su^2/(2*rho_us),
-     *
-     * that is, w is the linear (L1) weight and rho is the *reciprocal* of the
-     * quadratic (L2) weight. Zero selects the default: no linear weight and
-     * the quadratic weight settings->rho_soft, which is what all soft
-     * constraints use when SOFT_WEIGHTS is disabled. The weights are given in
-     * the scale of the original problem and may be set at any point before a
-     * solve.
-     *
-     * Translating a formulation with a linear term and a nominal slack bound
-     * (as in acados), min ... + z*s + 0.5*Z*s^2 s.t. A*x <= bupper + s, s >= d,
-     * amounts to
-     *
-     *     bupper += d,   w_us = max(0, z + Z*d),   rho_us = 1/Z,
-     *
-     * since substituting s = d + su removes the nominal bound from the slack
-     * (the max only guards against a negative linear weight, which would make
-     * the slack unbounded).
-     */
-    c_float *rho_ls; // Reciprocal quadratic weight (default settings->rho_soft)
-    c_float *rho_us;
-    c_float *w_ls; // Linear weight (default 0)
-    c_float *w_us;
-#endif
 
     // Settings
     DAQPSettings* settings;
@@ -279,6 +248,42 @@ typedef struct{
     void *timer;
     // M*u from the latest feasibility scan (length m-ms); NULL disables batching
     c_float *Mu;
+
+    /* Per-constraint penalties for the soft constraints. For
+     *
+     *     blower - sl <= A*x <= bupper + su,    sl,su >= 0,
+     *
+     * the objective is augmented with
+     *
+     *     w_ls*sl + sl^2/(2*rho_ls)   and   w_us*su + su^2/(2*rho_us),
+     *
+     * that is, w is the linear (L1) weight and rho is the *reciprocal* of the
+     * quadratic (L2) weight. Zero selects the default: no linear weight and
+     * the quadratic weight settings->rho_soft, which is what all soft
+     * constraints use when SOFT_WEIGHTS is disabled. The weights are given in
+     * the scale of the original problem and may be set at any point before a
+     * solve.
+     *
+     * The arrays are only allocated (and only read) when SOFT_WEIGHTS is
+     * enabled, but they are always part of the workspace so that the layout
+     * does not depend on the build. They are kept last for the same reason:
+     * a library built without SOFT_WEIGHTS never touches them, so it stays
+     * compatible with a caller that does not know about them.
+     *
+     * Translating a formulation with a linear term and a nominal slack bound
+     * (as in acados), min ... + z*s + 0.5*Z*s^2 s.t. A*x <= bupper + s, s >= d,
+     * amounts to
+     *
+     *     bupper += d,   w_us = max(0, z + Z*d),   rho_us = 1/Z,
+     *
+     * since substituting s = d + su removes the nominal bound from the slack
+     * (the max only guards against a negative linear weight, which would make
+     * the slack unbounded).
+     */
+    c_float *rho_ls; // Reciprocal quadratic weight (default settings->rho_soft)
+    c_float *rho_us;
+    c_float *w_ls; // Linear weight (default 0)
+    c_float *w_us;
 }DAQPWorkspace;
 
 #define DAQP_IS_HIERARCHICAL(work) \

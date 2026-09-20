@@ -5,6 +5,7 @@
 
 int daqp_ldp(DAQPWorkspace *work){
     int exitflag=DAQP_EXIT_ITERLIMIT,iter,i;
+    work->soft_slack = 0; // Only set when a solution is found
     int tried_repair=0, cycle_counter=0;
     c_float best_fval = -1;
     c_float fval_bound = 2*work->settings->fval_bound; // Internal objective is twice the nomninal
@@ -56,6 +57,9 @@ int daqp_ldp(DAQPWorkspace *work){
                     }
 
 
+                    // Softening was needed only if a soft constraint ended up
+                    // violated by more than the primal tolerance
+                    work->soft_slack = daqp_max_soft_slack(work);
                     if(work->soft_slack > work->settings->primal_tol)
                         exitflag = DAQP_EXIT_SOFT_OPTIMAL;
                     else

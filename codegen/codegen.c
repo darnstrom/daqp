@@ -227,9 +227,11 @@ void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work, const char* prefix){
     // Timer
     fprintf(f, "NULL,\n"); // Timer
     if(m > ms)
-        fprintf(f, "%sMu};\n\n", prefix);
+        fprintf(f, "%sMu,\n", prefix);
     else
-        fprintf(f, "NULL};\n\n");
+        fprintf(f, "NULL,\n");
+    // Soft weights (NULL selects the default weight for every soft constraint)
+    fprintf(f, "NULL, NULL, NULL, NULL};\n\n");
 }
 
 void write_daqp_settings_src(FILE*  f, DAQPSettings* settings, const char* prefix){
