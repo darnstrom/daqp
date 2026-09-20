@@ -374,9 +374,45 @@ int daqp_remove_blocking(DAQPWorkspace *work){
         for(i = 0; i < work->n_active; i++)
             work->lam[i] += alpha*(work->lam_star[i]-work->lam[i]);
 
-    // Remove the constraint from the working set and update LDL
     work->sing_ind = DAQP_EMPTY_IND;
     ind = work->WS[rm_ind];
+
+    /* A slack that switches state keeps its place in the working set, and the
+     * only change to the LDL is that its row gains or loses rho on the
+     * diagonal. Nothing in the factorization depends on the diagonal of the
+     * last row, so the state of a slack there can be switched in place instead
+     * of removing the constraint and forming its row of M*M' again. */
+    if(rm_target != 0 && rm_ind == work->n_active-1 && !singular){
+        int ns_active = 0;
+        const c_float rho = daqp_soft_rho(work,ind);
+        if(DAQP_IS_SLACK_FIXED(ind)){
+            DAQP_SET_SLACK_FREE(ind);
+            work->D[rm_ind] += rho;
+        }
+        else{
+            DAQP_SET_SLACK_FIXED(ind);
+            work->D[rm_ind] -= rho;
+        }
+        work->lam[rm_ind] = DAQP_IS_LOWER(ind) ? -rm_target : rm_target;
+        // The linear weight enters the right-hand side, so this row has to be
+        // recomputed in the next complementary slackness problem
+        if(work->reuse_ind > rm_ind) work->reuse_ind = rm_ind;
+        // Singularity is checked as in daqp_update_LDL_add (a free slack
+        // relaxes the rank condition since it adds rho to the diagonal)
+        for(i = 0; i < work->n_active; i++)
+            if(DAQP_IS_SOFT(work->WS[i]) && DAQP_IS_SLACK_FREE(work->WS[i]))
+                ns_active++;
+        if(work->D[rm_ind] < work->settings->sing_tol ||
+                rm_ind >= work->n + ns_active){
+            work->sing_ind = rm_ind;
+            work->D[rm_ind] = 0;
+        }
+        else
+            daqp_pivot_last(work); // The new diagonal may be a worse pivot
+        return 1;
+    }
+
+    // Remove the constraint from the working set and update LDL
     daqp_remove_constraint(work,rm_ind);
 
     // A slack that reached its breakpoint switches state and is put back with
