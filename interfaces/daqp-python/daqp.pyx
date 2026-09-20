@@ -74,7 +74,7 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
           progress_tol = DAQP_DEFAULT_PROG_TOL, cycle_tol = DAQP_DEFAULT_CYCLE_TOL,
           iter_limit =  DAQP_DEFAULT_ITER_LIMIT, fval_bound = DAQP_INF,
           eps_prox= DAQP_DEFAULT_EPS_PROX, eta_prox = DAQP_DEFAULT_ETA,
-          rho_soft = DAQP_DEFAULT_RHO_SOFT,
+          rho_soft = DAQP_DEFAULT_RHO_SOFT, w_soft = DAQP_DEFAULT_W_SOFT,
           rel_subopt = DAQP_DEFAULT_REL_SUBOPT, abs_subopt = DAQP_DEFAULT_ABS_SUBOPT,
           sing_tol = DAQP_DEFAULT_SING_TOL, refactor_tol = DAQP_DEFAULT_REFACTOR_TOL,
           time_limit = 0,
@@ -203,7 +203,7 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
     cdef DAQPSettings settings = [primal_tol, dual_tol, zero_tol, pivot_tol,
             progress_tol, cycle_tol, iter_limit, fval_bound,
             eps_prox, eta_prox, rho_soft, rel_subopt, abs_subopt, sing_tol, refactor_tol,
-            time_limit]
+            time_limit, w_soft]
     cdef DAQPResult res = [&x[0], lam_ptr, 0, 0, 0, 0, 0, 0, 0]
 
     if primal_start is None and dual_start is None:
@@ -581,7 +581,7 @@ cdef class Model:
 
         Available keys: ``primal_tol``, ``dual_tol``, ``zero_tol``,
         ``pivot_tol``, ``progress_tol``, ``cycle_tol``, ``iter_limit``,
-        ``fval_bound``, ``eps_prox``, ``eta_prox``, ``rho_soft``,
+        ``fval_bound``, ``eps_prox``, ``eta_prox``, ``rho_soft``, ``w_soft``,
         ``rel_subopt``, ``abs_subopt``, ``sing_tol``, ``refactor_tol``,
         ``time_limit``.
         """
@@ -600,6 +600,7 @@ cdef class Model:
             'eps_prox':     s.eps_prox,
             'eta_prox':     s.eta_prox,
             'rho_soft':     s.rho_soft,
+            'w_soft':       s.w_soft,
             'rel_subopt':   s.rel_subopt,
             'abs_subopt':   s.abs_subopt,
             'sing_tol':     s.sing_tol,
@@ -624,6 +625,7 @@ cdef class Model:
         if 'eps_prox'     in new_settings: s.eps_prox     = new_settings['eps_prox']
         if 'eta_prox'     in new_settings: s.eta_prox     = new_settings['eta_prox']
         if 'rho_soft'     in new_settings: s.rho_soft     = new_settings['rho_soft']
+        if 'w_soft'       in new_settings: s.w_soft       = new_settings['w_soft']
         if 'rel_subopt'   in new_settings: s.rel_subopt   = new_settings['rel_subopt']
         if 'abs_subopt'   in new_settings: s.abs_subopt   = new_settings['abs_subopt']
         if 'sing_tol'     in new_settings: s.sing_tol     = new_settings['sing_tol']

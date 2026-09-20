@@ -71,6 +71,10 @@ typedef struct{
     c_float sing_tol;
     c_float refactor_tol;
     c_float time_limit;
+
+    // Uniform linear weight for soft constraints (0 gives a pure quadratic
+    // penalty). Placed last to keep the offsets of the settings above.
+    c_float w_soft;
 }DAQPSettings;
 
 
@@ -258,11 +262,10 @@ typedef struct{
      *     w_ls*sl + sl^2/(2*rho_ls)   and   w_us*su + su^2/(2*rho_us),
      *
      * that is, w is the linear (L1) weight and rho is the *reciprocal* of the
-     * quadratic (L2) weight. Zero selects the default: no linear weight and
-     * the quadratic weight settings->rho_soft, which is what all soft
-     * constraints use when SOFT_WEIGHTS is disabled. The weights are given in
-     * the scale of the original problem and may be set at any point before a
-     * solve.
+     * quadratic (L2) weight. Zero selects the uniform weights settings->w_soft
+     * and settings->rho_soft, which is what all soft constraints use when
+     * SOFT_WEIGHTS is disabled. The weights are given in the scale of the
+     * original problem and may be set at any point before a solve.
      *
      * The arrays are only allocated (and only read) when SOFT_WEIGHTS is
      * enabled, but they are always part of the workspace so that the layout
@@ -282,7 +285,7 @@ typedef struct{
      */
     c_float *rho_ls; // Reciprocal quadratic weight (default settings->rho_soft)
     c_float *rho_us;
-    c_float *w_ls; // Linear weight (default 0)
+    c_float *w_ls; // Linear weight (default settings->w_soft)
     c_float *w_us;
 }DAQPWorkspace;
 

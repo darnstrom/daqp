@@ -100,6 +100,8 @@ struct DAQPSettings
     sing_tol::Cdouble
     refactor_tol::Cdouble
     time_limit::Cdouble
+
+    w_soft::Cdouble
 end
 function DAQPSettings()
     settings = Ref{DAQPBase.DAQPSettings}()

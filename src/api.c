@@ -517,6 +517,7 @@ void daqp_default_settings(DAQPSettings* settings){
     settings->eta_prox = DAQP_DEFAULT_ETA;
 
     settings->rho_soft = DAQP_DEFAULT_RHO_SOFT;
+    settings->w_soft = DAQP_DEFAULT_W_SOFT;
 
     settings->rel_subopt = DAQP_DEFAULT_REL_SUBOPT;
     settings->abs_subopt = DAQP_DEFAULT_ABS_SUBOPT;

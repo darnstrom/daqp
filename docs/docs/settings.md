@@ -29,6 +29,7 @@ Table of contents
 | `eps_prox` | Proximal regularization. A negative value enables automatic regularization for singular problems. A positive forces proximal regularization. | -1e-6|
 | `eta_prox` | Tolerance that determines if a fixed point has been reached during proximal-point iterations. A negative value selects an automatic tolerance: 1e-6 for the default `dual_tol`, otherwise the smaller of 1e-6 and `0.1*dual_tol`. A nonnegative value is used directly. | -1|
 | `rho_soft` | Weight used for soft constraints (higher enables more violations) | 1e-6|
+| `w_soft` | Linear weight used for soft constraints, giving an L1 penalty on the violation (0 gives a pure quadratic penalty) | 0 |
 | `rel_subopt` | Allowed relative suboptimality in branch and bound | 0 |
 | `abs_subopt` | Allowed absolute suboptimality in branch and bound | 0 |
 | `sing_tol` | Tolerance for checking if the LDL' factorization is singular| 3.7e-11 |
