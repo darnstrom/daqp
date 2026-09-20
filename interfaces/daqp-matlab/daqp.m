@@ -9,6 +9,7 @@ classdef daqp< handle
     end
     properties(SetAccess = protected)
         n = 0; m = 0; ms = 0
+        has_solved = false
         H; f;
         A; bupper; blower; sense;
         break_points;
@@ -113,6 +114,7 @@ classdef daqp< handle
         function [x,fval,exitflag,info] = solve(this)
             [x,fval,exitflag,info] = daqpmex('solve', this.work_ptr,...
                 this.H,this.f,this.A,this.bupper,this.blower,this.sense,this.break_points);
+            this.has_solved = true;
         end
         function [exitflag,setup_time] = setup(this,H,f,A,bupper,blower,sense,break_points,problem_type,primal_start,dual_start,init_mask)
             if(nargin < 8)
@@ -153,6 +155,7 @@ classdef daqp< handle
                 this.H = this.H' % col.major => row.major
             end
             this.sense = int32(sense);
+            this.has_solved = false;
             this.break_points= int32(break_points);
             [exitflag,setup_time] = daqpmex('setup', this.work_ptr,this.H,this.f,...
                 this.A,this.bupper,this.blower,this.sense,this.break_points,int32(problem_type),...
@@ -227,9 +230,14 @@ classdef daqp< handle
                 this.sense = int32(sense);
                 update_mask = update_mask+16;
             end
+            structural_update = bitand(update_mask,int32(3)) ~= 0;
+            reuse_sense = structural_update && isempty(sense) && this.has_solved;
+            if structural_update && isempty(sense) && ~this.has_solved
+                update_mask = bitor(update_mask,int32(16));
+            end
             exitflag = daqpmex('update', this.work_ptr,...
                 this.H,this.f,this.A,this.bupper,this.blower,this.sense,...
-                update_mask);
+                update_mask,reuse_sense);
         end
         function codegen(this,varargin)
             if(length(varargin)<1 || ~ischar(varargin{1}))

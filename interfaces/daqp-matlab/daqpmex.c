@@ -227,9 +227,11 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  work->qp->A= (c_float *)mxGetPr(prhs[4]);
 	  work->qp->bupper= (c_float *)mxGetPr(prhs[5]);
 	  work->qp->blower= (c_float *)mxGetPr(prhs[6]);
-	  work->qp->sense= (int *)mxGetPr(prhs[7]);
+	  int update_mask = (int)mxGetScalar(prhs[8]);
+	  const int reuse_sense = nrhs > 9 && mxGetScalar(prhs[9]) != 0;
+	  work->qp->sense = reuse_sense ? work->sense : (int *)mxGetPr(prhs[7]);
+	  if(reuse_sense) update_mask |= DAQP_UPDATE_sense;
 	  // Update LDP with new QP data
-	  const int update_mask = (int)mxGetScalar(prhs[8]);
 	  const int error_flag = daqp_update_ldp(update_mask,work,work->qp);
 	  plhs[0] = mxCreateDoubleScalar(error_flag);
 	}

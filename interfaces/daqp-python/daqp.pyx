@@ -267,6 +267,7 @@ cdef class Model:
     cdef double[::1]    _lam
 
     cdef bint _has_model
+    cdef bint _has_solved
 
     def __cinit__(self):
         self._work = <DAQPWorkspace*>calloc(1, sizeof(DAQPWorkspace))
@@ -274,6 +275,7 @@ cdef class Model:
             raise MemoryError("Failed to allocate DAQPWorkspace")
         allocate_daqp_settings(self._work)
         self._has_model = False
+        self._has_solved = False
 
     def __dealloc__(self):
         if self._work != NULL:
@@ -431,6 +433,7 @@ cdef class Model:
             self._work.settings[0] = old_settings_val
 
         self._has_model = True
+        self._has_solved = False
 
         # ---- set primal iterate ----
         if primal_start is not None:
@@ -466,6 +469,7 @@ cdef class Model:
 
         with nogil:
             daqp_solve(&res, self._work)
+        self._has_solved = True
 
         info = {
             'solve_time': res.solve_time,
@@ -498,7 +502,9 @@ cdef class Model:
         blower : 1-D array_like or None
             Updated lower bounds.
         sense : 1-D int array_like or None
-            Updated constraint sense flags.
+            Updated constraint sense flags. If omitted during a structural
+            update, the complete state from the previous solve is reused;
+            supplying it explicitly overrides that warm start.
         break_points : 1-D int array_like or None
             Updated break points.
 
@@ -559,6 +565,14 @@ cdef class Model:
                 self._sense = s_arr
                 self._qp.sense = &self._sense[0]
                 update_mask |= DAQP_UPDATE_sense
+
+        # Omitted sense reuses DAQP's state; explicit sense overrides it.
+        if sense is None and (update_mask & (DAQP_UPDATE_Rinv | DAQP_UPDATE_M)):
+            if self._has_solved:
+                self._qp.sense = self._work.sense
+            else:
+                self._qp.sense = NULL if m == 0 else &self._sense[0]
+            update_mask |= DAQP_UPDATE_sense
 
         if break_points is not None:
             bp_arr = np.ascontiguousarray(break_points, dtype=np.intc)

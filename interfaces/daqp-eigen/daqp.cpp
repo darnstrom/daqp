@@ -268,14 +268,9 @@ int DAQP::update(Eigen::MatrixXd const& H,
 
     // There is no previous active set before the first successful solve.
     if (warm_start_ && is_solved_){
+        // Omitted sense reuses DAQP's state; explicit sense overrides it.
         if(sense_ptr == nullptr)
             sense_ptr = work_.sense; // Directly work with sense of workspace
-        for(int i = 0; i < m; i++){
-            // Carry the actual working-set state forward
-            const int state_mask = DAQP_ACTIVE | DAQP_LOWER | DAQP_SLACK_FIXED;
-            sense_ptr[i] = (sense_ptr[i] & ~state_mask)
-                         | (work_.sense[i] & state_mask);
-        }
         update_mask |= DAQP_UPDATE_sense; // Ensure sense is update
 
         // Adjust break points based on feasibility of previous solution

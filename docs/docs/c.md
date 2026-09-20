@@ -70,6 +70,19 @@ daqp_update_ldp(DAQP_UPDATE_v, &work, &qp);  // DAQP_UPDATE_v recomputes v = R'\
 daqp_solve(&result, &work);
 ```
 
+If `H` or `A` changes, its transformed working-set factorization must be
+rebuilt. To reuse the complete state from the preceding solve (i.e., for warm starting), point the problem at the workspace sense before updating:
+
+```c
+qp.sense = work.sense;
+daqp_update_ldp(DAQP_UPDATE_Rinv | DAQP_UPDATE_M |
+                DAQP_UPDATE_v | DAQP_UPDATE_d |
+                DAQP_UPDATE_sense, &work, &qp);
+```
+
+Passing a separate `qp.sense` array with `DAQP_UPDATE_sense` instead replaces
+the stored state with the state supplied by the caller.
+
 When the workspace is no longer needed, free it with:
 ```c
 free_daqp_workspace(&work);

@@ -41,7 +41,8 @@ int main() {
     // A subsequent warm update must retain DAQP_SOFT. With f=-9 the mixed
     // L1/L2 optimum is rho*(9-w)/(1+rho) = 7/11, rather than the hard x=0.
     f[0] = -9.0;
-    if (solver.update(H, f, A, bu, bl, sense, break_points) != 0)
+    const Eigen::VectorXi reuse_sense(0);
+    if (solver.update(H, f, A, bu, bl, reuse_sense, break_points) != 0)
         return 1;
     if (std::abs(solver.solve().get_primal()[0] - 7.0/11.0) > 1e-10)
         return 1;
@@ -61,11 +62,20 @@ int main() {
     if (std::abs(fixed_slack_solver.solve().get_primal()[0]) > 1e-10)
         return 1;
     f[0] = -1.1;
-    if (fixed_slack_solver.update(H, f, A, bu, bl, sense, break_points) != 0)
+    if (fixed_slack_solver.update(H, f, A, bu, bl, reuse_sense, break_points) != 0)
         return 1;
     if (std::abs(fixed_slack_solver.solve().get_primal()[0]) > 1e-10)
         return 1;
     if (fixed_slack_solver.get_iterations() != 1)
+        return 1;
+
+    // Explicit sense overrides the stored state; make the row hard again.
+    Eigen::VectorXi hard_sense = Eigen::VectorXi::Zero(1);
+    f[0] = -10.0;
+    if (fixed_slack_solver.update(H, f, A, bu, bl, hard_sense,
+                                  break_points) != 0)
+        return 1;
+    if (std::abs(fixed_slack_solver.solve().get_primal()[0]) > 1e-10)
         return 1;
 
     return 0;
