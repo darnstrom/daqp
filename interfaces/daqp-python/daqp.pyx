@@ -632,6 +632,32 @@ cdef class Model:
         if 'refactor_tol' in new_settings: s.refactor_tol = new_settings['refactor_tol']
         if 'time_limit'   in new_settings: s.time_limit   = new_settings['time_limit']
 
+    def soft_weights(self, rho_l=None, rho_u=None, w_l=None, w_u=None):
+        """
+        Set the weights of the soft constraints, one element per constraint.
+
+        ``rho_l``/``rho_u`` are the reciprocal quadratic weights and
+        ``w_l``/``w_u`` the linear ones, for the lower and the upper bound.
+        An argument left as ``None`` keeps that weight at its default, i.e.
+        the ``rho_soft``/``w_soft`` settings.
+        """
+        cdef double[::1] rl, ru, wl, wu
+        cdef double *prl = NULL
+        cdef double *pru = NULL
+        cdef double *pwl = NULL
+        cdef double *pwu = NULL
+        if rho_l is not None:
+            rl = np.ascontiguousarray(rho_l, dtype=np.double); prl = &rl[0]
+        if rho_u is not None:
+            ru = np.ascontiguousarray(rho_u, dtype=np.double); pru = &ru[0]
+        if w_l is not None:
+            wl = np.ascontiguousarray(w_l, dtype=np.double); pwl = &wl[0]
+        if w_u is not None:
+            wu = np.ascontiguousarray(w_u, dtype=np.double); pwu = &wu[0]
+        if not daqp_set_soft_weights(self._work, prl, pru, pwl, pwu):
+            raise RuntimeError(
+                    "daqp was built without support for individual soft weights")
+
 
 @cython.boundscheck(False)
 @cython.wraparound(False)

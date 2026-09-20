@@ -2,7 +2,7 @@
 #include "factorization.h"
 
 /* Soft constraints (see types.h for the penalty and its weights, which are
- * uniform unless SOFT_WEIGHTS is enabled). A soft constraint contributes
+ * uniform if DAQP_NO_SOFT_WEIGHTS is set). A soft constraint contributes
  * 0.5*rho*(|lam|-w)_+^2 to the dual, so its slack is zero while |lam| <= w
  * (DAQP_SLACK_FIXED) and rho*(|lam|-w) beyond that (DAQP_SLACK_FREE); only the
  * latter adds rho to the diagonal of the dual Hessian and shifts the dual
@@ -12,7 +12,7 @@
 
 // Nonzero unless every soft constraint has the same, purely quadratic penalty,
 // in which case the branches below stay out of the hot loops
-#ifdef SOFT_WEIGHTS
+#ifdef DAQP_SOFT_WEIGHTS
 #define DAQP_HAS_L1(work) \
     ((work)->settings->w_soft != 0 || (work)->rho_ls != NULL)
 #else
@@ -29,7 +29,7 @@ static inline int daqp_soft_ind(DAQPWorkspace *work, const int id){
 // Reciprocal quadratic weight of the active side of constraint id (zero
 // selects settings->rho_soft, which is given in the normalized formulation)
 static inline c_float daqp_soft_rho(DAQPWorkspace *work, const int id){
-#ifdef SOFT_WEIGHTS
+#ifdef DAQP_SOFT_WEIGHTS
     if(work->rho_ls != NULL){
         const int i = daqp_soft_ind(work,id);
         const c_float rho = DAQP_IS_LOWER(id) ? work->rho_ls[i] : work->rho_us[i];
@@ -45,7 +45,7 @@ static inline c_float daqp_soft_rho(DAQPWorkspace *work, const int id){
 // Linear weight of the active side of constraint id, i.e. what the multiplier
 // has to exceed for the slack to become nonzero (zero selects settings->w_soft)
 static inline c_float daqp_soft_w(DAQPWorkspace *work, const int id){
-#ifdef SOFT_WEIGHTS
+#ifdef DAQP_SOFT_WEIGHTS
     if(work->w_ls != NULL){
         const int i = daqp_soft_ind(work,id);
         const c_float w = DAQP_IS_LOWER(id) ? work->w_ls[i] : work->w_us[i];

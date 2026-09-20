@@ -84,6 +84,9 @@ cdef extern from "api.h":
         void free_daqp_ldp(DAQPWorkspace *work)
     cdef extern nogil:
         void allocate_daqp_settings(DAQPWorkspace *work)
+    cdef extern nogil:
+        int daqp_set_soft_weights(DAQPWorkspace *work, double *rho_l, double *rho_u,
+                double *w_l, double *w_u)
 
 cdef extern from "utils.h":
     cdef extern nogil:

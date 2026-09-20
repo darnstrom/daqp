@@ -25,8 +25,8 @@ if(PROFILING)
 endif()
 
 option (SOFT_WEIGHTS "Allow individual weights for the soft constraints" ON)
-if(SOFT_WEIGHTS)
-  add_compile_definitions(SOFT_WEIGHTS)
+if(NOT SOFT_WEIGHTS)
+  add_compile_definitions(DAQP_NO_SOFT_WEIGHTS)
 endif()
 
 option (FASTER_MATH "Enable some faster math" ON)

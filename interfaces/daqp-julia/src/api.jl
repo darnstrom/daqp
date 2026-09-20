@@ -390,6 +390,18 @@ function reset(d::DAQPBase.Model)
     reset(d.work)
 end
 
+# Weights of the soft constraints, one entry per constraint (nothing leaves
+# the weight at its default: settings.rho_soft and settings.w_soft)
+function soft_weights(d::DAQPBase.Model; rho_l=nothing, rho_u=nothing,
+        w_l=nothing, w_u=nothing)
+    arg(v) = isnothing(v) ? C_NULL : convert(Vector{Cdouble},v)
+    ok = ccall((:daqp_set_soft_weights,DAQPBase.libdaqp),Cint,
+               (Ptr{DAQPBase.Workspace},Ptr{Cdouble},Ptr{Cdouble},Ptr{Cdouble},Ptr{Cdouble}),
+               d.work, arg(rho_l), arg(rho_u), arg(w_l), arg(w_u))
+    ok == 0 && error("libdaqp was built without support for individual soft weights")
+    return nothing
+end
+
 using Downloads
 function codegen(d::DAQPBase.Model; fname="daqp_workspace", dir="codegen", prefix="daqp_", src=false)
     @assert(d.has_model, "setup the model before code generation")

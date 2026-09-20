@@ -190,6 +190,15 @@ classdef daqp< handle
             daqpmex('set_settings', this.work_ptr, settings);
         end
 
+        function soft_weights(this,rho_l,rho_u,w_l,w_u)
+            % Weights of the soft constraints, one element per constraint
+            % ([] leaves that weight at settings.rho_soft/settings.w_soft)
+            if nargin < 3, rho_u = []; end
+            if nargin < 4, w_l = []; end
+            if nargin < 5, w_u = []; end
+            daqpmex('set_soft_weights', this.work_ptr, rho_l,rho_u,w_l,w_u);
+        end
+
         function soften_constraints(this,ids)
             this.sense(ids) = this.sense(ids)+8;
             % TODO: update workspace

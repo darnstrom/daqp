@@ -7,6 +7,11 @@ extern "C" {
 
 #include <stddef.h>
 
+// Individual weights for the soft constraints, unless explicitly disabled
+#ifndef DAQP_NO_SOFT_WEIGHTS
+#define DAQP_SOFT_WEIGHTS
+#endif
+
 #define DAQP_EMPTY_IND -1
 #define DAQP_UNCONSTRAINED_OPTIMAL -2
 #define DAQP_INF ((c_float)1e30)

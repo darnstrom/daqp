@@ -385,6 +385,37 @@ void DAQP::set_rho_soft(double val) {
     is_solved_ = false;
 }
 
+void DAQP::set_w_soft(double val) {
+    settings_.w_soft = val;
+    is_solved_ = false;
+}
+
+bool DAQP::set_soft_weights(Eigen::VectorXd const& rho_lower,
+                            Eigen::VectorXd const& rho_upper,
+                            Eigen::VectorXd const& w_lower,
+                            Eigen::VectorXd const& w_upper) {
+    if (rho_lower.size() > max_constraints_ || rho_upper.size() > max_constraints_ ||
+        w_lower.size() > max_constraints_ || w_upper.size() > max_constraints_)
+        return false;
+    // The weights are allocated for max_constraints_, like the other buffers,
+    // since a later update may bring more constraints
+    const int m = work_.m;
+    work_.m = max_constraints_;
+    const bool ok = daqp_allocate_soft_weights(&work_) != 0;
+    work_.m = m;
+    if (!ok) return false;
+
+    auto copy = [](Eigen::VectorXd const& src, c_float* dst) {
+        for (int i = 0; i < src.size(); i++) dst[i] = src[i];
+    };
+    copy(rho_lower, work_.rho_ls);
+    copy(rho_upper, work_.rho_us);
+    copy(w_lower, work_.w_ls);
+    copy(w_upper, work_.w_us);
+    is_solved_ = false;
+    return true;
+}
+
 void DAQP::set_rel_subopt(double val) {
     settings_.rel_subopt = val;
     is_solved_ = false;

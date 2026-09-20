@@ -207,6 +207,15 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  work->settings->rel_subopt= (c_float)mxGetScalar(mxGetField(s, 0, "rel_subopt"));
 	  work->settings->time_limit= (c_float)mxGetScalar(mxGetField(s, 0, "time_limit"));
 	}
+	else if (!strcmp("set_soft_weights", cmd)) {
+	  // rho_l, rho_u, w_l, w_u (an empty argument leaves that weight alone)
+	  c_float* w[4];
+	  int i;
+	  for(i = 0; i < 4; i++)
+		w[i] = mxIsEmpty(prhs[2+i]) ? NULL : (c_float *)mxGetPr(prhs[2+i]);
+	  if(!daqp_set_soft_weights(work,w[0],w[1],w[2],w[3]))
+		mexErrMsgTxt("daqpmex was built without support for individual soft weights");
+	}
 	else if (!strcmp("update", cmd)) {
 	  if(work->qp == NULL) mexErrMsgTxt("No problem to update");
 	  // Update QP pointers

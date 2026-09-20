@@ -262,7 +262,7 @@ void free_daqp_ldp(DAQPWorkspace *work){
         free(work->dlower);
     }
 
-#ifdef SOFT_WEIGHTS
+#ifdef DAQP_SOFT_WEIGHTS
     free(work->rho_ls); // Single block for all the weights
 #endif
     work->rho_ls = NULL;
@@ -359,7 +359,7 @@ void allocate_daqp_ldp(DAQPWorkspace *work, int n, int m, int ms, int alloc_R, i
 // They are only allocated on request, so that a solve that uses the uniform
 // weights in settings neither spends the memory nor reads the arrays.
 int daqp_allocate_soft_weights(DAQPWorkspace *work){
-#ifdef SOFT_WEIGHTS
+#ifdef DAQP_SOFT_WEIGHTS
     if(work->rho_ls != NULL) return 1; // Already allocated
     // The weights are indexed by the original problem, whose size is kept in
     // eq->m while equalities are eliminated
@@ -374,6 +374,23 @@ int daqp_allocate_soft_weights(DAQPWorkspace *work){
 #else
     (void)work; return 0; // Built without support for individual weights
 #endif
+}
+
+// Set the weights of the soft constraints, one entry per constraint of the
+// original problem (NULL leaves that weight untouched). Returns 0 if the
+// weights are unavailable, i.e. if the build has no support for them.
+int daqp_set_soft_weights(DAQPWorkspace *work, c_float *rho_l, c_float *rho_u,
+        c_float *w_l, c_float *w_u){
+    int i;
+    if(!daqp_allocate_soft_weights(work)) return 0;
+    const int m = (work->eq != NULL && work->eq->installed) ? work->eq->m : work->m;
+    for(i = 0; i < m; i++){
+        if(rho_l != NULL) work->rho_ls[i] = rho_l[i];
+        if(rho_u != NULL) work->rho_us[i] = rho_u[i];
+        if(w_l != NULL) work->w_ls[i] = w_l[i];
+        if(w_u != NULL) work->w_us[i] = w_u[i];
+    }
+    return 1;
 }
 
 void allocate_daqp_avi(DAQPAVI* avi, const int n){
