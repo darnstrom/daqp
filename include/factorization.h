@@ -15,7 +15,7 @@ static inline c_float daqp_dot_inline(const c_float* v1, const c_float* v2, cons
     for (int i = 0; i < n; i++) sum += v1[i] * v2[i];
     return sum;
 }
-// rho is the reciprocal quadratic weight, used if the constraint is softened
+// rho is the reciprocal quadratic weight for a free soft slack, zero otherwise
 void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind, const c_float rho);
 void daqp_update_LDL_remove(DAQPWorkspace *work, const int rm_ind);
 

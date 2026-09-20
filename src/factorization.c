@@ -41,8 +41,8 @@ void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind, const c_float r
     else
         sum = dot_row(Mi+start_col,Mi+start_col,work->n-start_col);
 
-    // A nonzero slack contributes its reciprocal weight to the diagonal
-    if(DAQP_IS_SOFT(add_ind) && DAQP_IS_SLACK_FREE(add_ind)){
+    // A nonzero rho marks a free soft slack and contributes to the diagonal
+    if(rho != 0){
         sum += rho;
         ns_active++;
     }

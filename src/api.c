@@ -264,11 +264,11 @@ void free_daqp_ldp(DAQPWorkspace *work){
 
 #ifdef SOFT_WEIGHTS
     free(work->rho_ls); // Single block for all the weights
+#endif
     work->rho_ls = NULL;
     work->rho_us = NULL;
     work->w_ls = NULL;
     work->w_us = NULL;
-#endif
 
     work->sense = NULL;
 }
@@ -322,12 +322,10 @@ void allocate_daqp_workspace(DAQPWorkspace *work, int n, int ns){
     work->n_prox = 0;
     work->soft_slack = 0;
 
-#ifdef SOFT_WEIGHTS
     work->rho_ls= NULL;
     work->rho_us= NULL;
     work->w_ls= NULL;
     work->w_us= NULL;
-#endif
 
     work->bnb = NULL;
     work->nh = 1;

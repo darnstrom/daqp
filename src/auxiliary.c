@@ -56,12 +56,15 @@ static inline c_float daqp_soft_w(DAQPWorkspace *work, const int id){
     return work->settings->w_soft;
 }
 
-// Shift of the dual linear term (only nonzero for a free slack with w > 0)
-static inline c_float daqp_soft_shift(DAQPWorkspace *work, const int id){
+// Signed violation of a free soft constraint for multiplier lam. At lam = 0,
+// its negative is the shift of the dual linear term.
+static inline c_float daqp_soft_residual(DAQPWorkspace *work, const int id,
+        const c_float lam){
     const c_float w = daqp_soft_w(work,id);
-    if(w == 0 || DAQP_IS_SLACK_FIXED(id)) return 0;
-    const c_float shift = daqp_soft_rho(work,id)*w;
-    return DAQP_IS_LOWER(id) ? -shift : shift;
+    if(w == 0)
+        return lam == 0 ? 0 : daqp_soft_rho(work,id)*lam;
+    return daqp_soft_rho(work,id)
+        *(lam + (DAQP_IS_LOWER(id) ? w : -w));
 }
 
 // Contribution to the objective from the slack of constraint id
@@ -93,7 +96,7 @@ c_float daqp_max_soft_slack(DAQPWorkspace *work){
 c_float daqp_soft_slack(DAQPWorkspace *work, const int i){
     const int id = work->WS[i];
     if(DAQP_IS_SLACK_FIXED(id)) return 0;
-    return work->lam_star[i]*daqp_soft_rho(work,id) - daqp_soft_shift(work,id);
+    return daqp_soft_residual(work,id,work->lam_star[i]);
 }
 
 void daqp_remove_constraint(DAQPWorkspace* work, const int rm_ind){
@@ -125,8 +128,9 @@ static void daqp_add_constraint_keep_slack(DAQPWorkspace *work,
         const int add_ind, c_float lam){
     // Update data structures
     DAQP_SET_ACTIVE(add_ind);
-    daqp_update_LDL_add(work, add_ind,
-            DAQP_IS_SOFT(add_ind) ? daqp_soft_rho(work,add_ind) : 0);
+    const c_float rho = DAQP_IS_SOFT(add_ind) && DAQP_IS_SLACK_FREE(add_ind)
+        ? daqp_soft_rho(work,add_ind) : 0;
+    daqp_update_LDL_add(work,add_ind,rho);
     work->WS[work->n_active] = add_ind;
     work->lam[work->n_active] = lam;
     work->n_active++;
@@ -358,13 +362,22 @@ int daqp_remove_blocking(DAQPWorkspace *work){
     if(release) DAQP_SET_SLACK_FREE(ind);
     else DAQP_SET_SLACK_FIXED(ind);
 
+    // Nothing in the factorization depends on the diagonal of the last row,
+    // so a slack there can switch without forming its row of M*M' again
     if(rm_ind == work->n_active-1 && !singular){
         const c_float rho = daqp_soft_rho(work,ind);
         work->D[rm_ind] += release ? rho : -rho;
         work->lam[rm_ind] = lam;
         // The shift in this row's RHS changed, so it has to be recomputed
         if(work->reuse_ind > rm_ind) work->reuse_ind = rm_ind;
-        if(work->D[rm_ind] < work->settings->sing_tol){
+        // Singularity as in daqp_update_LDL_add: a free slack adds rho to the
+        // diagonal, and so relaxes the rank condition
+        int ns_active = 0;
+        for(i = 0; i < work->n_active; i++)
+            if(DAQP_IS_SOFT(work->WS[i]) && DAQP_IS_SLACK_FREE(work->WS[i]))
+                ns_active++;
+        if(work->D[rm_ind] < work->settings->sing_tol ||
+                rm_ind >= work->n + ns_active){
             work->sing_ind = rm_ind;
             work->D[rm_ind] = 0;
         }
@@ -389,7 +402,8 @@ void daqp_compute_CSP(DAQPWorkspace *work){
         const int id = work->WS[i];
         sum = DAQP_IS_LOWER(id) ? -work->dlower[id] : -work->dupper[id];
         // Linear weight of a nonzero slack
-        if(has_l1 && DAQP_IS_SOFT(id)) sum += daqp_soft_shift(work,id);
+        if(has_l1 && DAQP_IS_SOFT(id) && DAQP_IS_SLACK_FREE(id))
+            sum -= daqp_soft_residual(work,id,0);
         for(j=0; j<i; j++)
             sum -= work->L[disp++]*work->xldl[j];
         disp++; //Skip 1 in L
@@ -578,8 +592,7 @@ void daqp_refine_active(DAQPWorkspace *work){
         // reciprocal-weight term. Account for it (and for the linear weight)
         // when forming the refinement residual.
         if(DAQP_IS_SOFT(id) && DAQP_IS_SLACK_FREE(id))
-            work->xldl[i] -= daqp_soft_rho(work,id)*work->lam_star[i]
-                - daqp_soft_shift(work,id);
+            work->xldl[i] -= daqp_soft_residual(work,id,work->lam_star[i]);
     }
 
     // Forward substitution L * y = xldl
