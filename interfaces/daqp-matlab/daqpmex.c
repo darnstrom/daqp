@@ -211,8 +211,11 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  // rho_l, rho_u, w_l, w_u (an empty argument leaves that weight alone)
 	  c_float* w[4];
 	  int i;
-	  for(i = 0; i < 4; i++)
+	  for(i = 0; i < 4; i++){
+		if(!mxIsEmpty(prhs[2+i]) && mxGetNumberOfElements(prhs[2+i]) != work->m)
+		  mexErrMsgTxt("soft weights must have one entry per constraint");
 		w[i] = mxIsEmpty(prhs[2+i]) ? NULL : (c_float *)mxGetPr(prhs[2+i]);
+	  }
 	  if(!daqp_set_soft_weights(work,w[0],w[1],w[2],w[3]))
 		mexErrMsgTxt("daqpmex was built without support for individual soft weights");
 	}

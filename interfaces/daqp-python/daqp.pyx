@@ -646,14 +646,23 @@ cdef class Model:
         cdef double *pru = NULL
         cdef double *pwl = NULL
         cdef double *pwu = NULL
+        cdef int m = self._work.m
         if rho_l is not None:
-            rl = np.ascontiguousarray(rho_l, dtype=np.double); prl = &rl[0]
+            rl = np.ascontiguousarray(rho_l, dtype=np.double)
+            if rl.shape[0] != m: raise ValueError("rho_l must have one entry per constraint")
+            prl = &rl[0]
         if rho_u is not None:
-            ru = np.ascontiguousarray(rho_u, dtype=np.double); pru = &ru[0]
+            ru = np.ascontiguousarray(rho_u, dtype=np.double)
+            if ru.shape[0] != m: raise ValueError("rho_u must have one entry per constraint")
+            pru = &ru[0]
         if w_l is not None:
-            wl = np.ascontiguousarray(w_l, dtype=np.double); pwl = &wl[0]
+            wl = np.ascontiguousarray(w_l, dtype=np.double)
+            if wl.shape[0] != m: raise ValueError("w_l must have one entry per constraint")
+            pwl = &wl[0]
         if w_u is not None:
-            wu = np.ascontiguousarray(w_u, dtype=np.double); pwu = &wu[0]
+            wu = np.ascontiguousarray(w_u, dtype=np.double)
+            if wu.shape[0] != m: raise ValueError("w_u must have one entry per constraint")
+            pwu = &wu[0]
         if not daqp_set_soft_weights(self._work, prl, pru, pwl, pwu):
             raise RuntimeError(
                     "daqp was built without support for individual soft weights")

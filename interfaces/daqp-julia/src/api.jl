@@ -394,10 +394,20 @@ end
 # the weight at its default: settings.rho_soft and settings.w_soft)
 function soft_weights(d::DAQPBase.Model; rho_l=nothing, rho_u=nothing,
         w_l=nothing, w_u=nothing)
-    arg(v) = isnothing(v) ? C_NULL : convert(Vector{Cdouble},v)
-    ok = ccall((:daqp_set_soft_weights,DAQPBase.libdaqp),Cint,
-               (Ptr{DAQPBase.Workspace},Ptr{Cdouble},Ptr{Cdouble},Ptr{Cdouble},Ptr{Cdouble}),
-               d.work, arg(rho_l), arg(rho_u), arg(w_l), arg(w_u))
+    function arg(v, name)
+        isnothing(v) && return nothing
+        x = convert(Vector{Cdouble},v)
+        length(x) == d.qpj.m || throw(DimensionMismatch(
+            "$name must have one entry per constraint"))
+        return x
+    end
+    rl, ru = arg(rho_l, "rho_l"), arg(rho_u, "rho_u")
+    wl, wu = arg(w_l, "w_l"), arg(w_u, "w_u")
+    ok = GC.@preserve rl ru wl wu ccall(
+        (:daqp_set_soft_weights,DAQPBase.libdaqp),Cint,
+        (Ptr{DAQPBase.Workspace},Ptr{Cdouble},Ptr{Cdouble},Ptr{Cdouble},Ptr{Cdouble}),
+        d.work, isnothing(rl) ? C_NULL : rl, isnothing(ru) ? C_NULL : ru,
+        isnothing(wl) ? C_NULL : wl, isnothing(wu) ? C_NULL : wu)
     ok == 0 && error("libdaqp was built without support for individual soft weights")
     return nothing
 end

@@ -1,4 +1,5 @@
 #include "api.h"
+#include "auxiliary.h"
 #include "utils.h"
 #include <stdlib.h>
 #include <stdio.h>
@@ -381,14 +382,35 @@ int daqp_allocate_soft_weights(DAQPWorkspace *work){
 // weights are unavailable, i.e. if the build has no support for them.
 int daqp_set_soft_weights(DAQPWorkspace *work, c_float *rho_l, c_float *rho_u,
         c_float *w_l, c_float *w_u){
-    int i;
+    int i, rebuild = 0;
     if(!daqp_allocate_soft_weights(work)) return 0;
     const int m = (work->eq != NULL && work->eq->installed) ? work->eq->m : work->m;
+    // A equality-reduced problem is rebuilt by daqp_eq_reinstall 
+    // Otherwise, only an active soft constraint makes the factorization stale
+    if(!(work->eq != NULL && work->eq->neq != 0 && !work->eq->installed))
+        for(i = 0; i < work->n_active; i++)
+            if(DAQP_IS_SOFT(work->WS[i])){
+                rebuild = 1;
+                break;
+            }
     for(i = 0; i < m; i++){
         if(rho_l != NULL) work->rho_ls[i] = rho_l[i];
         if(rho_u != NULL) work->rho_us[i] = rho_u[i];
         if(w_l != NULL) work->w_ls[i] = w_l[i];
         if(w_u != NULL) work->w_us[i] = w_u[i];
+    }
+
+    // Reset the factorization
+    if(rebuild){
+        reset_daqp_workspace(work);
+        if(DAQP_IS_HIERARCHICAL(work)){
+            const int m = work->m;
+            work->m = work->break_points[0];
+            daqp_activate_constraints(work);
+            work->m = m;
+        }
+        else
+            daqp_activate_constraints(work);
     }
     return 1;
 }

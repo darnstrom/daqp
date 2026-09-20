@@ -60,7 +60,7 @@ The type of a constraint is classified through an integer value (called sense), 
 |1|Active| The constraint should be imposed as an equality at the start|
 |2|Lower| Determine which of the lower and upper bound is imposed when active| 
 |4|Immutable| Disallow the constraint to be activated/deactivated|
-|8|Soft| The constraint [may be violated]({{ '/start/advanced/soft' | relative_url }}) at a cost | 
+|8|Soft| The constraint [may be violated]({{ '/start/advanced/soft' | relative_url }}) at a cost |
 |16|Binary| Either the upper or lower bound should hold with equality|
 
 These flags can be combined through addition. For example, if we want to encode equality constraints in our problem we would mark these as active and immutable, that is, with sense 1+4=5.

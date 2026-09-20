@@ -394,8 +394,11 @@ bool DAQP::set_soft_weights(Eigen::VectorXd const& rho_lower,
                             Eigen::VectorXd const& rho_upper,
                             Eigen::VectorXd const& w_lower,
                             Eigen::VectorXd const& w_upper) {
-    if (rho_lower.size() > max_constraints_ || rho_upper.size() > max_constraints_ ||
-        w_lower.size() > max_constraints_ || w_upper.size() > max_constraints_)
+    const auto valid_size = [this](Eigen::Index size) {
+        return size == 0 || size == work_.m;
+    };
+    if (!valid_size(rho_lower.size()) || !valid_size(rho_upper.size()) ||
+        !valid_size(w_lower.size()) || !valid_size(w_upper.size()))
         return false;
     // The weights are allocated for max_constraints_, like the other buffers,
     // since a later update may bring more constraints

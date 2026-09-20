@@ -173,6 +173,31 @@ void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work, const char* prefix){
     //write_float_array(f,work->v,n,varname);
     snprintf(varname, sizeof(varname), "%ssense", prefix);
     write_int_array(f,work->sense, m,varname);
+    if(work->rho_ls != NULL){
+        /* Generated workspaces store the normalized LDP without its scaling
+         * array, so convert the externally scaled weights to that formulation
+         * before serializing them. */
+        c_float *weight = malloc(m*sizeof(c_float));
+        for(i = 0; i < m; i++) weight[i] = work->rho_ls[i] == 0 ? 0 :
+            work->rho_ls[i]*(work->scaling == NULL ? 1 :
+                    work->scaling[i]*work->scaling[i]);
+        snprintf(varname, sizeof(varname), "%srho_ls", prefix);
+        write_float_array(f,weight,m,varname);
+        for(i = 0; i < m; i++) weight[i] = work->rho_us[i] == 0 ? 0 :
+            work->rho_us[i]*(work->scaling == NULL ? 1 :
+                    work->scaling[i]*work->scaling[i]);
+        snprintf(varname, sizeof(varname), "%srho_us", prefix);
+        write_float_array(f,weight,m,varname);
+        for(i = 0; i < m; i++) weight[i] = work->w_ls[i] == 0 ? 0 :
+            work->w_ls[i]/(work->scaling == NULL ? 1 : work->scaling[i]);
+        snprintf(varname, sizeof(varname), "%sw_ls", prefix);
+        write_float_array(f,weight,m,varname);
+        for(i = 0; i < m; i++) weight[i] = work->w_us[i] == 0 ? 0 :
+            work->w_us[i]/(work->scaling == NULL ? 1 : work->scaling[i]);
+        snprintf(varname, sizeof(varname), "%sw_us", prefix);
+        write_float_array(f,weight,m,varname);
+        free(weight);
+    }
     //snprintf(varname, sizeof(varname), "%sscaling", prefix);
     //write_float_array(f,work->scaling, m,varname);
 
@@ -231,7 +256,11 @@ void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work, const char* prefix){
     else
         fprintf(f, "NULL,\n");
     // Soft weights (NULL selects the default weight for every soft constraint)
-    fprintf(f, "NULL, NULL, NULL, NULL};\n\n");
+    if(work->rho_ls != NULL)
+        fprintf(f, "%srho_ls, %srho_us, %sw_ls, %sw_us};\n\n",
+                prefix,prefix,prefix,prefix);
+    else
+        fprintf(f, "NULL, NULL, NULL, NULL};\n\n");
 }
 
 void write_daqp_settings_src(FILE*  f, DAQPSettings* settings, const char* prefix){
