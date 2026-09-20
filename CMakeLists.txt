@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(daqp VERSION 0.9.1)
+project(daqp VERSION 0.10.0)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
@@ -78,6 +78,10 @@ target_include_directories(daqpstat PUBLIC
 
 add_library(daqp SHARED ${daqp_src} ${daqp_headers} ${daqp_codegen_src} ${daqp_codegen_headers})
 add_library(daqp::daqp ALIAS daqp)
+set_target_properties(daqp PROPERTIES
+  VERSION ${PROJECT_VERSION}
+  SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
+)
 target_include_directories(daqp PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>
@@ -120,7 +124,7 @@ if(JULIA)
 
     add_custom_target(sync_julia_interface ALL
         COMMAND ${CMAKE_COMMAND} -E copy_directory "${JULIA_INTERFACE_DIR}" "${JULIA_BINARY_DIR}"
-        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:daqp> "${JULIA_BINARY_DIR}"
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:daqp> "${JULIA_BINARY_DIR}/libdaqp${CMAKE_SHARED_LIBRARY_SUFFIX}"
         DEPENDS daqp
         COMMENT "Syncing Julia files and library..."
     )
@@ -162,7 +166,7 @@ if(PYTHON)
         COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/codegen" "${PYTHON_BINARY_DIR}/csrc/codegen"
         COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt" "${PYTHON_BINARY_DIR}/csrc/"
         COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE" "${PYTHON_BINARY_DIR}/"
-        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:daqp> "${PYTHON_BINARY_DIR}"
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:daqp> "${PYTHON_BINARY_DIR}/libdaqp${CMAKE_SHARED_LIBRARY_SUFFIX}"
         DEPENDS daqp
         COMMENT "Syncing Python files and library..."
     )

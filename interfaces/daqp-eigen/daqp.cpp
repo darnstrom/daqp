@@ -404,17 +404,19 @@ bool DAQP::set_soft_weights(Eigen::VectorXd const& rho_lower,
     // since a later update may bring more constraints
     const int m = work_.m;
     work_.m = max_constraints_;
-    const bool ok = daqp_allocate_soft_weights(&work_) != 0;
+    bool ok = daqp_allocate_soft_weights(&work_) != 0;
     work_.m = m;
     if (!ok) return false;
 
-    auto copy = [](Eigen::VectorXd const& src, c_float* dst) {
-        for (int i = 0; i < src.size(); i++) dst[i] = src[i];
+    auto data_or_null = [](Eigen::VectorXd const& values) {
+        return values.size() == 0
+            ? static_cast<c_float*>(nullptr)
+            : const_cast<c_float*>(values.data());
     };
-    copy(rho_lower, work_.rho_ls);
-    copy(rho_upper, work_.rho_us);
-    copy(w_lower, work_.w_ls);
-    copy(w_upper, work_.w_us);
+    ok = daqp_set_soft_weights(&work_,
+        data_or_null(rho_lower), data_or_null(rho_upper),
+        data_or_null(w_lower), data_or_null(w_upper)) != 0;
+    if (!ok) return false;
     is_solved_ = false;
     return true;
 }

@@ -6,6 +6,10 @@ include(GNUInstallDirs)
 
 add_library(${PROJECT_NAME} SHARED daqp.cpp)
 add_library(daqp::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
+set_target_properties(${PROJECT_NAME} PROPERTIES
+  VERSION ${CMAKE_PROJECT_VERSION}
+  SOVERSION ${CMAKE_PROJECT_VERSION_MAJOR}.${CMAKE_PROJECT_VERSION_MINOR}
+)
 target_include_directories(${PROJECT_NAME} PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>
@@ -21,6 +25,7 @@ add_executable(05_warmstart tests/05_warmstart.cpp)
 add_executable(06_general_hessian tests/06_general_hessian.cpp)
 add_executable(07_symmetrize_hessian tests/07_symmetrize_hessian.cpp)
 add_executable(08_unconstrained_check tests/08_unconstrained_check.cpp)
+add_executable(09_soft_weights tests/09_soft_weights.cpp)
 
 set(TARGETS
     00_basic_qp
@@ -32,6 +37,7 @@ set(TARGETS
     06_general_hessian
     07_symmetrize_hessian
     08_unconstrained_check
+    09_soft_weights
 )
 
 foreach(TARGET ${TARGETS})

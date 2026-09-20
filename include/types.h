@@ -262,8 +262,8 @@ typedef struct{
      *
      * The arrays are NULL until daqp_allocate_soft_weights is called, so a
      * solve with uniform weights neither spends the memory nor reads them, and
-     * they are last in the workspace so that a library built without them stays
-     * compatible with a caller that does not know about them.
+     * they are last in the workspace to preserve the offsets of the fields
+     * above and keep the layout common to builds with and without support.
      */
     c_float *rho_ls; // Reciprocal quadratic weight (default settings->rho_soft)
     c_float *rho_us;
