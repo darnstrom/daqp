@@ -27,31 +27,33 @@ static inline int daqp_soft_ind(DAQPWorkspace *work, const int id){
 // Reciprocal quadratic weight of the active side of constraint id (zero
 // selects settings->rho_soft, which is given in the normalized formulation)
 static inline c_float daqp_soft_rho(DAQPWorkspace *work, const int id){
-#ifndef SOFT_WEIGHTS
-    (void)id; return work->settings->rho_soft; // Uniform weight
+#ifdef SOFT_WEIGHTS
+    if(work->rho_ls != NULL){
+        const int i = daqp_soft_ind(work,id);
+        const c_float rho = DAQP_IS_LOWER(id) ? work->rho_ls[i] : work->rho_us[i];
+        if(rho != 0)
+            return work->scaling ? rho*work->scaling[id]*work->scaling[id] : rho;
+    }
 #else
-    if(work->rho_ls == NULL) return work->settings->rho_soft; // No weights set
-    const int i = daqp_soft_ind(work,id);
-    const c_float rho = DAQP_IS_LOWER(id) ? work->rho_ls[i] : work->rho_us[i];
-    if(rho == 0) return work->settings->rho_soft;
-    if(work->scaling == NULL) return rho;
-    return rho*work->scaling[id]*work->scaling[id];
+    (void)id;
 #endif
+    return work->settings->rho_soft;
 }
 
 // Linear weight of the active side of constraint id, i.e. what the multiplier
 // has to exceed for the slack to become nonzero (zero selects settings->w_soft)
 static inline c_float daqp_soft_w(DAQPWorkspace *work, const int id){
-#ifndef SOFT_WEIGHTS
-    (void)id; return work->settings->w_soft; // Uniform weight
+#ifdef SOFT_WEIGHTS
+    if(work->w_ls != NULL){
+        const int i = daqp_soft_ind(work,id);
+        const c_float w = DAQP_IS_LOWER(id) ? work->w_ls[i] : work->w_us[i];
+        if(w != 0)
+            return work->scaling ? w/work->scaling[id] : w;
+    }
 #else
-    if(work->w_ls == NULL) return work->settings->w_soft; // No weights set
-    const int i = daqp_soft_ind(work,id);
-    const c_float w = DAQP_IS_LOWER(id) ? work->w_ls[i] : work->w_us[i];
-    if(w == 0) return work->settings->w_soft; // Default weight
-    if(work->scaling == NULL) return w;
-    return w/work->scaling[id];
+    (void)id;
 #endif
+    return work->settings->w_soft;
 }
 
 // Shift of the dual linear term (only nonzero for a free slack with w > 0)
@@ -69,17 +71,6 @@ static inline c_float daqp_soft_penalty(DAQPWorkspace *work, const int id,
     if(w == 0) return daqp_soft_rho(work,id)*lam*lam; // Plain quadratic penalty
     if(DAQP_IS_SLACK_FIXED(id)) return 0; // The slack is zero
     return daqp_soft_rho(work,id)*(lam*lam-w*w);
-}
-
-// Mark whether the slack is zero or not, given the multiplier
-static inline void daqp_set_slack_state(DAQPWorkspace *work, const int id,
-        const c_float lam){
-    if(!DAQP_IS_SOFT(id)) return;
-    const c_float w = daqp_soft_w(work,id);
-    if(w > 0 && (DAQP_IS_LOWER(id) ? -lam : lam) < w)
-        DAQP_SET_SLACK_FIXED(id);
-    else
-        DAQP_SET_SLACK_FREE(id);
 }
 
 // Largest violation of a soft constraint, in the units of the original
@@ -145,7 +136,14 @@ static void daqp_add_constraint_keep_slack(DAQPWorkspace *work,
 }
 
 void daqp_add_constraint(DAQPWorkspace *work, const int add_ind, c_float lam){
-    daqp_set_slack_state(work,add_ind,lam);
+    // Mark whether the slack is zero, given the multiplier
+    if(DAQP_IS_SOFT(add_ind)){
+        const c_float w = daqp_soft_w(work,add_ind);
+        if(w > 0 && (DAQP_IS_LOWER(add_ind) ? -lam : lam) < w)
+            DAQP_SET_SLACK_FIXED(add_ind);
+        else
+            DAQP_SET_SLACK_FREE(add_ind);
+    }
     daqp_add_constraint_keep_slack(work,add_ind,lam);
 }
 
