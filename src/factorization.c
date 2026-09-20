@@ -41,8 +41,7 @@ void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind, const c_float r
     else
         sum = dot_row(Mi+start_col,Mi+start_col,work->n-start_col);
 
-    // A soft constraint with a nonzero slack contributes its reciprocal
-    // quadratic weight to the diagonal of the dual Hessian
+    // A nonzero slack contributes its reciprocal weight to the diagonal
     if(DAQP_IS_SOFT(add_ind) && DAQP_IS_SLACK_FREE(add_ind)){
         sum += rho;
         ns_active++;

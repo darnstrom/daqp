@@ -57,8 +57,7 @@ int daqp_ldp(DAQPWorkspace *work){
                     }
 
 
-                    // Softening was needed only if a soft constraint ended up
-                    // violated by more than the primal tolerance
+                    // Softening was needed if a soft constraint ended up violated
                     work->soft_slack = daqp_max_soft_slack(work);
                     if(work->soft_slack > work->settings->primal_tol)
                         exitflag = DAQP_EXIT_SOFT_OPTIMAL;

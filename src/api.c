@@ -323,8 +323,6 @@ void allocate_daqp_workspace(DAQPWorkspace *work, int n, int ns){
     work->soft_slack = 0;
 
 #ifdef SOFT_WEIGHTS
-    // Only touched when the weights are used, so that a workspace allocated
-    // by a caller that predates them is not written out of bounds
     work->rho_ls= NULL;
     work->rho_us= NULL;
     work->w_ls= NULL;
@@ -358,8 +356,7 @@ void allocate_daqp_ldp(DAQPWorkspace *work, int n, int m, int ms, int alloc_R, i
     work->v = (alloc_v == 1) ? malloc(n*sizeof(c_float)) :  NULL;
 
 #ifdef SOFT_WEIGHTS
-    // Weights of the soft constraints (one block). Zero means default,
-    // i.e., no linear weight and the quadratic weight in settings.
+    // Weights of the soft constraints, in one block (zero selects the default)
     work->rho_ls = (m > 0) ? calloc(4*m,sizeof(c_float)) : NULL;
     if(work->rho_ls != NULL){
         work->rho_us = work->rho_ls + m;

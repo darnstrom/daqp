@@ -72,8 +72,8 @@ typedef struct{
     c_float refactor_tol;
     c_float time_limit;
 
-    // Uniform linear weight for soft constraints (0 gives a pure quadratic
-    // penalty). Placed last to keep the offsets of the settings above.
+    // Linear weight for soft constraints, 0 gives a pure quadratic penalty
+    // (last to keep the offsets of the settings above)
     c_float w_soft;
 }DAQPSettings;
 
@@ -253,34 +253,26 @@ typedef struct{
     // M*u from the latest feasibility scan (length m-ms); NULL disables batching
     c_float *Mu;
 
-    /* Per-constraint penalties for the soft constraints. For
+    /* Per-constraint penalties for the soft constraints:
      *
      *     blower - sl <= A*x <= bupper + su,    sl,su >= 0,
      *
-     * the objective is augmented with
-     *
-     *     w_ls*sl + sl^2/(2*rho_ls)   and   w_us*su + su^2/(2*rho_us),
-     *
-     * that is, w is the linear (L1) weight and rho is the *reciprocal* of the
-     * quadratic (L2) weight. Zero selects the uniform weights settings->w_soft
-     * and settings->rho_soft, which is what all soft constraints use when
+     * adds w_ls*sl + sl^2/(2*rho_ls) to the objective (and likewise for the
+     * upper side), so w is the linear (L1) weight and rho the *reciprocal*
+     * quadratic (L2) weight. Zero selects settings->w_soft and
+     * settings->rho_soft, which is what every soft constraint uses when
      * SOFT_WEIGHTS is disabled. The weights are given in the scale of the
      * original problem and may be set at any point before a solve.
      *
-     * The arrays are only allocated (and only read) when SOFT_WEIGHTS is
-     * enabled, but they are always part of the workspace so that the layout
-     * does not depend on the build. They are kept last for the same reason:
-     * a library built without SOFT_WEIGHTS never touches them, so it stays
-     * compatible with a caller that does not know about them.
+     * The arrays are only allocated and read when SOFT_WEIGHTS is enabled, but
+     * are always part of the workspace, and last in it, so that a library
+     * built without them stays compatible with a caller that does not know
+     * about them.
      *
-     * Translating a formulation with a linear term and a nominal slack bound
-     * (as in acados), min ... + z*s + 0.5*Z*s^2 s.t. A*x <= bupper + s, s >= d,
-     * amounts to
-     *
-     *     bupper += d,   w_us = max(0, z + Z*d),   rho_us = 1/Z,
-     *
-     * since substituting s = d + su removes the nominal bound from the slack
-     * (the max only guards against a negative linear weight, which would make
+     * A formulation with a linear term and a nominal slack bound (as in
+     * acados), min ... + z*s + 0.5*Z*s^2 s.t. A*x <= bupper + s, s >= d, maps
+     * to bupper += d, w_us = max(0, z + Z*d), rho_us = 1/Z by substituting
+     * s = d + su (the max guards against a negative weight, which would make
      * the slack unbounded).
      */
     c_float *rho_ls; // Reciprocal quadratic weight (default settings->rho_soft)
