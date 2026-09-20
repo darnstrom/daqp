@@ -253,24 +253,17 @@ typedef struct{
     // M*u from the latest feasibility scan (length m-ms); NULL disables batching
     c_float *Mu;
 
-    /* Per-constraint penalties for the soft constraints: with
+    /* Penalties of the soft constraints, in the scale of the original problem:
+     * the objective gains w*s + s^2/(2*rho) per violated side, so w is the
+     * linear (L1) weight and rho the *reciprocal* quadratic (L2) one (see the
+     * documentation on soft constraints). A zero entry selects settings->w_soft
+     * and settings->rho_soft, which is what every soft constraint uses when
+     * DAQP_NO_SOFT_WEIGHTS is set.
      *
-     *     blower - sl <= A*x <= bupper + su,    sl,su >= 0,
-     *
-     * the objective gains w_ls*sl + sl^2/(2*rho_ls) (likewise for the upper
-     * side), so w is the linear (L1) weight and rho the *reciprocal* quadratic
-     * (L2) weight, both in the scale of the original problem. Zero selects
-     * settings->w_soft and settings->rho_soft, which is what every soft
-     * constraint uses when DAQP_NO_SOFT_WEIGHTS is set. The arrays are NULL until
-     * daqp_allocate_soft_weights is called, so a solve with uniform weights
-     * neither spends the memory nor reads them. They are always part of the
-     * workspace, and last in it, so that a library built without the weights
-     * remains compatible with a caller that does not know about them.
-     *
-     * A formulation with a nominal slack bound (as in acados),
-     * min ... + z*s + 0.5*Z*s^2 s.t. A*x <= bupper + s, s >= d, maps to
-     * bupper += d, w_us = max(0, z + Z*d), rho_us = 1/Z by substituting
-     * s = d + su (the max guards against an unbounded slack).
+     * The arrays are NULL until daqp_allocate_soft_weights is called, so a
+     * solve with uniform weights neither spends the memory nor reads them, and
+     * they are last in the workspace so that a library built without them stays
+     * compatible with a caller that does not know about them.
      */
     c_float *rho_ls; // Reciprocal quadratic weight (default settings->rho_soft)
     c_float *rho_us;

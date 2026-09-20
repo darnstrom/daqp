@@ -28,8 +28,8 @@ Table of contents
 | `fval_bound` | Maximum allowed objective function value. The solver terminates if the dual objective exceeds this value (since it is a lower bound of the optimal value). | 1e30|
 | `eps_prox` | Proximal regularization. A negative value enables automatic regularization for singular problems. A positive forces proximal regularization. | -1e-6|
 | `eta_prox` | Tolerance that determines if a fixed point has been reached during proximal-point iterations. A negative value selects an automatic tolerance: 1e-6 for the default `dual_tol`, otherwise the smaller of 1e-6 and `0.1*dual_tol`. A nonnegative value is used directly. | -1|
-| `rho_soft` | Weight used for soft constraints (higher enables more violations) | 1e-6|
-| `w_soft` | Linear weight used for soft constraints, giving an L1 penalty on the violation (0 gives a pure quadratic penalty) | 0 |
+| `rho_soft` | Weight used for [soft constraints]({{ '/start/advanced/soft' | relative_url }}) (higher enables more violations) | 1e-6|
+| `w_soft` | Linear weight used for [soft constraints]({{ '/start/advanced/soft' | relative_url }}) (higher make the resulting penalty function more exact) | 0 |
 | `rel_subopt` | Allowed relative suboptimality in branch and bound | 0 |
 | `abs_subopt` | Allowed absolute suboptimality in branch and bound | 0 |
 | `sing_tol` | Tolerance for checking if the LDL' factorization is singular| 3.7e-11 |
@@ -60,7 +60,7 @@ The type of a constraint is classified through an integer value (called sense), 
 |1|Active| The constraint should be imposed as an equality at the start|
 |2|Lower| Determine which of the lower and upper bound is imposed when active| 
 |4|Immutable| Disallow the constraint to be activated/deactivated|
-|8|Soft| The constraint should be softened | 
+|8|Soft| The constraint [may be violated]({{ '/start/advanced/soft' | relative_url }}) at a cost | 
 |16|Binary| Either the upper or lower bound should hold with equality|
 
 These flags can be combined through addition. For example, if we want to encode equality constraints in our problem we would mark these as active and immutable, that is, with sense 1+4=5.
