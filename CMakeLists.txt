@@ -24,7 +24,7 @@ if(PROFILING)
   add_compile_definitions(PROFILING)
 endif()
 
-option (SOFT_WEIGHTS "Use different weights/bounds for soft constraints slacks" OFF)
+option (SOFT_WEIGHTS "Allow individual weights for the soft constraints" ON)
 if(SOFT_WEIGHTS)
   add_compile_definitions(SOFT_WEIGHTS)
 endif()

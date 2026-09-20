@@ -10,9 +10,11 @@
  * passing w is an ordinary blocking event (see daqp_remove_blocking).
  */
 
-// Nonzero if a linear weight can be present (a single test if it is uniform)
+// Nonzero unless every soft constraint has the same, purely quadratic penalty,
+// in which case the branches below stay out of the hot loops
 #ifdef SOFT_WEIGHTS
-#define DAQP_HAS_L1(work) 1
+#define DAQP_HAS_L1(work) \
+    ((work)->settings->w_soft != 0 || (work)->rho_ls != NULL)
 #else
 #define DAQP_HAS_L1(work) ((work)->settings->w_soft != 0)
 #endif
@@ -154,6 +156,7 @@ void daqp_add_constraint(DAQPWorkspace *work, const int add_ind, c_float lam){
 void daqp_compute_primal_and_fval(DAQPWorkspace *work){
     int i,j,disp,id;
     c_float fval=0;
+    const int has_l1 = DAQP_HAS_L1(work);
     // Reset u
     for(j=0;j<work->n;j++)
         work->u[j]=0;
@@ -173,7 +176,9 @@ void daqp_compute_primal_and_fval(DAQPWorkspace *work){
             for(j=0,disp=work->n*(id-work->ms);j<work->n;j++)
                 work->u[j]-=work->M[disp++]*li;
         }
-        if(DAQP_IS_SOFT(id)) fval += daqp_soft_penalty(work,id,li);
+        if(DAQP_IS_SOFT(id))
+            fval += has_l1 ? daqp_soft_penalty(work,id,li)
+                : work->settings->rho_soft*li*li;
     }
     for(j=0;j<work->n;j++)
         fval+=work->u[j]*work->u[j];

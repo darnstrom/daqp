@@ -353,14 +353,26 @@ void allocate_daqp_ldp(DAQPWorkspace *work, int n, int m, int ms, int alloc_R, i
     // Allocate memory for v
     work->v = (alloc_v == 1) ? malloc(n*sizeof(c_float)) :  NULL;
 
+}
+
+// Weights of the soft constraints, in one block (zero selects the default).
+// They are only allocated on request, so that a solve that uses the uniform
+// weights in settings neither spends the memory nor reads the arrays.
+int daqp_allocate_soft_weights(DAQPWorkspace *work){
 #ifdef SOFT_WEIGHTS
-    // Weights of the soft constraints, in one block (zero selects the default)
-    work->rho_ls = (m > 0) ? calloc(4*m,sizeof(c_float)) : NULL;
-    if(work->rho_ls != NULL){
-        work->rho_us = work->rho_ls + m;
-        work->w_ls = work->rho_ls + 2*m;
-        work->w_us = work->rho_ls + 3*m;
-    }
+    if(work->rho_ls != NULL) return 1; // Already allocated
+    // The weights are indexed by the original problem, whose size is kept in
+    // eq->m while equalities are eliminated
+    const int m = (work->eq != NULL && work->eq->installed) ? work->eq->m : work->m;
+    if(m == 0) return 0;
+    work->rho_ls = calloc(4*m,sizeof(c_float));
+    if(work->rho_ls == NULL) return 0;
+    work->rho_us = work->rho_ls + m;
+    work->w_ls = work->rho_ls + 2*m;
+    work->w_us = work->rho_ls + 3*m;
+    return 1;
+#else
+    (void)work; return 0; // Built without support for individual weights
 #endif
 }
 

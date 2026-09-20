@@ -261,9 +261,10 @@ typedef struct{
      * side), so w is the linear (L1) weight and rho the *reciprocal* quadratic
      * (L2) weight, both in the scale of the original problem. Zero selects
      * settings->w_soft and settings->rho_soft, which is what every soft
-     * constraint uses when SOFT_WEIGHTS is disabled. The arrays are only
-     * allocated and read when SOFT_WEIGHTS is enabled, but are always part of
-     * the workspace, and last in it, so that a library built without them
+     * constraint uses when SOFT_WEIGHTS is disabled. The arrays are NULL until
+     * daqp_allocate_soft_weights is called, so a solve with uniform weights
+     * neither spends the memory nor reads them. They are always part of the
+     * workspace, and last in it, so that a library built without SOFT_WEIGHTS
      * remains compatible with a caller that does not know about them.
      *
      * A formulation with a nominal slack bound (as in acados),
