@@ -263,7 +263,7 @@ void free_daqp_ldp(DAQPWorkspace *work){
     }
 
 #ifdef SOFT_WEIGHTS
-    if(work->rho_ls != NULL) free(work->rho_ls); // Single block for all weights
+    free(work->rho_ls); // Single block for all the weights
     work->rho_ls = NULL;
     work->rho_us = NULL;
     work->w_ls = NULL;

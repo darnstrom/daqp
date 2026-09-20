@@ -1,15 +1,13 @@
 #include "auxiliary.h"
 #include "factorization.h"
 
-/* Soft constraints
- * A constraint marked DAQP_SOFT may be violated at the cost of the penalty
- * documented in types.h, which contributes 0.5*rho*(|lam|-w)_+^2 to the dual.
- * Its slack is zero while |lam| <= w (DAQP_SLACK_FIXED) and rho*(|lam|-w)
- * beyond that (DAQP_SLACK_FREE); only the latter adds rho to the diagonal of
- * the dual Hessian and shifts the dual linear term by rho*w. The penalty is
- * continuously differentiable, so |lam| passing w is an ordinary blocking
- * event (see daqp_remove_blocking). The weights are uniform unless
- * SOFT_WEIGHTS is enabled, in which case they are set per constraint.
+/* Soft constraints (see types.h for the penalty and its weights, which are
+ * uniform unless SOFT_WEIGHTS is enabled). A soft constraint contributes
+ * 0.5*rho*(|lam|-w)_+^2 to the dual, so its slack is zero while |lam| <= w
+ * (DAQP_SLACK_FIXED) and rho*(|lam|-w) beyond that (DAQP_SLACK_FREE); only the
+ * latter adds rho to the diagonal of the dual Hessian and shifts the dual
+ * linear term by rho*w. The penalty is continuously differentiable, so |lam|
+ * passing w is an ordinary blocking event (see daqp_remove_blocking).
  */
 
 // Nonzero if a linear weight can be present (a single test if it is uniform)
@@ -351,21 +349,21 @@ int daqp_remove_blocking(DAQPWorkspace *work){
 
     work->sing_ind = DAQP_EMPTY_IND;
     ind = work->WS[rm_ind];
+    if(rm_target == 0){ // The constraint leaves the working set
+        daqp_remove_constraint(work,rm_ind);
+        return 1;
+    }
 
-    /* Switching state only adds or removes rho on the diagonal of the row, and
-     * nothing in the factorization depends on the diagonal of the last row, so
-     * a slack there can switch in place rather than be added anew. */
-    if(rm_target != 0 && rm_ind == work->n_active-1 && !singular){
+    // The slack switches state, which only adds or removes rho on the diagonal
+    const c_float lam = DAQP_IS_LOWER(ind) ? -rm_target : rm_target;
+    const int release = DAQP_IS_SLACK_FIXED(ind);
+    if(release) DAQP_SET_SLACK_FREE(ind);
+    else DAQP_SET_SLACK_FIXED(ind);
+
+    if(rm_ind == work->n_active-1 && !singular){
         const c_float rho = daqp_soft_rho(work,ind);
-        if(DAQP_IS_SLACK_FIXED(ind)){
-            DAQP_SET_SLACK_FREE(ind);
-            work->D[rm_ind] += rho;
-        }
-        else{
-            DAQP_SET_SLACK_FIXED(ind);
-            work->D[rm_ind] -= rho;
-        }
-        work->lam[rm_ind] = DAQP_IS_LOWER(ind) ? -rm_target : rm_target;
+        work->D[rm_ind] += release ? rho : -rho;
+        work->lam[rm_ind] = lam;
         // The shift in this row's RHS changed, so it has to be recomputed
         if(work->reuse_ind > rm_ind) work->reuse_ind = rm_ind;
         if(work->D[rm_ind] < work->settings->sing_tol){
@@ -374,18 +372,11 @@ int daqp_remove_blocking(DAQPWorkspace *work){
         }
         else
             daqp_pivot_last(work); // The new diagonal may be a worse pivot
-        return 1;
     }
-
-    // Remove the constraint from the working set and update LDL
-    daqp_remove_constraint(work,rm_ind);
-
-    // A slack that reached its breakpoint is put back with its new state
-    if(rm_target != 0 && work->sing_ind == DAQP_EMPTY_IND){
-        if(DAQP_IS_SLACK_FIXED(ind)) DAQP_SET_SLACK_FREE(ind);
-        else DAQP_SET_SLACK_FIXED(ind);
-        daqp_add_constraint_keep_slack(work,ind,
-                DAQP_IS_LOWER(ind) ? -rm_target : rm_target);
+    else{
+        daqp_remove_constraint(work,rm_ind);
+        if(work->sing_ind == DAQP_EMPTY_IND)
+            daqp_add_constraint_keep_slack(work,ind,lam);
     }
     return 1;
 }

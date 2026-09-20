@@ -11,9 +11,9 @@ extern "C" {
 void daqp_remove_constraint(DAQPWorkspace* work, const int rm_ind);
 void daqp_add_constraint(DAQPWorkspace *work, const int add_ind, c_float lam);
 void daqp_compute_primal_and_fval(DAQPWorkspace *work);
-// Slack of the soft constraint that is active at working set index i
+// Slack of the soft constraint active at working set index i, and the largest
+// slack among them (in the units of the original problem)
 c_float daqp_soft_slack(DAQPWorkspace *work, const int i);
-// Largest slack among the active soft constraints (in the problem's units)
 c_float daqp_max_soft_slack(DAQPWorkspace *work);
 void daqp_compute_Mu(DAQPWorkspace *work);
 int daqp_add_infeasible(DAQPWorkspace *work);

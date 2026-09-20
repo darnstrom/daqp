@@ -253,27 +253,23 @@ typedef struct{
     // M*u from the latest feasibility scan (length m-ms); NULL disables batching
     c_float *Mu;
 
-    /* Per-constraint penalties for the soft constraints:
+    /* Per-constraint penalties for the soft constraints: with
      *
      *     blower - sl <= A*x <= bupper + su,    sl,su >= 0,
      *
-     * adds w_ls*sl + sl^2/(2*rho_ls) to the objective (and likewise for the
-     * upper side), so w is the linear (L1) weight and rho the *reciprocal*
-     * quadratic (L2) weight. Zero selects settings->w_soft and
-     * settings->rho_soft, which is what every soft constraint uses when
-     * SOFT_WEIGHTS is disabled. The weights are given in the scale of the
-     * original problem and may be set at any point before a solve.
+     * the objective gains w_ls*sl + sl^2/(2*rho_ls) (likewise for the upper
+     * side), so w is the linear (L1) weight and rho the *reciprocal* quadratic
+     * (L2) weight, both in the scale of the original problem. Zero selects
+     * settings->w_soft and settings->rho_soft, which is what every soft
+     * constraint uses when SOFT_WEIGHTS is disabled. The arrays are only
+     * allocated and read when SOFT_WEIGHTS is enabled, but are always part of
+     * the workspace, and last in it, so that a library built without them
+     * remains compatible with a caller that does not know about them.
      *
-     * The arrays are only allocated and read when SOFT_WEIGHTS is enabled, but
-     * are always part of the workspace, and last in it, so that a library
-     * built without them stays compatible with a caller that does not know
-     * about them.
-     *
-     * A formulation with a linear term and a nominal slack bound (as in
-     * acados), min ... + z*s + 0.5*Z*s^2 s.t. A*x <= bupper + s, s >= d, maps
-     * to bupper += d, w_us = max(0, z + Z*d), rho_us = 1/Z by substituting
-     * s = d + su (the max guards against a negative weight, which would make
-     * the slack unbounded).
+     * A formulation with a nominal slack bound (as in acados),
+     * min ... + z*s + 0.5*Z*s^2 s.t. A*x <= bupper + s, s >= d, maps to
+     * bupper += d, w_us = max(0, z + Z*d), rho_us = 1/Z by substituting
+     * s = d + su (the max guards against an unbounded slack).
      */
     c_float *rho_ls; // Reciprocal quadratic weight (default settings->rho_soft)
     c_float *rho_us;
