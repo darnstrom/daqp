@@ -7,8 +7,8 @@ include(GNUInstallDirs)
 add_library(${PROJECT_NAME} SHARED daqp.cpp)
 add_library(daqp::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
 set_target_properties(${PROJECT_NAME} PROPERTIES
-  VERSION ${CMAKE_PROJECT_VERSION}
-  SOVERSION ${CMAKE_PROJECT_VERSION_MAJOR}.${CMAKE_PROJECT_VERSION_MINOR}
+  VERSION ${daqp_VERSION}
+  SOVERSION ${daqp_VERSION_MAJOR}.${daqp_VERSION_MINOR}
 )
 target_include_directories(${PROJECT_NAME} PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
@@ -16,39 +16,41 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 )
 target_link_libraries(${PROJECT_NAME} PUBLIC Eigen3::Eigen daqpstat)
 
-add_executable(00_basic_qp tests/00_basic_qp.cpp)
-add_executable(01_static_func tests/01_static_func.cpp)
-add_executable(02_class tests/02_class.cpp)
-add_executable(03_update tests/03_update.cpp)
-add_executable(04_slack_sign tests/04_slack_sign.cpp)
-add_executable(05_warmstart tests/05_warmstart.cpp)
-add_executable(06_general_hessian tests/06_general_hessian.cpp)
-add_executable(07_symmetrize_hessian tests/07_symmetrize_hessian.cpp)
-add_executable(08_unconstrained_check tests/08_unconstrained_check.cpp)
-add_executable(09_soft_weights tests/09_soft_weights.cpp)
+if(TEST)
+    add_executable(00_basic_qp tests/00_basic_qp.cpp)
+    add_executable(01_static_func tests/01_static_func.cpp)
+    add_executable(02_class tests/02_class.cpp)
+    add_executable(03_update tests/03_update.cpp)
+    add_executable(04_slack_sign tests/04_slack_sign.cpp)
+    add_executable(05_warmstart tests/05_warmstart.cpp)
+    add_executable(06_general_hessian tests/06_general_hessian.cpp)
+    add_executable(07_symmetrize_hessian tests/07_symmetrize_hessian.cpp)
+    add_executable(08_unconstrained_check tests/08_unconstrained_check.cpp)
+    add_executable(09_soft_weights tests/09_soft_weights.cpp)
 
-set(TARGETS
-    00_basic_qp
-    01_static_func
-    02_class
-    03_update
-    04_slack_sign
-    05_warmstart
-    06_general_hessian
-    07_symmetrize_hessian
-    08_unconstrained_check
-    09_soft_weights
-)
-
-foreach(TARGET ${TARGETS})
-    target_link_libraries(${TARGET} PRIVATE ${PROJECT_NAME})
-    target_include_directories(${TARGET}
-        PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}
+    set(TARGETS
+        00_basic_qp
+        01_static_func
+        02_class
+        03_update
+        04_slack_sign
+        05_warmstart
+        06_general_hessian
+        07_symmetrize_hessian
+        08_unconstrained_check
+        09_soft_weights
     )
 
-    add_test(NAME test_${TARGET} COMMAND ${TARGET})
-endforeach()
+    foreach(TARGET ${TARGETS})
+        target_link_libraries(${TARGET} PRIVATE ${PROJECT_NAME})
+        target_include_directories(${TARGET}
+            PRIVATE
+                ${CMAKE_CURRENT_SOURCE_DIR}
+        )
+
+        add_test(NAME test_${TARGET} COMMAND ${TARGET})
+    endforeach()
+endif()
 
 install(TARGETS ${PROJECT_NAME} EXPORT  ${PROJECT_NAME}Config
   ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"

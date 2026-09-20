@@ -266,16 +266,15 @@ int DAQP::update(Eigen::MatrixXd const& H,
         work_.v = nullptr;
     }
 
-    if (warm_start_){
+    // There is no previous active set before the first successful solve.
+    if (warm_start_ && is_solved_){
         if(sense_ptr == nullptr)
             sense_ptr = work_.sense; // Directly work with sense of workspace
         for(int i = 0; i < m; i++){
-            if(result_.lam[i] > 0)
-                sense_ptr[i] |= 1; // Active + Upper
-            else if(result_.lam[i] < 0)
-                sense_ptr[i] |= 3; // Active + Lower
-            else
-                sense_ptr[i] = 0;
+            // Carry the actual working-set state forward
+            const int state_mask = DAQP_ACTIVE | DAQP_LOWER | DAQP_SLACK_FIXED;
+            sense_ptr[i] = (sense_ptr[i] & ~state_mask)
+                         | (work_.sense[i] & state_mask);
         }
         update_mask |= DAQP_UPDATE_sense; // Ensure sense is update
 

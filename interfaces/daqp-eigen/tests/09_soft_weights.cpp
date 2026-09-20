@@ -6,6 +6,9 @@ int main() {
     DAQP solver(1, 1, 1);
     solver.set_rho_soft(0.5);
     solver.set_w_soft(2.0);
+    // Enabling warm start before the first update must not read an
+    // uninitialized previous result or erase the soft classification.
+    solver.set_warm_start();
 
     Eigen::MatrixXd H(1, 1);
     H << 1.0;
@@ -34,7 +37,36 @@ int main() {
         return 1;
     if (std::abs(solver.solve().get_primal()[0] - 8.0/11.0) > 1e-10)
         return 1;
+
+    // A subsequent warm update must retain DAQP_SOFT. With f=-9 the mixed
+    // L1/L2 optimum is rho*(9-w)/(1+rho) = 7/11, rather than the hard x=0.
+    f[0] = -9.0;
+    if (solver.update(H, f, A, bu, bl, sense, break_points) != 0)
+        return 1;
+    if (std::abs(solver.solve().get_primal()[0] - 7.0/11.0) > 1e-10)
+        return 1;
 #endif
+
+    // A soft constraint can be active while its L1 slack remains fixed at
+    // zero (|lambda| < w). Warm-starting must preserve that state rather than
+    // restarting the row on the nonzero-slack branch.
+    DAQP fixed_slack_solver(1, 1, 1);
+    fixed_slack_solver.set_rho_soft(0.5);
+    fixed_slack_solver.set_w_soft(2.0);
+    fixed_slack_solver.set_warm_start();
+    f[0] = -1.0;
+    sense[0] = DAQP_SOFT;
+    if (fixed_slack_solver.update(H, f, A, bu, bl, sense, break_points) != 0)
+        return 1;
+    if (std::abs(fixed_slack_solver.solve().get_primal()[0]) > 1e-10)
+        return 1;
+    f[0] = -1.1;
+    if (fixed_slack_solver.update(H, f, A, bu, bl, sense, break_points) != 0)
+        return 1;
+    if (std::abs(fixed_slack_solver.solve().get_primal()[0]) > 1e-10)
+        return 1;
+    if (fixed_slack_solver.get_iterations() != 1)
+        return 1;
 
     return 0;
 }
