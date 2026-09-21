@@ -448,14 +448,18 @@ void daqp_compute_singular_direction(DAQPWorkspace *work){
     }
     work->lam_star[work->sing_ind]=1;
 
-    // Ensure descent direction
-    c_float slope = 0;
-    for(i=0;i<=work->sing_ind;i++){
-        const int id = work->WS[i];
-        slope += (DAQP_IS_LOWER(id) ? work->dlower[id] : work->dupper[id])
-            *work->lam_star[i];
+    // Orient the direction such that is is a descent direction
+    const int id = work->WS[work->sing_ind];
+    const int lower = DAQP_IS_LOWER(id);
+    int flip = lower;
+    if(DAQP_IS_SOFT(id) && DAQP_IS_SLACK_FIXED(id)){
+        const c_float w = daqp_soft_w(work,id);
+        const c_float y = lower ? -work->lam[work->sing_ind]
+                                :  work->lam[work->sing_ind];
+        if(w > 0 && y >= w-work->settings->dual_tol)
+            flip = !lower;
     }
-    if(slope > 0)
+    if(flip)
         for(i=0;i<=work->sing_ind;i++)
             work->lam_star[i] =-work->lam_star[i];
 }
