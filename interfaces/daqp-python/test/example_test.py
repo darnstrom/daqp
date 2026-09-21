@@ -341,6 +341,39 @@ class TestModel(unittest.TestCase):
         np.testing.assert_allclose(x_ws, x_ref, atol=1e-8)
         np.testing.assert_allclose(fval_ws, fval_ref, atol=1e-8)
 
+    def test_model_structural_update_reuses_l1_state(self):
+        """Omitted sense reuses L1 state; explicit sense overrides it."""
+        H = np.array([[1.0]], dtype=c_double)
+        f = np.array([-1.0], dtype=c_double)
+        A = np.empty((0, 1), dtype=c_double)
+        bupper = np.array([0.0], dtype=c_double)
+        blower = np.array([-1e30], dtype=c_double)
+        soft = np.array([8], dtype=c_int)
+
+        d = daqp.Model()
+        d.settings = {'rho_soft': 0.5, 'w_soft': 2.0}
+        d.setup(H, f, A, bupper, blower, soft)
+        x, _, ef, _ = d.solve()
+        self.assertGreater(ef, 0)
+        np.testing.assert_allclose(x, 0.0, atol=1e-10)
+
+        # Omitted sense reconstructs the active zero-slack state.
+        H2 = np.array([[1.1]], dtype=c_double)
+        f2 = np.array([-1.1], dtype=c_double)
+        self.assertEqual(d.update(H=H2, f=f2), 0)
+        x, _, ef, info = d.solve()
+        self.assertGreater(ef, 0)
+        np.testing.assert_allclose(x, 0.0, atol=1e-10)
+        self.assertEqual(info['iterations'], 1)
+
+        # Explicit hard sense replaces the stored soft state.
+        hard = np.array([0], dtype=c_int)
+        f3 = np.array([-10.0], dtype=c_double)
+        self.assertEqual(d.update(f=f3, sense=hard), 0)
+        x, _, ef, _ = d.solve()
+        self.assertGreater(ef, 0)
+        np.testing.assert_allclose(x, 0.0, atol=1e-10)
+
     def test_model_warm_start_dual(self):
         """Dual warm start via setup does not require more iterations than cold start."""
         H, f, A, bupper, blower, sense = self._make_qp()

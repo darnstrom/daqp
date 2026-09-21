@@ -102,6 +102,14 @@ class DAQP {
     void set_eps_prox(double val);
     void set_eta_prox(double val);
     void set_rho_soft(double val);
+    void set_w_soft(double val);
+    // Weights of the soft constraints, one element per constraint (an empty
+    // vector leaves that weight at settings.rho_soft/settings.w_soft). False
+    // if DAQP was built without support for individual weights.
+    bool set_soft_weights(Eigen::VectorXd const& rho_lower = Eigen::VectorXd(),
+                          Eigen::VectorXd const& rho_upper = Eigen::VectorXd(),
+                          Eigen::VectorXd const& w_lower = Eigen::VectorXd(),
+                          Eigen::VectorXd const& w_upper = Eigen::VectorXd());
     void set_rel_subopt(double val);
     void set_abs_subopt(double val);
     void set_sing_tol(double val);

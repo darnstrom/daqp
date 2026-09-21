@@ -24,6 +24,7 @@ const char* SETTINGS_FIELDS[] = {
   "eps_prox",
   "eta_prox",
   "rho_soft",
+  "w_soft",
   "abs_subopt",
   "rel_subopt",
   "sing_tol",
@@ -181,6 +182,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		mxSetField(s, 0, "eps_prox", mxCreateDoubleScalar(work->settings->eps_prox));
 		mxSetField(s, 0, "eta_prox", mxCreateDoubleScalar(work->settings->eta_prox));
 		mxSetField(s, 0, "rho_soft", mxCreateDoubleScalar(work->settings->rho_soft));
+		mxSetField(s, 0, "w_soft", mxCreateDoubleScalar(work->settings->w_soft));
 		mxSetField(s, 0, "abs_subopt", mxCreateDoubleScalar(work->settings->abs_subopt));
 		mxSetField(s, 0, "rel_subopt", mxCreateDoubleScalar(work->settings->rel_subopt));
 		mxSetField(s, 0, "time_limit", mxCreateDoubleScalar(work->settings->time_limit));
@@ -200,9 +202,22 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  work->settings->eps_prox = (c_float)mxGetScalar(mxGetField(s, 0, "eps_prox"));
 	  work->settings->eta_prox= (c_float)mxGetScalar(mxGetField(s, 0, "eta_prox"));
 	  work->settings->rho_soft= (c_float)mxGetScalar(mxGetField(s, 0, "rho_soft"));
+	  work->settings->w_soft= (c_float)mxGetScalar(mxGetField(s, 0, "w_soft"));
 	  work->settings->abs_subopt= (c_float)mxGetScalar(mxGetField(s, 0, "abs_subopt"));
 	  work->settings->rel_subopt= (c_float)mxGetScalar(mxGetField(s, 0, "rel_subopt"));
 	  work->settings->time_limit= (c_float)mxGetScalar(mxGetField(s, 0, "time_limit"));
+	}
+	else if (!strcmp("set_soft_weights", cmd)) {
+	  // rho_l, rho_u, w_l, w_u (an empty argument leaves that weight alone)
+	  c_float* w[4];
+	  int i;
+	  for(i = 0; i < 4; i++){
+		if(!mxIsEmpty(prhs[2+i]) && mxGetNumberOfElements(prhs[2+i]) != work->m)
+		  mexErrMsgTxt("soft weights must have one entry per constraint");
+		w[i] = mxIsEmpty(prhs[2+i]) ? NULL : (c_float *)mxGetPr(prhs[2+i]);
+	  }
+	  if(!daqp_set_soft_weights(work,w[0],w[1],w[2],w[3]))
+		mexErrMsgTxt("daqpmex was built without support for individual soft weights");
 	}
 	else if (!strcmp("update", cmd)) {
 	  if(work->qp == NULL) mexErrMsgTxt("No problem to update");
@@ -212,9 +227,11 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  work->qp->A= (c_float *)mxGetPr(prhs[4]);
 	  work->qp->bupper= (c_float *)mxGetPr(prhs[5]);
 	  work->qp->blower= (c_float *)mxGetPr(prhs[6]);
-	  work->qp->sense= (int *)mxGetPr(prhs[7]);
+	  int update_mask = (int)mxGetScalar(prhs[8]);
+	  const int reuse_sense = nrhs > 9 && mxGetScalar(prhs[9]) != 0;
+	  work->qp->sense = reuse_sense ? work->sense : (int *)mxGetPr(prhs[7]);
+	  if(reuse_sense) update_mask |= DAQP_UPDATE_sense;
 	  // Update LDP with new QP data
-	  const int update_mask = (int)mxGetScalar(prhs[8]);
 	  const int error_flag = daqp_update_ldp(update_mask,work,work->qp);
 	  plhs[0] = mxCreateDoubleScalar(error_flag);
 	}

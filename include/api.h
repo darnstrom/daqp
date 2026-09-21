@@ -16,7 +16,7 @@ typedef struct{
     c_float *x;
     c_float *lam;
     c_float fval;
-    c_float soft_slack;
+    c_float soft_slack; // Largest violation of a soft constraint
 
     int exitflag;
     int iter;
@@ -41,6 +41,10 @@ void allocate_daqp_settings(DAQPWorkspace *work);
 void allocate_daqp_workspace(DAQPWorkspace *work, int n, int ns);
 void allocate_daqp_ldp(DAQPWorkspace *work, int n, int m, int ms, int alloc_R, int alloc_v);
 void allocate_daqp_avi(DAQPAVI *avi, int n);
+// Per-constraint soft weights (both return 0 if the build has no support)
+int  daqp_allocate_soft_weights(DAQPWorkspace *work);
+int  daqp_set_soft_weights(DAQPWorkspace *work, c_float *rho_l, c_float *rho_u,
+        c_float *w_l, c_float *w_u);
 
 void free_daqp_ldp(DAQPWorkspace *work);
 void free_daqp_workspace(DAQPWorkspace *work);

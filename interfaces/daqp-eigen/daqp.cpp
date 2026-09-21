@@ -266,17 +266,11 @@ int DAQP::update(Eigen::MatrixXd const& H,
         work_.v = nullptr;
     }
 
-    if (warm_start_){
+    // There is no previous active set before the first successful solve.
+    if (warm_start_ && is_solved_){
+        // Omitted sense reuses DAQP's state; explicit sense overrides it.
         if(sense_ptr == nullptr)
             sense_ptr = work_.sense; // Directly work with sense of workspace
-        for(int i = 0; i < m; i++){
-            if(result_.lam[i] > 0)
-                sense_ptr[i] |= 1; // Active + Upper
-            else if(result_.lam[i] < 0)
-                sense_ptr[i] |= 3; // Active + Lower
-            else
-                sense_ptr[i] = 0;
-        }
         update_mask |= DAQP_UPDATE_sense; // Ensure sense is update
 
         // Adjust break points based on feasibility of previous solution
@@ -383,6 +377,42 @@ void DAQP::set_eta_prox(double val) {
 void DAQP::set_rho_soft(double val) {
     settings_.rho_soft = val;
     is_solved_ = false;
+}
+
+void DAQP::set_w_soft(double val) {
+    settings_.w_soft = val;
+    is_solved_ = false;
+}
+
+bool DAQP::set_soft_weights(Eigen::VectorXd const& rho_lower,
+                            Eigen::VectorXd const& rho_upper,
+                            Eigen::VectorXd const& w_lower,
+                            Eigen::VectorXd const& w_upper) {
+    const auto valid_size = [this](Eigen::Index size) {
+        return size == 0 || size == work_.m;
+    };
+    if (!valid_size(rho_lower.size()) || !valid_size(rho_upper.size()) ||
+        !valid_size(w_lower.size()) || !valid_size(w_upper.size()))
+        return false;
+    // The weights are allocated for max_constraints_, like the other buffers,
+    // since a later update may bring more constraints
+    const int m = work_.m;
+    work_.m = max_constraints_;
+    bool ok = daqp_allocate_soft_weights(&work_) != 0;
+    work_.m = m;
+    if (!ok) return false;
+
+    auto data_or_null = [](Eigen::VectorXd const& values) {
+        return values.size() == 0
+            ? static_cast<c_float*>(nullptr)
+            : const_cast<c_float*>(values.data());
+    };
+    ok = daqp_set_soft_weights(&work_,
+        data_or_null(rho_lower), data_or_null(rho_upper),
+        data_or_null(w_lower), data_or_null(w_upper)) != 0;
+    if (!ok) return false;
+    is_solved_ = false;
+    return true;
 }
 
 void DAQP::set_rel_subopt(double val) {

@@ -704,6 +704,15 @@ void daqp_eq_retrieve(DAQPResult* res, DAQPWorkspace* work){
     DAQPEqElim* eq = work->eq;
     int i, j;
     if(eq == NULL || eq->neq == 0) return;
+    if(eq->installed){
+        // Preserve the reduced problem's final working-set state
+        const int state_mask = DAQP_ACTIVE | DAQP_LOWER | DAQP_SLACK_FIXED;
+        for(j = 0; j < eq->m_r; j++){
+            const int id = eq->map[j];
+            eq->sense_full[id] = (eq->sense_full[id] & ~state_mask)
+                               | (work->sense[j] & state_mask);
+        }
+    }
     if(eq->installed) expand_solution(work,work->u,eq->tmp);
     if((eq->installed || eq->expanded) && res->lam != NULL &&
             !DAQP_IS_HIERARCHICAL(work)){

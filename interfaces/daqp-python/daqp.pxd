@@ -40,11 +40,14 @@ cdef extern from "types.h":
         double refactor_tol;
         double time_limit;
 
+        double w_soft;
+
     ctypedef struct DAQPWorkspace:
         int n
         int m
         int ms
         int nh
+        int* sense
         DAQPSettings* settings
 
 cdef extern from "api.h":
@@ -82,6 +85,9 @@ cdef extern from "api.h":
         void free_daqp_ldp(DAQPWorkspace *work)
     cdef extern nogil:
         void allocate_daqp_settings(DAQPWorkspace *work)
+    cdef extern nogil:
+        int daqp_set_soft_weights(DAQPWorkspace *work, double *rho_l, double *rho_u,
+                double *w_l, double *w_u)
 
 cdef extern from "utils.h":
     cdef extern nogil:
@@ -98,6 +104,7 @@ cdef extern from "constants.h":
     cdef double DAQP_DEFAULT_ETA
     cdef int DAQP_DEFAULT_ITER_LIMIT
     cdef double DAQP_DEFAULT_RHO_SOFT
+    cdef double DAQP_DEFAULT_W_SOFT
     cdef double  DAQP_DEFAULT_REL_SUBOPT
     cdef double  DAQP_DEFAULT_ABS_SUBOPT
     cdef double  DAQP_DEFAULT_SING_TOL
