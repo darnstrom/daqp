@@ -27,6 +27,7 @@ export setup
 export solve
 export update
 export settings
+export soft_weights
 
 export isfeasible
 

@@ -256,6 +256,47 @@ end
     DAQPBase.free_c_workspace(p)
 end
 
+@testset "Individual soft weights" begin
+    H = reshape([1.0], 1, 1)
+    f = [-10.0]
+    A = zeros(0, 1)
+    bupper = [0.0]
+    blower = [-1e30]
+    sense = Cint[DAQPBase.SOFT]
+    d = DAQPBase.Model()
+    DAQPBase.settings(d, Dict(:rho_soft => 0.5, :w_soft => 2.0))
+    DAQPBase.setup(d, H, f, A, bupper, blower, sense)
+
+    x, _, exitflag, info = DAQPBase.solve(d)
+    @test exitflag == 2
+    @test x[1] ≈ 8/3 atol=1e-10
+    @test info.λ[1] ≈ 22/3 atol=1e-10
+
+    # First-time allocation after a solve must invalidate the factorization.
+    DAQPBase.soft_weights(d; rho_u=[0.1])
+    x, _, exitflag, info = DAQPBase.solve(d)
+    @test exitflag == 2
+    @test x[1] ≈ 8/11 atol=1e-10
+    @test info.λ[1] ≈ 102/11 atol=1e-10
+
+    # The same applies to later updates of an allocated weight array.
+    DAQPBase.soft_weights(d; rho_u=[0.2])
+    x, _, exitflag, info = DAQPBase.solve(d)
+    @test exitflag == 2
+    @test x[1] ≈ 4/3 atol=1e-10
+    @test info.λ[1] ≈ 26/3 atol=1e-10
+
+    @test_throws DimensionMismatch DAQPBase.soft_weights(d; rho_u=[0.1, 0.2])
+
+    # Code generation must retain the individual weight arrays.
+    srcdir = tempname()
+    DAQPBase.codegen(d, dir=srcdir)
+    generated = read(joinpath(srcdir, "daqp_workspace.c"), String)
+    @test occursin("c_float daqp_rho_us[1]", generated)
+    @test occursin("daqp_rho_ls, daqp_rho_us, daqp_w_ls, daqp_w_us", generated)
+    rm(srcdir, recursive=true)
+end
+
 @testset "Code generation" begin
     n = 5; m = 5; ms = 5; nAct =2;
     xref,H,f,A,bupper,blower,sense = generate_test_QP(n,m,ms,nAct,kappa)

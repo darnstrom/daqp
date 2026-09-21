@@ -7,6 +7,11 @@ extern "C" {
 
 #include <stddef.h>
 
+// Individual weights for the soft constraints, unless explicitly disabled
+#ifndef DAQP_NO_SOFT_WEIGHTS
+#define DAQP_SOFT_WEIGHTS
+#endif
+
 #define DAQP_EMPTY_IND -1
 #define DAQP_UNCONSTRAINED_OPTIMAL -2
 #define DAQP_INF ((c_float)1e30)
@@ -22,6 +27,7 @@ extern "C" {
 #define DAQP_AUTO_ETA_CAP 1e-6
 #define DAQP_DEFAULT_ITER_LIMIT 10000
 #define DAQP_DEFAULT_RHO_SOFT 1e-6
+#define DAQP_DEFAULT_W_SOFT 0
 #define DAQP_DEFAULT_REL_SUBOPT 0
 #define DAQP_DEFAULT_ABS_SUBOPT 0
 #define DAQP_DEFAULT_SING_TOL (3.7e-11)
@@ -88,7 +94,7 @@ extern "C" {
 #define DAQP_BINARY 16
 #define DAQP_IS_BINARY(x) (work->sense[x]&16)
 
-// marks that the soft slack is at its lower bound (d_ls or d_us)
+// marks that the slack of a soft constraint is zero (see auxiliary.c)
 #define DAQP_SLACK_FIXED 32
 #define DAQP_IS_SLACK_FIXED(x) (work->sense[x]&32)
 #define DAQP_IS_SLACK_FREE(x) ((work->sense[x]&32)==0)

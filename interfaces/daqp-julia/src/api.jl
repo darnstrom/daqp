@@ -195,7 +195,8 @@ The following functions acts on such models:
 
 * `setup(d,H,f,A,bupper,blower,sense;primal_start, dual_start)`: setup a problem (see `DAQPBase.quadprog` or DAQPBase.avi for details)
 * `solve(d)`: solve a populated model
-* `update(d,H,f,A,bupper,blower,sense)`: update an existing model
+* `update(d,H,f,A,bupper,blower,sense)`: update an existing model. Omitting
+  `sense` reuses the previous state; supplying it overrides the warm start.
 * `dict = DAQPBase.settings(d)`: return a Dictionary with the current settings for the model `d`
 * `settings(d,dict)`: update the settings for `d` with the Dictionary `dict`
 """
@@ -205,6 +206,7 @@ mutable struct Model
     qpc::QPc
     qpc_ptr::Ptr{DAQPBase.QPc}
     has_model::Bool
+    has_solved::Bool
     x::Vector{Float64}
     λ::Vector{Float64}
     function Model()
@@ -215,6 +217,7 @@ mutable struct Model
         ccall((:allocate_daqp_settings,DAQPBase.libdaqp),Nothing,(Ptr{DAQPBase.Workspace},),work)
         finalizer(DAQPBase.delete!, daqp)
         daqp.has_model=false
+        daqp.has_solved=false
         return daqp
     end
 end
@@ -233,8 +236,11 @@ end
 
 function setup(daqp::DAQPBase.Model, qp::DAQPBase.QPj;primal_start::Vector{Cdouble}=Cdouble[],
         dual_start::Vector{Cdouble}=Cdouble[],init_mask=Cint(0))
-    daqp.qpj = qp
+    # Own sense so warm starts do not modify the caller's QP.
+    daqp.qpj = QPj(qp.n,qp.m,qp.ms,qp.H,qp.f,qp.A,qp.bupper,qp.blower,
+                   copy(qp.sense),qp.break_points,qp.nh,qp.is_avi,qp.is_factorized)
     daqp.qpc = DAQPBase.QPc(daqp.qpj)
+    daqp.has_solved = false
     old_settings = settings(daqp); # in case setup fails
     unsafe_store!(daqp.qpc_ptr,daqp.qpc)
     setup_time = Ref{Cdouble}(0.0);
@@ -292,6 +298,7 @@ function solve(daqp::DAQPBase.Model;setup_time=0.0)
     ccall((:daqp_solve, DAQPBase.libdaqp), Nothing,
           (Ref{DAQPBase.DAQPResult},Ref{DAQPBase.Workspace}),
           result_ptr,daqp.work)
+    daqp.has_solved = true
 
     result = unsafe_load(Base.unsafe_convert(Ptr{DAQPResult}, result_ptr))
     info = (x = daqp.x, λ=daqp.λ, fval=result.fval,
@@ -370,6 +377,15 @@ function update(daqp::DAQPBase.Model, H,f,A,bupper,blower,sense=nothing,break_po
         update_mask |= DAQP_UPDATE_sense
     end
 
+    # Omitted sense reuses DAQP's state; explicit sense overrides it.
+    if isnothing(sense) && (update_mask & (DAQP_UPDATE_Rinv | DAQP_UPDATE_M)) != 0
+        if daqp.has_solved
+            work = unsafe_load(daqp.work)
+            unsafe_copyto!(pointer(daqp.qpj.sense), work.sense, Int(qp.m))
+        end
+        update_mask |= DAQP_UPDATE_sense
+    end
+
     if(!isnothing(break_points) && length(break_points)== qp.nh)
         daqp.qpj.break_points .= break_points
         update_mask |= DAQP_UPDATE_hierarchy
@@ -388,6 +404,28 @@ end
 
 function reset(d::DAQPBase.Model)
     reset(d.work)
+end
+
+# Weights of the soft constraints, one entry per constraint (nothing leaves
+# the weight at its default: settings.rho_soft and settings.w_soft)
+function soft_weights(d::DAQPBase.Model; rho_l=nothing, rho_u=nothing,
+        w_l=nothing, w_u=nothing)
+    function arg(v, name)
+        isnothing(v) && return nothing
+        x = convert(Vector{Cdouble},v)
+        length(x) == d.qpj.m || throw(DimensionMismatch(
+            "$name must have one entry per constraint"))
+        return x
+    end
+    rl, ru = arg(rho_l, "rho_l"), arg(rho_u, "rho_u")
+    wl, wu = arg(w_l, "w_l"), arg(w_u, "w_u")
+    ok = GC.@preserve rl ru wl wu ccall(
+        (:daqp_set_soft_weights,DAQPBase.libdaqp),Cint,
+        (Ptr{DAQPBase.Workspace},Ptr{Cdouble},Ptr{Cdouble},Ptr{Cdouble},Ptr{Cdouble}),
+        d.work, isnothing(rl) ? C_NULL : rl, isnothing(ru) ? C_NULL : ru,
+        isnothing(wl) ? C_NULL : wl, isnothing(wu) ? C_NULL : wu)
+    ok == 0 && error("libdaqp was built without support for individual soft weights")
+    return nothing
 end
 
 using Downloads

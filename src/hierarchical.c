@@ -1,5 +1,6 @@
 #include "hierarchical.h"
 #include "types.h"
+#include "auxiliary.h"
 #include <stdlib.h>
 
 int daqp_hiqp(DAQPWorkspace *work, c_float *lambda){
@@ -51,7 +52,7 @@ int daqp_hiqp(DAQPWorkspace *work, c_float *lambda){
         for(j=0; j<work->n_active;j++){
             id=work->WS[j];
             if(DAQP_IS_SOFT(id)){
-                w = work->lam_star[j]*work->settings->rho_soft;
+                w = daqp_soft_slack(work,j);
                 if(w < -work->settings->primal_tol)
                     work->dlower[id]+=w;
                 else if(w > work->settings->primal_tol)

@@ -42,7 +42,7 @@ cmake -S "$TEMP_REPO/daqp_base" -B "$TEMP_REPO/daqp_base/build" \
     -DCMAKE_BUILD_TYPE=Release >/dev/null
 cmake --build "$TEMP_REPO/daqp_base/build" -- -j"$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 2)" >/dev/null
 
-BASE_LIB="$(find "$TEMP_REPO/daqp_base/build" -name libdaqp.so -type f -print -quit)"
+BASE_LIB="$(find -L "$TEMP_REPO/daqp_base/build" -name libdaqp.so -type f -print -quit)"
 if [ -z "$BASE_LIB" ]; then
     echo "Baseline build did not produce libdaqp.so"
     exit 1

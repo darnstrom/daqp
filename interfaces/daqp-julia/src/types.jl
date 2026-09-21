@@ -100,6 +100,8 @@ struct DAQPSettings
     sing_tol::Cdouble
     refactor_tol::Cdouble
     time_limit::Cdouble
+
+    w_soft::Cdouble
 end
 function DAQPSettings()
     settings = Ref{DAQPBase.DAQPSettings}()
@@ -174,4 +176,11 @@ struct Workspace
     eq::Ptr{Cvoid}
     timer::Ptr{Cvoid}
     Mu::Ptr{Cdouble}
+
+    # Weights of the soft constraints (only used by libdaqp built with
+    # SOFT_WEIGHTS, but always part of the workspace)
+    rho_ls::Ptr{Cdouble}
+    rho_us::Ptr{Cdouble}
+    w_ls::Ptr{Cdouble}
+    w_us::Ptr{Cdouble}
 end
