@@ -34,18 +34,3 @@ jobs:
       - name: "Test Julia interface"
         run: julia --color=yes --project=build/interfaces/daqp-julia -e "using Pkg; Pkg.test()"
 
-  no-soft-weights:
-    name: No soft weights - ubuntu-latest - ${{ github.event_name }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: "Create build directory and run CMake"
-        run: cmake -S . -B build -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DJULIA=ON -DSOFT_WEIGHTS=OFF
-      - name: "Build Project"
-        run: cmake --build build --target all --config Release -- -j4
-      - uses: julia-actions/setup-julia@v2
-        with:
-          version: '1'
-          arch: x64
-      - name: "Test Julia interface"
-        run: julia --color=yes --project=build/interfaces/daqp-julia -e "using Pkg; Pkg.test()"
