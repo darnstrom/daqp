@@ -644,6 +644,7 @@ void daqp_eq_expand(DAQPWorkspace* work){
         work->lam_star[i] *= eq->scaling[work->WS[i]];
     work->fval += eq->up_norm2; // ||u||^2 = ||up||^2+||w||^2
     expand_solution(work,work->u,eq->tmp);
+    eq->working_set_valid = 1;
     daqp_eq_restore(work);
     for(i = 0; i < eq->n; i++) work->x[i] = eq->tmp[i];
     eq->expanded = 1;
@@ -676,10 +677,14 @@ int daqp_eq_eliminate(DAQPWorkspace* work){
         else if(work->eq != NULL) work->eq->neq = 0;
         return (flag < 0) ? flag : 0;
     }
-    // Form the working set of the reduced problem
-    reset_daqp_workspace(work);
-    error_flag = daqp_activate_constraints(work);
-    if(error_flag < 0) return error_flag;
+    // Reuse the working-set factorization when the reduction is unchanged.
+    if(flag == 2 || !work->eq->working_set_valid){
+        reset_daqp_workspace(work);
+        error_flag = daqp_activate_constraints(work);
+        if(error_flag < 0) return error_flag;
+        work->eq->working_set_valid = 1;
+    }
+    else work->sing_ind = DAQP_EMPTY_IND;
     if(work->n_prox > 0) daqp_eq_restore(work);
     return work->eq->neq;
 }
@@ -705,6 +710,7 @@ void daqp_eq_retrieve(DAQPResult* res, DAQPWorkspace* work){
     int i, j;
     if(eq == NULL || eq->neq == 0) return;
     if(eq->installed){
+        eq->working_set_valid = res->exitflag > 0;
         // Preserve the reduced problem's final working-set state
         const int state_mask = DAQP_ACTIVE | DAQP_LOWER | DAQP_SLACK_FIXED;
         for(j = 0; j < eq->m_r; j++){

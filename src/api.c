@@ -385,9 +385,14 @@ int daqp_set_soft_weights(DAQPWorkspace *work, c_float *rho_l, c_float *rho_u,
     int i, rebuild = 0;
     if(!daqp_allocate_soft_weights(work)) return 0;
     const int m = (work->eq != NULL && work->eq->installed) ? work->eq->m : work->m;
-    // A equality-reduced problem is rebuilt by daqp_eq_reinstall 
-    // Otherwise, only an active soft constraint makes the factorization stale
-    if(!(work->eq != NULL && work->eq->neq != 0 && !work->eq->installed))
+    const int reduced_pending = work->eq != NULL && work->eq->neq != 0
+        && !work->eq->installed;
+    // A restored equality-reduced problem is reactivated by daqp_eq_reinstall.
+    // Otherwise, only an active soft constraint makes the factorization stale.
+    if(reduced_pending){
+        if(work->n_prox == 0) rebuild = 1;
+    }
+    else
         for(i = 0; i < work->n_active; i++)
             if(DAQP_IS_SOFT(work->WS[i])){
                 rebuild = 1;
@@ -403,6 +408,7 @@ int daqp_set_soft_weights(DAQPWorkspace *work, c_float *rho_l, c_float *rho_u,
     // Reset the factorization
     if(rebuild){
         reset_daqp_workspace(work);
+        if(reduced_pending) return 1;
         if(DAQP_IS_HIERARCHICAL(work)){
             const int m = work->m;
             work->m = work->break_points[0];

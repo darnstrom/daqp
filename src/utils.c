@@ -65,8 +65,8 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
     // Update the full LDP before optionally installing a reduced one below
     daqp_eq_restore(work);
     // An elimination is formed from Rinv and A, so it cannot be reused if
-    // either changes (neq == 0 marks the factorization as invalid)
-    if(work->eq != NULL && (mask&(DAQP_UPDATE_Rinv+DAQP_UPDATE_M)))
+    // either changes, or if the caller replaces the constraint states
+    if(work->eq != NULL && (mask&(DAQP_UPDATE_Rinv+DAQP_UPDATE_M+DAQP_UPDATE_sense)))
         work->eq->neq = 0;
 
     // Add original qp to workspace
@@ -129,7 +129,8 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
 
     // Update M. Only the equality rows are needed if the constraints are eliminated 
     if(mask&DAQP_UPDATE_eliminate && daqp_eq_will_reduce(work)){
-        reset_daqp_workspace(work); // M is not formed
+        // Changing H or H invalidates reduced factorization.
+        if(mask&(DAQP_UPDATE_Rinv+DAQP_UPDATE_M)) reset_daqp_workspace(work);
         skip_constraints = 1;
     }
     else if(mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M){

@@ -150,6 +150,7 @@ typedef struct{
     int m_r; // Reduced number of constraints
     int installed; // Whether the reduced problem is currently in the workspace
     int expanded; // Whether the reduced solution has already been expanded
+    int working_set_valid; // Whether WS/L/D describe the reduced active set
 
     int* eq_ids; // The neq eliminated, followed by the nign ignored, equalities
     int* drop_ids; // Constraints that are implied by the equalities

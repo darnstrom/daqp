@@ -557,6 +557,7 @@ int daqp_activate_constraints(DAQPWorkspace *work){
 // Deactivate all active constraints that are mutable (i.e., not equality constraints)
 void daqp_deactivate_constraints(DAQPWorkspace *work){
     int i;
+    if(work->eq != NULL) work->eq->working_set_valid = 0;
     for(i =0;i<work->n_active;i++){
         if(DAQP_IS_IMMUTABLE(work->WS[i])) continue;
         DAQP_SET_INACTIVE(work->WS[i]);
