@@ -102,6 +102,7 @@ struct DAQPSettings
     time_limit::Cdouble
 
     w_soft::Cdouble
+    eq_reduction::Cint
 end
 function DAQPSettings()
     settings = Ref{DAQPBase.DAQPSettings}()

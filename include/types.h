@@ -73,8 +73,10 @@ typedef struct{
     c_float time_limit;
 
     // Linear weight for soft constraints, 0 gives a pure quadratic penalty
-    // (last to keep the offsets of the settings above)
     c_float w_soft;
+
+    // Equality-reduction policy: DAQP_EQ_REDUCTION_{OFF,AUTO,ON}
+    int eq_reduction;
 }DAQPSettings;
 
 
@@ -150,8 +152,11 @@ typedef struct{
     int m_r; // Reduced number of constraints
     int installed; // Whether the reduced problem is currently in the workspace
     int expanded; // Whether the reduced solution has already been expanded
+    int working_set_valid; // Whether WS/L/D describe the reduced active set
 
     int* eq_ids; // The neq eliminated, followed by the nign ignored, equalities
+    // Consecutive update rebuilds since the elimination was last reused
+    int rebuilds;
     int* drop_ids; // Constraints that are implied by the equalities
     int* map; // Constraint index in the original problem of each reduced one
     c_float* Q; // Householder vectors (leading neq columns) and Q2 (trailing)

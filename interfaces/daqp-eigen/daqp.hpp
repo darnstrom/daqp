@@ -103,6 +103,7 @@ class DAQP {
     void set_eta_prox(double val);
     void set_rho_soft(double val);
     void set_w_soft(double val);
+    void set_eq_reduction(int val);
     // Weights of the soft constraints, one element per constraint (an empty
     // vector leaves that weight at settings.rho_soft/settings.w_soft). False
     // if DAQP was built without support for individual weights.

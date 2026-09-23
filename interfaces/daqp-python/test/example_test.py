@@ -283,15 +283,22 @@ class TestModel(unittest.TestCase):
         self.assertIn('primal_tol', s)
         self.assertIn('eps_prox', s)
         self.assertIn('time_limit', s)
+        self.assertIn('eq_reduction', s)
         self.assertEqual(s['time_limit'], 0.0)
+        self.assertEqual(s['eq_reduction'], 0)
+        self.assertEqual(daqp.EQ_REDUCTION_OFF, -1)
+        self.assertEqual(daqp.EQ_REDUCTION_AUTO, 0)
+        self.assertEqual(daqp.EQ_REDUCTION_ON, 1)
 
     def test_model_settings_set(self):
         """settings setter updates only the specified keys."""
         d = daqp.Model()
         original_primal_tol = d.settings['primal_tol']
-        d.settings = {'iter_limit': 42, 'time_limit': 5.0}
+        d.settings = {'iter_limit': 42, 'time_limit': 5.0,
+                      'eq_reduction': -1}
         self.assertEqual(d.settings['iter_limit'], 42)
         self.assertAlmostEqual(d.settings['time_limit'], 5.0)
+        self.assertEqual(d.settings['eq_reduction'], -1)
         # Other settings should be unchanged
         self.assertAlmostEqual(d.settings['primal_tol'], original_primal_tol)
 

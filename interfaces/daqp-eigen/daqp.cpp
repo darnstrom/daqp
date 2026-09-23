@@ -384,6 +384,11 @@ void DAQP::set_w_soft(double val) {
     is_solved_ = false;
 }
 
+void DAQP::set_eq_reduction(int val) {
+    settings_.eq_reduction = val;
+    is_solved_ = false;
+}
+
 bool DAQP::set_soft_weights(Eigen::VectorXd const& rho_lower,
                             Eigen::VectorXd const& rho_upper,
                             Eigen::VectorXd const& w_lower,
