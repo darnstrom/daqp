@@ -363,8 +363,10 @@ int daqp_allocate_soft_weights(DAQPWorkspace *work){
 #ifdef DAQP_SOFT_WEIGHTS
     if(work->rho_ls != NULL) return 1; // Already allocated
     // The weights are indexed by the original problem, whose size is kept in
-    // eq->m while equalities are eliminated
-    const int m = (work->eq != NULL && work->eq->installed) ? work->eq->m : work->m;
+    // eq->m while equalities are eliminated. A larger work->m is kept, since
+    // an interface may set it to allocate for a later, larger problem.
+    int m = work->m;
+    if(work->eq != NULL && work->eq->installed && work->eq->m > m) m = work->eq->m;
     if(m == 0) return 0;
     work->rho_ls = calloc(4*m,sizeof(c_float));
     if(work->rho_ls == NULL) return 0;

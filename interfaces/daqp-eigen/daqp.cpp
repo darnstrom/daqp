@@ -393,8 +393,12 @@ bool DAQP::set_soft_weights(Eigen::VectorXd const& rho_lower,
                             Eigen::VectorXd const& rho_upper,
                             Eigen::VectorXd const& w_lower,
                             Eigen::VectorXd const& w_upper) {
-    const auto valid_size = [this](Eigen::Index size) {
-        return size == 0 || size == work_.m;
+    // One weight per constraint of the original problem, whose size is kept
+    // in eq->m while equalities are eliminated (work_.m is then reduced)
+    const int m_orig = (work_.eq != nullptr && work_.eq->installed)
+        ? work_.eq->m : work_.m;
+    const auto valid_size = [m_orig](Eigen::Index size) {
+        return size == 0 || size == m_orig;
     };
     if (!valid_size(rho_lower.size()) || !valid_size(rho_upper.size()) ||
         !valid_size(w_lower.size()) || !valid_size(w_upper.size()))

@@ -602,6 +602,39 @@ class TestSemiProximal(unittest.TestCase):
 
         self.assertLess(exitflag, 0)
 
+    def test_soft_weights_with_eliminated_equalities(self):
+        """Weights set before the first solve, while the equality-reduced
+        problem is in the workspace, have one entry per original constraint."""
+        n, neq, nsoft = 40, 16, 20
+        m = neq + nsoft
+        H = np.full((n, n), 0.01, dtype=c_double) + 1.99*np.eye(n)
+        f = np.linspace(-5.0, 5.0, n)
+        A = np.zeros((m, n), dtype=c_double)
+        for i in range(m):
+            A[i, i % n] = 1.0
+        bupper = np.full(m, 0.5, dtype=c_double)
+        blower = np.full(m, -0.5, dtype=c_double)
+        bupper[:neq] = blower[:neq] = 0.1
+        sense = np.full(m, 8, dtype=c_int)  # soft
+        sense[:neq] = 5  # active + immutable
+        rho_u = np.full(m, 0.1, dtype=c_double)
+
+        d_ref = daqp.Model()
+        d_ref.setup(H, f, A, bupper, blower, sense)
+        d_ref.solve()
+        d_ref.soft_weights(rho_u=rho_u)
+        x_ref, _, exitflag_ref, _ = d_ref.solve()
+        self.assertEqual(exitflag_ref, 2)  # soft optimal
+
+        d = daqp.Model()
+        d.setup(H, f, A, bupper, blower, sense)
+        with self.assertRaises(ValueError):
+            d.soft_weights(rho_u=np.full(nsoft, 0.1, dtype=c_double))
+        d.soft_weights(rho_u=rho_u)
+        x, _, exitflag, _ = d.solve()
+        self.assertEqual(exitflag, exitflag_ref)
+        np.testing.assert_allclose(x, x_ref, atol=1e-8)
+
 
 if __name__ == '__main__':
     unittest.main()
