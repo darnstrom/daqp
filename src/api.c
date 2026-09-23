@@ -15,7 +15,7 @@ void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
     tic(&timer);
     if(work->settings->time_limit > 0)  work->timer = &timer;
 #endif
-    if(work->sing_ind != DAQP_UNCONSTRAINED_OPTIMAL){
+    if(!(work->state & DAQP_STATE_UNCONSTRAINED)){
         // Select algorithm
         if(work->n_prox==0){
             if(work->avi == NULL || work->avi->is_symmetric){
@@ -320,6 +320,7 @@ void allocate_daqp_workspace(DAQPWorkspace *work, int n, int ns){
 
     work->prox_mask = calloc(work->n, sizeof(int)); // all zeros initially
     work->n_prox = 0;
+    work->state = 0;
     work->soft_slack = 0;
 
     work->rho_ls= NULL;
@@ -687,7 +688,7 @@ void daqp_dual_init_active(DAQPProblem* qp, c_float* lam){
 
 // Set the starting iterate
 void daqp_set_primal_start(DAQPWorkspace* work, c_float* x){
-    if(work->sing_ind != DAQP_UNCONSTRAINED_OPTIMAL){
+    if(!(work->state & DAQP_STATE_UNCONSTRAINED)){
         int i;
         for(i = 0; i < work->n; i++) work->x[i] = x[i];
     }

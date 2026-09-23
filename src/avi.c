@@ -37,7 +37,7 @@ int daqp_solve_avi(DAQPWorkspace *work) {
         }
 
         // Update linear term
-        daqp_update_v(avi->xtemp,work,0);
+        daqp_update_v(avi->xtemp,work);
         daqp_update_d(work, work->qp->bupper,work->qp->blower);
 
         exitflag = daqp_ldp(work);
