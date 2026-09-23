@@ -27,6 +27,8 @@ if(TEST)
     add_executable(07_symmetrize_hessian tests/07_symmetrize_hessian.cpp)
     add_executable(08_unconstrained_check tests/08_unconstrained_check.cpp)
     add_executable(09_soft_weights tests/09_soft_weights.cpp)
+    add_executable(10_eq_reduction tests/10_eq_reduction.cpp)
+    add_executable(11_warm_update_M tests/11_warm_update_M.cpp)
 
     set(TARGETS
         00_basic_qp
@@ -39,6 +41,8 @@ if(TEST)
         07_symmetrize_hessian
         08_unconstrained_check
         09_soft_weights
+        10_eq_reduction
+        11_warm_update_M
     )
 
     foreach(TARGET ${TARGETS})

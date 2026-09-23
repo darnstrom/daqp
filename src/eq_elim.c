@@ -6,6 +6,16 @@
 #include <stdlib.h>
 #include <math.h>
 
+// Keeps a hot kernel out of line, so that its generated code does not
+// depend on the code it would otherwise be inlined into
+#if defined(__GNUC__) || defined(__clang__)
+#define DAQP_NOINLINE __attribute__((noinline))
+#elif defined(_MSC_VER)
+#define DAQP_NOINLINE __declspec(noinline)
+#else
+#define DAQP_NOINLINE
+#endif
+
 /*
  * The equality constraints are eliminated from
  *   min 0.5||u||^2  s.t.  dlower <= M u <= dupper,   M = A*Rinv, u = R*x+v
@@ -153,8 +163,34 @@ static int count_eq(const DAQPWorkspace* work){
  * only general constraints (multi-stage MPC, for instance).
  */
 static int is_eq_elim_worthwhile(const DAQPWorkspace* work, const int n_eq){
-    if(n_eq <= DAQP_EQ_MIN_COUNT || DAQP_EQ_MIN_RATIO*n_eq <= work->n) return 0;
-    if(work->RinvD != NULL && work->m == work->ms+n_eq) return 0;
+    const int n = work->n;
+    const int n_ineq = work->m-work->ms-n_eq;
+    const int policy = work->settings->eq_reduction;
+
+    if(policy == DAQP_EQ_REDUCTION_OFF) return 0;
+    if(policy == DAQP_EQ_REDUCTION_ON) return n_eq > 0;
+
+    // Rebuilding the elimination at every update costs more than solving the
+    // reduced problem saves, unless the problem is large, the Hessian is dense
+    // (so the full constraints are expensive to form) and the equalities
+    // remove a large part of it
+    if(work->eq != NULL && work->eq->rebuilds >= DAQP_EQ_MAX_REBUILDS &&
+            (work->RinvD != NULL || n < 2*DAQP_EQ_MIN_DIM ||
+             DAQP_EQ_REBUILD_MIN_RATIO*n_eq < n))
+        return 0;
+
+    // Fixed reduction overhead dominates for tiny problems. At larger sizes,
+    // require strictly more than the nominal equality ratio: exact-boundary
+    // cases have too little dimension reduction to recover the setup cost.
+    if(n < DAQP_EQ_MIN_DIM || n_eq <= DAQP_EQ_MIN_COUNT ||
+            DAQP_EQ_MIN_RATIO*n_eq <= n) return 0;
+
+    // A diagonal Hessian makes the original constraints especially cheap.
+    // Preserve the useful equality-dense case, but avoid reducing sparse
+    // equalities (and the equality-only multi-stage-MPC case).
+    if(work->RinvD != NULL && (n_ineq == 0 ||
+                DAQP_EQ_DIAG_MIN_RATIO*n_eq < n)) return 0;
+
     return 1;
 }
 
@@ -237,7 +273,7 @@ static void allocate_daqp_eq(DAQPWorkspace* work, const int n_eq){
  * linearly dependent on the already factorized ones are not eliminated; their
  * ids are stored after the eliminated ones in eq_ids.
  */
-static void build_qr(DAQPWorkspace* work){
+static DAQP_NOINLINE void build_qr(DAQPWorkspace* work){
     DAQPEqElim* eq = work->eq;
     const int n = eq->n;
     const c_float tol = sqrt(work->settings->zero_tol);
@@ -318,7 +354,7 @@ static void build_qr(DAQPWorkspace* work){
  * the ones of the simple bounds are rows of W, and the solution of the QP is
  * x = xp + W*w.
  */
-static void form_W(DAQPWorkspace* work){
+static DAQP_NOINLINE void form_W(DAQPWorkspace* work){
     DAQPEqElim* eq = work->eq;
     const int n = eq->n, ms = eq->ms, nz = eq->nz;
     const c_float* Q2 = eq->Q+(size_t)eq->neq*n;
@@ -348,7 +384,7 @@ static void form_W(DAQPWorkspace* work){
 }
 
 // Reduced row of constraint i: A_i*W, or row i of W for a simple bound
-static void reduced_row(const DAQPWorkspace* work, const int i, c_float* row){
+static DAQP_NOINLINE void reduced_row(const DAQPWorkspace* work, const int i, c_float* row){
     const DAQPEqElim* eq = work->eq;
     const int n = eq->n, ms = eq->ms, nz = eq->nz;
     int j, k;
@@ -381,7 +417,7 @@ static c_float row_dot_xp(const DAQPWorkspace* work, const int i){
  * Solve R'y1 = d_E and form xp = Rinv*(up-v), which is the part of the
  * solution that the eliminated equality constraints determine.
  */
-static void compute_particular(DAQPWorkspace* work){
+static DAQP_NOINLINE void compute_particular(DAQPWorkspace* work){
     DAQPEqElim* eq = work->eq;
     const int n = eq->n;
     c_float* up = eq->tmp;
@@ -665,9 +701,14 @@ int daqp_eq_form_full(DAQPWorkspace* work){
 
 int daqp_eq_eliminate(DAQPWorkspace* work){
     int flag, error_flag;
+    const int had_eq = work->eq != NULL;
     // Only the bounds are known to have changed; daqp_update_ldp invalidates
     // the factorization when the data it is formed from changes
     flag = daqp_eq_reduce(work,DAQP_UPDATE_d);
+    // Count consecutive rebuilds here rather than in daqp_eq_reduce, where
+    // the bookkeeping degrades the code generated for the factorization
+    if(flag == 2 && had_eq) work->eq->rebuilds++;
+    else if(flag == 1) work->eq->rebuilds = 0;
     if(flag <= 0){
         // No reduction was installed, so the full constraints are still owed
         if(daqp_eq_will_reduce(work)){
@@ -695,7 +736,11 @@ int daqp_eq_eliminate(DAQPWorkspace* work){
 int daqp_eq_reinstall(DAQPWorkspace* work){
     DAQPEqElim* eq = work->eq;
     int flag;
-    if(eq == NULL || eq->neq == 0 || eq->installed || work->n_prox > 0) return 0;
+    if(eq == NULL || eq->neq == 0) return 0;
+    // The policy may have changed since setup/update
+    if(work->settings->eq_reduction == DAQP_EQ_REDUCTION_OFF)
+        return daqp_eq_form_full(work);
+    if(eq->installed || work->n_prox > 0) return 0;
     flag = daqp_eq_eliminate(work);
     return (flag < 0) ? flag : 0;
 }

@@ -34,10 +34,23 @@ extern "C" {
 #define DAQP_DEFAULT_REFACTOR_TOL 1e-9
 #define DAQP_DEFAULT_EPS_PROX (-1e-6)
 
+// Equality-reduction policy (DAQPSettings.eq_reduction)
+#define DAQP_EQ_REDUCTION_OFF (-1)
+#define DAQP_EQ_REDUCTION_AUTO 0
+#define DAQP_EQ_REDUCTION_ON 1
+
 // Equality constraints are eliminated if there are sufficiently many of them
 // (neq > EQ_MIN_COUNT and EQ_MIN_RATIO*neq > n)
 #define DAQP_EQ_MIN_COUNT 5
 #define DAQP_EQ_MIN_RATIO 10
+#define DAQP_EQ_MIN_DIM 20
+// Diagonal Hessians require at least n/DAQP_EQ_DIAG_MIN_RATIO equalities
+#define DAQP_EQ_DIAG_MIN_RATIO 3
+// Automatic reduction gives up after this many consecutive update rebuilds,
+// unless the problem is large, has a dense Hessian and at least
+// n/DAQP_EQ_REBUILD_MIN_RATIO equalities
+#define DAQP_EQ_MAX_REBUILDS 3
+#define DAQP_EQ_REBUILD_MIN_RATIO 3
 
 
 // MACROS
@@ -64,7 +77,6 @@ extern "C" {
 #define DAQP_UPDATE_sense 16
 #define DAQP_UPDATE_hierarchy 32
 #define DAQP_UPDATE_unconstrained 64
-#define DAQP_UPDATE_eliminate 128
 
 // CONSTRAINT MASKS
 #define DAQP_ACTIVE 1

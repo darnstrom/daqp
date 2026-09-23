@@ -61,13 +61,17 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
     int do_activate = 0;
     int skip_constraints = 0;
     const int was_reduced = DAQP_IS_REDUCED(work);
+    const int eliminate = work->settings->eq_reduction != DAQP_EQ_REDUCTION_OFF;
 
     // Update the full LDP before optionally installing a reduced one below
     daqp_eq_restore(work);
-    // An elimination is formed from Rinv and A, so it cannot be reused if
-    // either changes, or if the caller replaces the constraint states
-    if(work->eq != NULL && (mask&(DAQP_UPDATE_Rinv+DAQP_UPDATE_M+DAQP_UPDATE_sense)))
-        work->eq->neq = 0;
+    if(work->eq != NULL){
+        // Rinv, A, and the equality set determine the elimination.
+        if(mask&(DAQP_UPDATE_Rinv+DAQP_UPDATE_M+DAQP_UPDATE_sense))
+            work->eq->neq = 0;
+        else
+            work->eq->rebuilds = 0;
+    }
 
     // Add original qp to workspace
     work->qp = qp;
@@ -128,7 +132,7 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
     if(unconstrained_flag == DAQP_UNCONSTRAINED_OPTIMAL) return 0;
 
     // Update M. Only the equality rows are needed if the constraints are eliminated 
-    if(mask&DAQP_UPDATE_eliminate && daqp_eq_will_reduce(work)){
+    if(eliminate && daqp_eq_will_reduce(work)){
         // Changing H or H invalidates reduced factorization.
         if(mask&(DAQP_UPDATE_Rinv+DAQP_UPDATE_M)) reset_daqp_workspace(work);
         skip_constraints = 1;
@@ -137,6 +141,7 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
         error_flag = daqp_update_M(work,qp->A,mask);
         if(error_flag<0)
             return error_flag;
+        do_activate = 1; // daqp_update_M cleared the working set
     }
 
     // Normalize Rinv
@@ -175,8 +180,12 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
              (work->avi != NULL && !work->avi->is_symmetric)))
         return DAQP_EXIT_UNSUPPORTED;
 
-    // The working set refers to the reduced LDP if one was installed
-    if(was_reduced) do_activate = 1;
+    // The working set refers to the reduced LDP if one was installed. When
+    // reduction has just been disabled, the full constraint matrix is still
+    // unformed; daqp_eq_form_full below forms it and activates constraints.
+    const int form_full_pending = !eliminate &&
+        work->eq != NULL && work->eq->neq != 0;
+    if(was_reduced && !form_full_pending) do_activate = 1;
 
     // Make sure activate constraints are activated.
     if(do_activate == 1 && skip_constraints){
@@ -197,12 +206,16 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
             return error_flag;
     }
 
-    if(mask&DAQP_UPDATE_eliminate)
-        return daqp_eq_eliminate(work);
+    if(eliminate){
+        error_flag = daqp_eq_eliminate(work);
+        return (error_flag < 0) ? error_flag : 0;
+    }
 
     // An earlier elimination left the full constraints unformed
-    if(work->eq != NULL && work->eq->neq != 0)
-        return daqp_eq_form_full(work);
+    if(work->eq != NULL && work->eq->neq != 0){
+        error_flag = daqp_eq_form_full(work);
+        return (error_flag < 0) ? error_flag : 0;
+    }
 
     return 0;
 }

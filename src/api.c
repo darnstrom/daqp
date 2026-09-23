@@ -65,9 +65,8 @@ void daqp_quadprog(DAQPResult *res, DAQPProblem* qp, DAQPSettings *settings){
 
     DAQPWorkspace work;
     work.settings = settings;
-    const int init_mask =
-        DAQP_UPDATE_unconstrained | DAQP_UPDATE_eliminate;
-    setup_flag = setup_daqp_main(qp,&work,&(res->setup_time),init_mask);
+    setup_flag = setup_daqp_main(qp,&work,&(res->setup_time),
+            DAQP_UPDATE_unconstrained);
     res->exitflag = setup_flag;
 
     if(setup_flag >= 0){
@@ -577,6 +576,7 @@ void daqp_default_settings(DAQPSettings* settings){
     settings->sing_tol = DAQP_DEFAULT_SING_TOL;
     settings->refactor_tol = DAQP_DEFAULT_REFACTOR_TOL;
     settings->time_limit = 0;
+    settings->eq_reduction = DAQP_EQ_REDUCTION_AUTO;
 }
 
 /* Remove redundant constraints*/

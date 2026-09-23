@@ -12,7 +12,7 @@ extern "C" {
 
 /*
  * Eliminate the equality constraints of the LDP in the workspace.
- * daqp_update_ldp applies the elimination when DAQP_UPDATE_eliminate is set;
+ * daqp_update_ldp applies the policy in DAQPSettings.eq_reduction;
  * daqp_extract_result retrieves the full solution after solving.
  *
  * Returns the number of eliminated constraints (0 if the LDP was left intact)
