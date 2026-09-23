@@ -668,7 +668,9 @@ cdef class Model:
         cdef double *pru = NULL
         cdef double *pwl = NULL
         cdef double *pwu = NULL
-        cdef int m = self._work.m
+        # One weight per constraint of the original problem (_work.m is
+        # reduced while equality constraints are eliminated)
+        cdef int m = self._qp.m
         if rho_l is not None:
             rl = np.ascontiguousarray(rho_l, dtype=np.double)
             if rl.shape[0] != m: raise ValueError("rho_l must have one entry per constraint")
