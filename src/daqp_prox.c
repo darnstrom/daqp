@@ -96,7 +96,7 @@ int daqp_prox(DAQPWorkspace *work){
                         work->v[i] = -(work->prox_mask[i] ? eps : 0.0)
                                      * work->x[i];
             }
-            daqp_update_v(work->v, work, 0);
+            daqp_update_v(work->v, work);
         }
 
         /* ----------------------------------------------------------------

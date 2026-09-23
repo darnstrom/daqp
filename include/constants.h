@@ -78,6 +78,13 @@ extern "C" {
 #define DAQP_UPDATE_hierarchy 32
 #define DAQP_UPDATE_unconstrained 64
 
+// WORKSPACE STATE MASKS
+// The DAQP_UPDATE_* bits in DAQP_STATE_PENDING mark the parts of the LDP that
+// an earlier update did not form, which the next update then forms
+#define DAQP_STATE_PENDING (DAQP_UPDATE_Rinv+DAQP_UPDATE_M+DAQP_UPDATE_v+DAQP_UPDATE_d+DAQP_UPDATE_sense+DAQP_UPDATE_hierarchy)
+#define DAQP_STATE_UNCONSTRAINED 256 // The unconstrained optimum is the solution
+#define DAQP_STATE_RINV_NORMALIZED 512 // The first ms rows of Rinv are normalized
+
 // CONSTRAINT MASKS
 #define DAQP_ACTIVE 1
 #define DAQP_IS_ACTIVE(x) (work->sense[x]&1)
