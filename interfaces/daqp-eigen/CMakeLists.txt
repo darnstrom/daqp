@@ -29,6 +29,7 @@ if(TEST)
     add_executable(09_soft_weights tests/09_soft_weights.cpp)
     add_executable(10_eq_reduction tests/10_eq_reduction.cpp)
     add_executable(11_warm_update_M tests/11_warm_update_M.cpp)
+    add_executable(12_update_state tests/12_update_state.cpp)
 
     set(TARGETS
         00_basic_qp
@@ -43,6 +44,7 @@ if(TEST)
         09_soft_weights
         10_eq_reduction
         11_warm_update_M
+        12_update_state
     )
 
     foreach(TARGET ${TARGETS})

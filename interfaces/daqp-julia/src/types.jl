@@ -161,6 +161,7 @@ struct Workspace
 
     iterations::Cint
     sing_ind::Cint
+    state::Cint
 
     prox_mask::Ptr{Cint}
     n_prox::Cint

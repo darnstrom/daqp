@@ -692,7 +692,7 @@ int daqp_eq_form_full(DAQPWorkspace* work){
     daqp_eq_restore(work);
     if(work->eq != NULL) work->eq->neq = 0; // Nothing to retrieve
     if(work->qp == NULL || work->qp->A == NULL) return 0;
-    error_flag = daqp_update_M(work,work->qp->A,0);
+    error_flag = daqp_update_M(work,work->qp->A);
     if(error_flag < 0) return error_flag;
     daqp_update_d(work,work->qp->bupper,work->qp->blower);
     reset_daqp_workspace(work);

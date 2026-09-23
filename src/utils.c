@@ -47,21 +47,27 @@ int daqp_retry_avi_with_reduced_rho(DAQPWorkspace* work){
     daqp_lu(avi->H_rho,avi->P_H2,work->n);
     error_flag = daqp_update_Rinv(work,avi->Hs_rho,0);
     if(error_flag < 0) return error_flag;
-    daqp_update_v(work->qp->f,work,DAQP_UPDATE_Rinv);
-    error_flag = daqp_update_M(work,work->qp->A,DAQP_UPDATE_Rinv);
+    daqp_update_v(work->qp->f,work);
+    error_flag = daqp_update_M(work,work->qp->A);
     if(error_flag < 0) return error_flag;
     daqp_normalize_Rinv(work);
     daqp_update_d(work,work->qp->bupper,work->qp->blower);
     return 1;
 }
 
-int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
+int daqp_update_ldp(int mask, DAQPWorkspace *work, DAQPProblem* qp){
     // TODO: copy dimensions from work->qp?
     int error_flag, i;
     int do_activate = 0;
     int skip_constraints = 0;
+    int unconstrained_flag = 0;
     const int was_reduced = DAQP_IS_REDUCED(work);
     const int eliminate = work->settings->eq_reduction != DAQP_EQ_REDUCTION_OFF;
+
+    // Also form what an earlier update left pending. Everything stays pending
+    // until this update completes, so an update that fails is redone.
+    mask |= work->state & DAQP_STATE_PENDING;
+    work->state = (work->state & DAQP_STATE_RINV_NORMALIZED) | (mask & DAQP_STATE_PENDING);
 
     // Update the full LDP before optionally installing a reduced one below
     daqp_eq_restore(work);
@@ -112,8 +118,8 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
             }
             else{
                 // Early unconstrained check for AVI: skip Cholesky if x=-H^{-1}f is feasible
-                int avi_unc = daqp_check_unconstrained(work,mask);
-                if(avi_unc == DAQP_UNCONSTRAINED_OPTIMAL) return 0;
+                unconstrained_flag = daqp_check_unconstrained(work,mask);
+                if(unconstrained_flag == DAQP_UNCONSTRAINED_OPTIMAL) return 0;
                 daqp_lu(work->avi->H_rho, work->avi->P_H2, work->n);
                 error_flag = daqp_update_Rinv(work, work->avi->Hs_rho,0);
             }
@@ -124,12 +130,18 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
 
     // Update v (moved before M to enable early-exit check below)
     if(mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_v){
-        daqp_update_v(qp->f,work,mask);
+        daqp_update_v(qp->f,work);
     }
 
-    int unconstrained_flag = (work->avi != NULL && !work->avi->is_symmetric)
-                             ? 1 : daqp_check_unconstrained(work,mask);
-    if(unconstrained_flag == DAQP_UNCONSTRAINED_OPTIMAL) return 0;
+    if(work->avi == NULL || work->avi->is_symmetric)
+        unconstrained_flag = daqp_check_unconstrained(work,mask);
+    if(unconstrained_flag == DAQP_UNCONSTRAINED_OPTIMAL){
+        // Rinv, v, and sense are formed, but not M and d, which depend on them
+        work->state &= ~(DAQP_UPDATE_Rinv+DAQP_UPDATE_v+DAQP_UPDATE_sense);
+        work->state |= DAQP_UPDATE_d;
+        if(mask&DAQP_UPDATE_Rinv) work->state |= DAQP_UPDATE_M;
+        return 0;
+    }
 
     // Update M. Only the equality rows are needed if the constraints are eliminated 
     if(eliminate && daqp_eq_will_reduce(work)){
@@ -138,16 +150,13 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
         skip_constraints = 1;
     }
     else if(mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M){
-        error_flag = daqp_update_M(work,qp->A,mask);
+        error_flag = daqp_update_M(work,qp->A);
         if(error_flag<0)
             return error_flag;
         do_activate = 1; // daqp_update_M cleared the working set
     }
 
-    // Normalize Rinv
-    if(mask&DAQP_UPDATE_Rinv){
-        daqp_normalize_Rinv(work);
-    }
+    daqp_normalize_Rinv(work);
 
     // Update d
     if(skip_constraints){
@@ -206,6 +215,8 @@ int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
             return error_flag;
     }
 
+    work->state &= ~DAQP_STATE_PENDING; // Everything has been formed
+
     if(eliminate){
         error_flag = daqp_eq_eliminate(work);
         return (error_flag < 0) ? error_flag : 0;
@@ -241,6 +252,14 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
         for(i = 0; i < n; i++) work->prox_mask[i] = 0;
     }
     work->n_prox = 0;
+    work->state &= ~DAQP_STATE_RINV_NORMALIZED;
+
+    if(H == NULL){ // LP: all directions need proximal regularization
+        if(work->qp != NULL && work->qp->f != NULL) work->n_prox = n;
+        if(work->scaling != NULL)
+            for(i = 0; i < work->ms; i++) work->scaling[i] = 1.0;
+        return 1;
+    }
 
     // Check if Diagonal
     int is_diagonal = 1;
@@ -431,11 +450,11 @@ c_float daqp_get_proximal_regularization(const DAQPWorkspace *work){
     return eps;
 }
 
-int daqp_update_M(DAQPWorkspace *work, c_float *A, const int mask){
+int daqp_update_M(DAQPWorkspace *work, c_float *A){
     int i,j,k,disp,disp2;
     const int n = work->n;
     const int mA = work->m-work->ms;
-    int stop_id =  (mask & DAQP_UPDATE_Rinv) ? n : n-work->ms;
+    int stop_id = (work->state & DAQP_STATE_RINV_NORMALIZED) ? n-work->ms : n;
     if(work->Rinv != NULL){
         for(k = 0,disp2=n*mA-1;k<mA;k++,disp2-=n){
             disp=DAQP_ARSUM(n);
@@ -471,7 +490,7 @@ int daqp_update_M(DAQPWorkspace *work, c_float *A, const int mask){
     return daqp_normalize_M(work);
 }
 
-void daqp_update_v(c_float *f, DAQPWorkspace *work, const int mask){
+void daqp_update_v(c_float *f, DAQPWorkspace *work){
     int i,j,disp;
     const int n = work->n;
     if(work->v == NULL || f == NULL) return;
@@ -482,7 +501,7 @@ void daqp_update_v(c_float *f, DAQPWorkspace *work, const int mask){
             for(i=0;i<n;++i) work->v[i] = f[i];
         return;
     }
-    int stop_id =  (mask & DAQP_UPDATE_Rinv) ? 0 : work->ms;
+    int stop_id = (work->state & DAQP_STATE_RINV_NORMALIZED) ? work->ms : 0;
     for(j=n-1,disp=DAQP_ARSUM(n);j>=stop_id;j--){
         for(i=n-1;i>j;i--)
             work->v[i] +=work->Rinv[--disp]*f[j];
@@ -569,6 +588,8 @@ int daqp_check_bounds(DAQPWorkspace* work, c_float* bupper, c_float* blower){
 void daqp_normalize_Rinv(DAQPWorkspace* work){
     int i,j,disp;
     c_float scaling_i;
+    if(work->state & DAQP_STATE_RINV_NORMALIZED) return;
+    work->state |= DAQP_STATE_RINV_NORMALIZED;
     // Normalize simple constraints
     if(work->Rinv !=NULL){
         for(i=0, disp=0; i < work->ms;i++){
@@ -649,6 +670,8 @@ int daqp_check_unconstrained(DAQPWorkspace* work, const int mask){
                     sum += work->Rinv[disp++] * work->v[j];
                 work->x[i] = -sum;
             }
+            if(work->state & DAQP_STATE_RINV_NORMALIZED)
+                for(i = 0; i < work->ms; i++) work->x[i] /= work->scaling[i];
         } else if(work->RinvD != NULL){
             for(i = 0; i < n; i++) work->x[i] = -work->RinvD[i] * work->v[i];
         } else {
@@ -678,7 +701,7 @@ int daqp_check_unconstrained(DAQPWorkspace* work, const int mask){
     }
     if(feasible){
         reset_daqp_workspace(work);
-        work->sing_ind = DAQP_UNCONSTRAINED_OPTIMAL;
+        work->state |= DAQP_STATE_UNCONSTRAINED;
         return DAQP_UNCONSTRAINED_OPTIMAL;
     }
     // Switch back such that any warm starts a preserved

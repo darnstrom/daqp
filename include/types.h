@@ -231,6 +231,7 @@ typedef struct{
 
     int iterations;
     int sing_ind; // Flag for denoting whether Mk Mk' is singular or not
+    int state; // DAQP_STATE_* flags
 
     // Proximal support. Diagonal Hessians can regularize individual
     // directions; dense singular Hessians use a full shift for stability.
