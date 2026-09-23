@@ -55,12 +55,16 @@ int daqp_retry_avi_with_reduced_rho(DAQPWorkspace* work){
     return 1;
 }
 
-int daqp_update_ldp(const int mask, DAQPWorkspace *work, DAQPProblem* qp){
+int daqp_update_ldp(int mask, DAQPWorkspace *work, DAQPProblem* qp){
     // TODO: copy dimensions from work->qp?
     int error_flag, i;
     int do_activate = 0;
     int skip_constraints = 0;
     const int was_reduced = DAQP_IS_REDUCED(work);
+    if(work->sing_ind == DAQP_UNCONSTRAINED_OPTIMAL){
+        mask |= work->reuse_ind;
+        work->reuse_ind = 0;
+    }
 
     // Update the full LDP before optionally installing a reduced one below
     daqp_eq_restore(work);
@@ -241,6 +245,14 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
         for(i = 0; i < n; i++) work->prox_mask[i] = 0;
     }
     work->n_prox = 0;
+
+    if(H == NULL){
+        if(work->qp != NULL && work->qp->f != NULL) work->n_prox = n;
+        if(work->scaling != NULL){
+            for(i = 0; i < work->ms; i++) work->scaling[i] = 1.0;
+        }
+        return 1;
+    }
 
     // Check if Diagonal
     int is_diagonal = 1;
@@ -649,6 +661,10 @@ int daqp_check_unconstrained(DAQPWorkspace* work, const int mask){
                     sum += work->Rinv[disp++] * work->v[j];
                 work->x[i] = -sum;
             }
+            if(!(mask & DAQP_UPDATE_Rinv) && work->scaling != NULL){
+                for(i = 0; i < work->ms; i++)
+                    work->x[i] /= work->scaling[i];
+            }
         } else if(work->RinvD != NULL){
             for(i = 0; i < n; i++) work->x[i] = -work->RinvD[i] * work->v[i];
         } else {
@@ -678,6 +694,12 @@ int daqp_check_unconstrained(DAQPWorkspace* work, const int mask){
     }
     if(feasible){
         reset_daqp_workspace(work);
+        if(work->avi != NULL && !work->avi->is_symmetric){
+            work->reuse_ind = mask & (DAQP_UPDATE_Rinv | DAQP_UPDATE_M | DAQP_UPDATE_v);
+        } else {
+            if(mask & DAQP_UPDATE_Rinv) daqp_normalize_Rinv(work);
+            if(mask & (DAQP_UPDATE_Rinv | DAQP_UPDATE_M)) work->reuse_ind = DAQP_UPDATE_M;
+        }
         work->sing_ind = DAQP_UNCONSTRAINED_OPTIMAL;
         return DAQP_UNCONSTRAINED_OPTIMAL;
     }
