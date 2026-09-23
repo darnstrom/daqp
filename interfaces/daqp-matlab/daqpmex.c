@@ -29,7 +29,8 @@ const char* SETTINGS_FIELDS[] = {
   "rel_subopt",
   "sing_tol",
   "refactor_tol",
-  "time_limit"
+  "time_limit",
+  "eq_reduction"
 };
 
 
@@ -186,6 +187,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		mxSetField(s, 0, "abs_subopt", mxCreateDoubleScalar(work->settings->abs_subopt));
 		mxSetField(s, 0, "rel_subopt", mxCreateDoubleScalar(work->settings->rel_subopt));
 		mxSetField(s, 0, "time_limit", mxCreateDoubleScalar(work->settings->time_limit));
+		mxSetField(s, 0, "eq_reduction", mxCreateDoubleScalar(work->settings->eq_reduction));
 		plhs[0] = s;
 	  }
 	}
@@ -206,6 +208,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  work->settings->abs_subopt= (c_float)mxGetScalar(mxGetField(s, 0, "abs_subopt"));
 	  work->settings->rel_subopt= (c_float)mxGetScalar(mxGetField(s, 0, "rel_subopt"));
 	  work->settings->time_limit= (c_float)mxGetScalar(mxGetField(s, 0, "time_limit"));
+	  work->settings->eq_reduction= (int)mxGetScalar(mxGetField(s, 0, "eq_reduction"));
 	}
 	else if (!strcmp("set_soft_weights", cmd)) {
 	  // rho_l, rho_u, w_l, w_u (an empty argument leaves that weight alone)

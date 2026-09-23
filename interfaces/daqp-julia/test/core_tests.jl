@@ -785,15 +785,14 @@ end
     qp_eq_test = DAQPBase.QPj(H_eq_test, zeros(n_eq_test), A_eq_test,
                               bu_eq_test, bl_eq_test, sense_eq_test)
 
-    # Persistent models retain the full workspace unless explicitly requested.
     d_full_test = DAQPBase.Model()
+    DAQPBase.settings(d_full_test, Dict(:eq_reduction => DAQPBase.DAQP_EQ_REDUCTION_OFF))
     setup_full_flag, _ = DAQPBase.setup(d_full_test, qp_eq_test)
     @test setup_full_flag > 0
     @test unsafe_load(d_full_test.work).n == n_eq_test
 
-    # The init mask explicitly enables equality elimination for a model.
-    setup_flag, _ = DAQPBase.setup(
-        d_eq_test, qp_eq_test; init_mask=DAQPBase.DAQP_UPDATE_eliminate)
+    DAQPBase.settings(d_eq_test, Dict(:eq_reduction => DAQPBase.DAQP_EQ_REDUCTION_ON))
+    setup_flag, _ = DAQPBase.setup(d_eq_test, qp_eq_test)
     @test setup_flag > 0
     @test unsafe_load(d_eq_test.work).n == n_eq_test - neq_test
 
@@ -802,16 +801,14 @@ end
     @test x_eq_test ≈ zeros(n_eq_test)
     @test unsafe_load(d_eq_test.work).n == n_eq_test
 
-    # An explicit update mask restores, updates, and reduces the workspace
-    # again without requiring a separate elimination call.
     bu_updated = copy(d_eq_test.qpj.bupper)
     bl_updated = copy(d_eq_test.qpj.blower)
     bu_updated[end] = 9.0
     bl_updated[end] = -9.0
     update_flag = DAQPBase.update(
         d_eq_test, nothing, nothing, nothing, bu_updated, bl_updated,
-        nothing, nothing, DAQPBase.DAQP_UPDATE_eliminate)
-    @test update_flag == neq_test
+        nothing, nothing, Cint(0))
+    @test update_flag == 0
     @test unsafe_load(d_eq_test.work).n == n_eq_test - neq_test
 end
 
@@ -833,7 +830,6 @@ end
     bu1, bl1 = bounds(randn(n))
     bu2, bl2 = bounds(randn(n))
 
-    elim_mask = DAQPBase.DAQP_UPDATE_unconstrained | DAQPBase.DAQP_UPDATE_eliminate
     xref1, fref1, eref1, _ = DAQPBase.quadprog(H, f, A, bu1, bl1, sense)
     xref2, fref2, eref2, _ = DAQPBase.quadprog(H, f, A, bu2, bl2, sense)
     @test eref1 == DAQPBase.OPTIMAL
@@ -841,7 +837,8 @@ end
 
     # Solving the same workspace twice gives the same answer both times
     d = DAQPBase.Model()
-    DAQPBase.setup(d, H, f, A, bu1, bl1, sense; init_mask=elim_mask)
+    DAQPBase.settings(d, Dict(:eq_reduction => DAQPBase.DAQP_EQ_REDUCTION_ON))
+    DAQPBase.setup(d, H, f, A, bu1, bl1, sense)
     x1, _, e1, _ = DAQPBase.solve(d)
     x2, fv2, e2, _ = DAQPBase.solve(d)
     @test e1 == DAQPBase.OPTIMAL && e2 == DAQPBase.OPTIMAL
@@ -849,10 +846,11 @@ end
     @test norm(x2 - xref1) < 1e-8
     @test abs(fv2 - fref1) < 1e-8
 
-    # Solving after an update, whether or not a new elimination is asked for
-    for mask in (Cint(0), DAQPBase.DAQP_UPDATE_eliminate)
+    # Solving after an update of the bounds, with or without an explicit mask
+    for mask in (Cint(0), DAQPBase.DAQP_UPDATE_d)
         du = DAQPBase.Model()
-        DAQPBase.setup(du, H, f, A, bu1, bl1, sense; init_mask=elim_mask)
+        DAQPBase.settings(du, Dict(:eq_reduction => DAQPBase.DAQP_EQ_REDUCTION_ON))
+        DAQPBase.setup(du, H, f, A, bu1, bl1, sense)
         DAQPBase.solve(du)
         DAQPBase.update(du, nothing, nothing, nothing, bu2, bl2,
                         nothing, nothing, mask)

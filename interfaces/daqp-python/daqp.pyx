@@ -3,6 +3,10 @@ cimport daqp
 from libc.stdlib cimport calloc, free
 cimport cython
 
+EQ_REDUCTION_OFF = DAQP_EQ_REDUCTION_OFF
+EQ_REDUCTION_AUTO = DAQP_EQ_REDUCTION_AUTO
+EQ_REDUCTION_ON = DAQP_EQ_REDUCTION_ON
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
 cdef void _solve_warm_start(DAQPProblem* problem, DAQPSettings* settings,
@@ -45,7 +49,7 @@ cdef void _solve_warm_start(DAQPProblem* problem, DAQPSettings* settings,
         with nogil:
             setup_flag = setup_daqp_main(
                 problem, work, &setup_time_c,
-                DAQP_UPDATE_unconstrained | DAQP_UPDATE_eliminate)
+                DAQP_UPDATE_unconstrained)
         res.setup_time = setup_time_c
         res.exitflag  = setup_flag
         if setup_flag >= 0:
@@ -77,8 +81,8 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
           rho_soft = DAQP_DEFAULT_RHO_SOFT, w_soft = DAQP_DEFAULT_W_SOFT,
           rel_subopt = DAQP_DEFAULT_REL_SUBOPT, abs_subopt = DAQP_DEFAULT_ABS_SUBOPT,
           sing_tol = DAQP_DEFAULT_SING_TOL, refactor_tol = DAQP_DEFAULT_REFACTOR_TOL,
-          time_limit = 0,
-          primal_start=None, dual_start=None):
+          time_limit = 0, primal_start=None, dual_start=None,
+          eq_reduction = DAQP_EQ_REDUCTION_AUTO):
     """
     Solve the quadratic program      minimize       0.5 x'*H*x + f' x
                                     subject to   blower <= A x <= bupper
@@ -140,6 +144,7 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
        * primal_tol : Primal feasibility tolerance
        * dual_tol   : Dual feasibility tolerance
        * eps_prox   : Negative selects automatic, zero disables, positive forces
+       * eq_reduction : -1 disables, 0 selects automatic, 1 forces reduction
     See <https://darnstrom.github.io/daqp/parameters>`_ for all available settings.
 
     Returns
@@ -203,7 +208,7 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
     cdef DAQPSettings settings = [primal_tol, dual_tol, zero_tol, pivot_tol,
             progress_tol, cycle_tol, iter_limit, fval_bound,
             eps_prox, eta_prox, rho_soft, rel_subopt, abs_subopt, sing_tol, refactor_tol,
-            time_limit, w_soft]
+            time_limit, w_soft, eq_reduction]
     cdef DAQPResult res = [&x[0], lam_ptr, 0, 0, 0, 0, 0, 0, 0]
 
     if primal_start is None and dual_start is None:
@@ -597,7 +602,8 @@ cdef class Model:
         ``pivot_tol``, ``progress_tol``, ``cycle_tol``, ``iter_limit``,
         ``fval_bound``, ``eps_prox``, ``eta_prox``, ``rho_soft``, ``w_soft``,
         ``rel_subopt``, ``abs_subopt``, ``sing_tol``, ``refactor_tol``,
-        ``time_limit``.
+        ``time_limit``, ``eq_reduction``. Equality reduction uses -1 for off,
+        0 for automatic selection, and 1 for forced on.
         """
         if self._work.settings == NULL:
             return {}
@@ -620,6 +626,7 @@ cdef class Model:
             'sing_tol':     s.sing_tol,
             'refactor_tol': s.refactor_tol,
             'time_limit':   s.time_limit,
+            'eq_reduction': s.eq_reduction,
         }
 
     @settings.setter
@@ -645,6 +652,7 @@ cdef class Model:
         if 'sing_tol'     in new_settings: s.sing_tol     = new_settings['sing_tol']
         if 'refactor_tol' in new_settings: s.refactor_tol = new_settings['refactor_tol']
         if 'time_limit'   in new_settings: s.time_limit   = new_settings['time_limit']
+        if 'eq_reduction' in new_settings: s.eq_reduction = new_settings['eq_reduction']
 
     def soft_weights(self, rho_l=None, rho_u=None, w_l=None, w_u=None):
         """

@@ -146,4 +146,5 @@ void reset_daqp_workspace(DAQPWorkspace *work){
     work->sing_ind=DAQP_EMPTY_IND;
     work->n_active =0;
     work->reuse_ind=0;
+    if(work->eq != NULL) work->eq->working_set_valid = 0;
 }
