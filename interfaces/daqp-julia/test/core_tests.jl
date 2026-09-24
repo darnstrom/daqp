@@ -204,6 +204,39 @@ end
     @test unsafe_load(Ptr{DAQPBase.Workspace}(dreuse.work)).reuse_ind ==
           wsreuse.n_active
 
+    # Reusing the workspace for a new f and b (e.g., a new parameter in MPC)
+    # must not keep binaries fixed or constraints active from the previous tree
+    nr, msr, mar, nbr = 8, 4, 6, 4
+    Lr = randn(nr,nr)
+    Hr = Lr'*Lr + 0.5I
+    Ar = randn(mar,nr)
+    sr = zeros(Cint,msr+mar)
+    sr[1:nbr] .= DAQPBase.BINARY
+    sr[msr+1:msr+2] .= DAQPBase.EQUALITY
+    function rand_rhs()
+        bu = [ones(msr); 1 .+ rand(mar)]
+        bl = [zeros(msr); -1 .- rand(mar)]
+        bu[msr+1:msr+2] = bl[msr+1:msr+2] = 0.3*randn(2)
+        return bu, bl
+    end
+    bur, blr = rand_rhs()
+    dr = DAQPBase.Model()
+    DAQPBase.setup(dr,Hr,randn(nr),Ar,bur,blr,sr)
+    for k = 1:20
+        fr = 3*randn(nr)
+        bur, blr = rand_rhs()
+        DAQPBase.update(dr,nothing,fr,nothing,bur,blr)
+        xr,fvalr,efr,_ = DAQPBase.solve(dr)
+        xq,fvalq,efq,_ = DAQPBase.quadprog(Hr,fr,Ar,bur,blr,copy(sr))
+        @test efr == efq
+        if efq == 1
+            @test norm(Ar[1:2,:]*xr - bur[msr+1:msr+2]) < tol
+            @test abs(fvalr-fvalq) < tol*(1+abs(fvalq))
+        end
+        # Only the equality constraints remain active between solves
+        @test unsafe_load(Ptr{DAQPBase.Workspace}(dr.work)).n_active == 2
+    end
+
 end
 
 @testset "Model interface" begin
