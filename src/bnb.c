@@ -20,17 +20,38 @@ static c_float daqp_binary_diff(const int id, DAQPWorkspace* work){
     return diff;
 }
 
+// The immutable constraints (e.g., equalities) are kept fixed as a prefix of
+// the working set throughout the tree. Returns the length of that prefix.
+static int daqp_bnb_setup_root(DAQPWorkspace* work){
+    int i, j, error_flag;
+    for(i = 0; i < work->n_active; i++)
+        if(!DAQP_IS_IMMUTABLE(work->WS[i])) break;
+    for(j = i; j < work->n_active; j++)
+        if(DAQP_IS_IMMUTABLE(work->WS[j])) break;
+    if(j == work->n_active) return i; // Mutable constraints are a warm start
+
+    // Immutable after mutable => only activate immutable constraints
+    for(i = 0; i < work->n_active; i++)
+        if(!DAQP_IS_IMMUTABLE(work->WS[i])) DAQP_SET_INACTIVE(work->WS[i]);
+    reset_daqp_workspace(work);
+    error_flag = daqp_activate_constraints(work);
+    return error_flag < 0 ? error_flag : work->n_active;
+}
+
 int daqp_bnb(DAQPWorkspace* work){
     int branch_id, exitflag;
     DAQPNode* node;
     c_float *swp_ptr = NULL;
+
+    exitflag = daqp_bnb_setup_root(work);
+    if(exitflag < 0) return exitflag;
+    work->bnb->neq = exitflag;
 
     // Modify upper bound based on absolute/relative suboptimality tolerance
     c_float fval_bound0 = work->settings->fval_bound;
     c_float eps_r = 1/(1+work->settings->rel_subopt);
     work->settings->fval_bound = (fval_bound0 - work->settings->abs_subopt)*eps_r;
 
-    work->bnb->neq = work->n_active;
     work->bnb->itercount=0;
     work->bnb->nodecount=0;
     // Setup root node
@@ -40,6 +61,7 @@ int daqp_bnb(DAQPWorkspace* work){
     work->bnb->tree[0].bin_id=0;
     work->bnb->n_nodes=1;
     work->bnb->n_clean=work->bnb->neq;
+    work->bnb->nWS=0;
 
     exitflag = DAQP_EXIT_INFEASIBLE;
     // Start tree exploration
@@ -75,6 +97,10 @@ int daqp_bnb(DAQPWorkspace* work){
 
     // Exploration completed
     work->iterations = work->bnb->itercount;
+    // Restore the root state (unfix binaries etc.) so that the workspace can
+    // be reused for subsequent solves
+    daqp_node_cleanup_workspace(work->bnb->neq,work);
+    work->bnb->n_clean = work->bnb->neq;
     if(swp_ptr==NULL){
         work->settings->fval_bound = fval_bound0;
         return exitflag < 0 ? exitflag : DAQP_EXIT_INFEASIBLE;

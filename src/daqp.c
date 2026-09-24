@@ -31,7 +31,8 @@ int daqp_ldp(DAQPWorkspace *work){
                         if(work->D[i] < min_D) min_D = work->D[i];
 
                     // If LDL is truly ill-conditioned, refactor for a better pivot ordering
-                    if(work->n_active > 2 && tried_repair != 1 &&
+                    // (Not in BnB, which relies on the order of the working set)
+                    if(work->n_active > 2 && tried_repair != 1 && work->bnb == NULL &&
                             min_D < work->settings->refactor_tol){
                         tried_repair = 1;
                         // Correct LOWER/UPPER (important for equality constraints)
