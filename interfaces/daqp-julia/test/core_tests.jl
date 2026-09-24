@@ -305,6 +305,26 @@ end
     end
 end
 
+@testset "BnB root warm start" begin
+    Random.seed!(4321)
+    H,f,A,bu,bl,sense = generate_test_MIQP(20,60,20,10)
+    d = DAQPBase.Model()
+    DAQPBase.setup(d,H,f,A,bu,bl,sense)
+    x1,f1,ef1,info1 = DAQPBase.solve(d)
+    @test ef1 == DAQPBase.OPTIMAL
+    # The root is warm started by the previous root working set
+    x2,f2,ef2,info2 = DAQPBase.solve(d)
+    @test ef2 == DAQPBase.OPTIMAL
+    @test abs(f2-f1) < 1e-6*(1+abs(f1))
+    @test info2.iterations < info1.iterations
+    # Resetting the workspace restores a cold root
+    DAQPBase.reset(d)
+    x3,f3,ef3,info3 = DAQPBase.solve(d)
+    @test ef3 == DAQPBase.OPTIMAL
+    @test abs(f3-f1) < 1e-6*(1+abs(f1))
+    @test info3.iterations == info1.iterations
+end
+
 @testset "Model interface" begin
     # Setup model and solve problem
     d = DAQPBase.Model()
