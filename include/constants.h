@@ -84,6 +84,7 @@ extern "C" {
 #define DAQP_STATE_PENDING (DAQP_UPDATE_Rinv+DAQP_UPDATE_M+DAQP_UPDATE_v+DAQP_UPDATE_d+DAQP_UPDATE_sense+DAQP_UPDATE_hierarchy)
 #define DAQP_STATE_UNCONSTRAINED 256 // The unconstrained optimum is the solution
 #define DAQP_STATE_RINV_NORMALIZED 512 // The first ms rows of Rinv are normalized
+#define DAQP_STATE_INCUMBENT 1024 // work->x holds a candidate solution for BnB
 
 // CONSTRAINT MASKS
 #define DAQP_ACTIVE 1

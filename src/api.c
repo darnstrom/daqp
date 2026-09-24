@@ -637,6 +637,10 @@ void daqp_primal_init_active(DAQPProblem* qp, c_float* x){
     c_float Ax, slack;
     c_float tol= 1e-9;
 
+    // For MIQPs, x is only used as an incumbent (see daqp_set_primal_start)
+    for(i=0; i < qp->m; i++)
+        if(qp->sense[i] & DAQP_BINARY) return;
+
     // Simple constraints
     for(i=0; i < qp->ms; i++){
         if(qp->sense[i] & DAQP_IMMUTABLE) continue;
@@ -693,5 +697,6 @@ void daqp_set_primal_start(DAQPWorkspace* work, c_float* x){
     if(!(work->state & DAQP_STATE_UNCONSTRAINED)){
         int i;
         for(i = 0; i < work->n; i++) work->x[i] = x[i];
+        if(work->bnb != NULL) work->state |= DAQP_STATE_INCUMBENT;
     }
 }
