@@ -232,7 +232,6 @@ void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work, const char* prefix){
             prefix,prefix,prefix,prefix, 0); // reuse_ind
     fprintf(f, "%sWS, %d,\n", prefix, 0); //n_active
     fprintf(f, "%d,%d,\n",0,-1); //iterations + sing_id
-    fprintf(f, "%d,\n", work->state & DAQP_STATE_RINV_NORMALIZED); // state
     fprintf(f, "%sprox_mask, %d,\n", prefix, work->n_prox); // proximal support
     fprintf(f, "%f,\n",0.0); // Soft slack
     fprintf(f, "&%ssettings, \n", prefix);
@@ -258,10 +257,11 @@ void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work, const char* prefix){
         fprintf(f, "NULL,\n");
     // Soft weights (NULL selects the default weight for every soft constraint)
     if(work->rho_ls != NULL)
-        fprintf(f, "%srho_ls, %srho_us, %sw_ls, %sw_us};\n\n",
+        fprintf(f, "%srho_ls, %srho_us, %sw_ls, %sw_us,\n",
                 prefix,prefix,prefix,prefix);
     else
-        fprintf(f, "NULL, NULL, NULL, NULL};\n\n");
+        fprintf(f, "NULL, NULL, NULL, NULL,\n");
+    fprintf(f, "%d};\n\n", work->state & DAQP_STATE_RINV_NORMALIZED); // state
 }
 
 void write_daqp_settings_src(FILE*  f, DAQPSettings* settings, const char* prefix){

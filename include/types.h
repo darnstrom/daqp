@@ -231,7 +231,6 @@ typedef struct{
 
     int iterations;
     int sing_ind; // Flag for denoting whether Mk Mk' is singular or not
-    int state; // DAQP_STATE_* flags
 
     // Proximal support. Diagonal Hessians can regularize individual
     // directions; dense singular Hessians use a full shift for stability.
@@ -275,6 +274,8 @@ typedef struct{
     c_float *rho_us;
     c_float *w_ls; // Linear weight (default settings->w_soft)
     c_float *w_us;
+
+    int state;
 }DAQPWorkspace;
 
 #define DAQP_IS_HIERARCHICAL(work) \

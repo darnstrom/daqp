@@ -51,7 +51,7 @@ bool check(const char* name, DAQPWorkspace* work, DAQPProblem* qp){
 
     bool pass = res.exitflag == res_ref.exitflag;
     for(int i = 0; i < 2; i++) pass = pass && std::fabs(x[i] - x_ref[i]) < 1e-8;
-    for(int i = 0; i < 3; i++) pass = pass && std::fabs(lam[i] - lam_ref[i]) < 1e-8;
+    for(int i = 0; i < qp->m; i++) pass = pass && std::fabs(lam[i] - lam_ref[i]) < 1e-8;
     std::printf("%-58s %s\n", name, pass ? "PASS" : "FAIL");
     if(!pass)
         std::printf("  got x = [%g, %g] (exitflag %d), expected x = [%g, %g] (exitflag %d)\n",
