@@ -18,6 +18,16 @@ int daqp_hiqp(DAQPWorkspace *work, c_float *lambda){
     // Start moving down the hierarchy
     c_float w;
     start=work->break_points[0];
+    // A previous solve leaves constraints of the soft levels in the working
+    // set; restart from the (hard) first level, whose active set is kept.
+    for(i = 0; i < work->n_active; i++) if(work->WS[i] >= start) break;
+    if(i < work->n_active){
+        work->m = start;
+        reset_daqp_workspace(work);
+        exitflag = daqp_activate_constraints(work);
+        if(exitflag < 0) return exitflag;
+        exitflag = 0;
+    }
     int nfree = work->n;
     for(i =1; i < work->nh; i++){
         // initialize current level

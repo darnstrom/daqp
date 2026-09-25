@@ -116,11 +116,9 @@ void daqp_remove_constraint(DAQPWorkspace* work, const int rm_ind){
     if(rm_ind < work->reuse_ind)
         work->reuse_ind = rm_ind;
 
-    // Check if the removal lead to singularity (can happen due to numerics)
-    if(work->n_active > 0 && work->D[work->n_active-1] < work->settings->sing_tol){
+    // Check if the removal lead to singularity (can happen due to numerics).
+    if(work->n_active > 0 && work->D[work->n_active-1] < work->settings->sing_tol)
         work->sing_ind = work->n_active-1;
-        work->D[work->n_active-1] = 0;
-    }
     else{ // Pivot for improved numerics
         daqp_pivot_last(work);
     }
@@ -382,10 +380,8 @@ int daqp_remove_blocking(DAQPWorkspace *work){
             if(DAQP_IS_SOFT(work->WS[i]) && DAQP_IS_SLACK_FREE(work->WS[i]))
                 ns_active++;
         if(work->D[rm_ind] < work->settings->sing_tol ||
-                rm_ind >= work->n + ns_active){
+                rm_ind >= work->n + ns_active)
             work->sing_ind = rm_ind;
-            work->D[rm_ind] = 0;
-        }
         else
             daqp_pivot_last(work); // The new diagonal may be a worse pivot
     }
@@ -467,7 +463,7 @@ void daqp_compute_singular_direction(DAQPWorkspace *work){
 
 void daqp_pivot_last(DAQPWorkspace *work){
     const int rm_ind = work->n_active-2;
-    if(work->n_active > 1 &&
+    if(work->n_active > 1 && work->sing_ind == DAQP_EMPTY_IND &&
             work->D[rm_ind] < work->settings->pivot_tol && // element in D small enough
             work->D[rm_ind] < work->D[work->n_active-1]){ // element in D smallar than neighbor
         const int ind_old = work->WS[rm_ind];
