@@ -236,6 +236,8 @@ int setup_daqp_bnb(DAQPWorkspace* work, int* sense, int nb, int ns){
         work->bnb->n_nodes = 0;
         work->bnb->nWS= 0;
         work->bnb->fixed_ids= malloc((nb+1)*sizeof(int));
+        work->bnb->root_WS= malloc((work->n+ns+1)*sizeof(int));
+        work->bnb->n_root_WS= 0;
     }
     return 1;
 }
@@ -286,6 +288,7 @@ void free_daqp_bnb(DAQPWorkspace* work){
         free(work->bnb->tree);
         free(work->bnb->tree_WS);
         free(work->bnb->fixed_ids);
+        free(work->bnb->root_WS);
         free(work->bnb);
         work->bnb = NULL;
     }
@@ -637,6 +640,10 @@ void daqp_primal_init_active(DAQPProblem* qp, c_float* x){
     c_float Ax, slack;
     c_float tol= 1e-9;
 
+    // For MIQPs, x is only used as an incumbent (see daqp_set_primal_start)
+    for(i=0; i < qp->m; i++)
+        if(qp->sense[i] & DAQP_BINARY) return;
+
     // Simple constraints
     for(i=0; i < qp->ms; i++){
         if(qp->sense[i] & DAQP_IMMUTABLE) continue;
@@ -693,5 +700,6 @@ void daqp_set_primal_start(DAQPWorkspace* work, c_float* x){
     if(!(work->state & DAQP_STATE_UNCONSTRAINED)){
         int i;
         for(i = 0; i < work->n; i++) work->x[i] = x[i];
+        if(work->bnb != NULL) work->state |= DAQP_STATE_INCUMBENT;
     }
 }

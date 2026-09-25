@@ -168,6 +168,38 @@ class Testing(unittest.TestCase):
         np.testing.assert_array_equal(sense, sense_original,
                                       err_msg="dual_start must not mutate sense")
 
+    def test_warm_start_miqp(self):
+        """Warm starts on an MIQP give the same optimum as a cold start."""
+        for seed in range(10):
+            rng = np.random.default_rng(seed)
+            n, nb = 12, 8
+            M = rng.standard_normal((n, n))
+            H = np.ascontiguousarray(M.T @ M + np.eye(n), dtype=c_double)
+            f = rng.standard_normal(n) * 10
+            f[:nb] = -np.abs(f[:nb])
+            A = np.ones((1, n), dtype=c_double)
+            A[0, nb:] = 0.0  # cardinality constraint on the binaries
+            bupper = np.concatenate([np.ones(nb), 5 * np.ones(n - nb), [nb // 2]])
+            blower = np.concatenate([np.zeros(nb), -5 * np.ones(n - nb), [-1e30]])
+            sense = np.zeros(n + 1, dtype=c_int)
+            sense[:nb] = 16  # binary
+
+            x_cold, fval_cold, ef_cold, info_cold = daqp.solve(
+                H, f, A, bupper, blower, sense)
+            self.assertEqual(ef_cold, 1)
+
+            # Optimal solution as primal start (also used as incumbent in BnB)
+            x_p, fval_p, ef_p, info_p = daqp.solve(
+                H, f, A, bupper, blower, sense, primal_start=x_cold)
+            self.assertEqual(ef_p, 1)
+            np.testing.assert_allclose(fval_p, fval_cold, atol=1e-8)
+            np.testing.assert_allclose(x_p, x_cold, atol=1e-6)
+
+            x_d, fval_d, ef_d, _ = daqp.solve(
+                H, f, A, bupper, blower, sense, dual_start=info_cold['lam'])
+            self.assertEqual(ef_d, 1)
+            np.testing.assert_allclose(fval_d, fval_cold, atol=1e-8)
+
 
 class TestModel(unittest.TestCase):
     """Tests for the daqp.Model workspace class."""

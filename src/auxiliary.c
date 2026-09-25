@@ -558,6 +558,7 @@ int daqp_activate_constraints(DAQPWorkspace *work){
 void daqp_deactivate_constraints(DAQPWorkspace *work){
     int i;
     if(work->eq != NULL) work->eq->working_set_valid = 0;
+    if(work->bnb != NULL) work->bnb->n_root_WS = 0; // Also drop the BnB warm start
     for(i =0;i<work->n_active;i++){
         if(DAQP_IS_IMMUTABLE(work->WS[i])) continue;
         DAQP_SET_INACTIVE(work->WS[i]);
