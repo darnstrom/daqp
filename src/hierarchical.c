@@ -12,6 +12,10 @@ int daqp_hiqp(DAQPWorkspace *work, c_float *lambda){
     // If only one hiearchy -> just solve normal LDP
     if(!DAQP_IS_HIERARCHICAL(work)) return daqp_ldp(work);
 
+    // A previous solve shifted d by the slacks of the soft levels, so it has
+    // to be reformed by an update first (without a qp, the caller resets d)
+    if((work->state & DAQP_UPDATE_d) && work->qp != NULL) return DAQP_EXIT_UNSUPPORTED;
+
     // Reset lambda for output
     if(lambda != NULL) for(i=0;i<work->m;i++) lambda[i]=0;
 
@@ -41,9 +45,16 @@ int daqp_hiqp(DAQPWorkspace *work, c_float *lambda){
                     daqp_add_constraint(work,j, -1.0);
                 else
                     daqp_add_constraint(work,j, 1.0);
-                if(work->sing_ind != DAQP_EMPTY_IND)
-                    return DAQP_EXIT_OVERDETERMINED_INITIAL;
+                if(work->sing_ind != DAQP_EMPTY_IND){
+                    // Dependent constraint (e.g., from a warm start): leave it
+                    // out, and make it mutable so that it is not ignored
+                    DAQP_SET_INACTIVE(j);
+                    DAQP_SET_MUTABLE(j);
+                    work->n_active--;
+                    work->sing_ind = DAQP_EMPTY_IND;
+                    if(work->reuse_ind > work->n_active) work->reuse_ind = work->n_active;
                 }
+            }
         }
 
         // Solve best solution in case daqp_ldp fails
@@ -115,5 +126,6 @@ int daqp_hiqp(DAQPWorkspace *work, c_float *lambda){
         exitflag = 3; // signify no degrees of freedoom left
     }
     work->iterations = iterations; // Append total number of iterations
+    work->state |= DAQP_UPDATE_d; // The levels have shifted d
     return exitflag;
 }
