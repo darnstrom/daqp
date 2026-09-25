@@ -72,6 +72,8 @@ int daqp_update_ldp(int mask, DAQPWorkspace *work, DAQPProblem* qp){
     // Update the full LDP before optionally installing a reduced one below
     daqp_eq_restore(work);
     if(work->eq != NULL){
+        // A new equality set needs the full constraints
+        if(mask&DAQP_UPDATE_sense && work->eq->neq != 0) mask |= DAQP_UPDATE_M;
         // Rinv, A, and the equality set determine the elimination.
         if(mask&(DAQP_UPDATE_Rinv+DAQP_UPDATE_M+DAQP_UPDATE_sense))
             work->eq->neq = 0;
@@ -86,9 +88,6 @@ int daqp_update_ldp(int mask, DAQPWorkspace *work, DAQPProblem* qp){
     work->n = qp->n;
     work->m = qp->m;
     work->ms = qp->ms;
-
-    // Reset sing_ind flag (re-evaluated below whenever relevant data changes)
-    work->sing_ind = DAQP_EMPTY_IND;
 
     // Update constraint sense
     if(mask&DAQP_UPDATE_sense){

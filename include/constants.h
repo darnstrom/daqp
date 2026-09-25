@@ -45,7 +45,7 @@ extern "C" {
 #define DAQP_EQ_MIN_RATIO 10
 #define DAQP_EQ_MIN_DIM 20
 // Diagonal Hessians require at least n/DAQP_EQ_DIAG_MIN_RATIO equalities
-#define DAQP_EQ_DIAG_MIN_RATIO 3
+#define DAQP_EQ_DIAG_MIN_RATIO 4
 // Automatic reduction gives up after this many consecutive update rebuilds,
 // unless the problem is large, has a dense Hessian and at least
 // n/DAQP_EQ_REBUILD_MIN_RATIO equalities

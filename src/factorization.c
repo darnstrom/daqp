@@ -98,7 +98,6 @@ void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind, const c_float r
     if(work->D[work->n_active] < work->settings->sing_tol ||
             (work->n_active >= work->n + ns_active)){
         work->sing_ind=work->n_active;
-        work->D[work->n_active]=0;
     }
 }
 void daqp_update_LDL_remove(DAQPWorkspace *work, const int rm_ind){

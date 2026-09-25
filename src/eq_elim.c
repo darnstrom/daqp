@@ -555,7 +555,7 @@ int daqp_eq_reduce(DAQPWorkspace* work, const int mask){
     }
     else{
         // Only the bounds depend on data that can have changed
-        if(mask&DAQP_UPDATE_sense)
+        if(mask&DAQP_UPDATE_sense || !eq->working_set_valid)
             for(j = 0; j < eq->m_r; j++) eq->sense[j] = work->sense[eq->map[j]];
         for(j = 0; j < eq->m_r; j++){
             const int id = eq->map[j];
