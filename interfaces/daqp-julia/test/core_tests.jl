@@ -569,6 +569,46 @@ end
     @test !d.has_model
 end
 
+@testset "Hierarchical re-solve" begin
+    # A solve shifts the bounds of the soft levels, so an update is needed
+    # before the next solve, which is then warm started
+    Random.seed!(1)
+    n, mh, ml, nl = 10, 3, 3, 2
+    m = mh+nl*ml
+    L = randn(n,n); H = L'L/n + I; f = randn(n)
+    A = randn(m,n); x0 = randn(n)
+    bu = A*x0 .+ 0.5rand(m); bl = A*x0 .- 0.5rand(m)
+    bu[mh+1:end] .= A[mh+1:end,:]*randn(n) .+ 0.05 # Conflicting soft levels
+    bl[mh+1:end] .= bu[mh+1:end] .- 0.1
+    bps = Cint.(mh .+ (0:nl) .* ml)
+    d = DAQPBase.Model()
+    DAQPBase.setup(d,H,f,A,bu,bl,zeros(Cint,m);break_points=bps)
+    x1,_,ef1,_ = DAQPBase.solve(d); x1 = copy(x1)
+    @test ef1 > 0
+    _,_,ef2,_ = DAQPBase.solve(d)
+    @test ef2 == DAQPBase.UNSUPPORTED
+    DAQPBase.update(d,nothing,nothing,nothing,nothing,nothing)
+    x3,_,ef3,_ = DAQPBase.solve(d)
+    @test ef3 > 0
+    @test norm(x3-x1) < 1e-8*(1+norm(x1))
+
+    # Linearly dependent equalities in a soft level are resolved by slacks:
+    # x1+x2 = 1 and 2(x1+x2) = 4 are equally weighted after normalization
+    A = [1.0 1; 2 2]
+    bu = [10.0;10;1;4]
+    bl = [-10.0;-10;1;4]
+    d = DAQPBase.Model()
+    DAQPBase.setup(d,Matrix{Float64}(I,2,2),zeros(2),A,bu,bl,zeros(Cint,4);break_points=Cint[2;4])
+    x,_,ef,_ = DAQPBase.solve(d)
+    @test ef > 0
+    @test norm(x-[0.75;0.75]) < 1e-4
+    # The equalities are restored by the update
+    DAQPBase.update(d,nothing,nothing,nothing,nothing,nothing)
+    x,_,ef,_ = DAQPBase.solve(d)
+    @test ef > 0
+    @test norm(x-[0.75;0.75]) < 1e-4
+end
+
 @testset "Trivial infeasible" begin
     H = [6.837677669279314 1.3993262799977795 1.9781574256330445 0.7988389688453156;
          1.3993262799977795 4.91607513347457 0.8347008717503388 0.964319980996552;
