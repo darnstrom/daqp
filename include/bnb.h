@@ -11,7 +11,7 @@ extern "C" {
 
 int daqp_bnb(DAQPWorkspace* work);
 int daqp_process_node(DAQPNode* node, DAQPWorkspace* work);
-int daqp_get_branch_id(DAQPWorkspace* work, const int most_fractional);
+int daqp_get_branch_id(DAQPWorkspace* work);
 void daqp_spawn_children(DAQPNode* node, const int branch_id, DAQPWorkspace* work);
 
 void daqp_node_cleanup_workspace(int n_clean, DAQPWorkspace* work);

@@ -104,7 +104,6 @@ static c_float daqp_bnb_incumbent(DAQPWorkspace* work){
 int daqp_bnb(DAQPWorkspace* work){
     int branch_id, exitflag;
     DAQPNode* node;
-    int has_bound;
     c_float *swp_ptr = NULL;
 
     exitflag = daqp_bnb_setup_root(work);
@@ -120,7 +119,6 @@ int daqp_bnb(DAQPWorkspace* work){
     c_float fval_bound0 = work->settings->fval_bound;
     c_float eps_r = 1/(1+work->settings->rel_subopt);
     work->settings->fval_bound = (fval_bound0 - work->settings->abs_subopt)*eps_r;
-    has_bound = fval_bound0 < DAQP_INF;
 
     // Start from a user-provided integer-feasible solution
     if(work->state & DAQP_STATE_INCUMBENT){
@@ -129,7 +127,6 @@ int daqp_bnb(DAQPWorkspace* work){
         if(fval_inc >= 0 && fval_inc < fval_bound0){
             work->settings->fval_bound = (fval_inc - work->settings->abs_subopt)*eps_r;
             swp_ptr = work->xold; // Marks that a feasible solution is stored in xold
-            has_bound = 1;
         }
     }
 
@@ -168,9 +165,8 @@ int daqp_bnb(DAQPWorkspace* work){
         if(exitflag<0) break; // Inner solver failed => exit loop
 
         // Find index to branch over
-        branch_id = daqp_get_branch_id(work, has_bound);
+        branch_id = daqp_get_branch_id(work);
         if(branch_id==DAQP_EMPTY_IND){// Nothing to branch over => integer feasible
-            has_bound = 1;
             work->settings->fval_bound = (0.5*work->fval - work->settings->abs_subopt)*eps_r;
             swp_ptr=work->xold; work->xold= work->u; work->u=swp_ptr; // Store feasible sol
         }
@@ -190,6 +186,7 @@ int daqp_bnb(DAQPWorkspace* work){
         return exitflag < 0 ? exitflag : DAQP_EXIT_INFEASIBLE;
     }
     else{
+        // Invert fval_bound = (0.5*fval_best - abs_subopt)*eps_r to recover fval_best
         work->fval = 2*work->settings->fval_bound/eps_r + 2*work->settings->abs_subopt;
         work->settings->fval_bound = fval_bound0;
         // Let work->u point to the best feasible solution
@@ -236,9 +233,10 @@ int daqp_process_node(DAQPNode* node, DAQPWorkspace* work){
     return exitflag;
 }
 
-int daqp_get_branch_id(DAQPWorkspace* work, const int most_fractional){
-    int i, id, branch_id = DAQP_EMPTY_IND;
-    c_float diff, half_width, dist, tol, frac, max_frac = 0;
+int daqp_get_branch_id(DAQPWorkspace* work){
+    int i;
+    int id = DAQP_EMPTY_IND;
+    c_float diff, dist, tol;
 
     for(i=0; i < work->bnb->nb; i++){
         id = work->bnb->bin_ids[i];
@@ -250,24 +248,17 @@ int daqp_get_branch_id(DAQPWorkspace* work, const int most_fractional){
 
         // A zero-dual binary constraint can lie at an endpoint without being
         // active. It is already integer feasible and does not need branching.
-        half_width = 0.5*(work->dupper[id]-work->dlower[id]);
-        dist = half_width-(diff < 0 ? -diff : diff);
+        dist = 0.5*(work->dupper[id]-work->dlower[id])
+            -(diff < 0 ? -diff : diff);
         tol = work->settings->primal_tol;
         if(work->scaling != NULL) tol *= work->scaling[id];
         if(dist <= tol) continue;
 
         // Explore the endpoint nearest to the relaxation first.
-        if(diff >= 0) id = DAQP_ADD_LOWER_FLAG(id);
-        // No upper bound -> dive to quickly get integer feasible solution
-        if(!most_fractional) return id;
-        frac = dist/half_width;
-        if(frac > max_frac){
-            max_frac = frac;
-            branch_id = id;
-        }
+        return diff < 0 ? id : DAQP_ADD_LOWER_FLAG(id);
     }
 
-    return branch_id;
+    return DAQP_EMPTY_IND;
 }
 
 void daqp_spawn_children(DAQPNode* node, const int branch_id, DAQPWorkspace* work){
