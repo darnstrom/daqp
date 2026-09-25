@@ -298,6 +298,7 @@ EigenDAQPResult const& DAQP::solve() {
     if (!is_solved_) {
         daqp_solve(&result_, &work_);
         is_solved_ = true;
+        get_slack();
     }
     return result_;
 }
