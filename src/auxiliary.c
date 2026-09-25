@@ -142,6 +142,7 @@ static void daqp_add_constraint_keep_slack(DAQPWorkspace *work,
 void daqp_add_constraint(DAQPWorkspace *work, const int add_ind, c_float lam){
     // Mark whether the slack is zero, given the multiplier
     if(DAQP_IS_SOFT(add_ind)){
+        DAQP_SET_MUTABLE(add_ind);
         const c_float w = daqp_soft_w(work,add_ind);
         if(w > 0 && (DAQP_IS_LOWER(add_ind) ? -lam : lam) < w)
             DAQP_SET_SLACK_FIXED(add_ind);
