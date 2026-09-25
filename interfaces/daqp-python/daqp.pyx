@@ -635,6 +635,8 @@ cdef class Model:
         if self._work.settings == NULL:
             return
         cdef DAQPSettings* s = self._work.settings
+        cdef double old_rho_soft = s.rho_soft
+        cdef double old_w_soft = s.w_soft
         if 'primal_tol'   in new_settings: s.primal_tol   = new_settings['primal_tol']
         if 'dual_tol'     in new_settings: s.dual_tol     = new_settings['dual_tol']
         if 'zero_tol'     in new_settings: s.zero_tol     = new_settings['zero_tol']
@@ -653,6 +655,8 @@ cdef class Model:
         if 'refactor_tol' in new_settings: s.refactor_tol = new_settings['refactor_tol']
         if 'time_limit'   in new_settings: s.time_limit   = new_settings['time_limit']
         if 'eq_reduction' in new_settings: s.eq_reduction = new_settings['eq_reduction']
+        if s.rho_soft != old_rho_soft or s.w_soft != old_w_soft:
+            daqp_refresh_soft_weights(self._work)
 
     def soft_weights(self, rho_l=None, rho_u=None, w_l=None, w_u=None):
         """

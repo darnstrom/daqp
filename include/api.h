@@ -45,6 +45,8 @@ void allocate_daqp_avi(DAQPAVI *avi, int n);
 int  daqp_allocate_soft_weights(DAQPWorkspace *work);
 int  daqp_set_soft_weights(DAQPWorkspace *work, c_float *rho_l, c_float *rho_u,
         c_float *w_l, c_float *w_u);
+// Call after writing settings->rho_soft or settings->w_soft on a live workspace.
+void daqp_refresh_soft_weights(DAQPWorkspace *work);
 
 void free_daqp_ldp(DAQPWorkspace *work);
 void free_daqp_workspace(DAQPWorkspace *work);

@@ -96,6 +96,8 @@ daqp_solve(&result, &work);
 A `NULL` argument leaves that weight alone, so `daqp_set_soft_weights(&work, rho, rho, NULL, NULL)`
 sets only the quadratic weights. The weights may also be written directly into `work.rho_ls`,
 `work.rho_us`, `work.w_ls` and `work.w_us` after `daqp_allocate_soft_weights(&work)`.
+If you change `work.settings->rho_soft` or `work.settings->w_soft` after setup,
+call `daqp_refresh_soft_weights(&work)` before the next solve.
 
 ### <img src="{{ '/assets/icons/julia.svg' | relative_url }}" class="nav-icon" alt="Julia"> Julia
 ```julia

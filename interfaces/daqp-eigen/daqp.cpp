@@ -375,12 +375,16 @@ void DAQP::set_eta_prox(double val) {
 }
 
 void DAQP::set_rho_soft(double val) {
+    const bool changed = settings_.rho_soft != val;
     settings_.rho_soft = val;
+    if (changed) daqp_refresh_soft_weights(&work_);
     is_solved_ = false;
 }
 
 void DAQP::set_w_soft(double val) {
+    const bool changed = settings_.w_soft != val;
     settings_.w_soft = val;
+    if (changed) daqp_refresh_soft_weights(&work_);
     is_solved_ = false;
 }
 

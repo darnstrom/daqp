@@ -382,14 +382,9 @@ int daqp_allocate_soft_weights(DAQPWorkspace *work){
 #endif
 }
 
-// Set the weights of the soft constraints, one entry per constraint of the
-// original problem (NULL leaves that weight untouched). Returns 0 if the
-// weights are unavailable, i.e. if the build has no support for them.
-int daqp_set_soft_weights(DAQPWorkspace *work, c_float *rho_l, c_float *rho_u,
-        c_float *w_l, c_float *w_u){
+// Refresh the cached active set after uniform or individual soft weights change.
+void daqp_refresh_soft_weights(DAQPWorkspace *work){
     int i, rebuild = 0;
-    if(!daqp_allocate_soft_weights(work)) return 0;
-    const int m = (work->eq != NULL && work->eq->installed) ? work->eq->m : work->m;
     const int reduced_pending = work->eq != NULL && work->eq->neq != 0
         && !work->eq->installed;
     // A restored equality-reduced problem is reactivated by daqp_eq_reinstall.
@@ -403,17 +398,10 @@ int daqp_set_soft_weights(DAQPWorkspace *work, c_float *rho_l, c_float *rho_u,
                 rebuild = 1;
                 break;
             }
-    for(i = 0; i < m; i++){
-        if(rho_l != NULL) work->rho_ls[i] = rho_l[i];
-        if(rho_u != NULL) work->rho_us[i] = rho_u[i];
-        if(w_l != NULL) work->w_ls[i] = w_l[i];
-        if(w_u != NULL) work->w_us[i] = w_u[i];
-    }
-
     // Reset the factorization
     if(rebuild){
         reset_daqp_workspace(work);
-        if(reduced_pending) return 1;
+        if(reduced_pending) return;
         if(DAQP_IS_HIERARCHICAL(work)){
             const int m = work->m;
             work->m = work->break_points[0];
@@ -423,6 +411,23 @@ int daqp_set_soft_weights(DAQPWorkspace *work, c_float *rho_l, c_float *rho_u,
         else
             daqp_activate_constraints(work);
     }
+}
+
+// Set the weights of the soft constraints, one entry per constraint of the
+// original problem (NULL leaves that weight untouched). Returns 0 if the
+// weights are unavailable, i.e. if the build has no support for them.
+int daqp_set_soft_weights(DAQPWorkspace *work, c_float *rho_l, c_float *rho_u,
+        c_float *w_l, c_float *w_u){
+    int i;
+    if(!daqp_allocate_soft_weights(work)) return 0;
+    const int m = (work->eq != NULL && work->eq->installed) ? work->eq->m : work->m;
+    for(i = 0; i < m; i++){
+        if(rho_l != NULL) work->rho_ls[i] = rho_l[i];
+        if(rho_u != NULL) work->rho_us[i] = rho_u[i];
+        if(w_l != NULL) work->w_ls[i] = w_l[i];
+        if(w_u != NULL) work->w_us[i] = w_u[i];
+    }
+    daqp_refresh_soft_weights(work);
     return 1;
 }
 

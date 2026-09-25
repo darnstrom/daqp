@@ -391,6 +391,15 @@ end
     @test x[1] ≈ 8/3 atol=1e-10
     @test info.λ[1] ≈ 22/3 atol=1e-10
 
+    DAQPBase.settings(d, Dict(:w_soft => 3.0))
+    x, _, exitflag, _ = DAQPBase.solve(d)
+    @test exitflag == 2
+    @test x[1] ≈ 7/3 atol=1e-10
+    DAQPBase.settings(d, Dict(:w_soft => 2.0))
+    x, _, exitflag, _ = DAQPBase.solve(d)
+    @test exitflag == 2
+    @test x[1] ≈ 8/3 atol=1e-10
+
     # First-time allocation after a solve must invalidate the factorization.
     DAQPBase.soft_weights(d; rho_u=[0.1])
     x, _, exitflag, info = DAQPBase.solve(d)
