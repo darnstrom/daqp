@@ -342,8 +342,8 @@ end
 function settings(p::Ptr{DAQPBase.Workspace},changes::Dict{Symbol,<:Any})
     workspace = unsafe_load(p);
     if(workspace.settings == C_NULL) return end
-    settings = unsafe_load(workspace.settings)
-    new = [haskey(changes,f) ? changes[f] : getfield(settings,f)
+    old_settings = unsafe_load(workspace.settings)
+    new = [haskey(changes,f) ? changes[f] : getfield(old_settings,f)
            for f in fieldnames(DAQPBase.DAQPSettings)];
     new_settings = DAQPBase.DAQPSettings(new...)
     return settings(p,new_settings)
