@@ -102,6 +102,9 @@ typedef struct{
 
     int nodecount;
     int itercount;
+
+    int* root_WS; // Working set of the latest root relaxation (warm starts the next solve)
+    int n_root_WS;
 }DAQPBnB;
 
 typedef struct{

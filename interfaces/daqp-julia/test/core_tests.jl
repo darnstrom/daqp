@@ -239,6 +239,92 @@ end
 
 end
 
+@testset "BnB incumbent and warm start" begin
+    rng_inc = MersenneTwister(1234)
+    Random.seed!(1234)
+    nbi = 10
+    # A huge relative suboptimality tolerance prunes the root given an incumbent
+    s_prune = settings(DAQPBase.Model(), Dict(:rel_subopt => 1e6))
+    # Dense, diagonal, and dense Hessian with an equality constraint
+    for (diagH, with_eq) in [(false,false), (false,false), (true,false), (false,true)]
+        H,f,A,bu,bl,sense = generate_test_MIQP(20,60,20,nbi)
+        diagH && (H = Matrix(Diagonal(diag(H))))
+        if with_eq # Origin remains feasible
+            sense[end] = DAQPBase.EQUALITY
+            bu[end] = bl[end] = 0.0
+        end
+        xopt,fopt,ef,info = quadprog(H,f,A,bu,bl,sense)
+        @test ef == DAQPBase.OPTIMAL
+        tolf = 1e-6*(1+abs(fopt))
+
+        # Optimal incumbent (also seeds the root with a warm-start working set)
+        x1,f1,ef1,info1 = quadprog(H,f,A,bu,bl,sense; primal_start=xopt)
+        @test ef1 == DAQPBase.OPTIMAL
+        @test abs(f1-fopt) < tolf
+        @test norm(x1-xopt) < 1e-6
+
+        # Stale incumbent: binaries of a perturbed problem, continuous part re-optimized
+        xp,_,_,_ = quadprog(H,f+30randn(rng_inc,20),A,bu,bl,sense)
+        bf, lf, sf = copy(bu), copy(bl), copy(sense)
+        bf[1:nbi] .= round.(xp[1:nbi]); lf[1:nbi] .= bf[1:nbi]
+        sf[1:nbi] .= DAQPBase.EQUALITY
+        xinc,_,efinc,_ = quadprog(H,f,A,bf,lf,sf)
+        if efinc == DAQPBase.OPTIMAL
+            x2,f2,ef2,info2 = quadprog(H,f,A,bu,bl,sense; primal_start=xinc)
+            @test ef2 == DAQPBase.OPTIMAL
+            @test abs(f2-fopt) < tolf
+            # The incumbent is returned when nothing better is found
+            x5,_,ef5,info5 = quadprog(H,f,A,bu,bl,sense; primal_start=xinc, settings=s_prune)
+            @test ef5 == DAQPBase.OPTIMAL
+            @test info5.nodes == 1
+            @test norm(x5-xinc) < 1e-6
+        end
+
+        # Candidates that are not integer feasible, or infeasible, are ignored
+        for perturb! in [x->(x[1] = 0.5), x->(x[end] += 1e3)]
+            xbad = copy(xopt); perturb!(xbad)
+            x3,f3,ef3,info3 = quadprog(H,f,A,bu,bl,sense; primal_start=xbad)
+            @test ef3 == DAQPBase.OPTIMAL
+            @test abs(f3-fopt) < tolf
+            @test info3.nodes == info.nodes
+        end
+
+        # Dual warm start
+        x4,f4,ef4,_ = quadprog(H,f,A,bu,bl,sense; dual_start=info.λ)
+        @test ef4 == DAQPBase.OPTIMAL
+        @test abs(f4-fopt) < tolf
+
+        # Repeated solves must not be affected by the previous working set
+        d = DAQPBase.Model()
+        DAQPBase.setup(d,H,f,A,bu,bl,sense; primal_start=xopt)
+        for i in 1:2
+            _,fd,efd,_ = DAQPBase.solve(d)
+            @test efd == DAQPBase.OPTIMAL
+            @test abs(fd-fopt) < tolf
+        end
+    end
+end
+
+@testset "BnB root warm start" begin
+    Random.seed!(4321)
+    H,f,A,bu,bl,sense = generate_test_MIQP(20,60,20,10)
+    d = DAQPBase.Model()
+    DAQPBase.setup(d,H,f,A,bu,bl,sense)
+    x1,f1,ef1,info1 = DAQPBase.solve(d)
+    @test ef1 == DAQPBase.OPTIMAL
+    # The root is warm started by the previous root working set
+    x2,f2,ef2,info2 = DAQPBase.solve(d)
+    @test ef2 == DAQPBase.OPTIMAL
+    @test abs(f2-f1) < 1e-6*(1+abs(f1))
+    @test info2.iterations < info1.iterations
+    # Resetting the workspace restores a cold root
+    DAQPBase.reset(d)
+    x3,f3,ef3,info3 = DAQPBase.solve(d)
+    @test ef3 == DAQPBase.OPTIMAL
+    @test abs(f3-f1) < 1e-6*(1+abs(f1))
+    @test info3.iterations == info1.iterations
+end
+
 @testset "Model interface" begin
     # Setup model and solve problem
     d = DAQPBase.Model()
