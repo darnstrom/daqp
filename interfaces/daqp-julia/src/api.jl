@@ -323,7 +323,13 @@ settings(daqp::DAQPBase.Model) = settings(daqp.work)
 function settings(p::Ptr{DAQPBase.Workspace}, new_settings::DAQPBase.DAQPSettings)
     workspace = unsafe_load(p);
     if(workspace.settings != C_NULL)
+        old_settings = unsafe_load(workspace.settings)
         unsafe_store!(workspace.settings,new_settings)
+        if old_settings.rho_soft != new_settings.rho_soft ||
+                old_settings.w_soft != new_settings.w_soft
+            ccall((:daqp_refresh_soft_weights,DAQPBase.libdaqp),Cvoid,
+                  (Ptr{DAQPBase.Workspace},),p)
+        end
     end
     return new_settings
 end
@@ -340,8 +346,7 @@ function settings(p::Ptr{DAQPBase.Workspace},changes::Dict{Symbol,<:Any})
     new = [haskey(changes,f) ? changes[f] : getfield(settings,f)
            for f in fieldnames(DAQPBase.DAQPSettings)];
     new_settings = DAQPBase.DAQPSettings(new...)
-    unsafe_store!(workspace.settings,new_settings);
-    return new_settings;
+    return settings(p,new_settings)
 end
 
 function update(daqp::DAQPBase.Model, H,f,A,bupper,blower,sense=nothing,break_points=nothing,

@@ -89,6 +89,8 @@ cdef extern from "api.h":
     cdef extern nogil:
         int daqp_set_soft_weights(DAQPWorkspace *work, double *rho_l, double *rho_u,
                 double *w_l, double *w_u)
+    cdef extern nogil:
+        void daqp_refresh_soft_weights(DAQPWorkspace *work)
 
 cdef extern from "utils.h":
     cdef extern nogil:

@@ -167,6 +167,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	else if (!strcmp("set_default_settings", cmd)){
 	  if(work->settings == NULL) work->settings = malloc(sizeof(DAQPSettings));
 	  daqp_default_settings(work->settings);
+	  daqp_refresh_soft_weights(work);
 	}
 	else if (!strcmp("get_settings", cmd)) {
 	  if(work->settings != NULL){
@@ -193,6 +194,8 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	}
 	else if (!strcmp("set_settings", cmd)) {
 	  const mxArray* s = prhs[2];
+	  const c_float old_rho_soft = work->settings->rho_soft;
+	  const c_float old_w_soft = work->settings->w_soft;
 	  work->settings->primal_tol = (c_float)mxGetScalar(mxGetField(s, 0, "primal_tol"));
 	  work->settings->dual_tol =  (c_float)mxGetScalar(mxGetField(s, 0, "dual_tol"));
 	  work->settings->zero_tol = (c_float)mxGetScalar(mxGetField(s, 0, "zero_tol"));
@@ -209,6 +212,9 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  work->settings->rel_subopt= (c_float)mxGetScalar(mxGetField(s, 0, "rel_subopt"));
 	  work->settings->time_limit= (c_float)mxGetScalar(mxGetField(s, 0, "time_limit"));
 	  work->settings->eq_reduction= (int)mxGetScalar(mxGetField(s, 0, "eq_reduction"));
+	  if(work->settings->rho_soft != old_rho_soft ||
+	     work->settings->w_soft != old_w_soft)
+	    daqp_refresh_soft_weights(work);
 	}
 	else if (!strcmp("set_soft_weights", cmd)) {
 	  // rho_l, rho_u, w_l, w_u (an empty argument leaves that weight alone)

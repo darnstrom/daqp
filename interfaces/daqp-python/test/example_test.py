@@ -204,6 +204,23 @@ class Testing(unittest.TestCase):
 class TestModel(unittest.TestCase):
     """Tests for the daqp.Model workspace class."""
 
+    def test_uniform_soft_settings_after_solve(self):
+        """Changing uniform penalties refreshes an active soft constraint."""
+        d = daqp.Model()
+        d.settings = {'rho_soft': 0.5}
+        H = np.array([[1.0]], dtype=c_double)
+        f = np.array([-10.0], dtype=c_double)
+        A = np.empty((0, 1), dtype=c_double)
+        bu = np.array([0.0], dtype=c_double)
+        bl = np.array([-1e30], dtype=c_double)
+        sense = np.array([8], dtype=c_int)
+        d.setup(H, f, A, bu, bl, sense)
+        self.assertAlmostEqual(d.solve()[0][0], 10.0 / 3.0)
+        d.settings = {'w_soft': 2.0}
+        self.assertAlmostEqual(d.solve()[0][0], 8.0 / 3.0)
+        d.settings = {'rho_soft': 0.25}
+        self.assertAlmostEqual(d.solve()[0][0], 1.6)
+
     def _make_qp(self):
         """Return a simple QP for testing."""
         H = np.array([[1.0, 0.0], [0.0, 1.0]], dtype=c_double)
