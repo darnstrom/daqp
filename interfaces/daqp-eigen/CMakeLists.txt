@@ -32,6 +32,7 @@ if(TEST)
     add_executable(12_update_state tests/12_update_state.cpp)
     add_executable(13_warm_start_drift tests/13_warm_start_drift.cpp)
     add_executable(14_degenerate_lp_warm tests/14_degenerate_lp_warm.cpp)
+    add_executable(15_degenerate_lp_skip tests/15_degenerate_lp_skip.cpp)
 
     set(TARGETS
         00_basic_qp
@@ -49,6 +50,7 @@ if(TEST)
         12_update_state
         13_warm_start_drift
         14_degenerate_lp_warm
+        15_degenerate_lp_skip
     )
 
     foreach(TARGET ${TARGETS})

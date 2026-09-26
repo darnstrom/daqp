@@ -121,6 +121,9 @@ extern "C" {
 #define DAQP_SET_SLACK_FIXED(x) (work->sense[x]|=32)
 #define DAQP_SET_SLACK_FREE(x) (work->sense[x]&=~32)
 
+// marks a constraint that is temporarily set aside (see gradient_step in daqp_prox.c)
+#define DAQP_SET_ASIDE 64
+
 # ifdef __cplusplus
 }
 # endif // ifdef __cplusplus
