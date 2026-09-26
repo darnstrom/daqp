@@ -27,7 +27,7 @@ Table of contents
 | `iter_limit` | Maximum number of iterations before terminating| 10000 |
 | `fval_bound` | Maximum allowed objective function value. The solver terminates if the dual objective exceeds this value (since it is a lower bound of the optimal value). | 1e30|
 | `eps_prox` | Proximal regularization. A negative value enables automatic regularization for singular problems. A positive forces proximal regularization. | -1e-6|
-| `eq_reduction` | Equality-reduction policy: `-1` disables reduction, `0` selects it automatically, and `1` forces it when eligible. | 0 |
+| `eq_reduction` | Equality-reduction policy: `-1` disables reduction, `0` selects it automatically for solves that start from scratch (e.g., `quadprog`, `linprog`, the Eigen interface without warm start, or a C update with `DAQP_UPDATE_eliminate` in its mask), and `1` forces it when eligible, also for a warm-started workspace/model that is updated and solved repeatedly. For such a workspace, `1` pays off when the solves take many iterations (roughly more than 15–30 per solve if the Hessian or constraint matrix changes between solves). | 0 |
 | `eta_prox` | Tolerance that determines if a fixed point has been reached during proximal-point iterations. A negative value selects an automatic tolerance: 1e-6 for the default `dual_tol`, otherwise the smaller of 1e-6 and `0.1*dual_tol`. A nonnegative value is used directly. | -1|
 | `rho_soft` | Weight used for [soft constraints]({{ '/start/advanced/soft' | relative_url }}) (higher enables more violations) | 1e-6|
 | `w_soft` | Linear weight used for [soft constraints]({{ '/start/advanced/soft' | relative_url }}) (higher make the resulting penalty function more exact) | 0 |

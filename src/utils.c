@@ -78,8 +78,6 @@ int daqp_update_ldp(int mask, DAQPWorkspace *work, DAQPProblem* qp){
         // Rinv, A, and the equality set determine the elimination.
         if(mask&(DAQP_UPDATE_Rinv+DAQP_UPDATE_M+DAQP_UPDATE_sense))
             work->eq->neq = 0;
-        else
-            work->eq->rebuilds = 0;
     }
 
     // Add original qp to workspace
@@ -144,12 +142,12 @@ int daqp_update_ldp(int mask, DAQPWorkspace *work, DAQPProblem* qp){
     }
 
     // Update M. Only the equality rows are needed if the constraints are eliminated 
-    // Automatic reduction is not updated for a new linear term or new bounds
-    // alone: the warm-started solves that typically follow such updates are
-    // too short to recover its cost, so the full problem is solved instead
+    // Automatic reduction only applies to a problem that is solved once
+    // (marked by DAQP_UPDATE_eliminate): the warm-started solves of a
+    // workspace that is updated are typically too short to recover its cost
     reduce = eliminate && daqp_eq_will_reduce(work) &&
         (work->settings->eq_reduction == DAQP_EQ_REDUCTION_ON ||
-         (mask&(DAQP_UPDATE_Rinv+DAQP_UPDATE_M+DAQP_UPDATE_sense)));
+         (mask&DAQP_UPDATE_eliminate));
     if(reduce){
         // Changing H or H invalidates reduced factorization.
         if(mask&(DAQP_UPDATE_Rinv+DAQP_UPDATE_M)) reset_daqp_workspace(work);

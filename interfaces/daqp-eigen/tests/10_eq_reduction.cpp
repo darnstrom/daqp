@@ -5,6 +5,7 @@
 #undef NDEBUG
 #endif
 #include <cassert>
+#include <cmath>
 #include <vector>
 
 namespace {
@@ -68,19 +69,16 @@ struct SizedProblem {
     }
 };
 
-bool setup_reduces(TestProblem& p, int policy, DAQPWorkspace& work) {
+// Set up a workspace, as for a one-shot solve (such as daqp_quadprog) or as a
+// workspace that is to be updated and solved repeatedly
+template <class Problem>
+bool setup_reduces(Problem& p, int policy, DAQPWorkspace& work,
+                   bool one_shot = true) {
     work = {};
     allocate_daqp_settings(&work);
     work.settings->eq_reduction = policy;
-    assert(setup_daqp(&p.qp, &work, nullptr) > 0);
-    return DAQP_IS_REDUCED(&work);
-}
-
-bool setup_reduces(SizedProblem& p, int policy, DAQPWorkspace& work) {
-    work = {};
-    allocate_daqp_settings(&work);
-    work.settings->eq_reduction = policy;
-    assert(setup_daqp(&p.qp, &work, nullptr) > 0);
+    assert(setup_daqp_main(&p.qp, &work, nullptr,
+                           one_shot ? DAQP_UPDATE_eliminate : 0) > 0);
     return DAQP_IS_REDUCED(&work);
 }
 
@@ -94,15 +92,25 @@ void cleanup(DAQPWorkspace& work) {
 int main() {
     DAQPWorkspace work{};
 
+    // AUTO reduces a one-shot problem, but not a workspace that is to be
+    // updated; ON reduces both
     TestProblem dense(false);
     assert(setup_reduces(dense, DAQP_EQ_REDUCTION_AUTO, work));
-    assert(work.eq->rebuilds == 0);
+    cleanup(work);
+    assert(!setup_reduces(dense, DAQP_EQ_REDUCTION_AUTO, work, false));
+    cleanup(work);
+    assert(setup_reduces(dense, DAQP_EQ_REDUCTION_ON, work, false));
+    cleanup(work);
 
-    // AUTO solves the full problem after an update of only the bounds, while
-    // ON keeps reducing, and OFF gives up a reduction that is in place
+    // Updates of a workspace are only reduced with ON (or when an update
+    // itself is marked as one-shot), and OFF gives up a reduction in place
+    assert(setup_reduces(dense, DAQP_EQ_REDUCTION_AUTO, work));
     dense.bu.back() = 9.0;
     assert(daqp_update_ldp(DAQP_UPDATE_d, &work, &dense.qp) >= 0);
     assert(!DAQP_IS_REDUCED(&work));
+    assert(daqp_update_ldp(DAQP_UPDATE_d | DAQP_UPDATE_eliminate, &work,
+                           &dense.qp) >= 0);
+    assert(DAQP_IS_REDUCED(&work));
     cleanup(work);
 
     assert(setup_reduces(dense, DAQP_EQ_REDUCTION_ON, work));
@@ -153,43 +161,34 @@ int main() {
     assert(!setup_reduces(dense, DAQP_EQ_REDUCTION_OFF, work));
     cleanup(work);
 
-    SizedProblem rebuild_candidate(60, 12, 20, false);
-    assert(setup_reduces(rebuild_candidate, DAQP_EQ_REDUCTION_AUTO, work));
+    // Solving a workspace repeatedly: whether the data or only the bounds are
+    // updated, AUTO solves the full problem after the setup (also if the setup
+    // was reduced) and ON reduces every update, with the same solutions
     const int structural = DAQP_UPDATE_Rinv | DAQP_UPDATE_M |
                            DAQP_UPDATE_v | DAQP_UPDATE_d |
                            DAQP_UPDATE_sense;
-    for (int i = 1; i <= DAQP_EQ_MAX_REBUILDS; ++i) {
-        assert(daqp_update_ldp(structural, &work,
-                               &rebuild_candidate.qp) >= 0);
-        assert(DAQP_IS_REDUCED(&work));
-        assert(work.eq->rebuilds == i);
-    }
-    assert(daqp_update_ldp(structural, &work, &rebuild_candidate.qp) >= 0);
-    assert(!DAQP_IS_REDUCED(&work));
-    assert(work.eq->rebuilds == DAQP_EQ_MAX_REBUILDS);
-    // A bounds-only update solves the full problem and resets the count, so
-    // the next update of the data reduces again
-    assert(daqp_update_ldp(DAQP_UPDATE_d, &work,
-                           &rebuild_candidate.qp) >= 0);
-    assert(!DAQP_IS_REDUCED(&work));
-    assert(work.eq->rebuilds == 0);
-    assert(daqp_update_ldp(structural, &work, &rebuild_candidate.qp) >= 0);
-    assert(DAQP_IS_REDUCED(&work));
-    assert(work.eq->rebuilds == 1);
-    cleanup(work);
-
-    // Many equalities: a dense Hessian keeps the reduction through rebuilds,
-    // while a diagonal one makes the full constraints cheap enough to give up
-    for (int diag = 0; diag < 2; ++diag) {
-        SizedProblem dense_eq(60, 30, 20, diag == 1);
-        assert(setup_reduces(dense_eq, DAQP_EQ_REDUCTION_AUTO, work));
-        for (int i = 1; i <= DAQP_EQ_MAX_REBUILDS; ++i) {
-            assert(daqp_update_ldp(structural, &work, &dense_eq.qp) >= 0);
-            assert(DAQP_IS_REDUCED(&work));
+    for (int policy : {DAQP_EQ_REDUCTION_AUTO, DAQP_EQ_REDUCTION_ON}) {
+        for (int mask : {structural, int(DAQP_UPDATE_d)}) {
+            SizedProblem p(60, 30, 20, false);
+            assert(setup_reduces(p, policy, work));
+            std::vector<c_float> xs(p.n), lams(p.m);
+            DAQPResult res{};
+            res.x = xs.data();
+            res.lam = lams.data();
+            daqp_solve(&res, &work);
+            assert(res.exitflag > 0);
+            for (int i = 0; i < 3; ++i) {
+                p.bu[p.m-1] = 9.0-i;
+                assert(daqp_update_ldp(mask, &work, &p.qp) >= 0);
+                assert(DAQP_IS_REDUCED(&work) ==
+                       (policy == DAQP_EQ_REDUCTION_ON));
+                daqp_solve(&res, &work);
+                assert(res.exitflag > 0);
+                for (int j = 0; j < p.neq; ++j) // The equalities hold
+                    assert(std::abs(xs[j] - 1.0) < 1e-9);
+            }
+            cleanup(work);
         }
-        assert(daqp_update_ldp(structural, &work, &dense_eq.qp) >= 0);
-        assert(DAQP_IS_REDUCED(&work) == (diag == 0));
-        cleanup(work);
     }
 
     TestProblem singular(true, true);

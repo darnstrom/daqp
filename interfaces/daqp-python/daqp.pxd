@@ -120,6 +120,7 @@ cdef extern from "constants.h":
     cdef int DAQP_UPDATE_sense
     cdef int DAQP_UPDATE_hierarchy
     cdef int DAQP_UPDATE_unconstrained
+    cdef int DAQP_UPDATE_eliminate
     cdef int DAQP_EQ_REDUCTION_OFF
     cdef int DAQP_EQ_REDUCTION_AUTO
     cdef int DAQP_EQ_REDUCTION_ON

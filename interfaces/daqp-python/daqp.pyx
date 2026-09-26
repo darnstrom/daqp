@@ -49,7 +49,7 @@ cdef void _solve_warm_start(DAQPProblem* problem, DAQPSettings* settings,
         with nogil:
             setup_flag = setup_daqp_main(
                 problem, work, &setup_time_c,
-                DAQP_UPDATE_unconstrained)
+                DAQP_UPDATE_unconstrained | DAQP_UPDATE_eliminate)
         res.setup_time = setup_time_c
         res.exitflag  = setup_flag
         if setup_flag >= 0:
@@ -603,7 +603,8 @@ cdef class Model:
         ``fval_bound``, ``eps_prox``, ``eta_prox``, ``rho_soft``, ``w_soft``,
         ``rel_subopt``, ``abs_subopt``, ``sing_tol``, ``refactor_tol``,
         ``time_limit``, ``eq_reduction``. Equality reduction uses -1 for off,
-        0 for automatic selection, and 1 for forced on.
+        0 for automatic selection (which only applies to solves that start from
+        scratch, so a warm-started model is not reduced), and 1 for forced on.
         """
         if self._work.settings == NULL:
             return {}
