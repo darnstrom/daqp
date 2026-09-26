@@ -17,7 +17,10 @@ REPEATS="${6:-3}"
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 SCRIPT_DIR="$REPO_ROOT/.github/benchmarks"
 EXPORTED_DIR="$OUTPUT_DIR/exported"
-CURRENT_LIB="$CURRENT_BUILD/interfaces/daqp-julia/libdaqp.so"
+# Link against the build tree, which has the full versioned symlink chain
+# (libdaqp.so -> libdaqp.so.MAJOR.MINOR -> ...), rather than the unversioned
+# copy for the Julia interface, which the runner would not find at load time
+CURRENT_LIB="$CURRENT_BUILD/libdaqp.so"
 
 if [ ! -f "$CURRENT_LIB" ]; then
     echo "Current libdaqp.so not found at $CURRENT_LIB"
@@ -26,12 +29,20 @@ fi
 
 python3 "$SCRIPT_DIR/export_maros_meszaros.py" "$MAROS_DATA" "$EXPORTED_DIR"
 
-cc -O3 -I"$REPO_ROOT/include" "$SCRIPT_DIR/maros_meszaros_runner.c" \
-    -L"$(dirname "$CURRENT_LIB")" -ldaqp -lm -o "$OUTPUT_DIR/maros_meszaros_runner"
+# The runner is built once per library, against that version's own headers:
+# the structs (e.g. DAQPSettings) and the library's soname differ between
+# versions, so one runner cannot be shared by both libraries.
+build_runner() { # <include-dir> <lib-dir> <output>
+    cc -O3 -I"$1" "$SCRIPT_DIR/maros_meszaros_runner.c" \
+        -L"$2" -Wl,-rpath,"$2" -ldaqp -lm -o "$3"
+}
+
+build_runner "$REPO_ROOT/include" "$(dirname "$CURRENT_LIB")" \
+    "$OUTPUT_DIR/maros_meszaros_runner_current"
 
 echo "Benchmarking current library"
 LD_LIBRARY_PATH="$(dirname "$CURRENT_LIB")${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
-    "$OUTPUT_DIR/maros_meszaros_runner" "$EXPORTED_DIR" \
+    "$OUTPUT_DIR/maros_meszaros_runner_current" "$EXPORTED_DIR" \
     "$OUTPUT_DIR/current.csv" "$REPEATS"
 
 TEMP_REPO="$(mktemp -d)"
@@ -48,9 +59,12 @@ if [ -z "$BASE_LIB" ]; then
     exit 1
 fi
 
+build_runner "$TEMP_REPO/daqp_base/include" "$(dirname "$BASE_LIB")" \
+    "$OUTPUT_DIR/maros_meszaros_runner_base"
+
 echo "Benchmarking baseline library $BASE_REF"
 LD_LIBRARY_PATH="$(dirname "$BASE_LIB")${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
-    "$OUTPUT_DIR/maros_meszaros_runner" "$EXPORTED_DIR" \
+    "$OUTPUT_DIR/maros_meszaros_runner_base" "$EXPORTED_DIR" \
     "$OUTPUT_DIR/master.csv" "$REPEATS"
 
 COMPARE_RESULT=0
