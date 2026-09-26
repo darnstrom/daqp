@@ -61,6 +61,7 @@ int daqp_update_ldp(int mask, DAQPWorkspace *work, DAQPProblem* qp){
     int do_activate = 0;
     int skip_constraints = 0;
     int unconstrained_flag = 0;
+    int reduce = 0;
     const int was_reduced = DAQP_IS_REDUCED(work);
     const int eliminate = work->settings->eq_reduction != DAQP_EQ_REDUCTION_OFF;
 
@@ -143,7 +144,13 @@ int daqp_update_ldp(int mask, DAQPWorkspace *work, DAQPProblem* qp){
     }
 
     // Update M. Only the equality rows are needed if the constraints are eliminated 
-    if(eliminate && daqp_eq_will_reduce(work)){
+    // Automatic reduction is not updated for a new linear term or new bounds
+    // alone: the warm-started solves that typically follow such updates are
+    // too short to recover its cost, so the full problem is solved instead
+    reduce = eliminate && daqp_eq_will_reduce(work) &&
+        (work->settings->eq_reduction == DAQP_EQ_REDUCTION_ON ||
+         (mask&(DAQP_UPDATE_Rinv+DAQP_UPDATE_M+DAQP_UPDATE_sense)));
+    if(reduce){
         // Changing H or H invalidates reduced factorization.
         if(mask&(DAQP_UPDATE_Rinv+DAQP_UPDATE_M)) reset_daqp_workspace(work);
         skip_constraints = 1;
@@ -189,9 +196,8 @@ int daqp_update_ldp(int mask, DAQPWorkspace *work, DAQPProblem* qp){
         return DAQP_EXIT_UNSUPPORTED;
 
     // The working set refers to the reduced LDP if one was installed. When
-    // reduction has just been disabled, the full constraint matrix is still
-    // unformed; daqp_eq_form_full below forms it and activates constraints.
-    const int form_full_pending = !eliminate &&
+    // reduction has been left out -> full constraint matrix unformed
+    const int form_full_pending = !reduce &&
         work->eq != NULL && work->eq->neq != 0;
     if(was_reduced && !form_full_pending) do_activate = 1;
 
@@ -216,7 +222,7 @@ int daqp_update_ldp(int mask, DAQPWorkspace *work, DAQPProblem* qp){
 
     work->state &= ~DAQP_STATE_PENDING; // Everything has been formed
 
-    if(eliminate){
+    if(reduce){
         error_flag = daqp_eq_eliminate(work);
         return (error_flag < 0) ? error_flag : 0;
     }

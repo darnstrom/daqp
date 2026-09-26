@@ -98,7 +98,14 @@ int main() {
     assert(setup_reduces(dense, DAQP_EQ_REDUCTION_AUTO, work));
     assert(work.eq->rebuilds == 0);
 
+    // AUTO solves the full problem after an update of only the bounds, while
+    // ON keeps reducing, and OFF gives up a reduction that is in place
     dense.bu.back() = 9.0;
+    assert(daqp_update_ldp(DAQP_UPDATE_d, &work, &dense.qp) >= 0);
+    assert(!DAQP_IS_REDUCED(&work));
+    cleanup(work);
+
+    assert(setup_reduces(dense, DAQP_EQ_REDUCTION_ON, work));
     assert(daqp_update_ldp(DAQP_UPDATE_d, &work, &dense.qp) >= 0);
     assert(DAQP_IS_REDUCED(&work));
 
@@ -160,13 +167,15 @@ int main() {
     assert(daqp_update_ldp(structural, &work, &rebuild_candidate.qp) >= 0);
     assert(!DAQP_IS_REDUCED(&work));
     assert(work.eq->rebuilds == DAQP_EQ_MAX_REBUILDS);
+    // A bounds-only update solves the full problem and resets the count, so
+    // the next update of the data reduces again
     assert(daqp_update_ldp(DAQP_UPDATE_d, &work,
                            &rebuild_candidate.qp) >= 0);
+    assert(!DAQP_IS_REDUCED(&work));
+    assert(work.eq->rebuilds == 0);
+    assert(daqp_update_ldp(structural, &work, &rebuild_candidate.qp) >= 0);
     assert(DAQP_IS_REDUCED(&work));
     assert(work.eq->rebuilds == 1);
-    assert(daqp_update_ldp(DAQP_UPDATE_d, &work,
-                           &rebuild_candidate.qp) >= 0);
-    assert(work.eq->rebuilds == 0);
     cleanup(work);
 
     // Many equalities: a dense Hessian keeps the reduction through rebuilds,
