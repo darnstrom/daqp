@@ -1044,3 +1044,63 @@ end
     end
     @test tquad < 10*tsetup #Should be orders of magnitude faster
 end
+
+@testset "Consecutive updates with forced reduction" begin
+    n, neq = 40, 16
+    H = Matrix{Float64}(I,n,n); A = copy(H); f = fill(-2.0,n)
+    bu = vcat(zeros(neq),ones(n-neq))
+    bl = vcat(zeros(neq),fill(-1e30,n-neq))
+    sense = vcat(fill(Cint(5),neq),zeros(Cint,n-neq))
+    for field1 in (:A,:H,:f), field2 in (:A,:H)
+        d = DAQPBase.Model()
+        DAQPBase.settings(d,Dict(:eq_reduction=>1))
+        DAQPBase.setup(d,H,f,A,bu,bl,sense); DAQPBase.solve(d)
+        for field in (field1,field2)
+            @test DAQPBase.update(d,field == :H ? H : nothing,
+                field == :f ? f : nothing,field == :A ? A : nothing,
+                nothing,nothing) == 0
+        end
+        x,value,flag,_ = DAQPBase.solve(d)
+        @test flag == 1
+        @test x ≈ vcat(zeros(neq),ones(n-neq)) atol=1e-8
+        @test value ≈ -36.0 atol=1e-8
+    end
+end
+
+@testset "Generated soft weights with equality reduction" begin
+    if local_lib && !isnothing(Sys.which("gcc"))
+        d = DAQPBase.Model()
+        DAQPBase.settings(d,Dict(:eq_reduction=>1))
+        H = Matrix{Float64}(I,2,2)
+        DAQPBase.setup(d,H,[0.0,-10.0],H,[0.0,0.0],[0.0,-1e30],Cint[5,8])
+        DAQPBase.soft_weights(d;rho_l=[0.0,0.2],rho_u=[0.0,0.1],
+                                w_l=[0.0,3.0],w_u=[0.0,2.0])
+        mktempdir() do dir
+            DAQPBase.codegen(d;dir)
+            get_local_sources(dir)
+            library = joinpath(dir,"generated."*Base.Libc.Libdl.dlext)
+            run(`gcc -shared -fPIC -I$dir $(joinpath(dir,"daqp_workspace.c")) -o $library`)
+            handle = Base.Libc.Libdl.dlopen(library)
+            try
+                generated = Ptr{DAQPBase.Workspace}(Base.Libc.Libdl.dlsym(handle,:daqp_work))
+                work = unsafe_load(generated)
+                @test work.n == 1
+                @test unsafe_load(work.rho_ls) ≈ 0.2
+                @test unsafe_load(work.rho_us) ≈ 0.1
+                @test unsafe_load(work.w_ls) ≈ 3.0
+                @test unsafe_load(work.w_us) ≈ 2.0
+                # Generated workspaces receive transformed bounds at runtime.
+                unsafe_store!(work.dupper,-10.0)
+                unsafe_store!(work.dlower,-1e30)
+                flag = ccall((:daqp_ldp,DAQPBase.libdaqp),Cint,
+                             (Ptr{DAQPBase.Workspace},),generated)
+                x,_,runtime_flag,_ = DAQPBase.solve(d)
+                @test flag == runtime_flag == 2
+                @test x[2] ≈ 8/11 atol=1e-9
+                @test unsafe_load(work.u)+10.0 ≈ x[2] atol=1e-9
+            finally
+                Base.Libc.Libdl.dlclose(handle)
+            end
+        end
+    end
+end

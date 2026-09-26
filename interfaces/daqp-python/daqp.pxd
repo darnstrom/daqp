@@ -96,6 +96,9 @@ cdef extern from "utils.h":
     cdef extern nogil:
         int daqp_update_ldp(int mask, DAQPWorkspace *work, DAQPProblem *qp)
 
+cdef extern from "eq_elim.h":
+    void daqp_eq_restore(DAQPWorkspace *work) noexcept nogil
+
 cdef extern from "constants.h":
     cdef double DAQP_INF
     cdef double DAQP_DEFAULT_PRIM_TOL
