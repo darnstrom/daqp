@@ -455,25 +455,63 @@ c_float daqp_get_proximal_regularization(const DAQPWorkspace *work){
     return eps;
 }
 
+// A blocked implementation of M <-- A*Rinv
+static void daqp_rinv_product_block(const c_float* Rinv, const c_float** a,
+        c_float** m, const int n){
+    int i0, j;
+    const c_float *a0 = a[0], *a1 = a[1], *a2 = a[2], *a3 = a[3];
+    const c_float* r;
+    for(i0 = n-2; i0 >= 0; i0 -= 2){
+        // Row i0+1 of Rinv only reaches the second column of the tile
+        r = Rinv+DAQP_R_OFFSET((i0+1),n)+i0;
+        c_float s01 = a0[i0+1]*r[1], s11 = a1[i0+1]*r[1];
+        c_float s21 = a2[i0+1]*r[1], s31 = a3[i0+1]*r[1];
+        c_float s00 = 0, s10 = 0, s20 = 0, s30 = 0;
+        for(j = i0; j >= 0; j--){
+            r = Rinv+DAQP_R_OFFSET(j,n)+i0;
+            const c_float r0 = r[0], r1 = r[1];
+            const c_float x0 = a0[j], x1 = a1[j], x2 = a2[j], x3 = a3[j];
+            s00 += x0*r0; s01 += x0*r1;
+            s10 += x1*r0; s11 += x1*r1;
+            s20 += x2*r0; s21 += x2*r1;
+            s30 += x3*r0; s31 += x3*r1;
+        }
+        m[0][i0] = s00; m[0][i0+1] = s01;
+        m[1][i0] = s10; m[1][i0+1] = s11;
+        m[2][i0] = s20; m[2][i0+1] = s21;
+        m[3][i0] = s30; m[3][i0+1] = s31;
+    }
+    if(n%2){ // The first column is left over, and only has a single term
+        const c_float s0 = a0[0]*Rinv[0], s1 = a1[0]*Rinv[0];
+        const c_float s2 = a2[0]*Rinv[0], s3 = a3[0]*Rinv[0];
+        m[0][0] = s0; m[1][0] = s1; m[2][0] = s2; m[3][0] = s3;
+    }
+}
+
 int daqp_update_M(DAQPWorkspace *work, c_float *A){
-    int i,j,k,disp,disp2;
+    int i,j,k,disp;
     const int n = work->n;
     const int mA = work->m-work->ms;
-    int stop_id = (work->state & DAQP_STATE_RINV_NORMALIZED) ? n-work->ms : n;
+    // The rows of Rinv of the simple bounds are scaled if Rinv is normalized
+    const int ns = (work->state & DAQP_STATE_RINV_NORMALIZED) ? work->ms : 0;
     if(work->Rinv != NULL){
-        for(k = 0,disp2=n*mA-1;k<mA;k++,disp2-=n){
-            disp=DAQP_ARSUM(n);
-            for(j = 0; j< stop_id ; ++j){
-                for(i=0;i<j;++i)
-                    work->M[disp2-i] += work->Rinv[--disp]*A[disp2-j];
-                work->M[disp2-j]=work->Rinv[--disp]*A[disp2-j];
+        for(k = 0; k < mA; k += 4){
+            const c_float* a[4];
+            c_float* m[4];
+            for(i = 0; i < 4; i++){ // The last row fills an incomplete block
+                const int row = (k+i < mA) ? k+i : mA-1;
+                a[i] = A+(size_t)row*n;
+                m[i] = work->M+(size_t)row*n;
             }
-            for(; j<n; ++j){// Take into account scaling in Rinv
-                c_float col_scaling = A[disp2-j]/work->scaling[n-j-1];
-                for(i=0;i<j;++i)
-                    work->M[disp2-i] += work->Rinv[--disp]*col_scaling;
-                work->M[disp2-j]= work->Rinv[--disp]*col_scaling;
+            if(ns > 0){ // Undo the scaling in Rinv, in place in M
+                for(i = 0; i < 4 && k+i < mA; i++){
+                    for(j = 0; j < ns; j++) m[i][j] = a[i][j]/work->scaling[j];
+                    for(; j < n; j++) m[i][j] = a[i][j];
+                    a[i] = m[i];
+                }
+                for(; i < 4; i++) a[i] = a[i-1];
             }
+            daqp_rinv_product_block(work->Rinv,a,m,n);
         }
     }
     else{
