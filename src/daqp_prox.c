@@ -3,6 +3,7 @@
 #include "utils.h"
 
 static int gradient_step(DAQPWorkspace* work);
+static int gradient_step_once(DAQPWorkspace* work);
 
 /* --------------------------------------------------------------------------
  * daqp_prox  --  outer proximal-point / semi-proximal loop
@@ -227,10 +228,33 @@ int daqp_prox(DAQPWorkspace *work){
  * active set does not span all n variables).  Advances x along the
  * direction delta_x = x - x_old until the nearest constraint boundary is
  * hit, activates that blocking constraint for the next inner solve, and
- * returns its index.
+ * returns its index. A blocking constraint that is linearly dependent on the
+ * active ones does not bring the iterate closer to a vertex (and daqp_ldp
+ * would remove it again), so it is set aside and the step continues to the
+ * next blocking constraint.
  * Returns DAQP_EMPTY_IND if the problem is unbounded in that direction.
  * --------------------------------------------------------------------------*/
 static int gradient_step(DAQPWorkspace* work){
+    int i, add_ind, last_skipped = DAQP_EMPTY_IND;
+    while((add_ind = gradient_step_once(work)) != DAQP_EMPTY_IND &&
+            work->sing_ind != DAQP_EMPTY_IND){
+        work->n_active--;
+        DAQP_SET_INACTIVE(add_ind);
+        work->sense[add_ind] |= DAQP_SET_ASIDE;
+        work->sing_ind = DAQP_EMPTY_IND;
+        if(work->reuse_ind > work->n_active) work->reuse_ind = work->n_active;
+        last_skipped = add_ind;
+    }
+    if(last_skipped != DAQP_EMPTY_IND){
+        for(i = 0; i < work->m; i++) work->sense[i] &= ~DAQP_SET_ASIDE;
+        // A step has been taken, so the problem is not unbounded along it
+        if(add_ind == DAQP_EMPTY_IND) add_ind = last_skipped;
+    }
+    return add_ind;
+}
+
+// Single step toward the first blocking constraint that is not active or set aside
+static int gradient_step_once(DAQPWorkspace* work){
     int j, k, disp, add_ind = DAQP_EMPTY_IND, add_lower = 0;
     const int nx = work->n;
     const int m  = work->m;
@@ -239,7 +263,7 @@ static int gradient_step(DAQPWorkspace* work){
 
     // Simple bounds: find first blocking constraint along delta_x
     for(j = 0; j < ms; j++){
-        if(work->sense[j] & (DAQP_ACTIVE + DAQP_IMMUTABLE)) continue;
+        if(work->sense[j] & (DAQP_ACTIVE + DAQP_IMMUTABLE + DAQP_SET_ASIDE)) continue;
         delta_s = work->x[j] - work->xold[j];
         if(delta_s > 0 &&
                 work->qp->bupper[j] < DAQP_INF &&
@@ -259,7 +283,7 @@ static int gradient_step(DAQPWorkspace* work){
 
     // General bounds
     for(j = ms, disp = 0; j < m; j++){
-        if(work->sense[j] & (DAQP_ACTIVE + DAQP_IMMUTABLE)){
+        if(work->sense[j] & (DAQP_ACTIVE + DAQP_IMMUTABLE + DAQP_SET_ASIDE)){
             disp += nx;
             continue;
         }
