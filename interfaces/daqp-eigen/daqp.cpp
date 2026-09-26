@@ -242,6 +242,9 @@ int DAQP::update(Eigen::MatrixXd const& H,
         if (H_ptr != nullptr) update_mask += DAQP_UPDATE_Rinv;
         if (f_ptr != nullptr) update_mask += DAQP_UPDATE_v;
     }
+    // Without warm start, every solve starts from scratch (as a one-shot
+    // solve does), so automatic equality reduction applies
+    if (!warm_start_) update_mask |= DAQP_UPDATE_eliminate;
 
     // Manage the pre-allocated Rinv buffer:
     // - When H is provided, make the buffer visible to daqp_update_Rinv.

@@ -170,15 +170,6 @@ static int is_eq_elim_worthwhile(const DAQPWorkspace* work, const int n_eq){
     if(policy == DAQP_EQ_REDUCTION_OFF) return 0;
     if(policy == DAQP_EQ_REDUCTION_ON) return n_eq > 0;
 
-    // Rebuilding the elimination at every update costs more than solving the
-    // reduced problem saves, unless the problem is large, the Hessian is dense
-    // (so the full constraints are expensive to form) and the equalities
-    // remove a large part of it
-    if(work->eq != NULL && work->eq->rebuilds >= DAQP_EQ_MAX_REBUILDS &&
-            (work->RinvD != NULL || n < 2*DAQP_EQ_MIN_DIM ||
-             DAQP_EQ_REBUILD_MIN_RATIO*n_eq < n))
-        return 0;
-
     // Fixed reduction overhead dominates for tiny problems. At larger sizes,
     // require strictly more than the nominal equality ratio: exact-boundary
     // cases have too little dimension reduction to recover the setup cost.
@@ -701,14 +692,9 @@ int daqp_eq_form_full(DAQPWorkspace* work){
 
 int daqp_eq_eliminate(DAQPWorkspace* work){
     int flag, error_flag;
-    const int had_eq = work->eq != NULL;
     // Only the bounds are known to have changed; daqp_update_ldp invalidates
     // the factorization when the data it is formed from changes
     flag = daqp_eq_reduce(work,DAQP_UPDATE_d);
-    // Count consecutive rebuilds here rather than in daqp_eq_reduce, where
-    // the bookkeeping degrades the code generated for the factorization
-    if(flag == 2 && had_eq) work->eq->rebuilds++;
-    else if(flag == 1) work->eq->rebuilds = 0;
     if(flag <= 0){
         // No reduction was installed, so the full constraints are still owed
         if(daqp_eq_will_reduce(work)){

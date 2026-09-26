@@ -65,8 +65,9 @@ void daqp_quadprog(DAQPResult *res, DAQPProblem* qp, DAQPSettings *settings){
 
     DAQPWorkspace work;
     work.settings = settings;
+    // The problem is solved once, so automatic equality reduction applies
     setup_flag = setup_daqp_main(qp,&work,&(res->setup_time),
-            DAQP_UPDATE_unconstrained);
+            DAQP_UPDATE_unconstrained | DAQP_UPDATE_eliminate);
     res->exitflag = setup_flag;
 
     if(setup_flag >= 0){

@@ -56,7 +56,7 @@ function quadprog(H::Union{Matrix{Float64}, Cholesky},f::Vector{Float64},
     !isnothing(settings) && DAQPBase.settings(d,settings)
     exitflag,setup_time = DAQPBase.setup(d,QPj(H,f,A,bupper,blower,sense;A_rowmaj);
         primal_start,dual_start,
-        init_mask=DAQP_UPDATE_unconstrained)
+        init_mask=DAQP_UPDATE_unconstrained|DAQP_UPDATE_eliminate)
     return DAQPBase.solve(d;setup_time);
 end
 
@@ -124,7 +124,7 @@ function linprog(f::Vector{Float64},
     d = DAQPBase.Model()
     exitflag,setup_time = DAQPBase.setup(
         d, QPj(zeros(0,0),f,A,bupper,blower,sense;A_rowmaj);
-        primal_start,dual_start)
+        primal_start,dual_start,init_mask=DAQP_UPDATE_eliminate)
     return  DAQPBase.solve(d;setup_time);
 end
 """
@@ -183,7 +183,7 @@ function avi(H::Matrix{Float64},f::Vector{Float64},
     d = DAQPBase.Model()
     !isnothing(settings) && DAQPBase.settings(d,settings)
     exitflag,setup_time = DAQPBase.setup(d,QPj(H,f,A,bupper,blower,sense;A_rowmaj,is_avi=true);
-        primal_start,dual_start)
+        primal_start,dual_start,init_mask=DAQP_UPDATE_eliminate)
     return  DAQPBase.solve(d;setup_time);
 end
 """

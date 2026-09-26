@@ -83,6 +83,13 @@ daqp_update_ldp(DAQP_UPDATE_Rinv | DAQP_UPDATE_M |
 Passing a separate `qp.sense` array with `DAQP_UPDATE_sense` instead replaces
 the stored state with the state supplied by the caller.
 
+A workspace is not reduced by the automatic equality reduction (setting
+`eq_reduction = 0`), since its warm-started solves are typically too short to
+recover the cost of eliminating the equality constraints. If an update is
+instead followed by a solve from scratch, add `DAQP_UPDATE_eliminate` to its
+mask to let the automatic reduction apply (the Eigen interface does this for
+objects without warm start). Setting `eq_reduction = 1` reduces every update.
+
 When the workspace is no longer needed, free it with:
 ```c
 free_daqp_workspace(&work);

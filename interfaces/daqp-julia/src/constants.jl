@@ -20,6 +20,7 @@ const DAQP_UPDATE_d = 8
 const DAQP_UPDATE_sense = 16
 const DAQP_UPDATE_hierarchy = 32
 const DAQP_UPDATE_unconstrained = 64
+const DAQP_UPDATE_eliminate = 128 # Lets automatic equality reduction apply (solves from scratch)
 
 const DAQP_EQ_REDUCTION_OFF = -1
 const DAQP_EQ_REDUCTION_AUTO = 0

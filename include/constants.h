@@ -34,7 +34,11 @@ extern "C" {
 #define DAQP_DEFAULT_REFACTOR_TOL 1e-9
 #define DAQP_DEFAULT_EPS_PROX (-1e-6)
 
-// Equality-reduction policy (DAQPSettings.eq_reduction)
+// Equality-reduction policy (DAQPSettings.eq_reduction). AUTO only reduces
+// solves that start from scratch, which the setup/update marks with
+// DAQP_UPDATE_eliminate (daqp_quadprog, the interfaces' one-shot solves, and
+// the Eigen interface without warm start); ON also reduces a warm-started
+// workspace that is updated and solved repeatedly
 #define DAQP_EQ_REDUCTION_OFF (-1)
 #define DAQP_EQ_REDUCTION_AUTO 0
 #define DAQP_EQ_REDUCTION_ON 1
@@ -46,11 +50,6 @@ extern "C" {
 #define DAQP_EQ_MIN_DIM 20
 // Diagonal Hessians require at least n/DAQP_EQ_DIAG_MIN_RATIO equalities
 #define DAQP_EQ_DIAG_MIN_RATIO 4
-// Automatic reduction gives up after this many consecutive update rebuilds,
-// unless the problem is large, has a dense Hessian and at least
-// n/DAQP_EQ_REBUILD_MIN_RATIO equalities
-#define DAQP_EQ_MAX_REBUILDS 3
-#define DAQP_EQ_REBUILD_MIN_RATIO 3
 
 
 // MACROS
@@ -77,6 +76,9 @@ extern "C" {
 #define DAQP_UPDATE_sense 16
 #define DAQP_UPDATE_hierarchy 32
 #define DAQP_UPDATE_unconstrained 64
+// Lets DAQP_EQ_REDUCTION_AUTO eliminate the equality constraints of the LDP
+// that this setup/update forms (for a solve that starts from scratch)
+#define DAQP_UPDATE_eliminate 128
 
 // WORKSPACE STATE MASKS
 // The DAQP_UPDATE_* bits in DAQP_STATE_PENDING mark the parts of the LDP that
