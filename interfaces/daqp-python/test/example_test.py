@@ -684,6 +684,28 @@ class TestSemiProximal(unittest.TestCase):
         self.assertEqual(exitflag, exitflag_ref)
         np.testing.assert_allclose(x, x_ref, atol=1e-8)
 
+    def test_consecutive_updates_with_forced_reduction(self):
+        n, neq = 40, 16
+        H = np.eye(n)
+        A = np.eye(n)
+        f = np.full(n, -2.0)
+        bu = np.r_[np.zeros(neq), np.ones(n-neq)]
+        bl = np.r_[np.zeros(neq), np.full(n-neq, -1e30)]
+        sense = np.r_[np.full(neq, 5), np.zeros(n-neq)].astype(np.intc)
+        for first in ({'A': A}, {'H': H}, {'f': f}):
+            for second in ({'A': A}, {'H': H}):
+                with self.subTest(first=list(first), second=list(second)):
+                    d = daqp.Model()
+                    d.settings = {'eq_reduction': 1}
+                    d.setup(H, f, A, bu, bl, sense)
+                    d.solve()
+                    self.assertEqual(d.update(**first), 0)
+                    self.assertEqual(d.update(**second), 0)
+                    x, value, flag, _ = d.solve()
+                    self.assertEqual(flag, 1)
+                    np.testing.assert_allclose(x, np.r_[np.zeros(neq), np.ones(n-neq)], atol=1e-8)
+                    self.assertAlmostEqual(value, -36.0)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -385,6 +385,9 @@ function update(daqp::DAQPBase.Model, H,f,A,bupper,blower,sense=nothing,break_po
     # Omitted sense reuses DAQP's state; explicit sense overrides it.
     if isnothing(sense) && (update_mask & (DAQP_UPDATE_Rinv | DAQP_UPDATE_M)) != 0
         if daqp.has_solved
+            # A preceding update may have installed a reduced workspace.
+            ccall((:daqp_eq_restore,DAQPBase.libdaqp),Cvoid,
+                  (Ptr{DAQPBase.Workspace},),daqp.work)
             work = unsafe_load(daqp.work)
             unsafe_copyto!(pointer(daqp.qpj.sense), work.sense, Int(qp.m))
         end

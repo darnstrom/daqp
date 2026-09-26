@@ -574,6 +574,8 @@ cdef class Model:
         # Omitted sense reuses DAQP's state; explicit sense overrides it.
         if sense is None and (update_mask & (DAQP_UPDATE_Rinv | DAQP_UPDATE_M)):
             if self._has_solved:
+                # A preceding update may have installed a reduced workspace.
+                daqp_eq_restore(self._work)
                 self._qp.sense = self._work.sense
             else:
                 self._qp.sense = NULL if m == 0 else &self._sense[0]
