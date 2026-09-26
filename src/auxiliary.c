@@ -482,70 +482,68 @@ void daqp_pivot_last(DAQPWorkspace *work){
     }
 }
 
-// Activate constrainte that are marked active in sense
+// Add constraint id to the working set, with a multiplier that reproduces the
+// slack state that is marked in sense
+static void daqp_activate_constraint(DAQPWorkspace *work, const int id){
+    c_float lam = 1.0;
+    const c_float w = DAQP_IS_SOFT(id) ? daqp_soft_w(work,id) : 0;
+    if(w > 0) lam = DAQP_IS_SLACK_FREE(id) ? w+1 : 0.9*w;
+    daqp_add_constraint(work,id, DAQP_IS_LOWER(id) ? -lam : lam);
+}
+
+// Activate the constraints that are marked active in sense
+// Equalities are activated before inequalities
 int daqp_activate_constraints(DAQPWorkspace *work){
-    //TODO prioritize inequalities?
-    int i;
-    for(i =0;i<work->m;i++){
-        if(DAQP_IS_ACTIVE(i)){
-            // Pick a multiplier that reproduces the marked slack state
-            c_float lam = 1.0;
-            const c_float w = DAQP_IS_SOFT(i) ? daqp_soft_w(work,i) : 0;
-            if(w > 0) lam = DAQP_IS_SLACK_FREE(i) ? w+1 : 0.9*w;
-            daqp_add_constraint(work,i, DAQP_IS_LOWER(i) ? -lam : lam);
+    int i, j, first_mutable = work->m;
+    for(i = 0; i < work->m; i++){
+        if(!DAQP_IS_ACTIVE(i)) continue;
+        if(!DAQP_IS_IMMUTABLE(i)){
+            if(i < first_mutable) first_mutable = i;
+            continue;
         }
+        daqp_activate_constraint(work,i);
         if(work->sing_ind != DAQP_EMPTY_IND){
-            int last_ind = work->WS[work->n_active-1];
-            if(DAQP_IS_IMMUTABLE(last_ind)){
-                c_float dependency_residual = 0.0;
-                c_float dependency_scale = 1.0;
-                int j;
+            c_float dependency_residual = 0.0;
+            c_float dependency_scale = 1.0;
 
-                /*
-                 * The new equality is linearly dependent on the active
-                 * equalities. The singular direction is a null vector of
-                 * their row Gramian. It also provides a consistency check
-                 * for the corresponding right-hand sides.
-                 */
-                daqp_compute_singular_direction(work);
-                for(j = 0; j < work->n_active; j++){
-                    int id = work->WS[j];
-                    c_float bound = DAQP_IS_LOWER(id)
-                        ? work->dlower[id] : work->dupper[id];
-                    c_float term = work->lam_star[j] * bound;
-                    dependency_residual += term;
-                    dependency_scale += term < 0 ? -term : term;
-                }
-
-                DAQP_SET_INACTIVE(last_ind);
-                work->n_active--;
-                work->sing_ind = DAQP_EMPTY_IND;
-                if(work->reuse_ind > work->n_active)
-                    work->reuse_ind = work->n_active;
-
-                if(dependency_residual <=
-                            work->settings->primal_tol*dependency_scale &&
-                        dependency_residual >=
-                            -work->settings->primal_tol*dependency_scale)
-                    continue; // Consistent redundant equality: safely ignore.
-                return DAQP_EXIT_OVERDETERMINED_INITIAL;
+            //  The new equality is linearly dependent on the active equalities
+            daqp_compute_singular_direction(work);
+            for(j = 0; j < work->n_active; j++){
+                int id = work->WS[j];
+                c_float bound = DAQP_IS_LOWER(id)
+                    ? work->dlower[id] : work->dupper[id];
+                c_float term = work->lam_star[j] * bound;
+                dependency_residual += term;
+                dependency_scale += term < 0 ? -term : term;
             }
 
-            int exitflag = 1;
-            for(;i<work->m;i++){
-                // 1. Check if there are equalities that couldn't be activated
-                // 2. Make sure that sense is clean for unactivated constraints
-                if(DAQP_IS_ACTIVE(i)){
-                    if(DAQP_IS_IMMUTABLE(i))
-                        exitflag = DAQP_EXIT_OVERDETERMINED_INITIAL;
-                    else
-                        DAQP_SET_INACTIVE(i);
-                }
-            }
-            // Remove the last constraint that lead to singularity
+            DAQP_SET_INACTIVE(i);
             work->n_active--;
             work->sing_ind = DAQP_EMPTY_IND;
-            return exitflag;
+            if(work->reuse_ind > work->n_active)
+                work->reuse_ind = work->n_active;
+
+            if(dependency_residual >
+                        work->settings->primal_tol*dependency_scale ||
+                    dependency_residual <
+                        -work->settings->primal_tol*dependency_scale)
+                return DAQP_EXIT_OVERDETERMINED_INITIAL;
+            // Consistent redundant equality: safely ignore.
+        }
+    }
+
+    // Activate active inequalities
+    for(i = first_mutable; i < work->m; i++){
+        if(!DAQP_IS_ACTIVE(i) || DAQP_IS_IMMUTABLE(i)) continue;
+        daqp_activate_constraint(work,i);
+        if(work->sing_ind != DAQP_EMPTY_IND){
+            // Leave this constraint and the remaining mutable ones inactive.
+            for(j = i; j < work->m; j++){
+                if(!DAQP_IS_IMMUTABLE(j)) DAQP_SET_INACTIVE(j);
+            }
+            work->n_active--;
+            work->sing_ind = DAQP_EMPTY_IND;
+            return 1;
         }
     }
     return 1;
