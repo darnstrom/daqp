@@ -472,6 +472,53 @@ class TestModel(unittest.TestCase):
 class TestSemiProximal(unittest.TestCase):
     """Tests for automatic and forced proximal modes."""
 
+    def test_small_positive_diagonal_hessian(self):
+        """Small, well-conditioned diagonal Hessians remain positive definite."""
+        n = 3
+        A = np.zeros((0, n), dtype=c_double)
+        bounds = np.zeros(0, dtype=c_double)
+        sense = np.zeros(0, dtype=c_int)
+        expected_x = np.array([1.0, -2.0, 3.0], dtype=c_double)
+
+        for scale in (1.0e-12, 1.0e-16):
+            H = scale * np.eye(n, dtype=c_double)
+            for settings in ({}, {'eps_prox': 0.0}):
+                for f in (np.zeros(n, dtype=c_double), -H @ expected_x):
+                    with self.subTest(scale=scale, settings=settings, f=f):
+                        x, _, flag, _ = daqp.solve(
+                            H, f, A, bounds, bounds, sense, **settings)
+                        self.assertEqual(flag, 1)
+                        np.testing.assert_allclose(x, -f / scale, atol=1.0e-12)
+
+    def test_large_scale_diagonal_without_regularization(self):
+        """Large-scale Hessians retain the legacy absolute acceptance threshold."""
+        H = np.diag([1.0e12, 1.0])
+        expected_x = np.array([1.0, -2.0], dtype=c_double)
+        A = np.zeros((0, 2), dtype=c_double)
+        bounds = np.zeros(0, dtype=c_double)
+        sense = np.zeros(0, dtype=c_int)
+
+        for f in (np.zeros(2, dtype=c_double), -H @ expected_x):
+            with self.subTest(f=f):
+                x, _, flag, _ = daqp.solve(
+                    H, f, A, bounds, bounds, sense, eps_prox=0.0)
+                self.assertEqual(flag, 1)
+                np.testing.assert_allclose(x, -f / np.diag(H), atol=1.0e-12)
+
+    def test_nonpositive_diagonal_without_regularization(self):
+        """Disabling regularization still rejects zero and negative entries."""
+        n = 3
+        A = np.zeros((0, n), dtype=c_double)
+        bounds = np.zeros(0, dtype=c_double)
+        sense = np.zeros(0, dtype=c_int)
+        for diagonal in ([0.0, 0.0, 0.0], [1.0e-12, 0.0, 1.0e-12],
+                         [1.0e-12, -1.0e-12, 1.0e-12]):
+            with self.subTest(diagonal=diagonal):
+                _, _, flag, _ = daqp.solve(
+                    np.diag(diagonal), np.zeros(n, dtype=c_double), A,
+                    bounds, bounds, sense, eps_prox=0.0)
+                self.assertEqual(flag, -5)
+
     def test_pd_hessian_n_prox_zero(self):
         """Automatic mode leaves a positive-definite Hessian unshifted."""
         H = np.array([[1.0, 0.0], [0.0, 1.0]], dtype=c_double)
