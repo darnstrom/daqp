@@ -294,6 +294,9 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
                 factor_tol = zero_tol * hessian_scale;
             eps = proximal_regularization_scaled(work, hessian_scale);
         }
+        // Allow small-scale Hessians without tightening the legacy absolute
+        // acceptance threshold for large-scale Hessians.
+        const c_float acceptance_tol = factor_tol < zero_tol ? factor_tol : zero_tol;
         if(work->Rinv != NULL){ work->RinvD = work->Rinv; work->Rinv = NULL; }
         for(i = 0, disp = 0; i < n; i++){
             c_float Hi;
@@ -307,7 +310,7 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
                     }
                     Hi += eps;
                 }
-                if(Hi <= zero_tol) return DAQP_EXIT_NONCONVEX;
+                if(Hi <= acceptance_tol) return DAQP_EXIT_NONCONVEX;
                 Hi = sqrt(Hi);
             } else {
                 if(Hi <= zero_tol) return DAQP_EXIT_NONCONVEX;
