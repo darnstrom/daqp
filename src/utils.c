@@ -660,7 +660,7 @@ int daqp_normalize_M(DAQPWorkspace* work){
             work->scaling[i] = 1.0;
 #ifndef DAQP_ASSUME_VALID
             if(work->qp->bupper[i] < -zero_tol || work->qp->blower[i] > zero_tol)
-                if(!DAQP_IS_IMMUTABLE(i) && !DAQP_IS_SOFT(i))
+                if((work->sense[i] & (DAQP_IMMUTABLE | DAQP_ACTIVE)) != DAQP_IMMUTABLE && !DAQP_IS_SOFT(i))
                     return DAQP_EXIT_INFEASIBLE;
 #endif
             work->sense[i] = DAQP_IMMUTABLE; // ignore zero-row constraint
