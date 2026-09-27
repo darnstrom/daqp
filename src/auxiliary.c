@@ -1,5 +1,6 @@
 #include "auxiliary.h"
 #include "factorization.h"
+#include "daqp.h"
 
 /* Soft constraints (see types.h for the penalty and its weights, which are
  * uniform if DAQP_NO_SOFT_WEIGHTS is set). A soft constraint contributes
@@ -558,6 +559,7 @@ void daqp_deactivate_constraints(DAQPWorkspace *work){
         if(DAQP_IS_IMMUTABLE(work->WS[i])) continue;
         DAQP_SET_INACTIVE(work->WS[i]);
     }
+    reset_daqp_workspace(work); // The next update activates the remaining ones
 }
 
 // One step of iterative refinement for active constraints.
