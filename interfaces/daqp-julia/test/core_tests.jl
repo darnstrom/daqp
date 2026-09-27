@@ -35,6 +35,13 @@ tol = 1e-4
     @test exitflag == -4
 end
 
+@testset "Zero-row equality" begin
+    exitflag, _ = setup(
+        DAQPBase.Model(), ones(1, 1), zeros(1), zeros(1, 1), [1.0], [1.0],
+        Cint[DAQPBase.EQUALITY])
+    @test exitflag == DAQPBase.INFEASIBLE
+end
+
 @testset "Quadprog (one-sided)" begin
     for nQP in 1:10
         _,H,f,A,bupper,blower,sense = generate_test_QP(n,m,ms,nAct,kappa);

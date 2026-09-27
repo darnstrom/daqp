@@ -149,24 +149,21 @@ int daqp_update_ldp(int mask, DAQPWorkspace *work, DAQPProblem* qp){
         (work->settings->eq_reduction == DAQP_EQ_REDUCTION_ON ||
          (mask&DAQP_UPDATE_eliminate));
     if(reduce){
-        // Changing H or H invalidates reduced factorization.
+        // Changing H or A invalidates reduced factorization.
         if(mask&(DAQP_UPDATE_Rinv+DAQP_UPDATE_M)) reset_daqp_workspace(work);
         skip_constraints = 1;
     }
     else if(mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M){
         error_flag = daqp_update_M(work,qp->A);
-        if(error_flag<0)
-            return error_flag;
+        if(error_flag<0) return error_flag;
         do_activate = 1; // daqp_update_M cleared the working set
     }
 
     daqp_normalize_Rinv(work);
 
     // Update d
-    if(skip_constraints){
-        // Formed together with the reduced constraints by the elimination
-    }
-    else if(mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M||mask&DAQP_UPDATE_v||mask&DAQP_UPDATE_d){
+    if(!skip_constraints && (mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M
+            ||mask&DAQP_UPDATE_v||mask&DAQP_UPDATE_d)){
         if(unconstrained_flag == 1){ // Already computed d, just need to normalize
             if(work->scaling != NULL){
                 for(i = 0; i < work->m; i++){
@@ -193,43 +190,31 @@ int daqp_update_ldp(int mask, DAQPWorkspace *work, DAQPProblem* qp){
              (work->avi != NULL && !work->avi->is_symmetric)))
         return DAQP_EXIT_UNSUPPORTED;
 
-    // The working set refers to the reduced LDP if one was installed. When
-    // reduction has been left out -> full constraint matrix unformed
-    const int form_full_pending = !reduce &&
-        work->eq != NULL && work->eq->neq != 0;
-    if(was_reduced && !form_full_pending) do_activate = 1;
-
-    // Make sure activate constraints are activated.
-    if(do_activate == 1 && skip_constraints){
-        reset_daqp_workspace(work);
-        do_activate = 0;
-    }
-    if(do_activate == 1){
-        reset_daqp_workspace(work);
-        if(!DAQP_IS_HIERARCHICAL(work))
-            error_flag = daqp_activate_constraints(work);
-        else{// Activate the first level (since those constraints are hard)
-            int m_tmp = work->m;
-            work->m = work->break_points[0];
-            error_flag = daqp_activate_constraints(work);
-            work->m = m_tmp;
-        }
-        if(error_flag<0)
-            return error_flag;
-    }
-
-    work->state &= ~DAQP_STATE_PENDING; // Everything has been formed
-
     if(reduce){
+        if(do_activate || was_reduced) reset_daqp_workspace(work);
         error_flag = daqp_eq_eliminate(work);
-        return (error_flag < 0) ? error_flag : 0;
     }
-
     // An earlier elimination left the full constraints unformed
-    if(work->eq != NULL && work->eq->neq != 0){
+    else if(work->eq != NULL && work->eq->neq != 0){
         error_flag = daqp_eq_form_full(work);
-        return (error_flag < 0) ? error_flag : 0;
     }
+    else{
+        error_flag = 0;
+        // An empty working set can be one that a reset left out
+        if(do_activate || work->n_active == 0){
+            reset_daqp_workspace(work);
+            if(!DAQP_IS_HIERARCHICAL(work))
+                error_flag = daqp_activate_constraints(work);
+            else{// Activate the first level (since those constraints are hard)
+                int m_tmp = work->m;
+                work->m = work->break_points[0];
+                error_flag = daqp_activate_constraints(work);
+                work->m = m_tmp;
+            }
+        }
+    }
+    if(error_flag < 0) return error_flag;
+    work->state &= ~DAQP_STATE_PENDING; // Everything has been formed
 
     return 0;
 }
@@ -660,7 +645,7 @@ int daqp_normalize_M(DAQPWorkspace* work){
             work->scaling[i] = 1.0;
 #ifndef DAQP_ASSUME_VALID
             if(work->qp->bupper[i] < -zero_tol || work->qp->blower[i] > zero_tol)
-                if(!DAQP_IS_IMMUTABLE(i) && !DAQP_IS_SOFT(i))
+                if((work->sense[i] & (DAQP_IMMUTABLE | DAQP_ACTIVE)) != DAQP_IMMUTABLE && !DAQP_IS_SOFT(i))
                     return DAQP_EXIT_INFEASIBLE;
 #endif
             work->sense[i] = DAQP_IMMUTABLE; // ignore zero-row constraint
