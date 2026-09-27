@@ -7,9 +7,7 @@ parent: Advanced Problem Types
 math: mathjax3
 ---
 
-A constraint that is marked **soft** may be violated, at a cost. Softening a constraint guarantees
-that the problem stays feasible, and the penalty decides how the unavoidable violation is shared
-among the soft constraints.
+A constraint that is marked **soft** may be violated, at a cost. Softening a constraint guarantees that the problem stays feasible, and the penalty decides how the unavoidable violation is shared among the soft constraints.
 
 ## The penalty
 
@@ -62,19 +60,15 @@ By default every soft constraint uses the settings `rho_soft` and `w_soft`
 purely quadratic, and `rho_soft = 1e-6` keeps the violation small, i.e. the constraint is
 *almost* hard.
 
-```julia
-DAQP.settings(d, Dict(:rho_soft => 1e-4, :w_soft => 1e3))
-```
 
 > These two are given in the **normalized** formulation that the solver works in, where the rows of
 > the constraint matrix have unit norm. The individual weights below are instead given in the scale
-> of the original problem, so the same number means the same thing only when the rows of $$A$$
-> (after the Hessian factor) already have unit norm.
+> of the original problem.
 
 ## Individual weights
 
 To weight the constraints differently, set one weight per constraint and side. Only the entries that
-are nonzero take effect; a zero entry falls back to `rho_soft`/`w_soft`.
+are nonzero take effect; a zero entry falls back to `rho_soft` and `w_soft`.
 
 ### <img src="{{ '/assets/icons/c.svg' | relative_url }}" class="nav-icon" alt="C"> C
 ```c
@@ -142,15 +136,3 @@ If a soft constraint ends up violated, the solver returns the exit flag `2` (`SO
 of `1`, and `soft_slack` in the result holds the largest violation, in the units of the original
 problem.
 
-## Mapping from a nominal slack bound
-
-A formulation that penalizes a slack with its own lower bound, as in
-[acados]({{ '/start/acados' | relative_url }}),
-
-$$\min\ \ldots + z\,s + \tfrac{1}{2}Z s^2 \quad \text{s.t.}\quad A x \leq b_u + s,\quad s \geq d,$$
-
-is obtained by substituting $$s = d + s_u$$, which gives
-
-$$b_u \mathrel{+}= d, \qquad w_u = \max(0,\, z + Z d), \qquad \rho_u = 1/Z.$$
-
-The $$\max$$ only guards against a negative linear weight, which would make the slack unbounded.
