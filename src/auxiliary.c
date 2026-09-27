@@ -144,6 +144,10 @@ void daqp_add_constraint(DAQPWorkspace *work, const int add_ind, c_float lam){
     if(DAQP_IS_SOFT(add_ind)){
         DAQP_SET_MUTABLE(add_ind);
         const c_float w = daqp_soft_w(work,add_ind);
+        if(w > 0){
+            const c_float magnitude = (DAQP_IS_LOWER(add_ind) ? -lam : lam) >= w ? w : 0;
+            lam = DAQP_IS_LOWER(add_ind) ? -magnitude : magnitude;
+        }
         if(w > 0 && (DAQP_IS_LOWER(add_ind) ? -lam : lam) < w)
             DAQP_SET_SLACK_FIXED(add_ind);
         else
@@ -255,11 +259,7 @@ int daqp_add_infeasible(DAQPWorkspace *work){
     // Set lam = lam_star
     c_float *swp_ptr;
     swp_ptr=work->lam; work->lam = work->lam_star; work->lam_star=swp_ptr;
-    // Add the constraint
-    if(isupper)
-        daqp_add_constraint(work,add_ind,1);
-    else
-        daqp_add_constraint(work,add_ind,-1);
+    daqp_add_constraint(work,add_ind,isupper ? -min_val : min_val);
     return 1;
 }
 
