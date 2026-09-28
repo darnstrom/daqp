@@ -72,9 +72,50 @@ void solve_hard(bool warm, c_float* x) {
     assert(std::abs(x[0] - x[1]) < 1e-9); // The equality holds
 }
 
+void expect_x(DAQPWorkspace* work, DAQPResult* res, c_float expected) {
+    daqp_solve(res, work);
+    assert(res->exitflag == DAQP_EXIT_OPTIMAL);
+    assert(std::abs(res->x[0] - expected) < 1e-9);
+}
+
+void check_detected_equality_update(bool general, bool reduce) {
+    c_float H[4] = {1, 0, 0, 1};
+    c_float f[2] = {-2, 0};
+    c_float A[2] = {1, 0};
+    c_float bu[1] = {1};
+    c_float bl[1] = {1};
+    DAQPProblem qp = {2, 1, general ? 0 : 1, H, f,
+                      general ? A : nullptr, bu, bl, nullptr, nullptr, 0, 0};
+    DAQPWorkspace work{};
+    allocate_daqp_settings(&work);
+    work.settings->eq_reduction = reduce ? DAQP_EQ_REDUCTION_ON : DAQP_EQ_REDUCTION_OFF;
+    assert(setup_daqp(&qp, &work, nullptr) >= 0);
+    c_float x[2], lam[1];
+    DAQPResult res{};
+    res.x = x;
+    res.lam = lam;
+    expect_x(&work, &res, 1);
+
+    // Widen the equality, then make it an equality again without updating sense.
+    bl[0] = -DAQP_INF;
+    bu[0] = 3;
+    assert(daqp_update_ldp(DAQP_UPDATE_d, &work, &qp) >= 0);
+    expect_x(&work, &res, 2);
+
+    bu[0] = bl[0] = 0.5;
+    assert(daqp_update_ldp(DAQP_UPDATE_d, &work, &qp) >= 0);
+    expect_x(&work, &res, 0.5);
+
+    free_daqp_workspace(&work);
+    free_daqp_ldp(&work);
+}
+
 } // namespace
 
 int main() {
+    check_detected_equality_update(false, false);
+    check_detected_equality_update(true, false);
+    check_detected_equality_update(true, true);
     c_float H[4] = {1, 0, 0, 1};
     c_float f[2] = {-1, -1};
     c_float A[6] = {1, 0,
