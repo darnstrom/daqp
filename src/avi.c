@@ -56,8 +56,7 @@ int daqp_solve_avi(DAQPWorkspace *work) {
             // If no decrease since last Newton iterate -> revert Newton step
             if(sum > minimum_newton_residual){
                 for(i = 0; i < n; i++) work->avi->x[i] = work->xold[i];
-                if(terminate_limit == 30 && avi->retry_rho_needed &&
-                   !DAQP_IS_REDUCED(work)){
+                if(terminate_limit == 30 && avi->retry_rho_needed){
                     retry_requested = 1;
                     break;
                 }

@@ -131,67 +131,102 @@ typedef struct{
 }DAQPAVI;
 
 /*
- * Elimination of equality constraints.
- *
- * The LDP
- *   min 0.5||u||^2  s.t.  dlower <= M u <= dupper,
- * in which the rows E are equalities (M_E u = d_E), is reduced with the QR
- * factorization M_E' = [Q1 Q2] [R; 0] by the change of variables
- *   u = Q1 y1 + Q2 w,   R' y1 = d_E.
- * Since ||u||^2 = ||y1||^2+||w||^2, the reduced problem in w is again an LDP,
- * with M_r = M Q2 and d_r = d - M Q1 y1, so no refactorization is needed.
- * The reduced problem has no simple bounds (ms = 0) and keeps the constraint
- * indexing of the original problem, with the eliminated rows marked immutable.
+ * The parts of the workspace that describe the LDP that is solved. An
+ * equality elimination keeps a second set for its reduced problem, which is
+ * swapped into the workspace while that problem is formed or solved, so that
+ * the solvers only ever see an ordinary problem.
  */
 typedef struct{
-    int n;  // Number of primal variables before elimination
-    int m;  // Number of constraints before elimination
-    int ms; // Number of simple bounds before elimination
+    DAQPProblem* qp;
+    int n;
+    int m;
+    int ms;
+    c_float *M;
+    c_float *dupper;
+    c_float *dlower;
+    c_float *Rinv;
+    c_float *RinvD;
+    c_float *v;
+    c_float *scaling;
+    c_float *Mu;
+    int *sense;
+    c_float *rho_ls;
+    c_float *rho_us;
+    c_float *w_ls;
+    c_float *w_us;
+    int state;
+    int n_prox;
+    int *bin_ids; // Binary constraints (if BnB)
+    int nb;
+}DAQPLDPData;
+
+/*
+ * Elimination of equality constraints, applied to the QP before it is turned
+ * into an LDP (see eq_elim.c).
+ *
+ * The equality constraints A_E x = b_E are eliminated through x = xp + W w,
+ * where the columns of W span the null space of A_E and xp is a particular
+ * solution. If the reduced Hessian is positive definite, W is chosen with
+ * W'HW = I and xp as the minimizer over the equality constraints, so that the
+ * reduced problem is min 0.5||w||^2 over the remaining constraints (no
+ * factorization is needed to form its LDP). Otherwise W is orthonormal and the
+ * reduced problem keeps the Hessian W'HW (a singular QP, an LP, or an AVI).
+ */
+typedef struct{
+    int n;  // Number of primal variables of the original problem
+    int m;  // Number of constraints of the original problem
+    int ms; // Number of simple bounds of the original problem
     int neq; // Number of eliminated equality constraints
-    int nign; // Number of equalities that were linearly dependent (ignored)
+    int nz; // Number of variables of the reduced problem (n-neq)
+    int mr; // Number of constraints of the reduced problem
     int ndrop; // Number of constraints that the equalities imply
-    int ncand; // Number of equality candidates that memory is allocated for
-    int nz; // Reduced number of primal variables (n-neq)
-    int m_r; // Reduced number of constraints
-    int installed; // Whether the reduced problem is currently in the workspace
-    int expanded; // Whether the reduced solution has already been expanded
-    int working_set_valid; // Whether WS/L/D describe the reduced active set
+    int ncand; // Number of equality candidates
+    int path; // DAQP_EQ_PATH_*
+    int metric; // Diagonal Hessian (QR in the metric of H)
+    int active; // A reduction is formed
+    int error; // Exit flag if the latest right-hand side is infeasible (else 0)
+    int installed; // The reduced problem is in the workspace
 
-    int* eq_ids; // The neq eliminated, followed by the nign ignored, equalities
+    int* eq_ids; // Eliminated equalities (ascending)
+    int* cand_ids; // Candidates that the reduction was formed for
+    int* keep; // Original index of each constraint of the reduced problem
     int* drop_ids; // Constraints that are implied by the equalities
-    int* map; // Constraint index in the original problem of each reduced one
-    c_float* Q; // Householder vectors (leading neq columns) and Q2 (trailing)
-    c_float* R; // Upper triangular factor of M_E' (packed by columns)
+    c_float* V; // Householder vectors (leading neq columns), then Z = Q2
     c_float* tau; // Householder scalars
-    c_float* s_eq; // Normalization of the eliminated equality constraints
-    c_float* y1; // Q1-part of u (solves R'y1 = d_E)
-    c_float* lam_eq; // Multipliers of the eliminated constraints
-    c_float* W; // Rinv*Q2 (n x nz, row major)
-    c_float* xp; // Part of the solution that the equalities determine
-    c_float* tmp; // Scratch of size 2n
+    c_float* s_eq; // Normalization of the eliminated equalities
+    c_float* R; // Triangular factor of the (normalized) A_E' (packed by columns)
+    c_float* dsq; // H^{-1/2} for a diagonal Hessian
+    c_float* W; // Null-space basis (n x nz, row major)
+    c_float* xp; // Particular solution
+    c_float fp; // Objective function value at xp
+    c_float* tmp; // Scratch of size 3n
 
-    c_float up_norm2; // ||up||^2 (offset in the objective function)
+    /*
+     * For a warm-started workspace, xp, H xp, and the shifts of the bounds are
+     * linear in b_E and f. The response to each equality with a nonzero
+     * right-hand side is kept (cols[k] = [xp_k (n), H xp_k (n), shift_k (mr)],
+     * formed when first needed), as is the response to f (xf, gf, df).
+     */
+    c_float** cols;
+    int ncols; // Number of entries in cols
+    c_float* xf;
+    c_float* gf;
+    c_float* df;
+    c_float* sh;
+    int f_valid;
 
-    // Reduced problem (swapped into the workspace while solving)
-    c_float* M;
-    c_float* dupper;
-    c_float* dlower;
-    c_float* scaling;
-    c_float* Mu;
-    int* sense;
-    // Full problem (restored into the workspace when it is updated). The
-    // reduced problem has an identity Hessian, so the Hessian factor and the
-    // linear term are set aside as well: the solver then sees an ordinary
-    // least-distance problem.
-    c_float* M_full;
-    c_float* dupper_full;
-    c_float* dlower_full;
-    c_float* scaling_full;
-    c_float* Mu_full;
-    c_float* Rinv_full;
-    c_float* RinvD_full;
-    c_float* v_full;
-    int* sense_full;
+    // The reduced problem and the storage of its data
+    DAQPProblem qp;
+    c_float* Hr;
+    c_float* fr;
+    c_float* Ar;
+    c_float* bur;
+    c_float* blr;
+    int* sr;
+    c_float* rho_r; // Soft weights of the reduced constraints (one block)
+    // The LDP of the problem that is not in the workspace (the reduced one,
+    // unless it is installed)
+    DAQPLDPData other;
 }DAQPEqElim;
 
 typedef struct{

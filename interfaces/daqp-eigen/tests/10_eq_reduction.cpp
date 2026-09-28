@@ -191,10 +191,28 @@ int main() {
         }
     }
 
+    // A singular Hessian is reduced as well (the proximal method then works
+    // in the reduced space if the reduced Hessian is still singular)
     TestProblem singular(true, true);
-    setup_reduces(singular, DAQP_EQ_REDUCTION_AUTO, work);
-    assert(work.n_prox > 0);
-    assert(work.eq != nullptr && work.eq->neq > 0);
-    assert(daqp_eq_will_reduce(&work));
+    {
+        std::vector<c_float> xs(TestProblem::n), lams(TestProblem::m);
+        std::vector<c_float> xf(TestProblem::n), lamf(TestProblem::m);
+        DAQPResult res{}, full{};
+        res.x = xs.data();
+        res.lam = lams.data();
+        full.x = xf.data();
+        full.lam = lamf.data();
+        DAQPSettings settings;
+        daqp_default_settings(&settings);
+        settings.eq_reduction = DAQP_EQ_REDUCTION_OFF;
+        daqp_quadprog(&full, &singular.qp, &settings);
+        assert(full.exitflag > 0);
+        assert(setup_reduces(singular, DAQP_EQ_REDUCTION_AUTO, work));
+        daqp_solve(&res, &work);
+        assert(res.exitflag > 0);
+        assert(std::abs(res.fval - full.fval) < 1e-6);
+        for (int j = 0; j < TestProblem::n; ++j)
+            assert(std::abs(xs[j] - xf[j]) < 1e-5);
+    }
     cleanup(work);
 }

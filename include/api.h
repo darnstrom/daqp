@@ -54,7 +54,10 @@ void free_daqp_bnb(DAQPWorkspace* work);
 void free_daqp_avi(DAQPWorkspace* work);
 
 void daqp_extract_result(DAQPResult* res, DAQPWorkspace* work);
-void daqp_eq_retrieve(DAQPResult* res, DAQPWorkspace* work);
+// Turn the result of the installed reduced problem (see eq_elim.h) into the
+// result of the original problem, and carry its working set over to the
+// original constraints
+void daqp_eq_expand(DAQPResult* res, DAQPWorkspace* work);
 void daqp_extract_active_duals(DAQPResult* res, DAQPWorkspace* work);
 void daqp_default_settings(DAQPSettings *settings);
 void daqp_minrep(int* is_redundant, c_float* A, c_float* b, int n, int m, int ms);

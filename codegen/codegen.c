@@ -9,6 +9,8 @@
 
 
 void render_daqp_workspace(DAQPWorkspace* work, const char *fname, const char *dir, const char *prefix){
+    // If the equality constraints are eliminated, the reduced problem is generated
+    const int reduced = daqp_eq_install(work);
     char *hfname= malloc(strlen(dir)+strlen(fname) + 3); // two chars for .h and 1 for terminator
     char *hguard= malloc(strlen(fname) + 3); // two chars for _H and 1 for terminator
     char *cfname= malloc(strlen(dir)+strlen(fname) + 3); // two chars for .c and 1 for terminator
@@ -79,6 +81,7 @@ void render_daqp_workspace(DAQPWorkspace* work, const char *fname, const char *d
     free(hfname);
     free(cfname);
     free(hguard);
+    if(reduced) daqp_eq_restore(work);
 }
 
 void write_daqp_workspace_h(FILE *f, DAQPWorkspace* work, const char* prefix){
@@ -176,36 +179,31 @@ void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work, const char* prefix){
     if(work->rho_ls != NULL){
         /* Generated workspaces store the normalized LDP without its scaling
          * array, so convert the externally scaled weights to that formulation
-         * before serializing them, mapping reduced rows to original weights. */
+         * before serializing them. */
         c_float *weight = malloc(m*sizeof(c_float));
-        const int *map = work->eq != NULL && work->eq->installed ? work->eq->map : NULL;
         for(i = 0; i < m; i++){
-            const int id = map == NULL ? i : map[i];
-            weight[i] = work->rho_ls[id] == 0 ? 0 :
-                work->rho_ls[id]*(work->scaling == NULL ? 1 :
+            weight[i] = work->rho_ls[i] == 0 ? 0 :
+                work->rho_ls[i]*(work->scaling == NULL ? 1 :
                     work->scaling[i]*work->scaling[i]);
         }
         snprintf(varname, sizeof(varname), "%srho_ls", prefix);
         write_float_array(f,weight,m,varname);
         for(i = 0; i < m; i++){
-            const int id = map == NULL ? i : map[i];
-            weight[i] = work->rho_us[id] == 0 ? 0 :
-                work->rho_us[id]*(work->scaling == NULL ? 1 :
+            weight[i] = work->rho_us[i] == 0 ? 0 :
+                work->rho_us[i]*(work->scaling == NULL ? 1 :
                     work->scaling[i]*work->scaling[i]);
         }
         snprintf(varname, sizeof(varname), "%srho_us", prefix);
         write_float_array(f,weight,m,varname);
         for(i = 0; i < m; i++){
-            const int id = map == NULL ? i : map[i];
-            weight[i] = work->w_ls[id] == 0 ? 0 :
-                work->w_ls[id]/(work->scaling == NULL ? 1 : work->scaling[i]);
+            weight[i] = work->w_ls[i] == 0 ? 0 :
+                work->w_ls[i]/(work->scaling == NULL ? 1 : work->scaling[i]);
         }
         snprintf(varname, sizeof(varname), "%sw_ls", prefix);
         write_float_array(f,weight,m,varname);
         for(i = 0; i < m; i++){
-            const int id = map == NULL ? i : map[i];
-            weight[i] = work->w_us[id] == 0 ? 0 :
-                work->w_us[id]/(work->scaling == NULL ? 1 : work->scaling[i]);
+            weight[i] = work->w_us[i] == 0 ? 0 :
+                work->w_us[i]/(work->scaling == NULL ? 1 : work->scaling[i]);
         }
         snprintf(varname, sizeof(varname), "%sw_us", prefix);
         write_float_array(f,weight,m,varname);

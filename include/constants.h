@@ -43,6 +43,11 @@ extern "C" {
 #define DAQP_EQ_REDUCTION_AUTO 0
 #define DAQP_EQ_REDUCTION_ON 1
 
+// How the reduced problem of an equality elimination is posed
+#define DAQP_EQ_PATH_LDP 0 // Identity Hessian, no linear term (H PD on the null space)
+#define DAQP_EQ_PATH_QP 1  // Reduced Hessian W'HW (singular QP or AVI)
+#define DAQP_EQ_PATH_LP 2  // No Hessian
+
 // Equality constraints are eliminated if there are sufficiently many of them
 // (neq > EQ_MIN_COUNT and EQ_MIN_RATIO*neq > n)
 #define DAQP_EQ_MIN_COUNT 5

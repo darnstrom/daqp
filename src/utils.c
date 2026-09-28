@@ -40,7 +40,6 @@ int daqp_retry_avi_with_reduced_rho(DAQPWorkspace* work){
     int error_flag;
 
     if(avi == NULL || !avi->retry_rho_needed) return 0;
-    if(DAQP_IS_REDUCED(work)) return 0;
     avi->retry_rho_needed = 0; // At most one retry per setup
     retry_rho = avi->rho/DAQP_AVI_RETRY_RHO_REDUCTION;
     daqp_install_avi_rho(avi,work->qp,retry_rho);
@@ -55,32 +54,21 @@ int daqp_retry_avi_with_reduced_rho(DAQPWorkspace* work){
     return 1;
 }
 
-int daqp_update_ldp(int mask, DAQPWorkspace *work, DAQPProblem* qp){
-    // TODO: copy dimensions from work->qp?
+/*
+ * Form the LDP of qp, which is the problem that the solvers see (the reduced
+ * problem of an equality elimination is passed here as it is).
+ */
+static int update_ldp_core(int mask, DAQPWorkspace *work, DAQPProblem* qp){
     int error_flag, i;
     int do_activate = 0;
-    int skip_constraints = 0;
     int unconstrained_flag = 0;
-    int reduce = 0;
-    const int was_reduced = DAQP_IS_REDUCED(work);
-    const int eliminate = work->settings->eq_reduction != DAQP_EQ_REDUCTION_OFF;
 
     // Also form what an earlier update left pending. Everything stays pending
     // until this update completes, so an update that fails is redone.
     mask |= work->state & DAQP_STATE_PENDING;
     work->state = (work->state & DAQP_STATE_RINV_NORMALIZED) | (mask & DAQP_STATE_PENDING);
 
-    // Update the full LDP before optionally installing a reduced one below
-    daqp_eq_restore(work);
-    if(work->eq != NULL){
-        // A new equality set needs the full constraints
-        if(mask&DAQP_UPDATE_sense && work->eq->neq != 0) mask |= DAQP_UPDATE_M;
-        // Rinv, A, and the equality set determine the elimination.
-        if(mask&(DAQP_UPDATE_Rinv+DAQP_UPDATE_M+DAQP_UPDATE_sense))
-            work->eq->neq = 0;
-    }
-
-    // Add original qp to workspace
+    // Add qp to workspace
     work->qp = qp;
 
     // Update dimensions of problem
@@ -141,19 +129,8 @@ int daqp_update_ldp(int mask, DAQPWorkspace *work, DAQPProblem* qp){
         return 0;
     }
 
-    // Update M. Only the equality rows are needed if the constraints are eliminated 
-    // Automatic reduction only applies to a problem that is solved once
-    // (marked by DAQP_UPDATE_eliminate): the warm-started solves of a
-    // workspace that is updated are typically too short to recover its cost
-    reduce = eliminate && daqp_eq_will_reduce(work) &&
-        (work->settings->eq_reduction == DAQP_EQ_REDUCTION_ON ||
-         (mask&DAQP_UPDATE_eliminate));
-    if(reduce){
-        // Changing H or A invalidates reduced factorization.
-        if(mask&(DAQP_UPDATE_Rinv+DAQP_UPDATE_M)) reset_daqp_workspace(work);
-        skip_constraints = 1;
-    }
-    else if(mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M){
+    // Update M
+    if(mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M){
         error_flag = daqp_update_M(work,qp->A);
         if(error_flag<0) return error_flag;
         do_activate = 1; // daqp_update_M cleared the working set
@@ -162,8 +139,8 @@ int daqp_update_ldp(int mask, DAQPWorkspace *work, DAQPProblem* qp){
     daqp_normalize_Rinv(work);
 
     // Update d
-    if(!skip_constraints && (mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M
-            ||mask&DAQP_UPDATE_v||mask&DAQP_UPDATE_d)){
+    if(mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M
+            ||mask&DAQP_UPDATE_v||mask&DAQP_UPDATE_d){
         if(unconstrained_flag == 1){ // Already computed d, just need to normalize
             if(work->scaling != NULL){
                 for(i = 0; i < work->m; i++){
@@ -190,33 +167,58 @@ int daqp_update_ldp(int mask, DAQPWorkspace *work, DAQPProblem* qp){
              (work->avi != NULL && !work->avi->is_symmetric)))
         return DAQP_EXIT_UNSUPPORTED;
 
-    if(reduce){
-        if(do_activate || was_reduced) reset_daqp_workspace(work);
-        error_flag = daqp_eq_eliminate(work);
-    }
-    // An earlier elimination left the full constraints unformed
-    else if(work->eq != NULL && work->eq->neq != 0){
-        error_flag = daqp_eq_form_full(work);
-    }
-    else{
-        error_flag = 0;
-        // An empty working set can be one that a reset left out
-        if(do_activate || work->n_active == 0){
-            reset_daqp_workspace(work);
-            if(!DAQP_IS_HIERARCHICAL(work))
-                error_flag = daqp_activate_constraints(work);
-            else{// Activate the first level (since those constraints are hard)
-                int m_tmp = work->m;
-                work->m = work->break_points[0];
-                error_flag = daqp_activate_constraints(work);
-                work->m = m_tmp;
-            }
+    error_flag = 0;
+    // An empty working set can be one that a reset left out
+    if(do_activate || work->n_active == 0){
+        reset_daqp_workspace(work);
+        if(!DAQP_IS_HIERARCHICAL(work))
+            error_flag = daqp_activate_constraints(work);
+        else{// Activate the first level (since those constraints are hard)
+            int m_tmp = work->m;
+            work->m = work->break_points[0];
+            error_flag = daqp_activate_constraints(work);
+            work->m = m_tmp;
         }
     }
     if(error_flag < 0) return error_flag;
     work->state &= ~DAQP_STATE_PENDING; // Everything has been formed
 
     return 0;
+}
+
+/*
+ * Update the workspace with (changes in) qp, as marked by mask. If the equality
+ * constraints are to be eliminated (see eq_elim.h), the LDP is formed for the
+ * reduced problem, and the workspace keeps describing qp otherwise.
+ */
+int daqp_update_ldp(int mask, DAQPWorkspace *work, DAQPProblem* qp){
+    int i, flag;
+    const int was_reduced = DAQP_IS_REDUCED(work);
+    daqp_eq_restore(work);
+    work->qp = qp;
+    // The constraint states are indexed by qp, also while its equality
+    // constraints are eliminated
+    if(mask&DAQP_UPDATE_sense && qp->sense != work->sense){
+        if(qp->sense == NULL) for(i = 0; i < qp->m; i++) work->sense[i] = 0;
+        else for(i = 0; i < qp->m; i++) work->sense[i] = qp->sense[i];
+    }
+    if(daqp_eq_wanted(work,qp,mask)){
+        flag = daqp_eq_update(work,qp,mask,update_ldp_core);
+        if(flag != DAQP_EQ_NOT_REDUCED){
+            work->n = qp->n;
+            work->m = qp->m;
+            work->ms = qp->ms;
+            return flag;
+        }
+    }
+    else daqp_eq_deactivate(work);
+    // The LDP of qp was not formed while its equalities were eliminated
+    if(was_reduced){
+        mask |= DAQP_UPDATE_M+DAQP_UPDATE_d;
+        if(qp->H != NULL) mask |= DAQP_UPDATE_Rinv;
+        if(qp->f != NULL) mask |= DAQP_UPDATE_v;
+    }
+    return update_ldp_core(mask,work,qp);
 }
 
 int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){

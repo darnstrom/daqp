@@ -7,42 +7,44 @@ extern "C" {
 
 #include "types.h"
 
-// Whether the workspace currently holds a reduced LDP
-#define DAQP_IS_REDUCED(work) ((work)->eq != NULL && (work)->eq->installed)
+/*
+ * Elimination of equality constraints (see eq_elim.c).
+ *
+ * The equalities are eliminated from the QP before it is turned into an LDP.
+ * The reduced problem is an ordinary DAQPProblem, whose LDP is formed and
+ * solved by the usual routines: it is swapped into the workspace (installed)
+ * while it is formed or solved, and the workspace describes the original
+ * problem otherwise (in particular work->qp, work->n, work->m and work->sense).
+ */
+
+// Whether the equality constraints of the workspace are eliminated
+#define DAQP_IS_REDUCED(work) ((work)->eq != NULL && (work)->eq->active)
+
+// Whether qp is to be reduced for an update with the given mask
+// (DAQPSettings.eq_reduction; AUTO only with DAQP_UPDATE_eliminate in mask)
+int daqp_eq_wanted(const DAQPWorkspace* work, const DAQPProblem* qp, const int mask);
 
 /*
- * Eliminate the equality constraints of the LDP in the workspace.
- * daqp_update_ldp applies the policy in DAQPSettings.eq_reduction (AUTO only
- * with DAQP_UPDATE_eliminate in its mask);
- * daqp_extract_result retrieves the full solution after solving.
- *
- * Returns the number of eliminated constraints (0 if the LDP was left intact)
- * or a negative exit flag if the equality constraints cannot be satisfied.
+ * Form or update the reduction of qp and the LDP of the reduced problem.
+ * update_ldp forms the LDP of a problem that is in the workspace.
+ * Returns DAQP_EQ_NOT_REDUCED if nothing can be eliminated, a negative exit
+ * flag if the equality constraints cannot be satisfied, and the return value
+ * of update_ldp otherwise.
  */
-int daqp_eq_eliminate(DAQPWorkspace* work);
+#define DAQP_EQ_NOT_REDUCED 1
+int daqp_eq_update(DAQPWorkspace* work, DAQPProblem* qp, int mask,
+        int (*update_ldp)(int, DAQPWorkspace*, DAQPProblem*));
 
-// Reduce the LDP in the workspace by eliminating equality constraints.
-// Returns 1 if a reduced LDP was installed, 0 if the LDP was left intact,
-// and a negative exit flag if the equalities are infeasible.
-int daqp_eq_reduce(DAQPWorkspace* work, const int mask);
+// Give up the reduction (the LDP of the original problem then has to be formed)
+void daqp_eq_deactivate(DAQPWorkspace* work);
 
-// Whether the equality constraints will be eliminated
-int daqp_eq_will_reduce(const DAQPWorkspace* work);
-
-// Put the full LDP back into the workspace (no-op if it is not reduced)
+// Swap the reduced problem into (install) or out of (restore) the workspace.
+// Install returns whether the reduced problem is installed.
+int daqp_eq_install(DAQPWorkspace* work);
 void daqp_eq_restore(DAQPWorkspace* work);
 
-// Form the constraints of the full problem, which an elimination never does
-// (neq == 0 then marks that they are formed)
-int daqp_eq_form_full(DAQPWorkspace* work);
-
-// Put back a reduction that a previous solve retrieved (no-op if there is
-// none), so that solving a workspace twice is the same as solving it once
-int daqp_eq_reinstall(DAQPWorkspace* work);
-
-// Expand the reduced iterate w in work->u into the full LDP iterate u,
-// and extract the multipliers of the eliminated equality constraints.
-void daqp_eq_expand(DAQPWorkspace* work);
+// Set the starting iterate of the reduced problem from x of the original one
+void daqp_eq_set_primal_start(DAQPWorkspace* work, const c_float* x);
 
 void free_daqp_eq(DAQPWorkspace* work);
 

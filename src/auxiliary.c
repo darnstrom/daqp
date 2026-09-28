@@ -20,20 +20,12 @@
 #define DAQP_HAS_L1(work) ((work)->settings->w_soft != 0)
 #endif
 
-// The weights are indexed by the original problem, which is renumbered if
-// equalities have been eliminated (work->scaling always refers to the
-// problem that is currently installed)
-static inline int daqp_soft_ind(DAQPWorkspace *work, const int id){
-    return (work->eq != NULL && work->eq->installed) ? work->eq->map[id] : id;
-}
-
 // Reciprocal quadratic weight of the active side of constraint id (zero
 // selects settings->rho_soft, which is given in the normalized formulation)
 static inline c_float daqp_soft_rho(DAQPWorkspace *work, const int id){
 #ifdef DAQP_SOFT_WEIGHTS
     if(work->rho_ls != NULL){
-        const int i = daqp_soft_ind(work,id);
-        const c_float rho = DAQP_IS_LOWER(id) ? work->rho_ls[i] : work->rho_us[i];
+        const c_float rho = DAQP_IS_LOWER(id) ? work->rho_ls[id] : work->rho_us[id];
         if(rho != 0)
             return work->scaling ? rho*work->scaling[id]*work->scaling[id] : rho;
     }
@@ -48,8 +40,7 @@ static inline c_float daqp_soft_rho(DAQPWorkspace *work, const int id){
 static inline c_float daqp_soft_w(DAQPWorkspace *work, const int id){
 #ifdef DAQP_SOFT_WEIGHTS
     if(work->w_ls != NULL){
-        const int i = daqp_soft_ind(work,id);
-        const c_float w = DAQP_IS_LOWER(id) ? work->w_ls[i] : work->w_us[i];
+        const c_float w = DAQP_IS_LOWER(id) ? work->w_ls[id] : work->w_us[id];
         if(w != 0)
             return work->scaling ? w/work->scaling[id] : w;
     }
@@ -553,7 +544,6 @@ int daqp_activate_constraints(DAQPWorkspace *work){
 // Deactivate all active constraints that are mutable (i.e., not equality constraints)
 void daqp_deactivate_constraints(DAQPWorkspace *work){
     int i;
-    if(work->eq != NULL) work->eq->working_set_valid = 0;
     if(work->bnb != NULL) work->bnb->n_root_WS = 0; // Also drop the BnB warm start
     for(i =0;i<work->n_active;i++){
         if(DAQP_IS_IMMUTABLE(work->WS[i])) continue;
