@@ -547,6 +547,68 @@ static int is_symmetric(const DAQPProblem* qp, const c_float zero_tol){
 }
 
 /*
+ * Split the null space Z (column major, n x nz) into [Z1 Z2], where Z2 spans
+ * the null directions that only involve the variables without curvature (the
+ * variables outside cid, whose rows and columns of H are zero). The rows cid
+ * of Z2 are set to exactly zero, so that H Z2 = 0 holds exactly and the
+ * reduced Hessian Z'HZ = blockdiag(Z1_C' H_CC Z1_C, 0) keeps an exact null
+ * space, as H itself has (a dense Z'HZ only has a numerical one). The reduced
+ * Hessian is formed in Hr. Returns the dimension of Z1.
+ */
+static DAQP_NOINLINE int split_flat(const DAQPProblem* qp, c_float* Z, const int n,
+        const int nz, const int* cid, const int nc, const c_float zero_tol, c_float* Hr){
+    const c_float tol = sqrt(zero_tol);
+    c_float *Y = calloc((size_t)nc*nz+1,sizeof(c_float)), *tau = calloc(nc+1,sizeof(c_float));
+    c_float *Zr = malloc((size_t)n*nz*sizeof(c_float)), *G;
+    int i, j, k, c, r = 0;
+
+    // Householder QR of Z_C' (the rows cid of Z), with its rank r
+    for(c = 0; c < nc && r < nz; c++){
+        c_float *col = Y+(size_t)r*nz, alpha = 0, beta, d;
+        for(j = 0; j < nz; j++) col[j] = Z[(size_t)j*n+cid[c]];
+        for(k = 0; k < r; k++) reflect(Y+(size_t)k*nz,tau[k],k,nz,col);
+        for(j = r; j < nz; j++) alpha += col[j]*col[j];
+        alpha = sqrt(alpha);
+        if(alpha <= tol) continue; // Dependent on the rows before
+        beta = (col[r] > 0) ? -alpha : alpha;
+        d = col[r]-beta;
+        tau[r] = -d/beta;
+        for(j = r+1; j < nz; j++) col[j] /= d;
+        col[r] = beta;
+        r++;
+    }
+
+    // Z <-- Z Q: rows (Q'z')' (row major), the last nz-r columns are Z2
+    for(i = 0; i < n; i++)
+        for(j = 0; j < nz; j++) Zr[(size_t)i*nz+j] = Z[(size_t)j*n+i];
+    apply_QT_many(Y,tau,r,nz,Zr,n,nz);
+    for(c = 0; c < nc; c++)
+        for(j = r; j < nz; j++) Zr[(size_t)cid[c]*nz+j] = 0; // Roundoff
+    for(i = 0; i < n; i++)
+        for(j = 0; j < nz; j++) Z[(size_t)j*n+i] = Zr[(size_t)i*nz+j];
+
+    // Hr = blockdiag(Z1_C' H_CC Z1_C, 0), with G = H_CC Z1_C (nc x r)
+    for(i = 0; i < nz*nz; i++) Hr[i] = 0;
+    G = malloc(((size_t)nc*r+1)*sizeof(c_float));
+    for(c = 0; c < nc; c++){
+        const c_float* Hc = qp->H+(size_t)cid[c]*n;
+        for(j = 0; j < r; j++){
+            c_float sm = 0;
+            for(k = 0; k < nc; k++) sm += Hc[cid[k]]*Zr[(size_t)cid[k]*nz+j];
+            G[(size_t)c*r+j] = sm;
+        }
+    }
+    for(i = 0; i < r; i++)
+        for(j = i; j < r; j++){
+            c_float sm = 0;
+            for(c = 0; c < nc; c++) sm += Zr[(size_t)cid[c]*nz+i]*G[(size_t)c*r+j];
+            Hr[(size_t)i*nz+j] = Hr[(size_t)j*nz+i] = sm;
+        }
+    free(G); free(Y); free(tau); free(Zr);
+    return r;
+}
+
+/*
  * Form the reduction of qp: the factorizations, the reduced constraints and the
  * storage of the reduced problem. Returns 0 if nothing (or everything) can be
  * eliminated.
@@ -556,8 +618,8 @@ static int build_reduction(DAQPWorkspace* work, DAQPProblem* qp){
     const int n = qp->n, m = qp->m, ms = qp->ms;
     const c_float zero_tol = work->settings->zero_tol;
     int i, j, k, c, neq, nz, mI = 0, mtot, mr, nb = 0;
-    int use_twoside = 0, use_refl = 0, symmetric = 1;
-    int* gen_ids;
+    int use_twoside = 0, use_refl = 0, symmetric = 1, split = 0, nc = 0;
+    int *gen_ids, *cid = NULL;
     c_float* L = NULL;
     const c_float* Z;
 
@@ -619,6 +681,18 @@ static int build_reduction(DAQPWorkspace* work, DAQPProblem* qp){
     accumulate_Z(eq->V,eq->tau,neq,n);
     Z = eq->V+(size_t)neq*n; // Column j of Z at Z+j*n
 
+    // The variables with curvature (nonzero rows of H). If there are few of
+    // them, the null directions without curvature are split off (split_flat).
+    if(qp->H != NULL && !eq->metric && symmetric){
+        cid = malloc(n*sizeof(int));
+        for(i = 0; i < n; i++){
+            const c_float* Hi = qp->H+(size_t)i*n;
+            for(j = 0; j < n; j++) if(Hi[j] != 0 || qp->H[(size_t)j*n+i] != 0) break;
+            if(j < n) cid[nc++] = i;
+        }
+        split = nc < nz; // Then some null directions have no curvature
+    }
+
     // The reduced Hessian, and how the reduced problem is posed
     free(eq->Hr); eq->Hr = NULL;
     free(eq->fr); eq->fr = NULL;
@@ -626,7 +700,11 @@ static int build_reduction(DAQPWorkspace* work, DAQPProblem* qp){
     else if(eq->metric) eq->path = DAQP_EQ_PATH_LDP;
     else{
         eq->Hr = malloc((size_t)nz*nz*sizeof(c_float));
-        if(use_twoside){
+        if(split){
+            split_flat(qp,(c_float*)Z,n,nz,cid,nc,zero_tol,eq->Hr);
+            use_refl = 0; // The rows (A Q)_2 refer to the unsplit Z
+        }
+        else if(use_twoside){
             c_float* B = malloc((size_t)n*n*sizeof(c_float));
             for(i = 0; i < n*n; i++) B[i] = qp->H[i];
             twoside(B,n,eq->V,eq->tau,neq,eq->tmp);
@@ -693,6 +771,7 @@ static int build_reduction(DAQPWorkspace* work, DAQPProblem* qp){
         }
     }
     free(L);
+    free(cid);
 
     /*
      * Keep the constraints that the reduced variables affect. The others are

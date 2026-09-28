@@ -535,8 +535,17 @@ void daqp_extract_result(DAQPResult* res, DAQPWorkspace* work){
     if(res->lam != NULL && !DAQP_IS_HIERARCHICAL(work)){
         for(i=0;i<work->m;i++)
             res->lam[i] = 0;
-        for(i=0;i<work->n_active;i++)
-            res->lam[work->WS[i]] = work->lam_star[i];
+        for(i=0;i<work->n_active;i++){
+            const int id = work->WS[i];
+            const c_float lam = work->lam_star[i];
+            // A weakly active constraint (zero multiplier) can be kept with a
+            // multiplier of the wrong sign within dual_tol; report it as zero
+            if(!DAQP_IS_IMMUTABLE(id) && !DAQP_IS_SOFT(id) &&
+                    (DAQP_IS_LOWER(id) ? lam > 0 : lam < 0))
+                res->lam[id] = 0;
+            else
+                res->lam[id] = lam;
+        }
     }
 
     // Shift back function value
