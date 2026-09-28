@@ -126,6 +126,9 @@ extern "C" {
 // marks a constraint that is temporarily set aside (see gradient_step in daqp_prox.c)
 #define DAQP_SET_ASIDE 64
 
+// Internal marker: ACTIVE and IMMUTABLE were set by bound equality detection.
+#define DAQP_AUTO_EQUALITY 128
+
 # ifdef __cplusplus
 }
 # endif // ifdef __cplusplus

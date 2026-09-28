@@ -99,7 +99,7 @@ int daqp_update_ldp(int mask, DAQPWorkspace *work, DAQPProblem* qp){
     }
 
     // Check bounds early
-    if(mask&DAQP_UPDATE_M||mask&DAQP_UPDATE_v||mask&DAQP_UPDATE_d){
+    if(mask&DAQP_UPDATE_M||mask&DAQP_UPDATE_v||mask&DAQP_UPDATE_d||mask&DAQP_UPDATE_sense){
         error_flag = daqp_check_bounds(work,qp->bupper,qp->blower);
         if(error_flag<0) return error_flag;
         if(error_flag==1) do_activate = 1;
@@ -597,7 +597,7 @@ int daqp_check_bounds(DAQPWorkspace* work, c_float* bupper, c_float* blower){
     int i;
     c_float diff;
     for(i =0;i<work->m;i++){
-        if(DAQP_IS_IMMUTABLE(i)) continue;
+        if(DAQP_IS_IMMUTABLE(i) && !(work->sense[i] & DAQP_AUTO_EQUALITY)) continue;
         diff = bupper[i] - blower[i];
         // Check for trivial infeasibility
         if ( diff < -work->settings->primal_tol ){
@@ -605,10 +605,14 @@ int daqp_check_bounds(DAQPWorkspace* work, c_float* bupper, c_float* blower){
         }
         // Check for unmarked equality constraint (blower == bupper)
         else if (diff < work->settings->zero_tol && !DAQP_IS_SOFT(i)){
-            work->sense[i] |= DAQP_ACTIVE + DAQP_IMMUTABLE;
+            if(!(work->sense[i] & DAQP_AUTO_EQUALITY) || !DAQP_IS_ACTIVE(i))
+                do_activate = 1;
+            work->sense[i] |= DAQP_ACTIVE | DAQP_IMMUTABLE | DAQP_AUTO_EQUALITY;
+        }
+        else if(work->sense[i] & DAQP_AUTO_EQUALITY){
+            work->sense[i] &= ~(DAQP_ACTIVE | DAQP_IMMUTABLE | DAQP_AUTO_EQUALITY);
             do_activate = 1;
         }
-        // TODO: Make innactive here
     }
 #endif
     return do_activate;
