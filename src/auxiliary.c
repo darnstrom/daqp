@@ -1,4 +1,5 @@
 #include "auxiliary.h"
+#include <float.h>
 #include "factorization.h"
 #include "daqp.h"
 
@@ -20,20 +21,12 @@
 #define DAQP_HAS_L1(work) ((work)->settings->w_soft != 0)
 #endif
 
-// The weights are indexed by the original problem, which is renumbered if
-// equalities have been eliminated (work->scaling always refers to the
-// problem that is currently installed)
-static inline int daqp_soft_ind(DAQPWorkspace *work, const int id){
-    return (work->eq != NULL && work->eq->installed) ? work->eq->map[id] : id;
-}
-
 // Reciprocal quadratic weight of the active side of constraint id (zero
 // selects settings->rho_soft, which is given in the normalized formulation)
 static inline c_float daqp_soft_rho(DAQPWorkspace *work, const int id){
 #ifdef DAQP_SOFT_WEIGHTS
     if(work->rho_ls != NULL){
-        const int i = daqp_soft_ind(work,id);
-        const c_float rho = DAQP_IS_LOWER(id) ? work->rho_ls[i] : work->rho_us[i];
+        const c_float rho = DAQP_IS_LOWER(id) ? work->rho_ls[id] : work->rho_us[id];
         if(rho != 0)
             return work->scaling ? rho*work->scaling[id]*work->scaling[id] : rho;
     }
@@ -48,8 +41,7 @@ static inline c_float daqp_soft_rho(DAQPWorkspace *work, const int id){
 static inline c_float daqp_soft_w(DAQPWorkspace *work, const int id){
 #ifdef DAQP_SOFT_WEIGHTS
     if(work->w_ls != NULL){
-        const int i = daqp_soft_ind(work,id);
-        const c_float w = DAQP_IS_LOWER(id) ? work->w_ls[i] : work->w_us[i];
+        const c_float w = DAQP_IS_LOWER(id) ? work->w_ls[id] : work->w_us[id];
         if(w != 0)
             return work->scaling ? w/work->scaling[id] : w;
     }
@@ -302,8 +294,10 @@ int daqp_remove_blocking(DAQPWorkspace *work){
     int i, ind, rm_ind = DAQP_EMPTY_IND;
     const int singular = work->sing_ind != DAQP_EMPTY_IND;
     const int has_l1 = DAQP_HAS_L1(work);
-    const c_float dual_tol = work->settings->dual_tol;
     c_float alpha = DAQP_INF, alpha_cand, y, ystar, p, target, rm_target = 0;
+    // Blocking beyond dual_tol, or beyond zero_tol for a singular direction (which
+    // is not a multiplier, but scaled to 1 for the constraint that made it singular)
+    const c_float tol = singular ? work->settings->zero_tol : work->settings->dual_tol;
 
     for(i = 0; i < work->n_active; i++){
         ind = work->WS[i];
@@ -314,7 +308,7 @@ int daqp_remove_blocking(DAQPWorkspace *work){
         ystar = lower ? -work->lam_star[i] : work->lam_star[i];
 
         if(!has_l1 || !DAQP_IS_SOFT(ind)){ // Blocked when the multiplier reaches zero
-            if(ystar >= -dual_tol) continue;
+            if(ystar >= -tol) continue;
             target = 0;
         }
         else{
@@ -323,8 +317,8 @@ int daqp_remove_blocking(DAQPWorkspace *work){
             const c_float w = daqp_soft_w(work,ind);
             const int fixed = DAQP_IS_SLACK_FIXED(ind);
             target = fixed ? 0 : w; // Blocked from below
-            if(ystar >= (singular ? 0 : target) - dual_tol){
-                if(!fixed || w == 0 || ystar <= (singular ? 0 : w) + dual_tol)
+            if(ystar >= (singular ? 0 : target) - tol){
+                if(!fixed || w == 0 || ystar <= (singular ? 0 : w) + tol)
                     continue;
                 target = w; // A zero slack is released
             }
@@ -492,10 +486,22 @@ static void daqp_activate_constraint(DAQPWorkspace *work, const int id){
     daqp_add_constraint(work,id, DAQP_IS_LOWER(id) ? -lam : lam);
 }
 
+// Remove the last constraint of a singular working set (not necessarily the
+// latest added one, due to pivoting). Equalities become mutable (re-added if violated)
+int daqp_drop_singular_last(DAQPWorkspace *work){
+    const int id = work->WS[--work->n_active];
+    DAQP_SET_INACTIVE(id);
+    if(!DAQP_IS_BINARY(id)) work->sense[id] &= ~DAQP_IMMUTABLE;
+    work->sing_ind = DAQP_EMPTY_IND;
+    if(work->reuse_ind > work->n_active)
+        work->reuse_ind = work->n_active;
+    return id;
+}
+
 // Activate the constraints that are marked active in sense
 // Equalities are activated before inequalities
 int daqp_activate_constraints(DAQPWorkspace *work){
-    int i, j, first_mutable = work->m;
+    int i, j, first_mutable = work->m, exitflag = 1;
     for(i = 0; i < work->m; i++){
         if(!DAQP_IS_ACTIVE(i)) continue;
         if(!DAQP_IS_IMMUTABLE(i)){
@@ -518,18 +524,13 @@ int daqp_activate_constraints(DAQPWorkspace *work){
                 dependency_scale += term < 0 ? -term : term;
             }
 
-            DAQP_SET_INACTIVE(i);
-            work->n_active--;
-            work->sing_ind = DAQP_EMPTY_IND;
-            if(work->reuse_ind > work->n_active)
-                work->reuse_ind = work->n_active;
-
+            // Dependency might only be numerical => keep as mutable constraint
+            daqp_drop_singular_last(work);
             if(dependency_residual >
                         work->settings->primal_tol*dependency_scale ||
                     dependency_residual <
                         -work->settings->primal_tol*dependency_scale)
-                return DAQP_EXIT_OVERDETERMINED_INITIAL;
-            // Consistent redundant equality: safely ignore.
+                exitflag = DAQP_EXIT_OVERDETERMINED_INITIAL;
         }
     }
 
@@ -538,28 +539,76 @@ int daqp_activate_constraints(DAQPWorkspace *work){
         if(!DAQP_IS_ACTIVE(i) || DAQP_IS_IMMUTABLE(i)) continue;
         daqp_activate_constraint(work,i);
         if(work->sing_ind != DAQP_EMPTY_IND){
-            // Leave this constraint and the remaining mutable ones inactive.
-            for(j = i; j < work->m; j++){
+            // Drop dependent constraint and leave remaining mutable ones inactive
+            daqp_drop_singular_last(work);
+            for(j = i+1; j < work->m; j++){
                 if(!DAQP_IS_IMMUTABLE(j)) DAQP_SET_INACTIVE(j);
             }
-            work->n_active--;
-            work->sing_ind = DAQP_EMPTY_IND;
-            return 1;
+            return exitflag;
         }
     }
-    return 1;
+    return exitflag;
 }
 
 // Deactivate all active constraints that are mutable (i.e., not equality constraints)
 void daqp_deactivate_constraints(DAQPWorkspace *work){
     int i;
-    if(work->eq != NULL) work->eq->working_set_valid = 0;
     if(work->bnb != NULL) work->bnb->n_root_WS = 0; // Also drop the BnB warm start
     for(i =0;i<work->n_active;i++){
         if(DAQP_IS_IMMUTABLE(work->WS[i])) continue;
         DAQP_SET_INACTIVE(work->WS[i]);
     }
     reset_daqp_workspace(work); // The next update activates the remaining ones
+}
+
+// Solve L*D*L'*dlam = r (r and dlam in xldl, zldl used as scratch)
+static void daqp_solve_working_set(DAQPWorkspace *work){
+    int i, j, disp;
+    const int na = work->n_active;
+    c_float sum;
+    // Forward substitution L*y = r
+    for(i = 0, disp = 0; i < na; i++){
+        sum = work->xldl[i];
+        for(j = 0; j < i; j++)
+            sum -= work->L[disp++]*work->xldl[j];
+        disp++; // Skip the stored diagonal (= 1)
+        work->xldl[i] = sum;
+    }
+    // Scale by D^{-1}
+    for(i = 0; i < na; i++)
+        work->zldl[i] = work->xldl[i]/work->D[i];
+    // Backward substitution L'*dlam = zldl
+    {
+        int start_disp = DAQP_ARSUM(na)-1;
+        for(i = na-1; i >= 0; i--){
+            sum = work->zldl[i];
+            disp = start_disp--;
+            for(j = na-1; j > i; j--){
+                sum -= work->xldl[j]*work->L[disp];
+                disp -= j;
+            }
+            work->xldl[i] = sum;
+        }
+    }
+}
+
+// y <-- y - M_W'*dlam for the working set W
+static void daqp_sub_working_set_rows(DAQPWorkspace *work, const c_float* dlam, c_float* y){
+    int i, j, disp, id;
+    for(i = 0; i < work->n_active; i++){
+        const c_float dl = dlam[i];
+        id = work->WS[i];
+        if(id < work->ms){
+            if(work->Rinv != NULL){
+                for(j = id, disp = DAQP_R_OFFSET(id,work->n); j < work->n; j++)
+                    y[j] -= work->Rinv[disp+j]*dl;
+            }
+            else y[id] -= dl;
+        }
+        else
+            for(j = 0, disp = work->n*(id-work->ms); j < work->n; j++)
+                y[j] -= work->M[disp++]*dl;
+    }
 }
 
 // One step of iterative refinement for active constraints.
@@ -572,13 +621,13 @@ void daqp_deactivate_constraints(DAQPWorkspace *work){
 //   M*(u - M'*delta_lam) = M*u - M*M'*delta_lam = M*u - r = d.
 void daqp_refine_active(DAQPWorkspace *work){
     int i, j, disp, id;
-    c_float sum, Mu, d;
+    c_float Mu, d;
 
     // Refinement uses xldl and zldl as scratch, invalidating the cached CSP
     // forward substitution independently of whether the active set changes.
     work->reuse_ind = 0;
 
-    // Compute -r[i] = -(M_i*u - d_i) and store in xldl[i].
+    // Compute r[i] = M_i*u - d_i and store in xldl[i].
     for(i = 0; i < work->n_active; i++){
         id = work->WS[i];
         if(id < work->ms){
@@ -603,54 +652,12 @@ void daqp_refine_active(DAQPWorkspace *work){
             work->xldl[i] -= daqp_soft_residual(work,id,work->lam_star[i]);
     }
 
-    // Forward substitution L * y = xldl
-    for(i=0, disp=0; i<work->n_active; i++){
-        sum = work->xldl[i];
-        for(j=0; j<i; j++)
-            sum -= work->L[disp++] * work->xldl[j];
-        disp++; // skip stored diagonal (= 1)
-        work->xldl[i] = sum;
-    }
+    daqp_solve_working_set(work); // xldl = delta_lam
 
-    // Scale by D^{-1}: zldl[i] = xldl[i] / D[i].
-    for(i=0; i<work->n_active; i++)
-        work->zldl[i] = work->xldl[i] / work->D[i];
-
-    // Backward substitution L' * delta_lam = zldl -> stored in xldl.
-    {
-        int start_disp = DAQP_ARSUM(work->n_active) - 1;
-        for(i=work->n_active-1; i>=0; i--){
-            sum = work->zldl[i];
-            disp = start_disp--;
-            for(j=work->n_active-1; j>i; j--){
-                sum -= work->xldl[j] * work->L[disp];
-                disp -= j;
-            }
-            work->xldl[i] = sum; // xldl[i] = delta_lam[i]
-        }
-    }
-
-    // Update lam_star += delta_lam.
-    // The residual r = M*u - d was computed from the exact constraint matrix,
+    // Update lam_star += delta_lam and u -= M'*delta_lam.
     for(i=0; i<work->n_active; i++)
         work->lam_star[i] += work->xldl[i];
-
-    // Update u -= M'*delta_lam and recompute fval.
-    for(i=0; i<work->n_active; i++){
-        c_float dlam = work->xldl[i];
-        id = work->WS[i];
-        if(id < work->ms){
-            if(work->Rinv != NULL){
-                for(j=id, disp=DAQP_R_OFFSET(id,work->n); j<work->n; j++)
-                    work->u[j] -= work->Rinv[disp+j] * dlam;
-            } else {
-                work->u[id] -= dlam;
-            }
-        } else {
-            for(j=0, disp=work->n*(id-work->ms); j<work->n; j++)
-                work->u[j] -= work->M[disp++] * dlam;
-        }
-    }
+    daqp_sub_working_set_rows(work,work->xldl,work->u);
 
     // Recompute fval since both u and lam_star changed
     c_float fval = 0;
@@ -661,4 +668,76 @@ void daqp_refine_active(DAQPWorkspace *work){
     for(j=0; j<work->n; j++)
         fval += work->u[j] * work->u[j];
     work->fval = fval;
+}
+
+// Residual of active constraint id at x: A_id x - b_id (b the active side)
+static c_float daqp_active_residual(const DAQPWorkspace *work, const int id){
+    const DAQPProblem* qp = work->qp;
+    const int n = work->n, ms = work->ms;
+    c_float val;
+    int j;
+    if(id < ms) val = work->x[id];
+    else{
+        const c_float* a = qp->A+(size_t)(id-ms)*n;
+        for(j = 0, val = 0; j < n; j++) val += a[j]*work->x[j];
+    }
+    return val - (DAQP_IS_LOWER(id) ? qp->blower[id] : qp->bupper[id]);
+}
+
+// One step of iterative refinement of x on the active constraints, done
+// directly in x to avoid the cancellation in x = Rinv*(u-v)
+void daqp_refine_primal(DAQPWorkspace *work){
+    int i, j, disp, id;
+    const int n = work->n, na = work->n_active, ms = work->ms;
+    const DAQPProblem* qp = work->qp;
+    c_float *r = work->xldl, *du = work->zldl, dfval = 0;
+    if(na == 0 || qp == NULL || work->sing_ind != DAQP_EMPTY_IND) return;
+
+    // Skip if x is accurate: a well-conditioned (unregularized) Hessian and rounding
+    // errors (about DAQP_REFINE_GAIN*eps*max(|u|,|v|)/min(D), with |u|^2 = fval >= |d_W|^2)
+    // below primal_tol
+    if(!(work->state & DAQP_STATE_ILL_CONDITIONED) && work->n_prox == 0){
+        c_float scale2 = work->fval, min_D = 1, err;
+        for(i = 0; i < na; i++) if(work->D[i] < min_D) min_D = work->D[i];
+        if(work->v != NULL)
+            for(i = 0; i < n; i++) if(work->v[i]*work->v[i] > scale2) scale2 = work->v[i]*work->v[i];
+        err = DAQP_REFINE_GAIN*(sizeof(c_float) == sizeof(float) ? FLT_EPSILON : DBL_EPSILON);
+        if(err*err*scale2 <= work->settings->primal_tol*work->settings->primal_tol*min_D*min_D) return;
+    }
+    for(i = 0; i < na; i++) if(DAQP_IS_SOFT(work->WS[i])) return;
+
+    // xldl and zldl are used as scratch
+    work->reuse_ind = 0;
+
+    // r = S*(A_W x - b_W)
+    for(i = 0; i < na; i++){
+        id = work->WS[i];
+        const c_float val = daqp_active_residual(work,id);
+        dfval += work->lam_star[i]*val;
+        r[i] = val*(work->scaling != NULL ? work->scaling[id] : 1);
+    }
+
+    daqp_solve_working_set(work); // r = dlam
+
+    // du = -M_W'*dlam
+    for(j = 0; j < n; j++) du[j] = 0;
+    daqp_sub_working_set_rows(work,r,du);
+    for(j = 0; j < n; j++) dfval += 0.5*du[j]*du[j];
+
+    // dx = Rinv*du (as ldp2qp_solution, without v)
+    if(work->Rinv != NULL){
+        for(i = 0, disp = 0; i < n; i++){
+            du[i] *= work->Rinv[disp++];
+            for(j = i+1; j < n; j++) du[i] += work->Rinv[disp++]*du[j];
+        }
+        if(work->scaling != NULL)
+            for(i = 0; i < ms; i++) du[i] /= work->scaling[i];
+    }
+    else if(work->RinvD != NULL)
+        for(i = 0; i < n; i++) du[i] *= work->RinvD[i];
+    for(i = 0; i < n; i++) work->x[i] += du[i];
+
+    for(i = 0; i < na; i++)
+        work->lam_star[i] += r[i]*(work->scaling != NULL ? work->scaling[work->WS[i]] : 1);
+    work->fval += 2*dfval; // fval is twice the objective function value
 }

@@ -574,8 +574,6 @@ cdef class Model:
         # Omitted sense reuses DAQP's state; explicit sense overrides it.
         if sense is None and (update_mask & (DAQP_UPDATE_Rinv | DAQP_UPDATE_M)):
             if self._has_solved:
-                # A preceding update may have installed a reduced workspace.
-                daqp_eq_restore(self._work)
                 self._qp.sense = self._work.sense
             else:
                 self._qp.sense = NULL if m == 0 else &self._sense[0]
@@ -675,8 +673,7 @@ cdef class Model:
         cdef double *pru = NULL
         cdef double *pwl = NULL
         cdef double *pwu = NULL
-        # One weight per constraint of the original problem (_work.m is
-        # reduced while equality constraints are eliminated)
+        # One weight per constraint of the original problem
         cdef int m = self._qp.m
         if rho_l is not None:
             rl = np.ascontiguousarray(rho_l, dtype=np.double)

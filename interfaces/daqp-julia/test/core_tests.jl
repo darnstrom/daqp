@@ -969,7 +969,9 @@ end
     DAQPBase.settings(d_eq_test, Dict(:eq_reduction => DAQPBase.DAQP_EQ_REDUCTION_ON))
     setup_flag, _ = DAQPBase.setup(d_eq_test, qp_eq_test)
     @test setup_flag > 0
-    @test unsafe_load(d_eq_test.work).n == n_eq_test - neq_test
+    # The equalities are eliminated, while the workspace describes the original problem
+    @test unsafe_load(d_eq_test.work).eq != C_NULL
+    @test unsafe_load(d_eq_test.work).n == n_eq_test
 
     x_eq_test, _, exitflag_eq_test, _ = DAQPBase.solve(d_eq_test)
     @test exitflag_eq_test == DAQPBase.OPTIMAL
@@ -984,7 +986,7 @@ end
         d_eq_test, nothing, nothing, nothing, bu_updated, bl_updated,
         nothing, nothing, Cint(0))
     @test update_flag == 0
-    @test unsafe_load(d_eq_test.work).n == n_eq_test - neq_test
+    @test unsafe_load(d_eq_test.work).eq != C_NULL
 end
 
 @testset "Equality elimination workspace reuse" begin

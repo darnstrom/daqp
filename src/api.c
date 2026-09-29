@@ -7,9 +7,20 @@
 
 // Solve problem from a given workspace and measure setup and solve time
 void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
+    int reduced;
     if(work->break_points == NULL) work->nh = 1;
-    // Put back an elimination that a previous solve retrieved
-    if((res->exitflag = daqp_eq_reinstall(work)) < 0) return;
+    // A policy that no longer eliminates takes effect before the solve
+    if(DAQP_IS_REDUCED(work) &&
+            work->settings->eq_reduction == DAQP_EQ_REDUCTION_OFF &&
+            (res->exitflag = daqp_update_ldp(0,work,work->qp)) < 0)
+        return;
+    // Solve the reduced problem if the equalities are eliminated (unless the
+    // latest update found its right-hand side to be infeasible)
+    if(DAQP_IS_REDUCED(work) && work->eq->error < 0){
+        res->exitflag = work->eq->error;
+        return;
+    }
+    reduced = daqp_eq_install(work);
 #ifdef PROFILING
     DAQPtimer timer;
     tic(&timer);
@@ -25,7 +36,12 @@ void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
                     res->exitflag = daqp_hiqp(work,res->lam);
                 else
                     res->exitflag = daqp_ldp(work);
-                if(res->exitflag > 0) ldp2qp_solution(work); // Retrieve qp solution
+                if(res->exitflag > 0){
+                    ldp2qp_solution(work); // Retrieve qp solution
+                    // Refine x (if it might be inaccurate)
+                    if(work->bnb == NULL && !DAQP_IS_HIERARCHICAL(work))
+                        daqp_refine_primal(work);
+                }
             }
             else{ //AVI
                 res->exitflag = daqp_solve_avi(work);
@@ -51,6 +67,10 @@ void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
 
     // Package result
     daqp_extract_result(res,work);
+    if(reduced){
+        daqp_eq_expand(res,work);
+        daqp_eq_restore(work);
+    }
     // Add time to result
 #ifdef PROFILING
     res->solve_time = get_time(&timer);
@@ -366,11 +386,10 @@ void allocate_daqp_ldp(DAQPWorkspace *work, int n, int m, int ms, int alloc_R, i
 int daqp_allocate_soft_weights(DAQPWorkspace *work){
 #ifdef DAQP_SOFT_WEIGHTS
     if(work->rho_ls != NULL) return 1; // Already allocated
-    // The weights are indexed by the original problem, whose size is kept in
-    // eq->m while equalities are eliminated. A larger work->m is kept, since
-    // an interface may set it to allocate for a later, larger problem.
-    int m = work->m;
-    if(work->eq != NULL && work->eq->installed && work->eq->m > m) m = work->eq->m;
+    // The weights are indexed by the original problem (also if its equality
+    // constraints are eliminated). An interface may set work->m to allocate
+    // for a later, larger problem.
+    const int m = work->m;
     if(m == 0) return 0;
     work->rho_ls = calloc(4*m,sizeof(c_float));
     if(work->rho_ls == NULL) return 0;
@@ -386,23 +405,17 @@ int daqp_allocate_soft_weights(DAQPWorkspace *work){
 // Refresh the cached active set after uniform or individual soft weights change.
 void daqp_refresh_soft_weights(DAQPWorkspace *work){
     int i, rebuild = 0;
-    const int reduced_pending = work->eq != NULL && work->eq->neq != 0
-        && !work->eq->installed;
-    // A restored equality-reduced problem is reactivated by daqp_eq_reinstall.
-    // Otherwise, only an active soft constraint makes the factorization stale.
-    if(reduced_pending){
-        if(work->n_prox == 0) rebuild = 1;
-    }
-    else
-        for(i = 0; i < work->n_active; i++)
-            if(DAQP_IS_SOFT(work->WS[i])){
-                rebuild = 1;
-                break;
-            }
+    // The working set is that of the reduced problem if equalities are eliminated
+    const int reduced = daqp_eq_install(work);
+    // Only an active soft constraint makes the factorization stale.
+    for(i = 0; i < work->n_active; i++)
+        if(DAQP_IS_SOFT(work->WS[i])){
+            rebuild = 1;
+            break;
+        }
     // Reset the factorization
     if(rebuild){
         reset_daqp_workspace(work);
-        if(reduced_pending) return;
         if(DAQP_IS_HIERARCHICAL(work)){
             const int m = work->m;
             work->m = work->break_points[0];
@@ -412,6 +425,7 @@ void daqp_refresh_soft_weights(DAQPWorkspace *work){
         else
             daqp_activate_constraints(work);
     }
+    if(reduced) daqp_eq_restore(work);
 }
 
 // Set the weights of the soft constraints, one entry per constraint of the
@@ -421,7 +435,7 @@ int daqp_set_soft_weights(DAQPWorkspace *work, c_float *rho_l, c_float *rho_u,
         c_float *w_l, c_float *w_u){
     int i;
     if(!daqp_allocate_soft_weights(work)) return 0;
-    const int m = (work->eq != NULL && work->eq->installed) ? work->eq->m : work->m;
+    const int m = work->m;
     for(i = 0; i < m; i++){
         if(rho_l != NULL) work->rho_ls[i] = rho_l[i];
         if(rho_u != NULL) work->rho_us[i] = rho_u[i];
@@ -526,8 +540,16 @@ void daqp_extract_result(DAQPResult* res, DAQPWorkspace* work){
     if(res->lam != NULL && !DAQP_IS_HIERARCHICAL(work)){
         for(i=0;i<work->m;i++)
             res->lam[i] = 0;
-        for(i=0;i<work->n_active;i++)
-            res->lam[work->WS[i]] = work->lam_star[i];
+        for(i=0;i<work->n_active;i++){
+            const int id = work->WS[i];
+            const c_float lam = work->lam_star[i];
+            // Report a multiplier of the wrong sign (within dual_tol) as zero
+            if(!DAQP_IS_IMMUTABLE(id) && !DAQP_IS_SOFT(id) &&
+                    (DAQP_IS_LOWER(id) ? lam > 0 : lam < 0))
+                res->lam[id] = 0;
+            else
+                res->lam[id] = lam;
+        }
     }
 
     // Shift back function value
@@ -552,9 +574,6 @@ void daqp_extract_result(DAQPResult* res, DAQPWorkspace* work){
         res->nodes = 1;
     else
         res->nodes = work->nh;
-
-    // Expand a reduced equality-eliminated result and restore the full LDP.
-    daqp_eq_retrieve(res,work);
 }
 
 void daqp_extract_active_duals(DAQPResult* res, DAQPWorkspace* work){
@@ -703,9 +722,13 @@ void daqp_dual_init_active(DAQPProblem* qp, c_float* lam){
 
 // Set the starting iterate
 void daqp_set_primal_start(DAQPWorkspace* work, c_float* x){
+    // x is given for the original problem, also if its equalities are eliminated
+    const int reduced = daqp_eq_install(work);
     if(!(work->state & DAQP_STATE_UNCONSTRAINED)){
         int i;
-        for(i = 0; i < work->n; i++) work->x[i] = x[i];
+        if(reduced) daqp_eq_set_primal_start(work,x);
+        else for(i = 0; i < work->n; i++) work->x[i] = x[i];
         if(work->bnb != NULL) work->state |= DAQP_STATE_INCUMBENT;
     }
+    if(reduced) daqp_eq_restore(work);
 }

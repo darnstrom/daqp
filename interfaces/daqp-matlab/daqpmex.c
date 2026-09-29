@@ -220,9 +220,9 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  // rho_l, rho_u, w_l, w_u (an empty argument leaves that weight alone)
 	  c_float* w[4];
 	  int i;
-	  // One weight per constraint of the original problem, whose size is kept
-	  // in eq->m while equalities are eliminated (work->m is then reduced)
-	  const int m = (work->eq != NULL && work->eq->installed) ? work->eq->m : work->m;
+	  // One weight per constraint (of the original problem, also when its
+	  // equality constraints are eliminated)
+	  const int m = work->m;
 	  for(i = 0; i < 4; i++){
 		if(!mxIsEmpty(prhs[2+i]) && mxGetNumberOfElements(prhs[2+i]) != m)
 		  mexErrMsgTxt("soft weights must have one entry per constraint");

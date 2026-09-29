@@ -43,6 +43,26 @@ extern "C" {
 #define DAQP_EQ_REDUCTION_AUTO 0
 #define DAQP_EQ_REDUCTION_ON 1
 
+// Minimum number of iterations for daqp_refine_primal to be applied (prox)
+#define DAQP_REFINE_MIN_ITER 5
+// A Hessian with a larger condition number (estimate) is refined (daqp_refine_primal)
+#define DAQP_REFINE_COND 1e6
+// Refine if the rounding errors (about DAQP_REFINE_GAIN*eps*max(|u|,|v|)/min(D))
+// might exceed primal_tol
+#define DAQP_REFINE_GAIN 1e3
+
+// eps (relative to max(H_ii)) used when a semi-proximal inner problem fails
+#define DAQP_PROX_EPS_MAX 1e-3
+// Regularize a reduced Hessian of an H with zero rows if cond > DAQP_HESSIAN_COND_MAX,
+// and any Hessian if n*eps*cond > DAQP_HESSIAN_COND_EPS
+#define DAQP_HESSIAN_COND_MAX 1e8
+#define DAQP_HESSIAN_COND_EPS 0.1
+
+// How the reduced problem of an equality elimination is posed
+#define DAQP_EQ_PATH_LDP 0 // Identity Hessian, no linear term (H PD on the null space)
+#define DAQP_EQ_PATH_QP 1  // Reduced Hessian W'HW (singular QP or AVI)
+#define DAQP_EQ_PATH_LP 2  // No Hessian
+
 // Equality constraints are eliminated if there are sufficiently many of them
 // (neq > EQ_MIN_COUNT and EQ_MIN_RATIO*neq > n)
 #define DAQP_EQ_MIN_COUNT 5
@@ -87,6 +107,7 @@ extern "C" {
 #define DAQP_STATE_UNCONSTRAINED 256 // The unconstrained optimum is the solution
 #define DAQP_STATE_RINV_NORMALIZED 512 // The first ms rows of Rinv are normalized
 #define DAQP_STATE_INCUMBENT 1024 // work->x holds a candidate solution for BnB
+#define DAQP_STATE_ILL_CONDITIONED 2048 // cond(H) (estimate) above DAQP_REFINE_COND
 
 // CONSTRAINT MASKS
 #define DAQP_ACTIVE 1

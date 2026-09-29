@@ -400,10 +400,9 @@ bool DAQP::set_soft_weights(Eigen::VectorXd const& rho_lower,
                             Eigen::VectorXd const& rho_upper,
                             Eigen::VectorXd const& w_lower,
                             Eigen::VectorXd const& w_upper) {
-    // One weight per constraint of the original problem, whose size is kept
-    // in eq->m while equalities are eliminated (work_.m is then reduced)
-    const int m_orig = (work_.eq != nullptr && work_.eq->installed)
-        ? work_.eq->m : work_.m;
+    // One weight per constraint (of the original problem, also when its
+    // equality constraints are eliminated)
+    const int m_orig = work_.m;
     const auto valid_size = [m_orig](Eigen::Index size) {
         return size == 0 || size == m_orig;
     };
