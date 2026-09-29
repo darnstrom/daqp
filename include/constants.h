@@ -43,14 +43,10 @@ extern "C" {
 #define DAQP_EQ_REDUCTION_AUTO 0
 #define DAQP_EQ_REDUCTION_ON 1
 
-// daqp_refine_primal only refines a solve that took more iterations than this:
-// a warm-started solve that (nearly) kept its working set costs about as much
-// as the refinement itself
+// Minimum number of iterations for daqp_refine_primal to be applied
 #define DAQP_REFINE_MIN_ITER 5
 
-// An inner problem of the proximal-point method that fails is solved again
-// with the regularization eps of its semi-proximal directions raised to
-// DAQP_PROX_EPS_MAX times the largest diagonal element of H (see daqp_prox.c)
+// eps (relative to max(H_ii)) used when a semi-proximal inner problem fails
 #define DAQP_PROX_EPS_MAX 1e-3
 
 // How the reduced problem of an equality elimination is posed

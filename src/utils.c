@@ -327,10 +327,7 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
     // (symmetrize) H into Rinv before Cholesky.
     if(work->RinvD != NULL){ work->Rinv = work->RinvD; work->RinvD = NULL; }
     if(!is_factored && !regularize_all && work->prox_mask != NULL && work->avi == NULL){
-        // A direction without curvature (a zero row and column of H) is
-        // decoupled from the others, so it can be regularized alone
-        // (semi-proximal). Otherwise, the full shift below is used if the
-        // factorization fails.
+        // Zero rows of H are decoupled => regularize only them (semi-proximal)
         hessian_scale = 0.0;
         for(i = 0; i < n; i++){
             c_float abs_diag = H[i*n+i];
@@ -376,8 +373,7 @@ pack_hessian:
                 diag_i -= work->Rinv[disp2] * work->Rinv[disp2];
             if(diag_i <= zero_tol)
                 goto regularize_hessian;
-            // (The pivots of the regularized directions of a semi-proximal
-            // factorization are eps)
+            // (Skip regularized pivots)
             if(diag_i < min_pivot && (regularize_all || work->n_prox == 0 ||
                         !work->prox_mask[i]))
                 min_pivot = diag_i;
@@ -459,8 +455,7 @@ c_float daqp_get_proximal_regularization(const DAQPWorkspace *work){
         return eps;
     }
 
-    // A semi-proximal factorization regularizes zero rows of H, whose row of
-    // Rinv is e_i/sqrt(eps) (e_i after the normalization of a bound)
+    // Semi-proximal: recover eps from a regularized row of Rinv (e_i/sqrt(eps))
     if(work->n_prox < work->n && work->prox_mask != NULL){
         for(i = 0; i < work->n && !work->prox_mask[i]; i++);
         rinv = (i < work->ms && (work->state & DAQP_STATE_RINV_NORMALIZED)) ?

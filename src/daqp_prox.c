@@ -44,12 +44,8 @@ int daqp_prox(DAQPWorkspace *work){
     // original problem, so one solve gives the exact solution.
     const int all_pd = (!is_lp) && (work->n_prox == 0);
 
-    // The regularization of semi-proximal directions can be changed cheaply
-    // (see rescale_prox). A small eps makes the directions without curvature
-    // dominate the rows of M, and constraints that only differ in the other
-    // directions become indistinguishable. An inner problem can then fail (a
-    // false certificate of infeasibility, or cycling), and it is therefore
-    // solved again with eps raised to eps_max.
+    // eps of semi-proximal directions can be changed cheaply (rescale_prox).
+    // A failed inner problem (often due to a small eps) is resolved with eps_max
     const int adaptive = !is_lp && !all_pd && work->avi == NULL &&
         work->prox_mask != NULL && work->n_prox < nx;
     c_float eps_max = eps;
@@ -118,7 +114,7 @@ int daqp_prox(DAQPWorkspace *work){
         daqp_update_d(work, work->qp->bupper, work->qp->blower);
         if(rescaled){ // The working set is factored anew after a rescaling
             reset_daqp_workspace(work);
-            daqp_activate_constraints(work); // (As for a repair in daqp_ldp)
+            daqp_activate_constraints(work);
             rescaled = 0;
         }
 
@@ -209,8 +205,7 @@ int daqp_prox(DAQPWorkspace *work){
 
     // Finalize
     if(total_iter >= work->settings->iter_limit) exitflag = DAQP_EXIT_ITERLIMIT;
-    // The final iterate is the solution of the latest inner problem (not
-    // refined after a short solve, see DAQP_REFINE_MIN_ITER)
+    // Refine x (skipped for short solves)
     if(exitflag > 0 && total_iter > DAQP_REFINE_MIN_ITER) daqp_refine_primal(work);
     if(is_lp){
         for(i = 0; i < work->n_active; i++)
@@ -324,7 +319,7 @@ static int prox_step(DAQPWorkspace* work, c_float* s_prev){
     c_float s;
     while((s = curvature_step(work)) >= 0){
         const c_float* d = work->xldl;
-        if(first){ // Lagged step length (see above)
+        if(first){ // Lagged (Barzilai-Borwein) step length
             const c_float s_exact = s;
             if(s_exact < DAQP_INF && *s_prev >= 0)
                 s = (*s_prev < 2*s_exact) ? *s_prev : 2*s_exact;
@@ -360,14 +355,9 @@ static int prox_step(DAQPWorkspace* work, c_float* s_prev){
     return moved;
 }
 
-/*
- * Change the regularization of the semi-proximal directions from eps to
- * eps_new. These directions are decoupled from the others (a zero row and
- * column of H, or a diagonal H), so their row and column of Rinv is
- * e_i/sqrt(H_ii+eps). A change of eps therefore only scales their column of M
- * (before the normalization of its rows) and the normalization of their
- * simple bounds. The working set has to be factored anew.
- */
+// Change eps of the semi-proximal directions to eps_new. The directions are
+// decoupled, so only their columns of Rinv and M are scaled (the working set
+// has to be refactored afterwards)
 static void rescale_prox(DAQPWorkspace* work, c_float eps, c_float eps_new){
     int i, j, disp;
     const int n = work->n, ms = work->ms;

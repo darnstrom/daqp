@@ -483,14 +483,8 @@ static void daqp_activate_constraint(DAQPWorkspace *work, const int id){
     daqp_add_constraint(work,id, DAQP_IS_LOWER(id) ? -lam : lam);
 }
 
-/*
- * Drop the constraint that makes the working set singular after an addition.
- * It is the last one in the working set, which need not be the added one (a
- * pivot, see daqp_pivot_last, can have moved another one last). An equality is
- * kept as a mutable constraint (with equal bounds), which is added again if it
- * ends up violated (but not a binary constraint, which BnB has fixed). Returns
- * the dropped constraint.
- */
+// Remove the last constraint of a singular working set (not necessarily the
+// latest added one, due to pivoting). Equalities become mutable (re-added if violated)
 int daqp_drop_singular_last(DAQPWorkspace *work){
     const int id = work->WS[--work->n_active];
     DAQP_SET_INACTIVE(id);
@@ -527,11 +521,7 @@ int daqp_activate_constraints(DAQPWorkspace *work){
                 dependency_scale += term < 0 ? -term : term;
             }
 
-            // The dependency (and its consistency) can be numerical only, so
-            // the equality is kept as a mutable constraint that is added if it
-            // ends up violated. The remaining constraints are activated also if
-            // it is inconsistent, since a working set that is factored anew
-            // during a solve has to be complete.
+            // Dependency might only be numerical => keep as mutable constraint
             daqp_drop_singular_last(work);
             if(dependency_residual >
                         work->settings->primal_tol*dependency_scale ||
@@ -546,8 +536,7 @@ int daqp_activate_constraints(DAQPWorkspace *work){
         if(!DAQP_IS_ACTIVE(i) || DAQP_IS_IMMUTABLE(i)) continue;
         daqp_activate_constraint(work,i);
         if(work->sing_ind != DAQP_EMPTY_IND){
-            // Drop the dependent constraint, and leave the remaining mutable
-            // ones inactive
+            // Drop dependent constraint and leave remaining mutable ones inactive
             daqp_drop_singular_last(work);
             for(j = i+1; j < work->m; j++){
                 if(!DAQP_IS_IMMUTABLE(j)) DAQP_SET_INACTIVE(j);
@@ -569,10 +558,7 @@ void daqp_deactivate_constraints(DAQPWorkspace *work){
     reset_daqp_workspace(work); // The next update activates the remaining ones
 }
 
-/*
- * Solve (L*D*L')*dlam = r for the working set, with r in xldl on entry and
- * dlam in xldl on return (zldl is used as scratch).
- */
+// Solve L*D*L'*dlam = r (r and dlam in xldl, zldl used as scratch)
 static void solve_working_set(DAQPWorkspace *work){
     int i, j, disp;
     const int na = work->n_active;
@@ -681,20 +667,6 @@ void daqp_refine_active(DAQPWorkspace *work){
     work->fval = fval;
 }
 
-/*
- * One step of iterative refinement of the primal solution on the active
- * constraints, measured in the variables of the QP. daqp_refine_active makes
- * the LDP hold its active constraints to working precision, but recovering
- * x = Rinv*(u-v) cancels the (possibly large) v, which leaves the active
- * constraints of the QP violated by rounding errors amplified by |v|. The
- * residuals r = S*(A_W x - b_W) (S the normalization) are therefore used
- * directly: L*D*L' dlam = r, and x is corrected by Rinv*du with
- * du = -M_W'*dlam, which does not involve v. The multipliers follow
- * (lam += S*dlam), which keeps stationarity, and so does the objective
- * function value (by lam'(A_W x - b_W) + 0.5*||du||^2).
- * Called after ldp2qp_solution (x formed, lam_star in the scale of the
- * constraints); a working set with soft constraints is left as it is.
- */
 // Residual of active constraint id at x: A_id x - b_id (b the active side)
 static c_float active_residual(const DAQPWorkspace *work, const int id){
     const DAQPProblem* qp = work->qp;
@@ -709,6 +681,8 @@ static c_float active_residual(const DAQPWorkspace *work, const int id){
     return val - (DAQP_IS_LOWER(id) ? qp->blower[id] : qp->bupper[id]);
 }
 
+// One step of iterative refinement of x on the active constraints, done
+// directly in x to avoid the cancellation in x = Rinv*(u-v)
 void daqp_refine_primal(DAQPWorkspace *work){
     int i, j, disp, id;
     const int n = work->n, na = work->n_active, ms = work->ms;
@@ -717,7 +691,7 @@ void daqp_refine_primal(DAQPWorkspace *work){
     if(na == 0 || qp == NULL || work->sing_ind != DAQP_EMPTY_IND) return;
     for(i = 0; i < na; i++) if(DAQP_IS_SOFT(work->WS[i])) return;
 
-    // xldl and zldl are used as scratch (see daqp_refine_active)
+    // xldl and zldl are used as scratch
     work->reuse_ind = 0;
 
     // r = S*(A_W x - b_W)
