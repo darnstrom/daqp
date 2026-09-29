@@ -483,10 +483,28 @@ static void daqp_activate_constraint(DAQPWorkspace *work, const int id){
     daqp_add_constraint(work,id, DAQP_IS_LOWER(id) ? -lam : lam);
 }
 
+/*
+ * Drop the constraint that makes the working set singular after an addition.
+ * It is the last one in the working set, which need not be the added one (a
+ * pivot, see daqp_pivot_last, can have moved another one last). An equality is
+ * kept as a mutable constraint (with equal bounds), which is added again if it
+ * ends up violated (but not a binary constraint, which BnB has fixed). Returns
+ * the dropped constraint.
+ */
+int daqp_drop_singular_last(DAQPWorkspace *work){
+    const int id = work->WS[--work->n_active];
+    DAQP_SET_INACTIVE(id);
+    if(!DAQP_IS_BINARY(id)) work->sense[id] &= ~DAQP_IMMUTABLE;
+    work->sing_ind = DAQP_EMPTY_IND;
+    if(work->reuse_ind > work->n_active)
+        work->reuse_ind = work->n_active;
+    return id;
+}
+
 // Activate the constraints that are marked active in sense
 // Equalities are activated before inequalities
 int daqp_activate_constraints(DAQPWorkspace *work){
-    int i, j, first_mutable = work->m;
+    int i, j, first_mutable = work->m, exitflag = 1;
     for(i = 0; i < work->m; i++){
         if(!DAQP_IS_ACTIVE(i)) continue;
         if(!DAQP_IS_IMMUTABLE(i)){
@@ -509,18 +527,17 @@ int daqp_activate_constraints(DAQPWorkspace *work){
                 dependency_scale += term < 0 ? -term : term;
             }
 
-            DAQP_SET_INACTIVE(i);
-            work->n_active--;
-            work->sing_ind = DAQP_EMPTY_IND;
-            if(work->reuse_ind > work->n_active)
-                work->reuse_ind = work->n_active;
-
+            // The dependency (and its consistency) can be numerical only, so
+            // the equality is kept as a mutable constraint that is added if it
+            // ends up violated. The remaining constraints are activated also if
+            // it is inconsistent, since a working set that is factored anew
+            // during a solve has to be complete.
+            daqp_drop_singular_last(work);
             if(dependency_residual >
                         work->settings->primal_tol*dependency_scale ||
                     dependency_residual <
                         -work->settings->primal_tol*dependency_scale)
-                return DAQP_EXIT_OVERDETERMINED_INITIAL;
-            // Consistent redundant equality: safely ignore.
+                exitflag = DAQP_EXIT_OVERDETERMINED_INITIAL;
         }
     }
 
@@ -529,16 +546,16 @@ int daqp_activate_constraints(DAQPWorkspace *work){
         if(!DAQP_IS_ACTIVE(i) || DAQP_IS_IMMUTABLE(i)) continue;
         daqp_activate_constraint(work,i);
         if(work->sing_ind != DAQP_EMPTY_IND){
-            // Leave this constraint and the remaining mutable ones inactive.
-            for(j = i; j < work->m; j++){
+            // Drop the dependent constraint, and leave the remaining mutable
+            // ones inactive
+            daqp_drop_singular_last(work);
+            for(j = i+1; j < work->m; j++){
                 if(!DAQP_IS_IMMUTABLE(j)) DAQP_SET_INACTIVE(j);
             }
-            work->n_active--;
-            work->sing_ind = DAQP_EMPTY_IND;
-            return 1;
+            return exitflag;
         }
     }
-    return 1;
+    return exitflag;
 }
 
 // Deactivate all active constraints that are mutable (i.e., not equality constraints)

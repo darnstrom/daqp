@@ -25,6 +25,7 @@ void daqp_compute_singular_direction(DAQPWorkspace *work);
 
 void daqp_pivot_last(DAQPWorkspace *work);
 
+int daqp_drop_singular_last(DAQPWorkspace *work);
 int daqp_activate_constraints(DAQPWorkspace *work);
 void daqp_deactivate_constraints(DAQPWorkspace *work);
 

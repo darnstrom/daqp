@@ -316,11 +316,7 @@ static int prox_step(DAQPWorkspace* work, c_float* s_prev){
         daqp_add_constraint(work, ind, lower ? -1.0 : 1.0);
         if(work->sing_ind == DAQP_EMPTY_IND) break;
         // Linearly dependent on the active constraints: set it aside
-        work->n_active--;
-        DAQP_SET_INACTIVE(ind);
-        work->sense[ind] |= DAQP_SET_ASIDE;
-        work->sing_ind = DAQP_EMPTY_IND;
-        if(work->reuse_ind > work->n_active) work->reuse_ind = work->n_active;
+        work->sense[daqp_drop_singular_last(work)] |= DAQP_SET_ASIDE;
         skipped = 1;
     }
     if(skipped)
