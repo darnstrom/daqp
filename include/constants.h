@@ -43,6 +43,11 @@ extern "C" {
 #define DAQP_EQ_REDUCTION_AUTO 0
 #define DAQP_EQ_REDUCTION_ON 1
 
+// daqp_refine_primal only refines a solve that took more iterations than this:
+// a warm-started solve that (nearly) kept its working set costs about as much
+// as the refinement itself
+#define DAQP_REFINE_MIN_ITER 5
+
 // How the reduced problem of an equality elimination is posed
 #define DAQP_EQ_PATH_LDP 0 // Identity Hessian, no linear term (H PD on the null space)
 #define DAQP_EQ_PATH_QP 1  // Reduced Hessian W'HW (singular QP or AVI)

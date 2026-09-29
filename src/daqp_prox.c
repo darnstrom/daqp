@@ -2,7 +2,7 @@
 #include "auxiliary.h"
 #include "utils.h"
 
-static int prox_step(DAQPWorkspace* work);
+static int prox_step(DAQPWorkspace* work, c_float* s_prev);
 
 /* --------------------------------------------------------------------------
  * daqp_prox  --  outer proximal-point / semi-proximal loop
@@ -20,10 +20,11 @@ static int prox_step(DAQPWorkspace* work);
  * --------------------------------------------------------------------------*/
 int daqp_prox(DAQPWorkspace *work){
     int i, total_iter = 0;
+    c_float s_prev = -1; // Exact step length of the latest prox_step (-1: none)
     int center_relaxed = 0;
     int nx, is_lp;
     const c_float relaxation = 1.5;
-    int exitflag;
+    int exitflag = DAQP_EXIT_ITERLIMIT; // If no iteration can be taken
     c_float *swp_ptr;
     c_float max_diff, tol_stat;
     c_float eta = work->settings->eta_prox;
@@ -150,6 +151,7 @@ int daqp_prox(DAQPWorkspace *work){
         // relax the step for an AVI. The center is then confirmed by a plain
         // proximal step before convergence is declared.
         center_relaxed = 0;
+        if(work->iterations != 1) s_prev = -1; // The working set has changed
         if(work->iterations == 1 && work->n_active < nx &&
                 total_iter < work->settings->iter_limit){
             if(work->avi != NULL){
@@ -159,7 +161,7 @@ int daqp_prox(DAQPWorkspace *work){
                 center_relaxed = 1;
             }
             else{
-                const int step_flag = prox_step(work);
+                const int step_flag = prox_step(work,&s_prev);
                 if(step_flag == DAQP_EXIT_UNBOUNDED){
                     exitflag = DAQP_EXIT_UNBOUNDED;
                     break;
@@ -171,6 +173,9 @@ int daqp_prox(DAQPWorkspace *work){
 
     // Finalize
     if(total_iter >= work->settings->iter_limit) exitflag = DAQP_EXIT_ITERLIMIT;
+    // The final iterate is the solution of the latest inner problem (not
+    // refined after a short solve, see DAQP_REFINE_MIN_ITER)
+    if(exitflag > 0 && total_iter > DAQP_REFINE_MIN_ITER) daqp_refine_primal(work);
     if(is_lp){
         for(i = 0; i < work->n_active; i++)
             work->lam_star[i] /= eps; // Rescale dual variables
@@ -267,23 +272,29 @@ static int blocking_constraint(DAQPWorkspace* work, c_float* s, int* lower){
  * With an unchanged working set, d keeps the active constraints active, and
  * the proximal iterates contract along d only by eps/(eps+mu), where mu =
  * d'Hd/d'd is the curvature along d (for an LP, they do not converge along d
- * at all). x is therefore moved to the minimizer of the objective along d
- * (curvature_step), or to the first inactive constraint that blocks the step,
- * which is then added to the working set. A blocking constraint that is
- * linearly dependent on the active ones does not change the working set (and
- * daqp_ldp would remove it again), so it is set aside and the step continues
- * to the next one.
+ * at all). x is therefore moved along d (curvature_step), or to the first
+ * inactive constraint that blocks the step, which is then added to the working
+ * set. A blocking constraint that is linearly dependent on the active ones
+ * does not change the working set (and daqp_ldp would remove it again), so it
+ * is set aside and the step continues to the next one.
  *
  * Returns 1 if the center was moved and 0 if not (d is not a descent
  * direction, or no constraint blocks a step without curvature in a QP, which
  * may be flat only up to rounding errors). An LP whose descent direction is
  * not blocked is unbounded: DAQP_EXIT_UNBOUNDED.
  * --------------------------------------------------------------------------*/
-static int prox_step(DAQPWorkspace* work){
-    int i, k, ind, lower = 0, moved = 0, skipped = 0;
+static int prox_step(DAQPWorkspace* work, c_float* s_prev){
+    int i, k, ind, lower = 0, moved = 0, skipped = 0, first = 1;
     c_float s;
     while((s = curvature_step(work)) >= 0){
         const c_float* d = work->xldl;
+        if(first){ // Lagged step length (see above)
+            const c_float s_exact = s;
+            if(s_exact < DAQP_INF && *s_prev >= 0)
+                s = (*s_prev < 2*s_exact) ? *s_prev : 2*s_exact;
+            *s_prev = (s_exact < DAQP_INF) ? s_exact : -1;
+            first = 0;
+        }
         ind = blocking_constraint(work,&s,&lower);
         if(ind == DAQP_EMPTY_IND){
             if(s < DAQP_INF){ // The minimizer along d
@@ -294,6 +305,7 @@ static int prox_step(DAQPWorkspace* work){
                 return DAQP_EXIT_UNBOUNDED;
             break;
         }
+        *s_prev = -1; // Blocked: the working set changes
         // Advance to the blocking constraint and activate it. A constraint
         // that x already violates (within the tolerance) blocks at once: the
         // step is not reversed, which would undo proximal progress.

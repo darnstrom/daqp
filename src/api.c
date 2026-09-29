@@ -36,7 +36,13 @@ void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
                     res->exitflag = daqp_hiqp(work,res->lam);
                 else
                     res->exitflag = daqp_ldp(work);
-                if(res->exitflag > 0) ldp2qp_solution(work); // Retrieve qp solution
+                if(res->exitflag > 0){
+                    ldp2qp_solution(work); // Retrieve qp solution
+                    // (Not for a short warm-started solve, see DAQP_REFINE_MIN_ITER)
+                    if(work->bnb == NULL && !DAQP_IS_HIERARCHICAL(work) &&
+                            work->iterations > DAQP_REFINE_MIN_ITER)
+                        daqp_refine_primal(work);
+                }
             }
             else{ //AVI
                 res->exitflag = daqp_solve_avi(work);
