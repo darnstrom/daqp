@@ -47,7 +47,7 @@ extern "C" {
 #define DAQP_REFINE_MIN_ITER 5
 // A Hessian with a larger condition number (estimate) is refined (daqp_refine_primal)
 #define DAQP_REFINE_COND 1e6
-// Refine if the rounding errors (about DAQP_REFINE_GAIN*eps*max(|d_W|,|v|)/min(D))
+// Refine if the rounding errors (about DAQP_REFINE_GAIN*eps*max(|u|,|v|)/min(D))
 // might exceed primal_tol
 #define DAQP_REFINE_GAIN 1e3
 
