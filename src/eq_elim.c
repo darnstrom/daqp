@@ -546,15 +546,9 @@ static int is_symmetric(const DAQPProblem* qp, const c_float zero_tol){
     return 1;
 }
 
-/*
- * Split the null space Z (column major, n x nz) into [Z1 Z2], where Z2 spans
- * the null directions that only involve the variables without curvature (the
- * variables outside cid, whose rows and columns of H are zero). The rows cid
- * of Z2 are set to exactly zero, so that H Z2 = 0 holds exactly and the
- * reduced Hessian Z'HZ = blockdiag(Z1_C' H_CC Z1_C, 0) keeps an exact null
- * space, as H itself has (a dense Z'HZ only has a numerical one). The reduced
- * Hessian is formed in Hr. Returns the dimension of Z1.
- */
+// Split Z (n x nz) into [Z1 Z2], with Z2 zero in the rows cid (the variables
+// with curvature), so that H*Z2 = 0 exactly. Forms Hr = blockdiag(Z1'HZ1, 0)
+// and returns the dimension of Z1
 static DAQP_NOINLINE int split_flat(const DAQPProblem* qp, c_float* Z, const int n,
         const int nz, const int* cid, const int nc, const c_float zero_tol, c_float* Hr){
     const c_float tol = sqrt(zero_tol);
@@ -681,8 +675,7 @@ static int build_reduction(DAQPWorkspace* work, DAQPProblem* qp){
     accumulate_Z(eq->V,eq->tau,neq,n);
     Z = eq->V+(size_t)neq*n; // Column j of Z at Z+j*n
 
-    // The variables with curvature (nonzero rows of H). If there are few of
-    // them, the null directions without curvature are split off (split_flat).
+    // Variables with curvature (nonzero rows of H), for split_flat
     if(qp->H != NULL && !eq->metric && symmetric){
         cid = malloc(n*sizeof(int));
         for(i = 0; i < n; i++){

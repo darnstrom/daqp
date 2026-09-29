@@ -177,11 +177,8 @@ int daqp_prox(DAQPWorkspace *work){
             break;
         }
 
-        // With an unchanged working set the proximal map is locally affine,
-        // and its steps slow down along directions with little curvature (or
-        // none, for an LP). Move the center along the step (prox_step), or
-        // relax the step for an AVI. The center is then confirmed by a plain
-        // proximal step before convergence is declared.
+        // Unchanged working set => accelerate by moving the center along the
+        // step (relax the step for an AVI). Convergence is confirmed afterwards
         center_relaxed = 0;
         if(work->iterations != 1) s_prev = -1; // The working set has changed
         if(work->iterations == 1 && work->n_active < nx &&
@@ -228,18 +225,13 @@ int daqp_prox(DAQPWorkspace *work){
     return exitflag;
 }
 
-/*
- * Step length along d = x - x_old that minimizes the objective 0.5x'Hx + f'x:
- * -g'd/d'Hd with g = Hx+f (d in work->xldl on return). Returns DAQP_INF for a
- * direction without curvature (an LP, or curvature at the level of rounding
- * errors), and -1 if d is not a descent direction.
- */
+// Step length -g'd/d'Hd that minimizes the objective along d = x-x_old (d in
+// xldl). Returns DAQP_INF if d has no curvature, -1 if d is not a descent direction
 static c_float curvature_step(DAQPWorkspace* work){
     int i, j;
     const int n = work->n;
     const DAQPProblem* qp = work->qp;
-    // Scratch: d and Hd (formed anew by the next inner solve, since
-    // daqp_update_d resets reuse_ind before it)
+    // Scratch (reuse_ind is reset by the next daqp_update_d)
     c_float *d = work->xldl, *hd = work->zldl;
     c_float gd = 0, dhd = 0, dd = 0, hmax = 0;
 
@@ -264,12 +256,8 @@ static c_float curvature_step(DAQPWorkspace* work){
     return (dhd > work->settings->zero_tol*hmax*dd) ? -gd/dhd : DAQP_INF;
 }
 
-/*
- * The first constraint that blocks the step x + s*(x - x_old) for s < *s,
- * among the ones that are not active, immutable, or set aside. Returns its
- * index (DAQP_EMPTY_IND if none), with *s shortened to the step that reaches
- * it and *lower marking whether it is its lower bound.
- */
+// First inactive constraint that blocks x + s*(x-x_old) for s < *s (*s is
+// shortened to the blocking step, *lower marks a lower bound)
 static int blocking_constraint(DAQPWorkspace* work, c_float* s, int* lower){
     int i, j, ind = DAQP_EMPTY_IND;
     const int n = work->n, m = work->m, ms = work->ms;
@@ -300,19 +288,12 @@ static int blocking_constraint(DAQPWorkspace* work, c_float* s, int* lower){
 /* --------------------------------------------------------------------------
  * prox_step  --  step along the latest proximal step d = x - x_old
  *
- * With an unchanged working set, d keeps the active constraints active, and
- * the proximal iterates contract along d only by eps/(eps+mu), where mu =
- * d'Hd/d'd is the curvature along d (for an LP, they do not converge along d
- * at all). x is therefore moved along d (curvature_step), or to the first
- * inactive constraint that blocks the step, which is then added to the working
- * set. A blocking constraint that is linearly dependent on the active ones
- * does not change the working set (and daqp_ldp would remove it again), so it
- * is set aside and the step continues to the next one.
+ * With an unchanged working set, the proximal iterates converge slowly along
+ * d. x is therefore moved to the minimizer along d, or to the first blocking
+ * constraint, which is added to the working set (dependent ones are set aside).
  *
- * Returns 1 if the center was moved and 0 if not (d is not a descent
- * direction, or no constraint blocks a step without curvature in a QP, which
- * may be flat only up to rounding errors). An LP whose descent direction is
- * not blocked is unbounded: DAQP_EXIT_UNBOUNDED.
+ * Returns 1 if x was moved, 0 otherwise, and DAQP_EXIT_UNBOUNDED for an LP
+ * with an unblocked descent direction.
  * --------------------------------------------------------------------------*/
 static int prox_step(DAQPWorkspace* work, c_float* s_prev){
     int i, k, ind, lower = 0, moved = 0, skipped = 0, first = 1;
@@ -337,9 +318,8 @@ static int prox_step(DAQPWorkspace* work, c_float* s_prev){
             break;
         }
         *s_prev = -1; // Blocked: the working set changes
-        // Advance to the blocking constraint and activate it. A constraint
-        // that x already violates (within the tolerance) blocks at once: the
-        // step is not reversed, which would undo proximal progress.
+        // Advance to the blocking constraint and activate it (no step back if
+        // it is already violated)
         if(s >= 0) for(k = 0; k < work->n; k++) work->x[k] += s*d[k];
         moved = 1;
         if(lower) DAQP_SET_LOWER(ind);

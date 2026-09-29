@@ -544,8 +544,7 @@ void daqp_extract_result(DAQPResult* res, DAQPWorkspace* work){
         for(i=0;i<work->n_active;i++){
             const int id = work->WS[i];
             const c_float lam = work->lam_star[i];
-            // A weakly active constraint (zero multiplier) can be kept with a
-            // multiplier of the wrong sign within dual_tol; report it as zero
+            // Report a multiplier of the wrong sign (within dual_tol) as zero
             if(!DAQP_IS_IMMUTABLE(id) && !DAQP_IS_SOFT(id) &&
                     (DAQP_IS_LOWER(id) ? lam > 0 : lam < 0))
                 res->lam[id] = 0;
