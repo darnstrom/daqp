@@ -4,7 +4,8 @@
 #include <math.h>
 
 static int prox_step(DAQPWorkspace* work, c_float* s_prev);
-static void rescale_prox(DAQPWorkspace* work, c_float eps, c_float eps_new);
+static void prox_rescale(DAQPWorkspace* work, c_float eps, c_float eps_new);
+static int prox_is_infeasible(const DAQPWorkspace* work);
 
 /* --------------------------------------------------------------------------
  * daqp_prox  --  outer proximal-point / semi-proximal loop
@@ -44,7 +45,7 @@ int daqp_prox(DAQPWorkspace *work){
     // original problem, so one solve gives the exact solution.
     const int all_pd = (!is_lp) && (work->n_prox == 0);
 
-    // eps of semi-proximal directions can be changed cheaply (rescale_prox).
+    // eps of semi-proximal directions can be changed cheaply (prox_rescale).
     // A failed inner problem (often due to a small eps) is resolved with eps_max
     const int adaptive = !is_lp && !all_pd && work->avi == NULL &&
         work->prox_mask != NULL && work->n_prox < nx;
@@ -57,7 +58,15 @@ int daqp_prox(DAQPWorkspace *work){
             if(hii < 0) hii = -hii;
             if(hii > hmax) hmax = hii;
         }
-        if(DAQP_PROX_EPS_MAX*hmax > eps_max) eps_max = DAQP_PROX_EPS_MAX*hmax;
+        // Reset an eps that an earlier solve has raised (as in daqp_update_Rinv)
+        c_float eps0 = work->settings->eps_prox < 0 ? -work->settings->eps_prox : work->settings->eps_prox;
+        if(eps0 < sqrt(work->settings->zero_tol)*hmax) eps0 = sqrt(work->settings->zero_tol)*hmax;
+        if(eps > 1.01*eps0){
+            prox_rescale(work,eps,eps0);
+            eps = eps0;
+            rescaled = 1;
+        }
+        eps_max = DAQP_PROX_EPS_MAX*hmax > eps ? DAQP_PROX_EPS_MAX*hmax : eps;
     }
 
     // A negative eta selects an automatic tolerance. Preserve the established
@@ -130,8 +139,9 @@ int daqp_prox(DAQPWorkspace *work){
 
         total_iter += work->iterations;
         if(adaptive && eps < eps_max && total_iter < work->settings->iter_limit &&
-                (exitflag == DAQP_EXIT_INFEASIBLE || exitflag == DAQP_EXIT_CYCLE)){
-            rescale_prox(work,eps,eps_max);
+                (exitflag == DAQP_EXIT_CYCLE ||
+                 (exitflag == DAQP_EXIT_INFEASIBLE && !prox_is_infeasible(work)))){
+            prox_rescale(work,eps,eps_max);
             eps = eps_max;
             rescaled = 1;
             s_prev = -1;
@@ -227,7 +237,7 @@ int daqp_prox(DAQPWorkspace *work){
 
 // Step length -g'd/d'Hd that minimizes the objective along d = x-x_old (d in
 // xldl). Returns DAQP_INF if d has no curvature, -1 if d is not a descent direction
-static c_float curvature_step(DAQPWorkspace* work){
+static c_float prox_curvature_step(DAQPWorkspace* work){
     int i, j;
     const int n = work->n;
     const DAQPProblem* qp = work->qp;
@@ -258,7 +268,7 @@ static c_float curvature_step(DAQPWorkspace* work){
 
 // First inactive constraint that blocks x + s*(x-x_old) for s < *s (*s is
 // shortened to the blocking step, *lower marks a lower bound)
-static int blocking_constraint(DAQPWorkspace* work, c_float* s, int* lower){
+static int prox_blocking_constraint(DAQPWorkspace* work, c_float* s, int* lower){
     int i, j, ind = DAQP_EMPTY_IND;
     const int n = work->n, m = work->m, ms = work->ms;
     const DAQPProblem* qp = work->qp;
@@ -298,7 +308,7 @@ static int blocking_constraint(DAQPWorkspace* work, c_float* s, int* lower){
 static int prox_step(DAQPWorkspace* work, c_float* s_prev){
     int i, k, ind, lower = 0, moved = 0, skipped = 0, first = 1;
     c_float s;
-    while((s = curvature_step(work)) >= 0){
+    while((s = prox_curvature_step(work)) >= 0){
         const c_float* d = work->xldl;
         if(first){ // Lagged (Barzilai-Borwein) step length
             const c_float s_exact = s;
@@ -307,7 +317,7 @@ static int prox_step(DAQPWorkspace* work, c_float* s_prev){
             *s_prev = (s_exact < DAQP_INF) ? s_exact : -1;
             first = 0;
         }
-        ind = blocking_constraint(work,&s,&lower);
+        ind = prox_blocking_constraint(work,&s,&lower);
         if(ind == DAQP_EMPTY_IND){
             if(s < DAQP_INF){ // The minimizer along d
                 for(k = 0; k < work->n; k++) work->x[k] += s*d[k];
@@ -338,7 +348,7 @@ static int prox_step(DAQPWorkspace* work, c_float* s_prev){
 // Change eps of the semi-proximal directions to eps_new. The directions are
 // decoupled, so only their columns of Rinv and M are scaled (the working set
 // has to be refactored afterwards)
-static void rescale_prox(DAQPWorkspace* work, c_float eps, c_float eps_new){
+static void prox_rescale(DAQPWorkspace* work, c_float eps, c_float eps_new){
     int i, j, disp;
     const int n = work->n, ms = work->ms;
     const int* mask = work->prox_mask;
@@ -372,4 +382,28 @@ static void rescale_prox(DAQPWorkspace* work, c_float eps, c_float eps_new){
         work->scaling[i] *= sc;
     }
 #undef DAQP_PROX_RATIO
+}
+
+// Whether the certificate of infeasibility from daqp_ldp (the dependency lam_star
+// of a singular working set) is valid and implies a violation above primal_tol.
+// In the constraints of the QP, q = S*lam_star gives sum q_i a_i = 0, and hence
+// max violation >= (-sum q_i b_i - sum_wrong |q_i| (bu_i-bl_i))/sum |q_i|, where the
+// sign of q_i is wrong for a violated b_i (only acceptable for two-sided constraints)
+static int prox_is_infeasible(const DAQPWorkspace* work){
+    int i, id, lower;
+    c_float q, gap = 0, norm = 0, wrong = 0;
+    if(work->sing_ind == DAQP_EMPTY_IND) return 0;
+    for(i = 0; i < work->n_active; i++){
+        id = work->WS[i];
+        lower = DAQP_IS_LOWER(id);
+        q = work->scaling != NULL ? work->lam_star[i]*work->scaling[id] : work->lam_star[i];
+        gap -= q*(lower ? work->qp->blower[id] : work->qp->bupper[id]);
+        if(!DAQP_IS_IMMUTABLE(id) && (lower ? q > 0 : q < 0)){
+            if(work->qp->bupper[id] < DAQP_INF && work->qp->blower[id] > -DAQP_INF)
+                gap -= (q < 0 ? -q : q)*(work->qp->bupper[id]-work->qp->blower[id]);
+            else wrong += q < 0 ? -q : q;
+        }
+        norm += q < 0 ? -q : q;
+    }
+    return wrong <= 1e-8*norm && gap > work->settings->primal_tol*norm;
 }
