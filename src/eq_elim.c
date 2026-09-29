@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <float.h>
 
 // Keeps a hot kernel out of line, so that its generated code does not
 // depend on the code it would otherwise be inlined into
@@ -734,6 +735,7 @@ form_W:
         eq_trsm_rows(L,nz,eq->W,n,nz);
         // Ill-conditioned Z'HZ => PATH_QP (where it is regularized). The squared
         // column norms of W are the diagonal of (Z'HZ)^-1
+        const c_float eps_mach = sizeof(c_float) == sizeof(float) ? FLT_EPSILON : DBL_EPSILON;
         c_float wmax = 0, hmax = 0;
         for(j = 0; j < nz; j++){
             c_float s2 = 0;
@@ -741,7 +743,8 @@ form_W:
             if(s2 > wmax) wmax = s2;
             if(eq->Hr[(size_t)j*nz+j] > hmax) hmax = eq->Hr[(size_t)j*nz+j];
         }
-        if(wmax*hmax > DAQP_HESSIAN_COND_MAX){
+        if((nc < n && wmax*hmax > DAQP_HESSIAN_COND_MAX) ||
+                nz*eps_mach*wmax*hmax > DAQP_HESSIAN_COND_EPS){
             free(L); L = NULL;
             eq->path = DAQP_EQ_PATH_QP;
             goto form_W;

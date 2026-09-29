@@ -53,8 +53,10 @@ extern "C" {
 
 // eps (relative to max(H_ii)) used when a semi-proximal inner problem fails
 #define DAQP_PROX_EPS_MAX 1e-3
-// A Hessian with a larger condition number (lower bound) is regularized
+// Regularize a reduced Hessian of an H with zero rows if cond > DAQP_HESSIAN_COND_MAX,
+// and any Hessian if n*eps*cond > DAQP_HESSIAN_COND_EPS
 #define DAQP_HESSIAN_COND_MAX 1e8
+#define DAQP_HESSIAN_COND_EPS 0.1
 
 // How the reduced problem of an equality elimination is posed
 #define DAQP_EQ_PATH_LDP 0 // Identity Hessian, no linear term (H PD on the null space)

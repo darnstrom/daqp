@@ -1,6 +1,7 @@
 #include "daqp.h"
 #include "utils.h"
 #include <math.h>
+#include <float.h>
 #include <stdio.h>
 
 #ifndef DAQP_AVI_PIVOT_TRIGGER
@@ -439,8 +440,10 @@ regularize_hessian:
         if(hii > hmax) hmax = hii;
     }
     // Regularize an ill-conditioned Hessian, or mark it for refinement
+    const c_float eps_mach = sizeof(c_float) == sizeof(float) ? FLT_EPSILON : DBL_EPSILON;
     if(!is_factored && !regularize_all && work->n_prox == 0 && work->avi == NULL &&
-            hinv_max*hmax > DAQP_HESSIAN_COND_MAX)
+            ((work->eq != NULL && work->eq->installed && hinv_max*hmax > DAQP_HESSIAN_COND_MAX) ||
+             n*eps_mach*hinv_max*hmax > DAQP_HESSIAN_COND_EPS))
         goto regularize_hessian;
     if(hinv_max*hmax > DAQP_REFINE_COND) work->state |= DAQP_STATE_ILL_CONDITIONED;
     return 1;
