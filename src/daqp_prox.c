@@ -1,8 +1,10 @@
 #include "daqp_prox.h"
 #include "auxiliary.h"
 #include "utils.h"
+#include <math.h>
 
 static int prox_step(DAQPWorkspace* work, c_float* s_prev);
+static void rescale_prox(DAQPWorkspace* work, c_float eps, c_float eps_new);
 
 /* --------------------------------------------------------------------------
  * daqp_prox  --  outer proximal-point / semi-proximal loop
@@ -41,6 +43,26 @@ int daqp_prox(DAQPWorkspace *work){
     // no direction needs a proximal shift.  The inner QP equals the
     // original problem, so one solve gives the exact solution.
     const int all_pd = (!is_lp) && (work->n_prox == 0);
+
+    // The regularization of semi-proximal directions can be changed cheaply
+    // (see rescale_prox). A small eps makes the directions without curvature
+    // dominate the rows of M, and constraints that only differ in the other
+    // directions become indistinguishable. An inner problem can then fail (a
+    // false certificate of infeasibility, or cycling), and it is therefore
+    // solved again with eps raised to eps_max.
+    const int adaptive = !is_lp && !all_pd && work->avi == NULL &&
+        work->prox_mask != NULL && work->n_prox < nx;
+    c_float eps_max = eps;
+    int rescaled = 0;
+    if(adaptive){
+        c_float hmax = 0;
+        for(i = 0; i < nx; i++){
+            c_float hii = work->qp->H[(size_t)i*nx+i];
+            if(hii < 0) hii = -hii;
+            if(hii > hmax) hmax = hii;
+        }
+        if(DAQP_PROX_EPS_MAX*hmax > eps_max) eps_max = DAQP_PROX_EPS_MAX*hmax;
+    }
 
     // A negative eta selects an automatic tolerance. Preserve the established
     // default, but tighten it when the user requests a non-default dual
@@ -94,6 +116,11 @@ int daqp_prox(DAQPWorkspace *work){
         }
 
         daqp_update_d(work, work->qp->bupper, work->qp->blower);
+        if(rescaled){ // The working set is factored anew after a rescaling
+            reset_daqp_workspace(work);
+            daqp_activate_constraints(work); // (As for a repair in daqp_ldp)
+            rescaled = 0;
+        }
 
         // xold <-- x  (pointer swap avoids copying)
         swp_ptr = work->xold; work->xold = work->x; work->x = swp_ptr;
@@ -106,6 +133,15 @@ int daqp_prox(DAQPWorkspace *work){
         exitflag = daqp_ldp(work);
 
         total_iter += work->iterations;
+        if(adaptive && eps < eps_max && total_iter < work->settings->iter_limit &&
+                (exitflag == DAQP_EXIT_INFEASIBLE || exitflag == DAQP_EXIT_CYCLE)){
+            rescale_prox(work,eps,eps_max);
+            eps = eps_max;
+            rescaled = 1;
+            s_prev = -1;
+            for(i = 0; i < nx; i++) work->x[i] = work->xold[i]; // The center
+            continue;
+        }
         if(exitflag < 0)
             break;              // Inner solver failed -- propagate error
         ldp2qp_solution(work); // Recover QP primal from LDP dual
@@ -322,4 +358,48 @@ static int prox_step(DAQPWorkspace* work, c_float* s_prev){
     if(skipped)
         for(i = 0; i < work->m; i++) work->sense[i] &= ~DAQP_SET_ASIDE;
     return moved;
+}
+
+/*
+ * Change the regularization of the semi-proximal directions from eps to
+ * eps_new. These directions are decoupled from the others (a zero row and
+ * column of H, or a diagonal H), so their row and column of Rinv is
+ * e_i/sqrt(H_ii+eps). A change of eps therefore only scales their column of M
+ * (before the normalization of its rows) and the normalization of their
+ * simple bounds. The working set has to be factored anew.
+ */
+static void rescale_prox(DAQPWorkspace* work, c_float eps, c_float eps_new){
+    int i, j, disp;
+    const int n = work->n, ms = work->ms;
+    const int* mask = work->prox_mask;
+    const c_float* H = work->qp->H;
+    // The scaling of column j of Rinv
+#define DAQP_PROX_RATIO(j) sqrt((H[(size_t)(j)*n+(j)]+eps)/(H[(size_t)(j)*n+(j)]+eps_new))
+    for(i = 0; i < n; i++){
+        if(!mask[i]) continue;
+        const c_float r = DAQP_PROX_RATIO(i);
+        if(work->Rinv == NULL){
+            work->RinvD[i] *= r;
+            if(i < ms) work->scaling[i] /= r;
+        }
+        else if(i < ms && (work->state & DAQP_STATE_RINV_NORMALIZED))
+            work->scaling[i] /= r;
+        else
+            work->Rinv[DAQP_R_OFFSET(i,n)+i] *= r;
+    }
+    for(i = ms, disp = 0; i < work->m; i++, disp += n){
+        c_float* mi = work->M+disp;
+        c_float norm2 = 1, sc;
+        for(j = 0; j < n; j++){
+            if(!mask[j] || mi[j] == 0) continue;
+            const c_float r = DAQP_PROX_RATIO(j);
+            norm2 += (r*r-1)*mi[j]*mi[j];
+            mi[j] *= r;
+        }
+        if(norm2 == 1) continue;
+        sc = 1/sqrt(norm2);
+        for(j = 0; j < n; j++) mi[j] *= sc;
+        work->scaling[i] *= sc;
+    }
+#undef DAQP_PROX_RATIO
 }

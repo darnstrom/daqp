@@ -326,10 +326,34 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
     // Not diagonal: ensure Rinv points to allocated data, then pack
     // (symmetrize) H into Rinv before Cholesky.
     if(work->RinvD != NULL){ work->Rinv = work->RinvD; work->RinvD = NULL; }
+    if(!is_factored && !regularize_all && work->prox_mask != NULL && work->avi == NULL){
+        // A direction without curvature (a zero row and column of H) is
+        // decoupled from the others, so it can be regularized alone
+        // (semi-proximal). Otherwise, the full shift below is used if the
+        // factorization fails.
+        hessian_scale = 0.0;
+        for(i = 0; i < n; i++){
+            c_float abs_diag = H[i*n+i];
+            if(abs_diag < 0.0) abs_diag = -abs_diag;
+            if(abs_diag > hessian_scale) hessian_scale = abs_diag;
+        }
+        for(i = 0; i < n; i++){
+            if(H[i*n+i] != 0) continue;
+            for(j = 0; j < n && H[i*n+j] == 0 && H[j*n+i] == 0; j++);
+            if(j < n) continue;
+            work->prox_mask[i] = 1;
+            work->n_prox++;
+        }
+        if(work->n_prox > 0){
+            eps = proximal_regularization_scaled(work, hessian_scale);
+            if(eps <= 0.0) return DAQP_EXIT_NONCONVEX;
+        }
+    }
     if(!is_factored){
 pack_hessian:
         for(i = 0, disp = 0; i < n; i++){
-            work->Rinv[disp++] = H[i*n+i] + (regularize_all ? eps : 0.0);
+            work->Rinv[disp++] = H[i*n+i] + ((regularize_all ||
+                        (work->n_prox > 0 && work->prox_mask[i])) ? eps : 0.0);
             for(j = i+1; j < n; j++)
                 work->Rinv[disp++] = (c_float)0.5*(H[i*n+j] + H[j*n+i]);
         }
@@ -352,7 +376,11 @@ pack_hessian:
                 diag_i -= work->Rinv[disp2] * work->Rinv[disp2];
             if(diag_i <= zero_tol)
                 goto regularize_hessian;
-            if(diag_i < min_pivot) min_pivot = diag_i;
+            // (The pivots of the regularized directions of a semi-proximal
+            // factorization are eps)
+            if(diag_i < min_pivot && (regularize_all || work->n_prox == 0 ||
+                        !work->prox_mask[i]))
+                min_pivot = diag_i;
             if(diag_i > max_pivot) max_pivot = diag_i;
             diag_i = 1/sqrt(diag_i);
             for(j = 1; j < n-i; j++){
@@ -365,7 +393,8 @@ pack_hessian:
          // A successful unregularized Cholesky factorization represents a
          // positive-definite Hessian down to zero_tol relative pivots.
          // Once a singular Hessian has been shifted, be more conservative 
-        if(min_pivot <= (regularize_all && !force_prox ? sqrt(zero_tol) : zero_tol)*max_pivot){
+        if(min_pivot <= ((regularize_all || work->n_prox > 0) && !force_prox ?
+                    sqrt(zero_tol) : zero_tol)*max_pivot){
 regularize_hessian:
             if(regularize_all){
                 if(eps <= 0 || regularization_tries++ >= 16) return DAQP_EXIT_NONCONVEX;
@@ -411,6 +440,10 @@ c_float daqp_get_proximal_regularization(const DAQPWorkspace *work){
 
     eps = work->settings->eps_prox;
     if(eps < 0.0) eps = -eps;
+    if(work->RinvD != NULL && work->prox_mask != NULL && work->n_prox < work->n){
+        for(i = 0; i < work->n && !work->prox_mask[i]; i++);
+        return 1/(work->RinvD[i]*work->RinvD[i]) - work->qp->H[i*work->n+i];
+    }
     if(work->RinvD != NULL){
         // Diagonal regularization has no retry loop, so reproduce its
         // scale-based floor directly. Avoid subtracting nearly equal large
@@ -424,6 +457,15 @@ c_float daqp_get_proximal_regularization(const DAQPWorkspace *work){
             eps = proximal_regularization_scaled(work, scale);
         }
         return eps;
+    }
+
+    // A semi-proximal factorization regularizes zero rows of H, whose row of
+    // Rinv is e_i/sqrt(eps) (e_i after the normalization of a bound)
+    if(work->n_prox < work->n && work->prox_mask != NULL){
+        for(i = 0; i < work->n && !work->prox_mask[i]; i++);
+        rinv = (i < work->ms && (work->state & DAQP_STATE_RINV_NORMALIZED)) ?
+            1/work->scaling[i] : work->Rinv[DAQP_R_OFFSET(i,work->n)+i];
+        return 1/(rinv*rinv);
     }
 
     // Handle eps-shift correctly for simple bounds

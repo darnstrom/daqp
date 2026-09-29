@@ -48,6 +48,11 @@ extern "C" {
 // as the refinement itself
 #define DAQP_REFINE_MIN_ITER 5
 
+// An inner problem of the proximal-point method that fails is solved again
+// with the regularization eps of its semi-proximal directions raised to
+// DAQP_PROX_EPS_MAX times the largest diagonal element of H (see daqp_prox.c)
+#define DAQP_PROX_EPS_MAX 1e-3
+
 // How the reduced problem of an equality elimination is posed
 #define DAQP_EQ_PATH_LDP 0 // Identity Hessian, no linear term (H PD on the null space)
 #define DAQP_EQ_PATH_QP 1  // Reduced Hessian W'HW (singular QP or AVI)
