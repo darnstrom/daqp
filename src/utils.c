@@ -58,7 +58,7 @@ int daqp_retry_avi_with_reduced_rho(DAQPWorkspace* work){
  * Form the LDP of qp, which is the problem that the solvers see (the reduced
  * problem of an equality elimination is passed here as it is).
  */
-static int update_ldp_core(int mask, DAQPWorkspace *work, DAQPProblem* qp){
+static int daqp_update_ldp_core(int mask, DAQPWorkspace *work, DAQPProblem* qp){
     int error_flag, i;
     int do_activate = 0;
     int unconstrained_flag = 0;
@@ -204,7 +204,7 @@ int daqp_update_ldp(int mask, DAQPWorkspace *work, DAQPProblem* qp){
         else for(i = 0; i < qp->m; i++) work->sense[i] = qp->sense[i];
     }
     if(daqp_eq_wanted(work,qp,mask)){
-        flag = daqp_eq_update(work,qp,mask,update_ldp_core);
+        flag = daqp_eq_update(work,qp,mask,daqp_update_ldp_core);
         if(flag != DAQP_EQ_NOT_REDUCED){
             work->n = qp->n;
             work->m = qp->m;
@@ -219,7 +219,7 @@ int daqp_update_ldp(int mask, DAQPWorkspace *work, DAQPProblem* qp){
         if(qp->H != NULL) mask |= DAQP_UPDATE_Rinv;
         if(qp->f != NULL) mask |= DAQP_UPDATE_v;
     }
-    return update_ldp_core(mask,work,qp);
+    return daqp_update_ldp_core(mask,work,qp);
 }
 
 int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){

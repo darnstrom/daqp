@@ -48,7 +48,7 @@
  * -------------------------------------------------------------------------*/
 
 // y <-- (I - tau v v') y on the indices >= k (v[k] = 1 implicitly)
-static void reflect(const c_float* v, const c_float tau, const int k, const int n, c_float* y){
+static void eq_reflect(const c_float* v, const c_float tau, const int k, const int n, c_float* y){
     int i;
     c_float w = y[k];
     for(i = k+1; i < n; i++) w += v[i]*y[i];
@@ -59,7 +59,7 @@ static void reflect(const c_float* v, const c_float tau, const int k, const int 
 
 // Y <-- Q'Y for cnt vectors of length n (stride ld) with the reflectors
 // 0..nr-1, four vectors per pass over a reflector
-static DAQP_NOINLINE void apply_QT_many(const c_float* V, const c_float* tau,
+static DAQP_NOINLINE void eq_apply_QT_many(const c_float* V, const c_float* tau,
         const int nr, const int n, c_float* Y, const int cnt, const size_t ld){
     int i, j, k;
     for(j = 0; j+3 < cnt; j += 4){
@@ -81,11 +81,11 @@ static DAQP_NOINLINE void apply_QT_many(const c_float* V, const c_float* tau,
         }
     }
     for(; j < cnt; j++)
-        for(k = 0; k < nr; k++) reflect(V+(size_t)k*n,tau[k],k,n,Y+j*ld);
+        for(k = 0; k < nr; k++) eq_reflect(V+(size_t)k*n,tau[k],k,n,Y+j*ld);
 }
 
 // Z = Q[:,nr:] accumulated in the columns nr..n-1 of V (four at a time)
-static DAQP_NOINLINE void accumulate_Z(c_float* V, const c_float* tau, const int nr, const int n){
+static DAQP_NOINLINE void eq_accumulate_Z(c_float* V, const c_float* tau, const int nr, const int n){
     int i, j, k;
     for(j = nr; j < n; j++){
         c_float* col = V+(size_t)j*n;
@@ -109,7 +109,7 @@ static DAQP_NOINLINE void accumulate_Z(c_float* V, const c_float* tau, const int
                 c0[i] -= w0*vi; c1[i] -= w1*vi; c2[i] -= w2*vi; c3[i] -= w3*vi;
             }
         }
-        for(; j < n; j++) reflect(v,tk,k,n,V+(size_t)j*n);
+        for(; j < n; j++) eq_reflect(v,tk,k,n,V+(size_t)j*n);
     }
 }
 
@@ -118,7 +118,7 @@ static DAQP_NOINLINE void accumulate_Z(c_float* V, const c_float* tau, const int
  * length n, in 4x4 register blocks. With upper, only j >= i is computed and
  * then mirrored.
  */
-static DAQP_NOINLINE void gemm_tn(const int n, const int p, const int q,
+static DAQP_NOINLINE void eq_gemm_tn(const int n, const int p, const int q,
         const c_float* X, const size_t ldx, const c_float* Y, const size_t ldy,
         c_float* C, const size_t ldc, const int upper){
     int i, j, k, a, b;
@@ -165,7 +165,7 @@ static DAQP_NOINLINE void gemm_tn(const int n, const int p, const int q,
  * major, ld = n). Only the trailing blocks B[k:,k:] are updated, which is all
  * that the trailing block B[nr:,nr:] = Z'BZ depends on.
  */
-static DAQP_NOINLINE void twoside(c_float* B, const int n, const c_float* V,
+static DAQP_NOINLINE void eq_twoside(c_float* B, const int n, const c_float* V,
         const c_float* tau, const int nr, c_float* p){
     int i, j, k;
     for(k = 0; k < nr; k++){
@@ -200,7 +200,7 @@ static DAQP_NOINLINE void twoside(c_float* B, const int n, const c_float* V,
  * in blocks of four. Returns 0 if A is not positive definite in the sense of
  * daqp_update_Rinv (a pivot below zero_tol, or relative to the largest pivot).
  */
-static DAQP_NOINLINE int chol(c_float* A, const int n, const c_float zero_tol){
+static DAQP_NOINLINE int eq_chol(c_float* A, const int n, const c_float zero_tol){
     int i, j, k, ib;
     c_float min_pivot = DAQP_INF, max_pivot = 0;
     for(ib = 0; ib < n; ib += 4){
@@ -244,7 +244,7 @@ static DAQP_NOINLINE int chol(c_float* A, const int n, const c_float zero_tol){
 }
 
 // Rows X_r <-- X_r L^{-T} (solves L x' = x'), cnt rows with stride ld
-static DAQP_NOINLINE void trsm_rows(const c_float* L, const int nz, c_float* X,
+static DAQP_NOINLINE void eq_trsm_rows(const c_float* L, const int nz, c_float* X,
         const int cnt, const size_t ld){
     int i, j, k;
     for(i = 0; i+3 < cnt; i += 4){
@@ -272,7 +272,7 @@ static DAQP_NOINLINE void trsm_rows(const c_float* L, const int nz, c_float* X,
 }
 
 // C = [a_ids] W for the rows ids of A (length n), with W row major n x nz
-static DAQP_NOINLINE void rows_times_W(const c_float* A, const int* ids, const int ms,
+static DAQP_NOINLINE void eq_rows_times_W(const c_float* A, const int* ids, const int ms,
         const int cnt, const int n, const c_float* W, const int nz, c_float* C){
     int i, j, k;
     for(i = 0; i+3 < cnt; i += 4){
@@ -303,7 +303,7 @@ static DAQP_NOINLINE void rows_times_W(const c_float* A, const int* ids, const i
     }
 }
 
-static c_float dot(const c_float* a, const c_float* b, const int n){
+static c_float eq_dot(const c_float* a, const c_float* b, const int n){
     int i;
     c_float s = 0;
     for(i = 0; i < n; i++) s += a[i]*b[i];
@@ -311,7 +311,7 @@ static c_float dot(const c_float* a, const c_float* b, const int n){
 }
 
 // y <-- H x (dense or diagonal H, which is known to be diagonal if metric)
-static void hess_times(const DAQPProblem* qp, const int metric, const c_float* x, c_float* y){
+static void eq_hess_times(const DAQPProblem* qp, const int metric, const c_float* x, c_float* y){
     int i;
     const int n = qp->n;
     if(qp->H == NULL){
@@ -322,7 +322,7 @@ static void hess_times(const DAQPProblem* qp, const int metric, const c_float* x
         for(i = 0; i < n; i++) y[i] = qp->H[(size_t)i*n+i]*x[i];
         return;
     }
-    for(i = 0; i < n; i++) y[i] = dot(qp->H+(size_t)i*n,x,n);
+    for(i = 0; i < n; i++) y[i] = eq_dot(qp->H+(size_t)i*n,x,n);
 }
 
 /* ---------------------------------------------------------------------------
@@ -331,7 +331,7 @@ static void hess_times(const DAQPProblem* qp, const int metric, const c_float* x
 
 // Whether the general constraint i is an equality constraint that can be
 // eliminated (the same criteria as daqp_check_bounds for equal bounds)
-static int is_candidate(const DAQPWorkspace* work, const DAQPProblem* qp, const int i){
+static int eq_is_candidate(const DAQPWorkspace* work, const DAQPProblem* qp, const int i){
     const int s = work->sense[i];
     if(s & (DAQP_SOFT+DAQP_BINARY)) return 0;
     if(qp->bupper[i] - qp->blower[i] < work->settings->zero_tol) return 1;
@@ -339,14 +339,14 @@ static int is_candidate(const DAQPWorkspace* work, const DAQPProblem* qp, const 
     return (s & (DAQP_ACTIVE+DAQP_IMMUTABLE)) == (DAQP_ACTIVE+DAQP_IMMUTABLE);
 }
 
-static int count_candidates(const DAQPWorkspace* work, const DAQPProblem* qp){
+static int eq_count_candidates(const DAQPWorkspace* work, const DAQPProblem* qp){
     int i, n_eq = 0;
     for(i = qp->ms; i < qp->m; i++)
-        if(is_candidate(work,qp,i)) n_eq++;
+        if(eq_is_candidate(work,qp,i)) n_eq++;
     return n_eq;
 }
 
-static int is_diagonal(const DAQPProblem* qp, const c_float zero_tol){
+static int eq_is_diagonal(const DAQPProblem* qp, const c_float zero_tol){
     int i, j;
     const int n = qp->n;
     if(qp->H == NULL) return 0;
@@ -363,12 +363,12 @@ static int is_diagonal(const DAQPProblem* qp, const c_float zero_tol){
  * diagonal Hessian makes a bound a single lookup and the equalities are the
  * only general constraints (multi-stage MPC, for instance).
  */
-static int is_worthwhile(const DAQPWorkspace* work, const DAQPProblem* qp, const int n_eq){
+static int eq_is_worthwhile(const DAQPWorkspace* work, const DAQPProblem* qp, const int n_eq){
     const int n = qp->n;
     const int n_ineq = qp->m-qp->ms-n_eq;
     if(n < DAQP_EQ_MIN_DIM || n_eq <= DAQP_EQ_MIN_COUNT ||
             DAQP_EQ_MIN_RATIO*n_eq <= n) return 0;
-    if(is_diagonal(qp,work->settings->zero_tol) &&
+    if(eq_is_diagonal(qp,work->settings->zero_tol) &&
             (n_ineq == 0 || DAQP_EQ_DIAG_MIN_RATIO*n_eq < n)) return 0;
     return 1;
 }
@@ -382,22 +382,22 @@ int daqp_eq_wanted(const DAQPWorkspace* work, const DAQPProblem* qp, const int m
     // A hierarchy refers to the constraints by their index, and a factored
     // Hessian (problem_type 2) is not available as a Hessian
     if(qp->nh > 1 || DAQP_IS_HIERARCHICAL(work) || qp->problem_type == 2) return 0;
-    n_eq = count_candidates(work,qp);
+    n_eq = eq_count_candidates(work,qp);
     if(n_eq == 0) return 0;
     if(policy == DAQP_EQ_REDUCTION_ON) return 1;
     // The default weights of soft constraints refer to the normalization of
     // the full problem, which is left as it is by the automatic policy
     for(i = 0; i < qp->m; i++)
         if(work->sense[i] & DAQP_SOFT) return 0;
-    return is_worthwhile(work,qp,n_eq);
+    return eq_is_worthwhile(work,qp,n_eq);
 }
 
 // Whether the equality constraints are the ones that the reduction was formed for
-static int same_candidates(const DAQPWorkspace* work, const DAQPProblem* qp){
+static int eq_same_candidates(const DAQPWorkspace* work, const DAQPProblem* qp){
     const DAQPEqElim* eq = work->eq;
     int i, k = 0;
     for(i = qp->ms; i < qp->m; i++){
-        if(!is_candidate(work,qp,i)) continue;
+        if(!eq_is_candidate(work,qp,i)) continue;
         if(k == eq->ncand || eq->cand_ids[k] != i) return 0;
         k++;
     }
@@ -408,7 +408,7 @@ static int same_candidates(const DAQPWorkspace* work, const DAQPProblem* qp){
  * Storage
  * -------------------------------------------------------------------------*/
 
-static void free_reduced_ldp(DAQPEqElim* eq){
+static void eq_free_reduced_ldp(DAQPEqElim* eq){
     DAQPLDPData* d = &eq->other;
     free(d->M); free(d->dupper); free(d->dlower); free(d->scaling); free(d->Mu);
     free(d->sense); free(d->Rinv); free(d->RinvD); free(d->v);
@@ -419,10 +419,10 @@ static void free_reduced_ldp(DAQPEqElim* eq){
 }
 
 // Storage of the LDP of the reduced problem (which has no simple bounds)
-static void allocate_reduced_ldp(DAQPEqElim* eq, const int nb){
+static void eq_allocate_reduced_ldp(DAQPEqElim* eq, const int nb){
     DAQPLDPData* d = &eq->other;
     const int nz = eq->nz, mr = eq->mr;
-    free_reduced_ldp(eq);
+    eq_free_reduced_ldp(eq);
     d->qp = &eq->qp;
     d->n = nz; d->m = mr; d->ms = 0;
     d->M = malloc((size_t)nz*mr*sizeof(c_float));
@@ -436,7 +436,7 @@ static void allocate_reduced_ldp(DAQPEqElim* eq, const int nb){
     d->bin_ids = (nb > 0) ? malloc(nb*sizeof(int)) : NULL;
 }
 
-static void free_rhs_cache(DAQPEqElim* eq){
+static void eq_free_rhs_cache(DAQPEqElim* eq){
     int k;
     if(eq->cols != NULL) for(k = 0; k < eq->ncols; k++) free(eq->cols[k]);
     free(eq->cols); free(eq->xf); free(eq->gf); free(eq->df); free(eq->sh);
@@ -445,8 +445,8 @@ static void free_rhs_cache(DAQPEqElim* eq){
     eq->f_valid = 0;
 }
 
-static void free_reduction(DAQPEqElim* eq){
-    free_rhs_cache(eq);
+static void eq_free_reduction(DAQPEqElim* eq){
+    eq_free_rhs_cache(eq);
     free(eq->eq_ids); free(eq->cand_ids); free(eq->keep); free(eq->drop_ids);
     free(eq->V); free(eq->tau); free(eq->s_eq); free(eq->R); free(eq->dsq);
     free(eq->W); free(eq->xp); free(eq->tmp);
@@ -457,9 +457,9 @@ static void free_reduction(DAQPEqElim* eq){
 }
 
 // Storage that only depends on the dimensions of the original problem
-static void allocate_reduction(DAQPEqElim* eq, const int n, const int m, const int ms){
+static void eq_allocate_reduction(DAQPEqElim* eq, const int n, const int m, const int ms){
     if(eq->V != NULL && eq->n == n && eq->m == m && eq->ms == ms) return;
-    free_reduction(eq);
+    eq_free_reduction(eq);
     eq->n = n; eq->m = m; eq->ms = ms;
     eq->eq_ids = malloc(m*sizeof(int));
     eq->cand_ids = malloc(m*sizeof(int));
@@ -487,7 +487,7 @@ static void allocate_reduction(DAQPEqElim* eq, const int n, const int m, const i
  * Candidates that are (numerically) linearly dependent on the ones before are
  * not eliminated; they are kept as constraints, which the equalities imply.
  */
-static DAQP_NOINLINE void build_qr(DAQPEqElim* eq, const DAQPProblem* qp, const c_float zero_tol){
+static DAQP_NOINLINE void eq_build_qr(DAQPEqElim* eq, const DAQPProblem* qp, const c_float zero_tol){
     const int n = eq->n, ms = eq->ms;
     const c_float tol = sqrt(zero_tol);
     c_float* panel = malloc(4*(size_t)n*sizeof(c_float));
@@ -505,11 +505,11 @@ static DAQP_NOINLINE void build_qr(DAQPEqElim* eq, const DAQPProblem* qp, const 
             pn[p] = (nrm <= zero_tol) ? 0 : 1/sqrt(nrm);
             for(i = 0; i < n; i++) col[i] *= pn[p];
         }
-        apply_QT_many(eq->V,eq->tau,k0,n,panel,cnt,n);
+        eq_apply_QT_many(eq->V,eq->tau,k0,n,panel,cnt,n);
         for(p = 0; p < cnt && neq < n; p++){
             c_float *col = panel+(size_t)p*n, alpha = 0, beta, d;
             if(pn[p] == 0) continue; // Empty constraint
-            for(q = k0; q < neq; q++) reflect(eq->V+(size_t)q*n,eq->tau[q],q,n,col);
+            for(q = k0; q < neq; q++) eq_reflect(eq->V+(size_t)q*n,eq->tau[q],q,n,col);
             for(i = neq; i < n; i++) alpha += col[i]*col[i];
             alpha = sqrt(alpha);
             if(alpha <= tol) continue; // Linearly dependent
@@ -529,7 +529,7 @@ static DAQP_NOINLINE void build_qr(DAQPEqElim* eq, const DAQPProblem* qp, const 
 }
 
 // Symmetric part of an asymmetric Hessian (AVI) is not what the reduction needs
-static int is_symmetric(const DAQPProblem* qp, const c_float zero_tol){
+static int eq_is_symmetric(const DAQPProblem* qp, const c_float zero_tol){
     int i, j;
     const int n = qp->n;
     c_float scale = 0;
@@ -549,7 +549,7 @@ static int is_symmetric(const DAQPProblem* qp, const c_float zero_tol){
 // Split Z (n x nz) into [Z1 Z2], with Z2 zero in the rows cid (the variables
 // with curvature), so that H*Z2 = 0 exactly. Forms Hr = blockdiag(Z1'HZ1, 0)
 // and returns the dimension of Z1
-static DAQP_NOINLINE int split_flat(const DAQPProblem* qp, c_float* Z, const int n,
+static DAQP_NOINLINE int eq_split_flat(const DAQPProblem* qp, c_float* Z, const int n,
         const int nz, const int* cid, const int nc, const c_float zero_tol, c_float* Hr){
     const c_float tol = sqrt(zero_tol);
     c_float *Y = calloc((size_t)nc*nz+1,sizeof(c_float)), *tau = calloc(nc+1,sizeof(c_float));
@@ -560,7 +560,7 @@ static DAQP_NOINLINE int split_flat(const DAQPProblem* qp, c_float* Z, const int
     for(c = 0; c < nc && r < nz; c++){
         c_float *col = Y+(size_t)r*nz, alpha = 0, beta, d;
         for(j = 0; j < nz; j++) col[j] = Z[(size_t)j*n+cid[c]];
-        for(k = 0; k < r; k++) reflect(Y+(size_t)k*nz,tau[k],k,nz,col);
+        for(k = 0; k < r; k++) eq_reflect(Y+(size_t)k*nz,tau[k],k,nz,col);
         for(j = r; j < nz; j++) alpha += col[j]*col[j];
         alpha = sqrt(alpha);
         if(alpha <= tol) continue; // Dependent on the rows before
@@ -575,7 +575,7 @@ static DAQP_NOINLINE int split_flat(const DAQPProblem* qp, c_float* Z, const int
     // Z <-- Z Q: rows (Q'z')' (row major), the last nz-r columns are Z2
     for(i = 0; i < n; i++)
         for(j = 0; j < nz; j++) Zr[(size_t)i*nz+j] = Z[(size_t)j*n+i];
-    apply_QT_many(Y,tau,r,nz,Zr,n,nz);
+    eq_apply_QT_many(Y,tau,r,nz,Zr,n,nz);
     for(c = 0; c < nc; c++)
         for(j = r; j < nz; j++) Zr[(size_t)cid[c]*nz+j] = 0; // Roundoff
     for(i = 0; i < n; i++)
@@ -607,7 +607,7 @@ static DAQP_NOINLINE int split_flat(const DAQPProblem* qp, c_float* Z, const int
  * storage of the reduced problem. Returns 0 if nothing (or everything) can be
  * eliminated.
  */
-static int build_reduction(DAQPWorkspace* work, DAQPProblem* qp){
+static int eq_build_reduction(DAQPWorkspace* work, DAQPProblem* qp){
     DAQPEqElim* eq = work->eq;
     const int n = qp->n, m = qp->m, ms = qp->ms;
     const c_float zero_tol = work->settings->zero_tol;
@@ -617,19 +617,19 @@ static int build_reduction(DAQPWorkspace* work, DAQPProblem* qp){
     c_float* L = NULL;
     const c_float* Z;
 
-    allocate_reduction(eq,n,m,ms);
-    free_rhs_cache(eq); // Formed for the previous reduction
+    eq_allocate_reduction(eq,n,m,ms);
+    eq_free_rhs_cache(eq); // Formed for the previous reduction
     eq->active = 0;
     if(work->bnb != NULL) work->bnb->n_root_WS = 0; // Refers to other constraints
 
     // Equality candidates
     eq->ncand = 0;
     for(i = ms; i < m; i++)
-        if(is_candidate(work,qp,i)) eq->cand_ids[eq->ncand++] = i;
+        if(eq_is_candidate(work,qp,i)) eq->cand_ids[eq->ncand++] = i;
 
     // A positive diagonal Hessian is used as a metric in the QR
     eq->metric = 0;
-    if(qp->H != NULL && is_diagonal(qp,zero_tol)){
+    if(qp->H != NULL && eq_is_diagonal(qp,zero_tol)){
         c_float scale = 0;
         for(i = 0; i < n; i++) if(qp->H[(size_t)i*n+i] > scale) scale = qp->H[(size_t)i*n+i];
         eq->metric = scale > 0;
@@ -641,9 +641,9 @@ static int build_reduction(DAQPWorkspace* work, DAQPProblem* qp){
         }
     }
     if(qp->H != NULL && !eq->metric && qp->problem_type == 1)
-        symmetric = is_symmetric(qp,zero_tol);
+        symmetric = eq_is_symmetric(qp,zero_tol);
 
-    build_qr(eq,qp,zero_tol);
+    eq_build_qr(eq,qp,zero_tol);
     neq = eq->neq;
     if(neq == 0 || neq == n) return 0; // Nothing (or everything) eliminated
     nz = eq->nz = n-neq;
@@ -672,10 +672,10 @@ static int build_reduction(DAQPWorkspace* work, DAQPProblem* qp){
         use_refl = f_refl < f_w;
     }
 
-    accumulate_Z(eq->V,eq->tau,neq,n);
+    eq_accumulate_Z(eq->V,eq->tau,neq,n);
     Z = eq->V+(size_t)neq*n; // Column j of Z at Z+j*n
 
-    // Variables with curvature (nonzero rows of H), for split_flat
+    // Variables with curvature (nonzero rows of H), for eq_split_flat
     if(qp->H != NULL && !eq->metric && symmetric){
         cid = malloc(n*sizeof(int));
         for(i = 0; i < n; i++){
@@ -694,13 +694,13 @@ static int build_reduction(DAQPWorkspace* work, DAQPProblem* qp){
     else{
         eq->Hr = malloc((size_t)nz*nz*sizeof(c_float));
         if(split){
-            split_flat(qp,(c_float*)Z,n,nz,cid,nc,zero_tol,eq->Hr);
+            eq_split_flat(qp,(c_float*)Z,n,nz,cid,nc,zero_tol,eq->Hr);
             use_refl = 0; // The rows (A Q)_2 refer to the unsplit Z
         }
         else if(use_twoside){
             c_float* B = malloc((size_t)n*n*sizeof(c_float));
             for(i = 0; i < n*n; i++) B[i] = qp->H[i];
-            twoside(B,n,eq->V,eq->tau,neq,eq->tmp);
+            eq_twoside(B,n,eq->V,eq->tau,neq,eq->tmp);
             for(i = 0; i < nz; i++)
                 for(j = 0; j <= i; j++)
                     eq->Hr[(size_t)i*nz+j] = eq->Hr[(size_t)j*nz+i] = B[(size_t)(neq+i)*n+neq+j];
@@ -708,15 +708,15 @@ static int build_reduction(DAQPWorkspace* work, DAQPProblem* qp){
         }
         else{
             c_float* HZ = malloc((size_t)n*nz*sizeof(c_float)); // Column j = H z_j
-            gemm_tn(n,nz,n,Z,n,qp->H,n,HZ,n,0); // (Z'H')_{ji} = (H Z)_{ij}
-            gemm_tn(n,nz,nz,Z,n,HZ,n,eq->Hr,nz,symmetric);
+            eq_gemm_tn(n,nz,n,Z,n,qp->H,n,HZ,n,0); // (Z'H')_{ji} = (H Z)_{ij}
+            eq_gemm_tn(n,nz,nz,Z,n,HZ,n,eq->Hr,nz,symmetric);
             free(HZ);
         }
         eq->path = DAQP_EQ_PATH_QP;
         if(symmetric){
             L = malloc((size_t)nz*nz*sizeof(c_float));
             for(i = 0; i < nz*nz; i++) L[i] = eq->Hr[i];
-            if(chol(L,nz,zero_tol)) eq->path = DAQP_EQ_PATH_LDP;
+            if(eq_chol(L,nz,zero_tol)) eq->path = DAQP_EQ_PATH_LDP;
             else{ free(L); L = NULL; }
         }
     }
@@ -731,7 +731,7 @@ form_W:
         for(j = 0; j < nz; j++) Wi[j] = s*Z[(size_t)j*n+i];
     }
     if(L != NULL){
-        trsm_rows(L,nz,eq->W,n,nz);
+        eq_trsm_rows(L,nz,eq->W,n,nz);
         // Ill-conditioned Z'HZ => PATH_QP (where it is regularized). The squared
         // column norms of W are the diagonal of (Z'HZ)^-1
         c_float wmax = 0, hmax = 0;
@@ -762,7 +762,7 @@ form_W:
         for(j = 0; j < nz; j++) eq->Ar[(size_t)i*nz+j] = eq->W[(size_t)i*nz+j];
     if(mI > 0){
         c_float* AI = eq->Ar+(size_t)ms*nz;
-        if(!use_refl) rows_times_W(qp->A,gen_ids,ms,mI,n,eq->W,nz,AI);
+        if(!use_refl) eq_rows_times_W(qp->A,gen_ids,ms,mI,n,eq->W,nz,AI);
         else{
             c_float* Ak = malloc((size_t)mI*n*sizeof(c_float));
             for(i = 0; i < mI; i++){
@@ -771,11 +771,11 @@ form_W:
                 if(eq->metric) for(k = 0; k < n; k++) dst[k] = a[k]*eq->dsq[k];
                 else for(k = 0; k < n; k++) dst[k] = a[k];
             }
-            apply_QT_many(eq->V,eq->tau,neq,n,Ak,mI,n); // Rows <-- (Q'a')'
+            eq_apply_QT_many(eq->V,eq->tau,neq,n,Ak,mI,n); // Rows <-- (Q'a')'
             for(i = 0; i < mI; i++)
                 for(j = 0; j < nz; j++) AI[(size_t)i*nz+j] = Ak[(size_t)i*n+neq+j];
             free(Ak);
-            if(L != NULL) trsm_rows(L,nz,AI,mI,nz);
+            if(L != NULL) eq_trsm_rows(L,nz,AI,mI,nz);
         }
     }
     free(L);
@@ -789,7 +789,7 @@ form_W:
     for(c = 0; c < mtot; c++){
         const int id = (c < ms) ? c : gen_ids[c-ms];
         const c_float* row = eq->Ar+(size_t)c*nz;
-        if(dot(row,row,nz) <= zero_tol){
+        if(eq_dot(row,row,nz) <= zero_tol){
             eq->drop_ids[eq->ndrop++] = id;
             continue;
         }
@@ -815,7 +815,7 @@ form_W:
     eq->qp.nh = 1;
     eq->qp.problem_type = qp->problem_type;
 
-    allocate_reduced_ldp(eq,nb);
+    eq_allocate_reduced_ldp(eq,nb);
     return 1;
 }
 
@@ -830,7 +830,7 @@ static c_float eq_value(const DAQPWorkspace* work, const DAQPProblem* qp, const 
  * moved to the minimizer y - W W'H y, and H xp_k and the shifts -a_c xp_k of
  * the bounds of the kept constraints follow.
  */
-static const c_float* rhs_column(DAQPEqElim* eq, const DAQPProblem* qp, const int k){
+static const c_float* eq_rhs_column(DAQPEqElim* eq, const DAQPProblem* qp, const int k){
     const int n = eq->n, ms = eq->ms, neq = eq->neq, nz = eq->nz, mr = eq->mr;
     c_float *col, *xk, *hk, *dk, *t = eq->tmp+2*n;
     int i, j, c;
@@ -849,10 +849,10 @@ static const c_float* rhs_column(DAQPEqElim* eq, const DAQPProblem* qp, const in
         for(j = k; j < i; j++) s -= Ri[j]*xk[j];
         xk[i] = s/Ri[i];
     }
-    for(i = neq-1; i >= 0; i--) reflect(eq->V+(size_t)i*n,eq->tau[i],i,n,xk);
+    for(i = neq-1; i >= 0; i--) eq_reflect(eq->V+(size_t)i*n,eq->tau[i],i,n,xk);
     if(eq->metric) for(i = 0; i < n; i++) xk[i] *= eq->dsq[i];
     // xk <-- xk - W W'H xk, hk = H xk
-    hess_times(qp,eq->metric,xk,hk);
+    eq_hess_times(qp,eq->metric,xk,hk);
     for(j = 0; j < nz; j++) t[j] = 0;
     for(i = 0; i < n; i++){
         const c_float* Wi = eq->W+(size_t)i*nz;
@@ -860,18 +860,18 @@ static const c_float* rhs_column(DAQPEqElim* eq, const DAQPProblem* qp, const in
         if(hi == 0) continue;
         for(j = 0; j < nz; j++) t[j] += Wi[j]*hi;
     }
-    for(i = 0; i < n; i++) xk[i] -= dot(eq->W+(size_t)i*nz,t,nz);
-    hess_times(qp,eq->metric,xk,hk);
+    for(i = 0; i < n; i++) xk[i] -= eq_dot(eq->W+(size_t)i*nz,t,nz);
+    eq_hess_times(qp,eq->metric,xk,hk);
     for(c = 0; c < mr; c++){
         const int id = eq->keep[c];
-        dk[c] = (id < ms) ? -xk[id] : -dot(qp->A+(size_t)(id-ms)*n,xk,n);
+        dk[c] = (id < ms) ? -xk[id] : -eq_dot(qp->A+(size_t)(id-ms)*n,xk,n);
     }
     eq->cols[k] = col;
     return col;
 }
 
 // Response of xp to f (PATH_LDP): xf = -W W'f, gf = H xf + f, df = -A xf
-static void rhs_f(DAQPEqElim* eq, const DAQPProblem* qp){
+static void eq_rhs_f(DAQPEqElim* eq, const DAQPProblem* qp){
     const int n = eq->n, nz = eq->nz, mr = eq->mr;
     c_float* t = eq->tmp+2*n;
     int i, j, c;
@@ -889,11 +889,11 @@ static void rhs_f(DAQPEqElim* eq, const DAQPProblem* qp){
             if(fi == 0) continue;
             for(j = 0; j < nz; j++) t[j] += Wi[j]*fi;
         }
-    for(i = 0; i < n; i++) eq->xf[i] = -dot(eq->W+(size_t)i*nz,t,nz);
-    hess_times(qp,eq->metric,eq->xf,eq->gf);
+    for(i = 0; i < n; i++) eq->xf[i] = -eq_dot(eq->W+(size_t)i*nz,t,nz);
+    eq_hess_times(qp,eq->metric,eq->xf,eq->gf);
     if(qp->f != NULL) for(i = 0; i < n; i++) eq->gf[i] += qp->f[i];
     // -a_c xf = a_c W W'f = Ar_c W'f (and the rows of W for the simple bounds)
-    for(c = 0; c < mr; c++) eq->df[c] = dot(eq->Ar+(size_t)c*nz,t,nz);
+    for(c = 0; c < mr; c++) eq->df[c] = eq_dot(eq->Ar+(size_t)c*nz,t,nz);
     eq->f_valid = 1;
 }
 
@@ -903,7 +903,7 @@ static void rhs_f(DAQPEqElim* eq, const DAQPProblem* qp){
  * warm, the responses to b_E and f are used if few equalities have a nonzero
  * right-hand side (as in MPC, where only the initial state enters b_E).
  */
-static int reduce_rhs(DAQPWorkspace* work, DAQPProblem* qp, const int warm){
+static int eq_reduce_rhs(DAQPWorkspace* work, DAQPProblem* qp, const int warm){
     DAQPEqElim* eq = work->eq;
     const int n = eq->n, ms = eq->ms, neq = eq->neq, nz = eq->nz, mr = eq->mr;
     const c_float primal_tol = work->settings->primal_tol;
@@ -914,14 +914,14 @@ static int reduce_rhs(DAQPWorkspace* work, DAQPProblem* qp, const int warm){
         for(k = 0; k < neq; k++) if(eq_value(work,qp,eq->eq_ids[k]) != 0) nnz++;
 
     if(warm && eq->path == DAQP_EQ_PATH_LDP && 4*nnz <= neq){
-        if(!eq->f_valid) rhs_f(eq,qp);
+        if(!eq->f_valid) eq_rhs_f(eq,qp);
         for(i = 0; i < n; i++){ eq->xp[i] = eq->xf[i]; g[i] = eq->gf[i]; }
         for(c = 0; c < mr; c++) eq->sh[c] = eq->df[c];
         for(k = 0; k < neq; k++){
             const c_float b = eq_value(work,qp,eq->eq_ids[k]);
             const c_float *col;
             if(b == 0) continue;
-            col = rhs_column(eq,qp,k);
+            col = eq_rhs_column(eq,qp,k);
             for(i = 0; i < n; i++){ eq->xp[i] += b*col[i]; g[i] += b*col[n+i]; }
             for(c = 0; c < mr; c++) eq->sh[c] += b*col[2*n+c];
         }
@@ -942,11 +942,11 @@ static int reduce_rhs(DAQPWorkspace* work, DAQPProblem* qp, const int warm){
             y[k] = s/Rk[k];
         }
         for(i = 0; i < n; i++) eq->xp[i] = (i < neq) ? y[i] : 0;
-        for(k = neq-1; k >= 0; k--) reflect(eq->V+(size_t)k*n,eq->tau[k],k,n,eq->xp);
+        for(k = neq-1; k >= 0; k--) eq_reflect(eq->V+(size_t)k*n,eq->tau[k],k,n,eq->xp);
         if(eq->metric) for(i = 0; i < n; i++) eq->xp[i] *= eq->dsq[i];
 
         // g = H xp + f, f(xp) = 0.5 xp'(g + f)
-        hess_times(qp,eq->metric,eq->xp,g);
+        eq_hess_times(qp,eq->metric,eq->xp,g);
         if(qp->f != NULL) for(i = 0; i < n; i++) g[i] += qp->f[i];
         eq->fp = 0;
         for(i = 0; i < n; i++) eq->fp += 0.5*eq->xp[i]*(g[i] + (qp->f != NULL ? qp->f[i] : 0));
@@ -962,8 +962,8 @@ static int reduce_rhs(DAQPWorkspace* work, DAQPProblem* qp, const int warm){
         if(eq->path == DAQP_EQ_PATH_LDP){
             // Move xp to the minimizer over the equalities: xp - W W'g, which
             // lowers the objective by 0.5||W'g||^2 since W'HW = I
-            for(i = 0; i < n; i++) eq->xp[i] -= dot(eq->W+(size_t)i*nz,fz,nz);
-            eq->fp -= 0.5*dot(fz,fz,nz);
+            for(i = 0; i < n; i++) eq->xp[i] -= eq_dot(eq->W+(size_t)i*nz,fz,nz);
+            eq->fp -= 0.5*eq_dot(fz,fz,nz);
         }
         else for(j = 0; j < nz; j++) eq->fr[j] = fz[j];
 
@@ -971,7 +971,7 @@ static int reduce_rhs(DAQPWorkspace* work, DAQPProblem* qp, const int warm){
         for(c = 0; c < mr; c++){
             const int id = eq->keep[c];
             const c_float shift = (id < ms) ? eq->xp[id] :
-                dot(qp->A+(size_t)(id-ms)*n,eq->xp,n);
+                eq_dot(qp->A+(size_t)(id-ms)*n,eq->xp,n);
             eq->bur[c] = (qp->bupper[id] >= DAQP_INF) ? DAQP_INF : qp->bupper[id]-shift;
             eq->blr[c] = (qp->blower[id] <= -DAQP_INF) ? -DAQP_INF : qp->blower[id]-shift;
         }
@@ -979,11 +979,11 @@ static int reduce_rhs(DAQPWorkspace* work, DAQPProblem* qp, const int warm){
     // The constraints that were left out only have to be consistent
     for(c = 0; c < eq->ndrop; c++){
         const int id = eq->drop_ids[c];
-        const c_float val = (id < ms) ? eq->xp[id] : dot(qp->A+(size_t)(id-ms)*n,eq->xp,n);
+        const c_float val = (id < ms) ? eq->xp[id] : eq_dot(qp->A+(size_t)(id-ms)*n,eq->xp,n);
         if(qp->bupper[id]-val < -primal_tol || qp->blower[id]-val > primal_tol){
             // An inconsistent dependent equality is reported the same way as
             // when it is detected while forming the working set
-            return is_candidate(work,qp,id) ? DAQP_EXIT_OVERDETERMINED_INITIAL
+            return eq_is_candidate(work,qp,id) ? DAQP_EXIT_OVERDETERMINED_INITIAL
                 : DAQP_EXIT_INFEASIBLE;
         }
     }
@@ -996,7 +996,7 @@ static int reduce_rhs(DAQPWorkspace* work, DAQPProblem* qp, const int warm){
 
 #define DAQP_SWAP(T,a,b) do{ T swp_ = (a); (a) = (b); (b) = swp_; }while(0)
 
-static void swap_ldp(DAQPWorkspace* work, DAQPLDPData* d){
+static void eq_swap_ldp(DAQPWorkspace* work, DAQPLDPData* d){
     DAQP_SWAP(DAQPProblem*,work->qp,d->qp);
     DAQP_SWAP(int,work->n,d->n);
     DAQP_SWAP(int,work->m,d->m);
@@ -1049,7 +1049,7 @@ int daqp_eq_install(DAQPWorkspace* work){
             d->w_us[c] = work->w_us[id];
         }
     }
-    swap_ldp(work,d);
+    eq_swap_ldp(work,d);
     eq->installed = 1;
     return 1;
 }
@@ -1057,7 +1057,7 @@ int daqp_eq_install(DAQPWorkspace* work){
 void daqp_eq_restore(DAQPWorkspace* work){
     DAQPEqElim* eq = work->eq;
     if(eq == NULL || !eq->installed) return;
-    swap_ldp(work,&eq->other);
+    eq_swap_ldp(work,&eq->other);
     eq->installed = 0;
 }
 
@@ -1085,10 +1085,10 @@ int daqp_eq_update(DAQPWorkspace* work, DAQPProblem* qp, int mask,
 
     rebuild = !eq->active || (mask&(DAQP_UPDATE_Rinv+DAQP_UPDATE_M)) ||
         eq->n != qp->n || eq->m != qp->m || eq->ms != qp->ms ||
-        !same_candidates(work,qp);
+        !eq_same_candidates(work,qp);
 
     if(rebuild){
-        flag = build_reduction(work,qp);
+        flag = eq_build_reduction(work,qp);
         if(flag <= 0){
             daqp_eq_deactivate(work);
             return (flag < 0) ? flag : DAQP_EQ_NOT_REDUCED;
@@ -1109,7 +1109,7 @@ int daqp_eq_update(DAQPWorkspace* work, DAQPProblem* qp, int mask,
     mask_r |= keep_mask;
 
     if(mask&DAQP_UPDATE_v) eq->f_valid = 0; // f has changed
-    flag = reduce_rhs(work,qp,!rebuild);
+    flag = eq_reduce_rhs(work,qp,!rebuild);
     if(flag < 0){
         eq->other.state |= mask_r & DAQP_STATE_PENDING; // Formed by the next update
         eq->error = flag; // Reported by a solve before that
@@ -1142,13 +1142,13 @@ int daqp_eq_update(DAQPWorkspace* work, DAQPProblem* qp, int mask,
  * with A_E' S = Q1 R (S the normalization; H^{1/2} Q1 R in the metric case):
  *   lam_E = -S R^{-1} Q1' g   (Q1' H^{-1/2} g in the metric case).
  */
-static void compute_lam_eq(DAQPWorkspace* work, const DAQPProblem* qp,
+static void eq_compute_lam_eq(DAQPWorkspace* work, const DAQPProblem* qp,
         const c_float* x, c_float* lam){
     DAQPEqElim* eq = work->eq;
     const int n = eq->n, ms = eq->ms, neq = eq->neq;
     c_float* g = eq->tmp;
     int i, k, c;
-    hess_times(qp,eq->metric,x,g);
+    eq_hess_times(qp,eq->metric,x,g);
     if(qp->f != NULL) for(i = 0; i < n; i++) g[i] += qp->f[i];
     for(c = 0; c < eq->mr; c++){
         const int id = eq->keep[c];
@@ -1161,7 +1161,7 @@ static void compute_lam_eq(DAQPWorkspace* work, const DAQPProblem* qp,
         }
     }
     if(eq->metric) for(i = 0; i < n; i++) g[i] *= eq->dsq[i];
-    for(k = 0; k < neq; k++) reflect(eq->V+(size_t)k*n,eq->tau[k],k,n,g);
+    for(k = 0; k < neq; k++) eq_reflect(eq->V+(size_t)k*n,eq->tau[k],k,n,g);
     for(k = neq-1; k >= 0; k--){ // R mu = -Q1'g
         const c_float* Rk = eq->R+DAQP_ARSUM(k);
         const c_float mu = -g[k]/Rk[k];
@@ -1180,10 +1180,10 @@ void daqp_eq_expand(DAQPResult* res, DAQPWorkspace* work){
     int i, c;
     if(eq == NULL || !eq->installed) return;
     qp = eq->other.qp; // The original problem
-    x = eq->tmp+2*(size_t)eq->n; // Not used by compute_lam_eq
+    x = eq->tmp+2*(size_t)eq->n; // Not used by eq_compute_lam_eq
 
     // x = xp + W w
-    for(i = 0; i < eq->n; i++) x[i] = eq->xp[i]+dot(eq->W+(size_t)i*eq->nz,work->x,eq->nz);
+    for(i = 0; i < eq->n; i++) x[i] = eq->xp[i]+eq_dot(eq->W+(size_t)i*eq->nz,work->x,eq->nz);
     if(res->x != NULL) for(i = 0; i < eq->n; i++) res->x[i] = x[i];
 
     // Objective function value (the reduced problem of PATH_LDP has no linear
@@ -1192,7 +1192,7 @@ void daqp_eq_expand(DAQPResult* res, DAQPWorkspace* work){
     if(eq->path == DAQP_EQ_PATH_LDP && work->v == NULL) fval_r = 0.5*work->fval;
     res->fval = fval_r + eq->fp;
     if(work->avi != NULL && !work->avi->is_symmetric && qp->f != NULL)
-        res->fval = dot(qp->f,x,eq->n); // As daqp_extract_result for an AVI
+        res->fval = eq_dot(qp->f,x,eq->n); // As daqp_extract_result for an AVI
 
     // Multipliers of the original constraints (keep is ascending, so they can
     // be scattered in place from the end)
@@ -1203,7 +1203,7 @@ void daqp_eq_expand(DAQPResult* res, DAQPWorkspace* work){
             res->lam[c] = 0;
             res->lam[eq->keep[c]] = l;
         }
-        compute_lam_eq(work,qp,x,res->lam);
+        eq_compute_lam_eq(work,qp,x,res->lam);
     }
 
     // Carry the working set over to the original constraints
@@ -1221,7 +1221,7 @@ void daqp_eq_set_primal_start(DAQPWorkspace* work, const c_float* x){
     int i, j;
     // w = W'H(x-xp) if W'HW = I, and w = W'(x-xp) if W is orthonormal
     for(i = 0; i < n; i++) t[i] = x[i]-eq->xp[i];
-    if(eq->path == DAQP_EQ_PATH_LDP) hess_times(qp,eq->metric,t,ht);
+    if(eq->path == DAQP_EQ_PATH_LDP) eq_hess_times(qp,eq->metric,t,ht);
     else for(i = 0; i < n; i++) ht[i] = t[i];
     for(j = 0; j < nz; j++) work->x[j] = 0;
     for(i = 0; i < n; i++){
@@ -1236,8 +1236,8 @@ void free_daqp_eq(DAQPWorkspace* work){
     DAQPEqElim* eq = work->eq;
     if(eq == NULL) return;
     daqp_eq_restore(work);
-    free_reduction(eq);
-    free_reduced_ldp(eq);
+    eq_free_reduction(eq);
+    eq_free_reduced_ldp(eq);
     free(eq);
     work->eq = NULL;
 }

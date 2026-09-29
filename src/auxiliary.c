@@ -560,7 +560,7 @@ void daqp_deactivate_constraints(DAQPWorkspace *work){
 }
 
 // Solve L*D*L'*dlam = r (r and dlam in xldl, zldl used as scratch)
-static void solve_working_set(DAQPWorkspace *work){
+static void daqp_solve_working_set(DAQPWorkspace *work){
     int i, j, disp;
     const int na = work->n_active;
     c_float sum;
@@ -591,7 +591,7 @@ static void solve_working_set(DAQPWorkspace *work){
 }
 
 // y <-- y - M_W'*dlam for the working set W
-static void sub_working_set_rows(DAQPWorkspace *work, const c_float* dlam, c_float* y){
+static void daqp_sub_working_set_rows(DAQPWorkspace *work, const c_float* dlam, c_float* y){
     int i, j, disp, id;
     for(i = 0; i < work->n_active; i++){
         const c_float dl = dlam[i];
@@ -650,12 +650,12 @@ void daqp_refine_active(DAQPWorkspace *work){
             work->xldl[i] -= daqp_soft_residual(work,id,work->lam_star[i]);
     }
 
-    solve_working_set(work); // xldl = delta_lam
+    daqp_solve_working_set(work); // xldl = delta_lam
 
     // Update lam_star += delta_lam and u -= M'*delta_lam.
     for(i=0; i<work->n_active; i++)
         work->lam_star[i] += work->xldl[i];
-    sub_working_set_rows(work,work->xldl,work->u);
+    daqp_sub_working_set_rows(work,work->xldl,work->u);
 
     // Recompute fval since both u and lam_star changed
     c_float fval = 0;
@@ -669,7 +669,7 @@ void daqp_refine_active(DAQPWorkspace *work){
 }
 
 // Residual of active constraint id at x: A_id x - b_id (b the active side)
-static c_float active_residual(const DAQPWorkspace *work, const int id){
+static c_float daqp_active_residual(const DAQPWorkspace *work, const int id){
     const DAQPProblem* qp = work->qp;
     const int n = work->n, ms = work->ms;
     c_float val;
@@ -718,16 +718,16 @@ void daqp_refine_primal(DAQPWorkspace *work){
     // r = S*(A_W x - b_W)
     for(i = 0; i < na; i++){
         id = work->WS[i];
-        const c_float val = active_residual(work,id);
+        const c_float val = daqp_active_residual(work,id);
         dfval += work->lam_star[i]*val;
         r[i] = val*(work->scaling != NULL ? work->scaling[id] : 1);
     }
 
-    solve_working_set(work); // r = dlam
+    daqp_solve_working_set(work); // r = dlam
 
     // du = -M_W'*dlam
     for(j = 0; j < n; j++) du[j] = 0;
-    sub_working_set_rows(work,r,du);
+    daqp_sub_working_set_rows(work,r,du);
     for(j = 0; j < n; j++) dfval += 0.5*du[j]*du[j];
 
     // dx = Rinv*du (as ldp2qp_solution, without v)
