@@ -716,28 +716,43 @@ static int build_reduction(DAQPWorkspace* work, DAQPProblem* qp){
         if(symmetric){
             L = malloc((size_t)nz*nz*sizeof(c_float));
             for(i = 0; i < nz*nz; i++) L[i] = eq->Hr[i];
-            if(chol(L,nz,zero_tol)){
-                eq->path = DAQP_EQ_PATH_LDP;
-                for(i = 0; i < nz*nz; i++) eq->Hr[i] = 0;
-            }
+            if(chol(L,nz,zero_tol)) eq->path = DAQP_EQ_PATH_LDP;
             else{ free(L); L = NULL; }
         }
     }
-    if(eq->path == DAQP_EQ_PATH_LDP){
-        if(eq->Hr == NULL) eq->Hr = calloc((size_t)nz*nz,sizeof(c_float));
-        for(i = 0; i < nz; i++) eq->Hr[(size_t)i*nz+i] = 1;
-    }
-    else eq->fr = malloc(nz*sizeof(c_float));
 
     // W (row major): H^{-1/2} Z, Z L^{-T}, or Z
     free(eq->W);
     eq->W = malloc((size_t)n*nz*sizeof(c_float));
+form_W:
     for(i = 0; i < n; i++){
         c_float* Wi = eq->W+(size_t)i*nz;
         const c_float s = eq->metric ? eq->dsq[i] : 1;
         for(j = 0; j < nz; j++) Wi[j] = s*Z[(size_t)j*n+i];
     }
-    if(L != NULL) trsm_rows(L,nz,eq->W,n,nz);
+    if(L != NULL){
+        trsm_rows(L,nz,eq->W,n,nz);
+        // Ill-conditioned Z'HZ => PATH_QP (where it is regularized). The squared
+        // column norms of W are the diagonal of (Z'HZ)^-1
+        c_float wmax = 0, hmax = 0;
+        for(j = 0; j < nz; j++){
+            c_float s2 = 0;
+            for(i = 0; i < n; i++) s2 += eq->W[(size_t)i*nz+j]*eq->W[(size_t)i*nz+j];
+            if(s2 > wmax) wmax = s2;
+            if(eq->Hr[(size_t)j*nz+j] > hmax) hmax = eq->Hr[(size_t)j*nz+j];
+        }
+        if(wmax*hmax > DAQP_HESSIAN_COND_MAX){
+            free(L); L = NULL;
+            eq->path = DAQP_EQ_PATH_QP;
+            goto form_W;
+        }
+    }
+    if(eq->path == DAQP_EQ_PATH_LDP){
+        if(eq->Hr == NULL) eq->Hr = calloc((size_t)nz*nz,sizeof(c_float));
+        else for(i = 0; i < nz*nz; i++) eq->Hr[i] = 0;
+        for(i = 0; i < nz; i++) eq->Hr[(size_t)i*nz+i] = 1;
+    }
+    else eq->fr = malloc(nz*sizeof(c_float));
 
     // Reduced constraints: rows of W for the simple bounds, then A_I W
     mtot = ms+mI;

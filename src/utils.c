@@ -66,7 +66,8 @@ static int update_ldp_core(int mask, DAQPWorkspace *work, DAQPProblem* qp){
     // Also form what an earlier update left pending. Everything stays pending
     // until this update completes, so an update that fails is redone.
     mask |= work->state & DAQP_STATE_PENDING;
-    work->state = (work->state & DAQP_STATE_RINV_NORMALIZED) | (mask & DAQP_STATE_PENDING);
+    work->state = (work->state & (DAQP_STATE_RINV_NORMALIZED|DAQP_STATE_ILL_CONDITIONED))
+        | (mask & DAQP_STATE_PENDING);
 
     // Add qp to workspace
     work->qp = qp;
@@ -242,7 +243,7 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
         for(i = 0; i < n; i++) work->prox_mask[i] = 0;
     }
     work->n_prox = 0;
-    work->state &= ~DAQP_STATE_RINV_NORMALIZED;
+    work->state &= ~(DAQP_STATE_RINV_NORMALIZED|DAQP_STATE_ILL_CONDITIONED);
 
     if(H == NULL){ // LP: all directions need proximal regularization
         if(work->qp != NULL && work->qp->f != NULL) work->n_prox = n;
@@ -300,6 +301,7 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
         // acceptance threshold for large-scale Hessians.
         const c_float acceptance_tol = factor_tol < zero_tol ? factor_tol : zero_tol;
         if(work->Rinv != NULL){ work->RinvD = work->Rinv; work->Rinv = NULL; }
+        c_float dmin = DAQP_INF, dmax = 0;
         for(i = 0, disp = 0; i < n; i++){
             c_float Hi;
             if(is_factored){ Hi = H[disp]; disp += n-i; }
@@ -319,7 +321,10 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
             }
             work->RinvD[i] = 1/Hi;
             if(work->scaling != NULL && i < work->ms) work->scaling[i] = Hi;
+            if(Hi < dmin) dmin = Hi;
+            if(Hi > dmax) dmax = Hi;
         }
+        if(dmax*dmax > DAQP_REFINE_COND*dmin*dmin) work->state |= DAQP_STATE_ILL_CONDITIONED;
         return 1;
     }
 
@@ -424,6 +429,20 @@ regularize_hessian:
                 work->Rinv[disp+j] -= work->Rinv[disp2++] * work->Rinv[disp];
         }
     }
+    // cond(H) >= max (H^-1)_ii * max H_ii (H_ii >= R_ii^2 if H is factored)
+    c_float hinv_max = 0, hmax = 0;
+    for(i = 0, disp = 0; i < n; i++){
+        const c_float hii = is_factored ? 1/(work->Rinv[disp]*work->Rinv[disp]) : H[i*n+i];
+        c_float s2 = 0;
+        for(j = i; j < n; j++, disp++) s2 += work->Rinv[disp]*work->Rinv[disp];
+        if(s2 > hinv_max) hinv_max = s2;
+        if(hii > hmax) hmax = hii;
+    }
+    // Regularize an ill-conditioned Hessian, or mark it for refinement
+    if(!is_factored && !regularize_all && work->n_prox == 0 && work->avi == NULL &&
+            hinv_max*hmax > DAQP_HESSIAN_COND_MAX)
+        goto regularize_hessian;
+    if(hinv_max*hmax > DAQP_REFINE_COND) work->state |= DAQP_STATE_ILL_CONDITIONED;
     return 1;
 }
 

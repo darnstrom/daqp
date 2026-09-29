@@ -1,4 +1,5 @@
 #include "auxiliary.h"
+#include <float.h>
 #include "factorization.h"
 #include "daqp.h"
 
@@ -690,6 +691,26 @@ void daqp_refine_primal(DAQPWorkspace *work){
     c_float *r = work->xldl, *du = work->zldl, dfval = 0;
     if(na == 0 || qp == NULL || work->sing_ind != DAQP_EMPTY_IND) return;
     for(i = 0; i < na; i++) if(DAQP_IS_SOFT(work->WS[i])) return;
+
+    // Skip if x is accurate: a well-conditioned (unregularized) Hessian and
+    // rounding errors (about DAQP_REFINE_GAIN*eps*max(|d_W|,|v|)/min(D)) below primal_tol
+    if(!(work->state & DAQP_STATE_ILL_CONDITIONED) && work->n_prox == 0){
+        c_float scale = 0, min_D = 1, b;
+        for(i = 0; i < na; i++){
+            id = work->WS[i];
+            b = DAQP_IS_LOWER(id) ? work->dlower[id] : work->dupper[id];
+            if(b < 0) b = -b;
+            if(b > scale) scale = b;
+            if(work->D[i] < min_D) min_D = work->D[i];
+        }
+        if(work->v != NULL)
+            for(i = 0; i < n; i++){
+                b = work->v[i] < 0 ? -work->v[i] : work->v[i];
+                if(b > scale) scale = b;
+            }
+        if(DAQP_REFINE_GAIN*scale*(sizeof(c_float) == sizeof(float) ? FLT_EPSILON : DBL_EPSILON)
+                <= work->settings->primal_tol*min_D) return;
+    }
 
     // xldl and zldl are used as scratch
     work->reuse_ind = 0;
