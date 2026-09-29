@@ -294,8 +294,10 @@ int daqp_remove_blocking(DAQPWorkspace *work){
     int i, ind, rm_ind = DAQP_EMPTY_IND;
     const int singular = work->sing_ind != DAQP_EMPTY_IND;
     const int has_l1 = DAQP_HAS_L1(work);
-    const c_float dual_tol = work->settings->dual_tol;
     c_float alpha = DAQP_INF, alpha_cand, y, ystar, p, target, rm_target = 0;
+    // Blocking beyond dual_tol, or beyond zero_tol for a singular direction (which
+    // is not a multiplier, but scaled to 1 for the constraint that made it singular)
+    const c_float tol = singular ? work->settings->zero_tol : work->settings->dual_tol;
 
     for(i = 0; i < work->n_active; i++){
         ind = work->WS[i];
@@ -306,7 +308,7 @@ int daqp_remove_blocking(DAQPWorkspace *work){
         ystar = lower ? -work->lam_star[i] : work->lam_star[i];
 
         if(!has_l1 || !DAQP_IS_SOFT(ind)){ // Blocked when the multiplier reaches zero
-            if(ystar >= -dual_tol) continue;
+            if(ystar >= -tol) continue;
             target = 0;
         }
         else{
@@ -315,8 +317,8 @@ int daqp_remove_blocking(DAQPWorkspace *work){
             const c_float w = daqp_soft_w(work,ind);
             const int fixed = DAQP_IS_SLACK_FIXED(ind);
             target = fixed ? 0 : w; // Blocked from below
-            if(ystar >= (singular ? 0 : target) - dual_tol){
-                if(!fixed || w == 0 || ystar <= (singular ? 0 : w) + dual_tol)
+            if(ystar >= (singular ? 0 : target) - tol){
+                if(!fixed || w == 0 || ystar <= (singular ? 0 : w) + tol)
                     continue;
                 target = w; // A zero slack is released
             }
