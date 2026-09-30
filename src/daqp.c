@@ -10,6 +10,7 @@ int daqp_ldp(DAQPWorkspace *work){
     int refine_adds=0; // Refinements without progress that added a constraint
     c_float best_fval = -1;
     c_float fval_bound = 2*work->settings->fval_bound; // Internal objective is twice the nomninal
+    work->state &= ~DAQP_STATE_NOISE_FLOOR;
 
     // Correctly cleanup a singular working-set on entry
     if(work->sing_ind != DAQP_EMPTY_IND && work->sing_ind == work->n_active-1 &&
@@ -92,8 +93,12 @@ cycle_guard:
                 if(work->fval-best_fval < work->settings->progress_tol){
                     if(cycle_counter++ > work->settings->cycle_tol){
                         if(tried_repair == 1 || work->bnb != NULL){
-                            exitflag = DAQP_EXIT_CYCLE;
-                            break;
+                            if(!daqp_set_noise_floor(work)){
+                                exitflag = DAQP_EXIT_CYCLE;
+                                break;
+                            }
+                            cycle_counter = 0;
+                            best_fval = -1;
                         }
                         else{// Cycling -> Try to reorder and refactorize LDL
                             tried_repair =1;

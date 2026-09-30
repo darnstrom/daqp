@@ -50,6 +50,12 @@ extern "C" {
 // Refine if the rounding errors (about DAQP_REFINE_GAIN*eps*max(|u|,|v|)/min(D))
 // might exceed primal_tol
 #define DAQP_REFINE_GAIN 1e3
+// When cycling persists after the working set has been refactorized, a
+// constraint is only added if its violation also exceeds the rounding level of
+// u = -M'lam, about DAQP_ADD_NOISE_GAIN*eps*sum|lam| (the rows of M are
+// normalized). Below it, the computed violation is rounding noise, on which a
+// degenerate working set can swap constraints indefinitely
+#define DAQP_ADD_NOISE_GAIN 10
 
 // eps (relative to max(H_ii)) used when a semi-proximal inner problem fails
 #define DAQP_PROX_EPS_MAX 1e-3
@@ -77,6 +83,10 @@ extern "C" {
 #define DAQP_R_OFFSET(X,Y) (((2*Y-X-1)*X)/2)
 
 // EXIT FLAGS
+// Optimal, but found after cycling with the rounding level as the tolerance for
+// adding constraints, and the solution violates a constraint by more than
+// primal_tol (see DAQP_ADD_NOISE_GAIN)
+#define DAQP_EXIT_OPTIMAL_INEXACT 4
 #define DAQP_EXIT_SOFT_OPTIMAL 2
 #define DAQP_EXIT_OPTIMAL 1
 #define DAQP_EXIT_INFEASIBLE -1
@@ -112,6 +122,9 @@ extern "C" {
 // Rinv holds the Cholesky factor R (with reciprocal diagonal), not its inverse.
 // Kept while the unconstrained optimum is optimal; inverted before a constrained solve.
 #define DAQP_STATE_CHOLESKY_PENDING 4096
+// Constraints are only added above the rounding level of u (set by daqp_ldp when
+// cycling persists, see DAQP_ADD_NOISE_GAIN)
+#define DAQP_STATE_NOISE_FLOOR 8192
 
 // CONSTRAINT MASKS
 #define DAQP_ACTIVE 1

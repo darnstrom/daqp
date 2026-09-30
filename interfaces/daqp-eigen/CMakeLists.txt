@@ -37,6 +37,7 @@ if(TEST)
     add_executable(17_cold_start_reduction tests/17_cold_start_reduction.cpp)
     add_executable(18_equality_warm_activation tests/18_equality_warm_activation.cpp)
     add_executable(19_fully_determined_eq tests/19_fully_determined_eq.cpp)
+    add_executable(20_degenerate_cycling tests/20_degenerate_cycling.cpp)
 
     set(TARGETS
         00_basic_qp
@@ -59,6 +60,7 @@ if(TEST)
         17_cold_start_reduction
         18_equality_warm_activation
         19_fully_determined_eq
+        20_degenerate_cycling
     )
 
     foreach(TARGET ${TARGETS})

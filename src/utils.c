@@ -1038,6 +1038,25 @@ void daqp_minrep_work(int* is_redundant, DAQPWorkspace* work){
     }
 }
 
+// Whether the QP solution in work->x violates a hard constraint of work->qp by
+// more than primal_tol (constraints that the LDP ignores are skipped)
+int daqp_violates_hard(DAQPWorkspace *work){
+    int i, j;
+    const DAQPProblem* qp = work->qp;
+    const c_float tol = work->settings->primal_tol;
+    for(i = 0; i < work->m; i++){
+        if(DAQP_IS_SOFT(i) || (DAQP_IS_IMMUTABLE(i) && !DAQP_IS_ACTIVE(i))) continue;
+        c_float val = 0;
+        if(i < work->ms) val = work->x[i];
+        else{
+            const c_float* a = qp->A+(size_t)(i-work->ms)*work->n;
+            for(j = 0; j < work->n; j++) val += a[j]*work->x[j];
+        }
+        if(val > qp->bupper[i]+tol || val < qp->blower[i]-tol) return 1;
+    }
+    return 0;
+}
+
 /* Profiling */
 #ifdef PROFILING
 #ifdef _WIN32

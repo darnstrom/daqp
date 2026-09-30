@@ -39,8 +39,12 @@ void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
                 if(res->exitflag > 0){
                     ldp2qp_solution(work); // Retrieve qp solution
                     // Refine x (if it might be inaccurate)
-                    if(work->bnb == NULL && !DAQP_IS_HIERARCHICAL(work))
+                    if(work->bnb == NULL && !DAQP_IS_HIERARCHICAL(work)){
                         daqp_refine_primal(work);
+                        // Constraints were only added above the rounding level
+                        if((work->state & DAQP_STATE_NOISE_FLOOR) && daqp_violates_hard(work))
+                            res->exitflag = DAQP_EXIT_OPTIMAL_INEXACT;
+                    }
                 }
             }
             else{ //AVI

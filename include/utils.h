@@ -26,6 +26,9 @@ void daqp_lu_solve(c_float* LU, int* P, c_float* b, c_float* x, int n);
 
 
 void daqp_minrep_work(int* is_redundant,DAQPWorkspace* work);
+
+// Check of a solution found with the noise floor (see daqp_set_noise_floor)
+int daqp_violates_hard(DAQPWorkspace *work);
 // Utils for profiling
 #ifdef PROFILING
 #ifdef _WIN32
