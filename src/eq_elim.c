@@ -605,8 +605,9 @@ static DAQP_NOINLINE int eq_split_flat(const DAQPProblem* qp, c_float* Z, const 
 
 /*
  * Form the reduction of qp: the factorizations, the reduced constraints and the
- * storage of the reduced problem. Returns 0 if nothing (or everything) can be
- * eliminated.
+ * storage of the reduced problem. Returns 0 if nothing can be eliminated, or if
+ * a soft constraint would be left out: it only has to be consistent with the
+ * equalities then, which would make it hard.
  */
 static int eq_build_reduction(DAQPWorkspace* work, DAQPProblem* qp){
     DAQPEqElim* eq = work->eq;
@@ -646,7 +647,7 @@ static int eq_build_reduction(DAQPWorkspace* work, DAQPProblem* qp){
 
     eq_build_qr(eq,qp,zero_tol);
     neq = eq->neq;
-    if(neq == 0 || neq == n) return 0; // Nothing (or everything) eliminated
+    if(neq == 0) return 0; // Nothing eliminated
     nz = eq->nz = n-neq;
 
     // The general constraints that are kept (dependent equalities included)
@@ -654,6 +655,33 @@ static int eq_build_reduction(DAQPWorkspace* work, DAQPProblem* qp){
     for(i = ms, k = 0; i < m; i++){
         if(k < neq && eq->eq_ids[k] == i){ k++; continue; }
         gen_ids[mI++] = i;
+    }
+
+    /*
+     * The equalities determine x = xp. The reduced problem is then empty, and
+     * all other constraints only have to be consistent with xp (which is
+     * checked when the right-hand side is reduced). Solving A_E x = b_E by the
+     * QR avoids the LDL of A_E H^{-1} A_E', whose conditioning is squared.
+     */
+    if(nz == 0){
+        eq->ndrop = 0;
+        for(c = 0; c < ms+mI; c++){
+            const int id = (c < ms) ? c : gen_ids[c-ms];
+            if(DAQP_IS_SOFT(id)){ free(gen_ids); return 0; }
+            eq->drop_ids[eq->ndrop++] = id;
+        }
+        free(gen_ids);
+        eq->path = DAQP_EQ_PATH_LDP;
+        free(eq->Hr); free(eq->fr); free(eq->Ar); free(eq->W);
+        eq->Hr = eq->fr = eq->Ar = NULL;
+        eq->W = malloc(sizeof(c_float)); // Rows of length 0 (kept non-NULL)
+        eq->mr = 0;
+        memset(&eq->qp,0,sizeof(DAQPProblem));
+        eq->qp.sense = eq->sr;
+        eq->qp.nh = 1;
+        eq->qp.problem_type = qp->problem_type;
+        eq_allocate_reduced_ldp(eq,0);
+        return 1;
     }
 
     /*
@@ -793,6 +821,7 @@ form_W:
         const int id = (c < ms) ? c : gen_ids[c-ms];
         const c_float* row = eq->Ar+(size_t)c*nz;
         if(eq_dot(row,row,nz) <= zero_tol){
+            if(DAQP_IS_SOFT(id)){ free(gen_ids); return 0; }
             eq->drop_ids[eq->ndrop++] = id;
             continue;
         }
