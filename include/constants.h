@@ -109,6 +109,10 @@ extern "C" {
 #define DAQP_STATE_INCUMBENT 1024 // work->x holds a candidate solution for BnB
 #define DAQP_STATE_ILL_CONDITIONED 2048 // cond(H) (estimate) above DAQP_REFINE_COND
 
+// Rinv holds the Cholesky factor R (with reciprocal diagonal), not its inverse.
+// Kept while the unconstrained optimum is optimal; inverted before a constrained solve.
+#define DAQP_STATE_CHOLESKY_PENDING 4096
+
 // CONSTRAINT MASKS
 #define DAQP_ACTIVE 1
 #define DAQP_IS_ACTIVE(x) (work->sense[x]&1)

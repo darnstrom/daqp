@@ -11,6 +11,77 @@
 #define DAQP_AVI_RETRY_RHO_REDUCTION ((c_float)16.0)
 #endif
 
+// Form packed R from H, retaining reciprocal diagonals as used throughout DAQP.
+// Return zero when an unfactored Hessian needs regularization.
+static int daqp_form_R(DAQPWorkspace *work, const c_float *H, int is_factored,
+        int regularize_all, c_float eps, c_float *min_pivot, c_float *max_pivot){
+    int i, j, k, disp, disp2;
+    const int n = work->n;
+    const c_float zero_tol = work->settings->zero_tol;
+    c_float *R = work->Rinv;
+    *min_pivot = DAQP_INF;
+    *max_pivot = 0;
+    if(is_factored){
+        for(i = 0, disp = 0; i < n; i++){
+            if(H[disp] <= zero_tol) return DAQP_EXIT_NONCONVEX;
+            R[disp] = 1/H[disp];
+            for(j = 1, disp++; j < n-i; j++, disp++) R[disp] = H[disp];
+        }
+        return 1;
+    }
+    for(i = 0, disp = 0; i < n; i++){
+        R[disp++] = H[i*n+i] + ((regularize_all ||
+                    (work->n_prox > 0 && work->prox_mask[i])) ? eps : 0);
+        for(j = i+1; j < n; j++) R[disp++] = (c_float)0.5*(H[i*n+j] + H[j*n+i]);
+    }
+    for(i = 0, disp = 0; i < n; disp += n-i, i++){
+        c_float pivot = R[disp];
+        for(k = 0, disp2 = i; k < i; k++, disp2 += n-k) pivot -= R[disp2]*R[disp2];
+        if(pivot <= zero_tol) return 0;
+        if(pivot < *min_pivot && (regularize_all || work->n_prox == 0 || !work->prox_mask[i]))
+            *min_pivot = pivot;
+        if(pivot > *max_pivot) *max_pivot = pivot;
+        c_float inv_diag = 1/sqrt(pivot);
+        // Four entries of row i per sweep over k, since R[k,j:j+4] are contiguous
+        // (same order of summation; the sweep is too short to pay off for i < 2)
+        for(j = 1; i >= 2 && j+4 <= n-i; j += 4){
+            c_float s0 = R[disp+j], s1 = R[disp+j+1], s2 = R[disp+j+2], s3 = R[disp+j+3];
+            for(k = 0, disp2 = i; k < i; k++, disp2 += n-k){
+                const c_float c = R[disp2];
+                s0 -= c*R[disp2+j]; s1 -= c*R[disp2+j+1];
+                s2 -= c*R[disp2+j+2]; s3 -= c*R[disp2+j+3];
+            }
+            R[disp+j] = s0*inv_diag; R[disp+j+1] = s1*inv_diag;
+            R[disp+j+2] = s2*inv_diag; R[disp+j+3] = s3*inv_diag;
+        }
+        for(; j < n-i; j++){
+            for(k = 0, disp2 = i; k < i; k++, disp2 += n-k) R[disp+j] -= R[disp2]*R[disp2+j];
+            R[disp+j] *= inv_diag;
+        }
+        R[disp] = inv_diag;
+    }
+    return 1;
+}
+
+static void daqp_invert_R(DAQPWorkspace *work){
+    int k, i, j, disp, disp2;
+    const int n = work->n;
+    c_float *R = work->Rinv;
+    for(k = 0, disp = 0; k < n; k++){
+        disp2 = disp;
+        R[disp] = R[disp2++];
+        for(j = k+1; j < n; j++) R[disp2++] *= -R[disp];
+        for(i = k+1, disp++; i < n; i++, disp++){
+            R[disp] *= R[disp2++];
+            for(j = 1; j < n-i; j++) R[disp+j] -= R[disp2++]*R[disp];
+        }
+    }
+}
+
+static int daqp_update_R(DAQPWorkspace *work, c_float *H,
+        int is_factored, int defer_inverse);
+static int daqp_finish_Rinv(DAQPWorkspace *work, const c_float *H, int is_factored);
+
 static c_float proximal_regularization_scaled(
         const DAQPWorkspace *work, c_float hessian_scale){
     c_float eps = work->settings->eps_prox;
@@ -67,8 +138,8 @@ static int daqp_update_ldp_core(int mask, DAQPWorkspace *work, DAQPProblem* qp){
     // Also form what an earlier update left pending. Everything stays pending
     // until this update completes, so an update that fails is redone.
     mask |= work->state & DAQP_STATE_PENDING;
-    work->state = (work->state & (DAQP_STATE_RINV_NORMALIZED|DAQP_STATE_ILL_CONDITIONED))
-        | (mask & DAQP_STATE_PENDING);
+    work->state = (work->state & (DAQP_STATE_RINV_NORMALIZED|DAQP_STATE_ILL_CONDITIONED|
+                DAQP_STATE_CHOLESKY_PENDING)) | (mask & DAQP_STATE_PENDING);
 
     // Add qp to workspace
     work->qp = qp;
@@ -95,10 +166,10 @@ static int daqp_update_ldp_core(int mask, DAQPWorkspace *work, DAQPProblem* qp){
         if(error_flag==1) do_activate = 1;
     }
 
-    // Update Rinv
+    // Form R first; dense QPs defer inversion until after the candidate check.
     if(mask&DAQP_UPDATE_Rinv){
         if(work->avi == NULL)
-            error_flag = daqp_update_Rinv(work, qp->H, qp->problem_type==2 ? 1 : 0);
+            error_flag = daqp_update_R(work, qp->H, qp->problem_type==2 ? 1 : 0, 1);
         else{
             daqp_update_avi(work->avi,qp,work->settings->zero_tol);
             if(work->avi->is_symmetric){
@@ -112,23 +183,40 @@ static int daqp_update_ldp_core(int mask, DAQPWorkspace *work, DAQPProblem* qp){
                 error_flag = daqp_update_Rinv(work, work->avi->Hs_rho,0);
             }
         }
-        if(error_flag<0)
-            return error_flag;
+        if(error_flag<0) return error_flag;
     }
 
-    // Update v (moved before M to enable early-exit check below)
-    if(mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_v){
+    // Update v (moved before M to enable early-exit check below). If Rinv
+    // still holds R, the unconstrained check forms v itself.
+    if(!(work->state & DAQP_STATE_CHOLESKY_PENDING) &&
+            (mask&DAQP_UPDATE_Rinv || mask&DAQP_UPDATE_v))
         daqp_update_v(qp->f,work);
-    }
 
     if(work->avi == NULL || work->avi->is_symmetric)
         unconstrained_flag = daqp_check_unconstrained(work,mask);
     if(unconstrained_flag == DAQP_UNCONSTRAINED_OPTIMAL){
-        // Rinv, v, and sense are formed, but not M and d, which depend on them
+        // Rinv (or R), v, and sense are formed, but not M and d, which depend on them
         work->state &= ~(DAQP_UPDATE_Rinv+DAQP_UPDATE_v+DAQP_UPDATE_sense);
         work->state |= DAQP_UPDATE_d;
         if(mask&DAQP_UPDATE_Rinv) work->state |= DAQP_UPDATE_M;
         return 0;
+    }
+
+    // A constrained solve needs Rinv (and M formed from it)
+    if(work->state & DAQP_STATE_CHOLESKY_PENDING){
+        work->state |= DAQP_UPDATE_M;
+        mask |= DAQP_UPDATE_M;
+        if(!daqp_finish_Rinv(work,qp->H,qp->problem_type==2)){
+            // Refactor with regularization => v and d from the check are stale
+            work->state |= DAQP_UPDATE_Rinv;
+            mask |= DAQP_UPDATE_Rinv;
+            error_flag = daqp_update_Rinv(work,qp->H,qp->problem_type==2);
+            if(error_flag<0) return error_flag;
+            unconstrained_flag = 0;
+            daqp_update_v(qp->f,work);
+        }
+        else if(unconstrained_flag == 0 && (mask&DAQP_UPDATE_Rinv || mask&DAQP_UPDATE_v))
+            daqp_update_v(qp->f,work); // Not formed by the check
     }
 
     // Update M
@@ -224,7 +312,11 @@ int daqp_update_ldp(int mask, DAQPWorkspace *work, DAQPProblem* qp){
 }
 
 int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
-    int i, j, k, disp, disp2;
+    return daqp_update_R(work,H,is_factored,0);
+}
+
+static int daqp_update_R(DAQPWorkspace *work, c_float* H, int is_factored, int defer_inverse){
+    int i, j, k, disp;
     const int n = work->n;
     c_float eps = work->settings->eps_prox;
     c_float zero_tol = work->settings->zero_tol;
@@ -244,7 +336,7 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
         for(i = 0; i < n; i++) work->prox_mask[i] = 0;
     }
     work->n_prox = 0;
-    work->state &= ~(DAQP_STATE_RINV_NORMALIZED|DAQP_STATE_ILL_CONDITIONED);
+    work->state &= ~(DAQP_STATE_RINV_NORMALIZED|DAQP_STATE_ILL_CONDITIONED|DAQP_STATE_CHOLESKY_PENDING);
 
     if(H == NULL){ // LP: all directions need proximal regularization
         if(work->qp != NULL && work->qp->f != NULL) work->n_prox = n;
@@ -352,85 +444,61 @@ int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
             if(eps <= 0.0) return DAQP_EXIT_NONCONVEX;
         }
     }
-    if(!is_factored){
-pack_hessian:
-        for(i = 0, disp = 0; i < n; i++){
-            work->Rinv[disp++] = H[i*n+i] + ((regularize_all ||
-                        (work->n_prox > 0 && work->prox_mask[i])) ? eps : 0.0);
-            for(j = i+1; j < n; j++)
-                work->Rinv[disp++] = (c_float)0.5*(H[i*n+j] + H[j*n+i]);
-        }
-    }
+    c_float min_pivot, max_pivot;
+form_R:
+    i = daqp_form_R(work,H,is_factored,regularize_all,eps,&min_pivot,&max_pivot);
+    if(i < 0) return i;
+    if(i == 0 || (!is_factored && min_pivot <=
+                ((regularize_all || work->n_prox > 0) && !force_prox ?
+                 sqrt(zero_tol) : zero_tol)*max_pivot)) goto regularize_hessian;
 
-    // Cholesky.
-    if(is_factored){
-        for(i=0, disp=0; i<n; i++){
-            if(H[disp] <= zero_tol) return DAQP_EXIT_NONCONVEX;
-            work->Rinv[disp] = 1/H[disp]; // Store 1/rii
-            for(j=1, disp++; j<n-i; j++, disp++)
-                work->Rinv[disp] = H[disp];
-        }
-    } else {
-        c_float min_pivot = DAQP_INF;
-        c_float max_pivot = 0.0;
+    // Keep poorly scaled factors on the full inverse/condition-check path.
+    if(defer_inverse){
+        c_float dmin = DAQP_INF, dmax = 0;
         for(i = 0, disp = 0; i < n; disp += n-i, i++){
-            c_float diag_i = work->Rinv[disp];  // read before overwrite
-            for(k = 0, disp2 = i; k < i; k++, disp2 += n-k)
-                diag_i -= work->Rinv[disp2] * work->Rinv[disp2];
-            if(diag_i <= zero_tol)
-                goto regularize_hessian;
-            // (Skip regularized pivots)
-            if(diag_i < min_pivot && (regularize_all || work->n_prox == 0 ||
-                        !work->prox_mask[i]))
-                min_pivot = diag_i;
-            if(diag_i > max_pivot) max_pivot = diag_i;
-            diag_i = 1/sqrt(diag_i);
-            for(j = 1; j < n-i; j++){
-                for(k = 0, disp2 = i; k < i; k++, disp2 += n-k)
-                    work->Rinv[disp+j] -= work->Rinv[disp2] * work->Rinv[disp2+j];
-                work->Rinv[disp+j] *= diag_i;
-            }
-            work->Rinv[disp] = diag_i;
+            c_float d = work->Rinv[disp];
+            if(d < dmin) dmin = d;
+            if(d > dmax) dmax = d;
         }
-         // A successful unregularized Cholesky factorization represents a
-         // positive-definite Hessian down to zero_tol relative pivots.
-         // Once a singular Hessian has been shifted, be more conservative 
-        if(min_pivot <= ((regularize_all || work->n_prox > 0) && !force_prox ?
-                    sqrt(zero_tol) : zero_tol)*max_pivot){
+        if(isfinite(dmin) && isfinite(dmax) && dmin > 0 &&
+                dmin*dmin > sqrt(zero_tol)*dmax*dmax){
+            work->state |= DAQP_STATE_CHOLESKY_PENDING;
+            return 1;
+        }
+    }
+    if(!daqp_finish_Rinv(work,H,is_factored)) goto regularize_hessian;
+    return 1;
+
 regularize_hessian:
-            if(regularize_all){
-                if(eps <= 0 || regularization_tries++ >= 16) return DAQP_EXIT_NONCONVEX;
-                eps *= 2.0;
-            }
-            else{
-                hessian_scale = 0.0;
-                for(k = 0; k < n; k++){
-                    c_float abs_diag = H[k*n+k];
-                    if(abs_diag < 0) abs_diag = -abs_diag;
-                    if(abs_diag > hessian_scale) hessian_scale = abs_diag;
-                }
-                eps = proximal_regularization_scaled(work, hessian_scale);
-                if(eps <= 0) return DAQP_EXIT_NONCONVEX;
-                regularize_all = 1;
-                work->n_prox = n;
-                if(work->prox_mask != NULL)
-                    for(k = 0; k < n; k++) work->prox_mask[k] = 1;
-            }
-            goto pack_hessian;
-        }
+    if(regularize_all){
+        if(eps <= 0 || regularization_tries++ >= 16) return DAQP_EXIT_NONCONVEX;
+        eps *= 2;
     }
-    // R -> Rinv
-    for(k=0, disp=0; k<n; k++){
-        disp2 = disp;
-        work->Rinv[disp] = work->Rinv[disp2++];
-        for(j=k+1; j<n; j++) work->Rinv[disp2++] *= -work->Rinv[disp];
-        for(i=k+1, disp++; i<n; i++, disp++){
-            work->Rinv[disp] *= work->Rinv[disp2++];
-            for(j=1; j<n-i; j++)
-                work->Rinv[disp+j] -= work->Rinv[disp2++] * work->Rinv[disp];
+    else{
+        hessian_scale = 0;
+        for(k = 0; k < n; k++){
+            c_float abs_diag = H[k*n+k];
+            if(abs_diag < 0) abs_diag = -abs_diag;
+            if(abs_diag > hessian_scale) hessian_scale = abs_diag;
         }
+        eps = proximal_regularization_scaled(work,hessian_scale);
+        if(eps <= 0) return DAQP_EXIT_NONCONVEX;
+        regularize_all = 1;
+        work->n_prox = n;
+        if(work->prox_mask != NULL)
+            for(k = 0; k < n; k++) work->prox_mask[k] = 1;
     }
+    goto form_R;
+}
+
+// Complete the factor and retain the existing inverse-based condition checks.
+// Return zero when the Hessian needs to be refactored with regularization.
+static int daqp_finish_Rinv(DAQPWorkspace *work, const c_float *H, int is_factored){
+    work->state &= ~DAQP_STATE_CHOLESKY_PENDING;
+    daqp_invert_R(work);
     // cond(H) >= max (H^-1)_ii * max H_ii (H_ii >= R_ii^2 if H is factored)
+    const int n = work->n;
+    int i, j, disp;
     c_float hinv_max = 0, hmax = 0;
     for(i = 0, disp = 0; i < n; i++){
         const c_float hii = is_factored ? 1/(work->Rinv[disp]*work->Rinv[disp]) : H[i*n+i];
@@ -441,10 +509,10 @@ regularize_hessian:
     }
     // Regularize an ill-conditioned Hessian, or mark it for refinement
     const c_float eps_mach = sizeof(c_float) == sizeof(float) ? FLT_EPSILON : DBL_EPSILON;
-    if(!is_factored && !regularize_all && work->n_prox == 0 && work->avi == NULL &&
+    if(!is_factored && work->n_prox == 0 && work->avi == NULL &&
             ((work->eq != NULL && work->eq->installed && hinv_max*hmax > DAQP_HESSIAN_COND_MAX) ||
              n*eps_mach*hinv_max*hmax > DAQP_HESSIAN_COND_EPS))
-        goto regularize_hessian;
+        return 0;
     if(hinv_max*hmax > DAQP_REFINE_COND) work->state |= DAQP_STATE_ILL_CONDITIONED;
     return 1;
 }
@@ -737,6 +805,7 @@ int daqp_check_unconstrained(DAQPWorkspace* work, const int mask){
     if (work->bnb != NULL || DAQP_IS_HIERARCHICAL(work) || work->n_prox >0) return 0; // Not a standard QP/AVI
     for(i = 0; i < work->m; i++) if(work->sense[i]&(DAQP_ACTIVE + DAQP_IMMUTABLE)) return 0; // No equalities
 
+    const int cholesky = (work->state & DAQP_STATE_CHOLESKY_PENDING) != 0;
     // Check if unconstrained optimum is primal feasible.
     int j, disp;
     c_float sum;
@@ -748,7 +817,25 @@ int daqp_check_unconstrained(DAQPWorkspace* work, const int mask){
     // Compute x_unc stored temporarily in work->x.
     swp_ptr = work->x; work->u = work->xold; work->x = work->xold; work->xold = swp_ptr;
 
-    if(work->avi != NULL && !work->avi->is_symmetric){
+    if(cholesky){
+        // Form v only when checking the candidate: R' v = f, then R x = -v.
+        // R is packed upper triangular with reciprocal diagonal entries.
+        c_float* v = work->v != NULL ? work->v : work->xldl;
+        int offset;
+        for(i = 0; i < n; i++) v[i] = work->qp->f != NULL ? work->qp->f[i] : 0;
+        for(i = 0, disp = 0; i < n; i++){ // (row-wise to traverse R contiguously)
+            const c_float vi = (v[i] *= work->Rinv[disp++]);
+            for(j = i+1; j < n; j++) v[j] -= work->Rinv[disp++]*vi;
+        }
+        for(i = n-1, offset = n*(n+1)/2; i >= 0; i--){
+            sum = -v[i];
+            offset -= n-i;
+            for(j = i+1; j < n; j++) sum -= work->Rinv[offset+j-i]*work->x[j];
+            work->x[i] = sum*work->Rinv[offset];
+            if(!isfinite(work->x[i])) feasible = 0;
+        }
+    }
+    else if(work->avi != NULL && !work->avi->is_symmetric){
         // AVI: unconstrained solution is x = -H^{-1} f
         if(work->qp->f != NULL)
             daqp_lu_solve(work->avi->LU_H, work->avi->P_H, work->qp->f, work->x, n);
