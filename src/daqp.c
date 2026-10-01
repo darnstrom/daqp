@@ -67,7 +67,7 @@ int daqp_ldp(DAQPWorkspace *work){
                     // then removed again without progress), further refinements
                     // repeat that deterministically, so they are stopped after
                     // two such attempts and the current solution is accepted.
-                    if(work->n_active > 0 && min_D < work->settings->pivot_tol &&
+                    if(work->n_active > 0 && min_D < DAQP_REFINE_PIVOT &&
                             refine_adds < 2){
                         daqp_refine_active(work);
                         // A constraint added after the refinement goes through

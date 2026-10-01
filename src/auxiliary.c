@@ -92,12 +92,12 @@ c_float daqp_max_soft_slack(DAQPWorkspace *work){
  * are then only added if their violation also exceeds the rounding level of
  * u = -M'lam, and daqp_solve checks the solution with primal_tol afterwards
  * (daqp_violates_hard).
- * Returns 0 (the cycling is reported) for BnB, the proximal method and
- * hierarchical problems, which handle cycling themselves, for a nonsymmetric
- * AVI, or if the floor is already used.
+ * Returns 0 (the cycling is reported) for the proximal method and hierarchical
+ * problems, which handle cycling themselves, for a nonsymmetric AVI, or if the
+ * floor is already used.
  */
 int daqp_set_noise_floor(DAQPWorkspace *work){
-    if(work->bnb != NULL || work->n_prox > 0 || DAQP_IS_HIERARCHICAL(work) ||
+    if(work->n_prox > 0 || DAQP_IS_HIERARCHICAL(work) ||
             (work->avi != NULL && !work->avi->is_symmetric) ||
             (work->state & DAQP_STATE_NOISE_FLOOR)) return 0;
     work->state |= DAQP_STATE_NOISE_FLOOR;
