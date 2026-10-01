@@ -945,6 +945,59 @@ end
     @test norm(x3 .- (-5.0)) < tol  # all at lower bound
 end
 
+@testset "Proximal steps across changing faces" begin
+    # A large positive eigenvalue sets the numerical regularization scale,
+    # while the small linear cost drives a long path through the nullspace.
+    # Prescribe a unique optimum with positive multipliers on 40 independent
+    # bounds/rows; the other rows are strictly slack there.
+    rng = MersenneTwister(2026)
+    n_face = 40
+    H_face = diagm(vcat(1e5, zeros(n_face-1)))
+    x_face = 100 .* randn(rng, n_face)
+    A_face = randn(rng, 120, n_face)
+    A_face ./= sqrt.(sum(abs2, A_face; dims=2))
+    multipliers = 1e-3 .* (1 .+ rand(rng, n_face-1))
+    f_face = -H_face*x_face - A_face[1:n_face-1, :]'*multipliers
+    f_face[3] -= 1e-3
+    bu_face = vcat(fill(1e4, n_face), A_face*x_face)
+    bu_face[3] = x_face[3]
+    bu_face[2n_face:end] .+= 1 .+ 9 .* rand(rng, 120-n_face+1)
+    bl_face = fill(-1e30, length(bu_face))
+    sense_face = zeros(Cint, length(bu_face))
+    d_face = DAQPBase.Model()
+    DAQPBase.settings(d_face, Dict(:eta_prox => 1e-10, :dual_tol => 1e-9))
+    DAQPBase.setup(d_face, H_face, f_face, A_face, bu_face, bl_face, sense_face)
+    x, _, flag, info = DAQPBase.solve(d_face)
+    @test flag == DAQPBase.OPTIMAL
+    @test norm(x-x_face, Inf) < 1e-3
+    @test maximum(vcat(x, A_face*x)-bu_face) < 1e-6
+    @test norm(H_face*x + f_face + info.λ[1:n_face] +
+               A_face'*info.λ[n_face+1:end], Inf) < 1e-6
+    @test maximum(abs.(info.λ .* (vcat(x, A_face*x)-bu_face))) < 1e-6
+    # Re-solving also checks that projection scratch preserves the workspace.
+    x_repeat, _, flag_repeat, _ = DAQPBase.solve(d_face)
+    @test flag_repeat == DAQPBase.OPTIMAL
+    @test norm(x_repeat-x_face, Inf) < 1e-3
+
+    # Rotate the positive eigendirection so the same prescribed optimum also
+    # exercises dense Rinv and normalized simple bounds during face changes.
+    positive_direction = normalize(randn(rng, n_face))
+    H_dense_face = 1e5 .* (positive_direction*positive_direction')
+    f_dense_face = -H_dense_face*x_face - A_face[1:n_face-1, :]'*multipliers
+    f_dense_face[3] -= 1e-3
+    dense_settings = settings(DAQPBase.Model(),
+                             Dict(:eta_prox => 1e-10, :dual_tol => 1e-9))
+    x_dense, _, flag_dense, info_dense = quadprog(
+        H_dense_face, f_dense_face, A_face, bu_face, bl_face, sense_face;
+        settings=dense_settings)
+    @test flag_dense == DAQPBase.OPTIMAL
+    @test norm(x_dense-x_face, Inf) < 1e-3
+    @test maximum(vcat(x_dense, A_face*x_dense)-bu_face) < 1e-6
+    @test norm(H_dense_face*x_dense + f_dense_face + info_dense.λ[1:n_face] +
+               A_face'*info_dense.λ[n_face+1:end], Inf) < 1e-6
+    @test maximum(abs.(info_dense.λ .* (vcat(x_dense, A_face*x_dense)-bu_face))) < 1e-6
+end
+
 @testset "Equality elimination update dispatch" begin
     n_eq_test = 10
     neq_test = 6

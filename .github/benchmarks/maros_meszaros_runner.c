@@ -14,7 +14,7 @@ typedef struct {
 } Problem;
 
 typedef struct {
-    int exitflag, iterations, solved;
+    int exitflag, iterations, outer_iterations, solved;
     double solve_time, primal, dual, gap;
 } Result;
 
@@ -160,6 +160,7 @@ static Result solve_problem(Problem *p, const Tolerance *tolerance, int repeats)
 
         output.exitflag = result.exitflag;
         output.iterations = result.iter;
+        output.outer_iterations = result.nodes;
         if (result.solve_time < output.solve_time) output.solve_time = result.solve_time;
     }
 
@@ -203,7 +204,7 @@ int main(int argc, char **argv) {
         {"high", 1e-9, 1e-9, 0},
     };
     fprintf(csv, "problem,n,m,posdef,tolerance,solved,solve_time_s,exitflag,"
-                 "iterations,primal_residual,dual_residual,duality_gap\n");
+                 "iterations,primal_residual,dual_residual,duality_gap,outer_iterations\n");
 
     char name[256], path[4096];
     int n, m, posdef, problem_count = 0;
@@ -219,10 +220,10 @@ int main(int argc, char **argv) {
         fprintf(stderr, "[%d] %s (n=%d, m=%d)\n", problem_count, name, n, m);
         for (size_t i = 0; i < sizeof(tolerances) / sizeof(tolerances[0]); ++i) {
             const Result result = solve_problem(&problem, &tolerances[i], repeats);
-            fprintf(csv, "%s,%d,%d,%d,%s,%d,%.17g,%d,%d,%.17g,%.17g,%.17g\n",
+            fprintf(csv, "%s,%d,%d,%d,%s,%d,%.17g,%d,%d,%.17g,%.17g,%.17g,%d\n",
                     name, n, m, posdef, tolerances[i].name, result.solved,
                     result.solve_time, result.exitflag, result.iterations,
-                    result.primal, result.dual, result.gap);
+                    result.primal, result.dual, result.gap, result.outer_iterations);
             fflush(csv);
         }
         free_problem(&problem);
