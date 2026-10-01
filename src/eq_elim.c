@@ -386,10 +386,6 @@ int daqp_eq_wanted(const DAQPWorkspace* work, const DAQPProblem* qp, const int m
     n_eq = eq_count_candidates(work,qp);
     if(n_eq == 0) return 0;
     if(policy == DAQP_EQ_REDUCTION_ON) return 1;
-    // The default weights of soft constraints refer to the normalization of
-    // the full problem, which is left as it is by the automatic policy
-    for(i = 0; i < qp->m; i++)
-        if(work->sense[i] & DAQP_SOFT) return 0;
     return eq_is_worthwhile(work,qp,n_eq);
 }
 
