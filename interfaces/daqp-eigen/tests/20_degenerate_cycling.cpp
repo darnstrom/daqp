@@ -20,8 +20,9 @@
 // Such violations are only ignored once the cycling persists after a
 // refactorization, and the solution is then checked with primal_tol
 // (DAQP_EXIT_OPTIMAL_INEXACT if it does not pass). Other solves are unaffected:
-// in particular, violations above primal_tol but below the rounding level are
-// still resolved.
+// in particular, violations above the rounding level are still resolved
+// (violations below it, but above primal_tol, are only resolved depending on
+// the rounding).
 
 namespace {
 
@@ -462,10 +463,11 @@ int main() {
 
     // Constraints that are inactive at the solution (lower bounds on the
     // friction rows of two contacts), tightened such that the solution
-    // violates them by delta: above primal_tol, but below the rounding level
-    // of u. They are added, and the new solution satisfies them
+    // violates them by delta: above primal_tol and above the rounding level of
+    // u (from about 3e-5 here). They are added, and the new solution satisfies
+    // them
     for (int row : {43, 48})
-        for (c_float delta : {3e-6, 3e-5}) {
+        for (c_float delta : {1e-4, 1e-3}) {
             Solve s;
             s.run(settings);
             assert(s.res.exitflag == DAQP_EXIT_OPTIMAL);

@@ -21,7 +21,7 @@ extern "C" {
 #define DAQP_DEFAULT_DUAL_TOL 1e-12
 #define DAQP_DEFAULT_ZERO_TOL 1e-11
 #define DAQP_DEFAULT_PROG_TOL 1e-14
-#define DAQP_DEFAULT_PIVOT_TOL 1e-6
+#define DAQP_DEFAULT_PIVOT_TOL 1e-8
 #define DAQP_DEFAULT_CYCLE_TOL 10
 #define DAQP_DEFAULT_ETA -1.0
 #define DAQP_AUTO_ETA_CAP 1e-6
@@ -50,6 +50,9 @@ extern "C" {
 // Refine if the rounding errors (about DAQP_REFINE_GAIN*eps*max(|u|,|v|)/min(D))
 // might exceed primal_tol
 #define DAQP_REFINE_GAIN 1e3
+// The active constraints are refined at a solution if a pivot of the LDL' is
+// below this (independent of pivot_tol, since BnB does not refine x afterwards)
+#define DAQP_REFINE_PIVOT 1e-6
 // When cycling persists after the working set has been refactorized, a
 // constraint is only added if its violation also exceeds the rounding level of
 // u = -M'lam, about DAQP_ADD_NOISE_GAIN*eps*sum|lam| (the rows of M are

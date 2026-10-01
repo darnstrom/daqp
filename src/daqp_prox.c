@@ -3,7 +3,12 @@
 #include "utils.h"
 #include <math.h>
 
-static int prox_step(DAQPWorkspace* work, c_float* s_prev);
+// Delay the extra projection work until ordinary proximal steps are slow.
+#define DAQP_PROX_FACE_START 16
+#define DAQP_PROX_FACE_STEPS 3
+
+static int prox_project_step(DAQPWorkspace* work, c_float eps);
+static int prox_step(DAQPWorkspace* work, c_float* s_prev, c_float eps, int projected);
 static void prox_rescale(DAQPWorkspace* work, c_float eps, c_float eps_new);
 static int prox_is_infeasible(const DAQPWorkspace* work);
 
@@ -188,10 +193,18 @@ int daqp_prox(DAQPWorkspace *work){
         }
 
         // Unchanged working set => accelerate by moving the center along the
-        // step (relax the step for an AVI). Convergence is confirmed afterwards
+        // step (relax the step for an AVI). Convergence is confirmed afterwards.
+        // After many outer steps, also accelerate small working-set changes,
+        // projecting the step onto the new face first.
         center_relaxed = 0;
-        if(work->iterations != 1) s_prev = -1; // The working set has changed
-        if(work->iterations == 1 && work->n_active < nx &&
+        int projected = 0;
+        if(work->iterations != 1){ // The working set has changed
+            s_prev = -1;
+            projected = !is_lp && work->avi == NULL && work->settings->eps_prox < 0 &&
+                work->nh >= DAQP_PROX_FACE_START && work->iterations <= 3 &&
+                prox_project_step(work,eps);
+        }
+        if((work->iterations == 1 || projected) && work->n_active < nx &&
                 total_iter < work->settings->iter_limit){
             if(work->avi != NULL){
                 for(i = 0; i < nx; i++)
@@ -200,7 +213,7 @@ int daqp_prox(DAQPWorkspace *work){
                 center_relaxed = 1;
             }
             else{
-                const int step_flag = prox_step(work,&s_prev);
+                const int step_flag = prox_step(work,&s_prev,eps,projected);
                 if(step_flag == DAQP_EXIT_UNBOUNDED){
                     exitflag = DAQP_EXIT_UNBOUNDED;
                     break;
@@ -233,6 +246,42 @@ int daqp_prox(DAQPWorkspace *work){
     }
     work->iterations = total_iter;
     return exitflag;
+}
+
+/* At the inner optimum, -g = E*(x-xold) + A_W'*lambda (E the proximal shift).
+ * The steepest descent direction on the active face, in the metric of H+E, is
+ * therefore Rinv*(I-M_W'*(M_W*M_W')^{-1}*M_W)*Rinv'*E*(x-xold). It is stored
+ * as x-xold for prox_step (xold is not needed as a center again).
+ */
+static int prox_project_step(DAQPWorkspace* work, c_float eps){
+    int i, j, id;
+    const int n = work->n, na = work->n_active;
+    c_float *r = work->xold, *saved_v = work->v, sum;
+    // Near a vertex, the inner solver resolves the remaining face cheaper
+    if(na >= 9*n/10 || work->sing_ind != DAQP_EMPTY_IND || work->qp->H == NULL) return 0;
+    for(i = 0; i < na; i++) if(DAQP_IS_SOFT(work->WS[i])) return 0;
+    // r = Rinv'*E*(x-xold) (daqp_update_v transforms in place into v)
+    for(i = 0; i < n; i++)
+        r[i] = (work->prox_mask == NULL || work->prox_mask[i]) ? eps*(work->x[i]-r[i]) : 0;
+    work->v = r;
+    daqp_update_v(r,work);
+    work->v = saved_v;
+    // r <-- r - M_W'*(M_W*M_W')^{-1}*M_W*r
+    for(i = 0; i < na; i++){
+        id = work->WS[i];
+        if(id >= work->ms)
+            for(j = 0, sum = 0; j < n; j++) sum += work->M[(size_t)(id-work->ms)*n+j]*r[j];
+        else if(work->Rinv != NULL)
+            for(j = id, sum = 0; j < n; j++) sum += work->Rinv[DAQP_R_OFFSET(id,n)+j]*r[j];
+        else sum = r[id];
+        work->xldl[i] = sum;
+    }
+    daqp_solve_working_set(work);
+    daqp_sub_working_set_rows(work,work->xldl,r);
+    daqp_apply_Rinv(work,r);
+    for(i = 0; i < n; i++) work->xold[i] = work->x[i]-r[i];
+    work->reuse_ind = 0;
+    return 1;
 }
 
 // Step length -g'd/d'Hd that minimizes the objective along d = x-x_old (d in
@@ -305,10 +354,11 @@ static int prox_blocking_constraint(DAQPWorkspace* work, c_float* s, int* lower)
  * Returns 1 if x was moved, 0 otherwise, and DAQP_EXIT_UNBOUNDED for an LP
  * with an unblocked descent direction.
  * --------------------------------------------------------------------------*/
-static int prox_step(DAQPWorkspace* work, c_float* s_prev){
-    int i, k, ind, lower = 0, moved = 0, skipped = 0, first = 1;
+static int prox_step(DAQPWorkspace* work, c_float* s_prev, c_float eps, int projected){
+    int i, k, ind, lower = 0, moved = 0, skipped = 0, first = 1, n_projections = 0;
     c_float s;
     while((s = prox_curvature_step(work)) >= 0){
+        const int null_direction = s >= DAQP_INF;
         const c_float* d = work->xldl;
         if(first){ // Lagged (Barzilai-Borwein) step length
             const c_float s_exact = s;
@@ -318,6 +368,19 @@ static int prox_step(DAQPWorkspace* work, c_float* s_prev){
             first = 0;
         }
         ind = prox_blocking_constraint(work,&s,&lower);
+        // Roundoff in a projected direction is amplified by a long step.
+        // Keep the inner iterate if the step would leave the active face.
+        if(projected && s > 0 && s < DAQP_INF){
+            for(i = 0; i < work->n_active; i++){
+                const int id = work->WS[i];
+                c_float ad = 0;
+                if(id < work->ms) ad = d[id];
+                else for(k = 0; k < work->n; k++)
+                    ad += work->qp->A[(size_t)(id-work->ms)*work->n+k]*d[k];
+                if(fabs(s*ad) > work->settings->primal_tol) break;
+            }
+            if(i < work->n_active) break;
+        }
         if(ind == DAQP_EMPTY_IND){
             if(s < DAQP_INF){ // The minimizer along d
                 for(k = 0; k < work->n; k++) work->x[k] += s*d[k];
@@ -335,7 +398,17 @@ static int prox_step(DAQPWorkspace* work, c_float* s_prev){
         if(lower) DAQP_SET_LOWER(ind);
         else DAQP_SET_UPPER(ind);
         daqp_add_constraint(work, ind, lower ? -1.0 : 1.0);
-        if(work->sing_ind == DAQP_EMPTY_IND) break;
+        if(work->sing_ind == DAQP_EMPTY_IND){
+            // Along a null direction of H, continue on the new face
+            if(null_direction && work->settings->eps_prox < 0 &&
+                    work->nh >= DAQP_PROX_FACE_START &&
+                    n_projections++ < DAQP_PROX_FACE_STEPS &&
+                    prox_project_step(work,eps)){
+                projected = 1;
+                continue;
+            }
+            break;
+        }
         // Linearly dependent on the active constraints: set it aside
         work->sense[daqp_drop_singular_last(work)] |= DAQP_SET_ASIDE;
         skipped = 1;
