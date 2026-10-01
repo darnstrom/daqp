@@ -452,16 +452,21 @@ form_R:
                 ((regularize_all || work->n_prox > 0) && !force_prox ?
                  sqrt(zero_tol) : zero_tol)*max_pivot)) goto regularize_hessian;
 
-    // Keep poorly scaled factors on the full inverse/condition-check path.
+    // Defer the inverse unless cond(H) might be close to the limits for which
+    // daqp_finish_Rinv regularizes H: cond(H) >= (max R_ii/min R_ii)^2 (each
+    // pivot is between the extreme eigenvalues), with a margin for the bound
     if(defer_inverse){
         c_float dmin = DAQP_INF, dmax = 0;
+        const c_float eps_mach = sizeof(c_float) == sizeof(float) ? FLT_EPSILON : DBL_EPSILON;
         for(i = 0, disp = 0; i < n; disp += n-i, i++){
             c_float d = work->Rinv[disp];
             if(d < dmin) dmin = d;
             if(d > dmax) dmax = d;
         }
-        if(isfinite(dmin) && isfinite(dmax) && dmin > 0 &&
-                dmin*dmin > sqrt(zero_tol)*dmax*dmax){
+        const c_float cond = DAQP_COND_DEFER_MARGIN*(dmax*dmax)/(dmin*dmin);
+        if(isfinite(dmin) && isfinite(dmax) && dmin > 0 && isfinite(cond) &&
+                n*eps_mach*cond <= DAQP_HESSIAN_COND_EPS &&
+                !(work->eq != NULL && work->eq->installed && cond > DAQP_HESSIAN_COND_MAX)){
             work->state |= DAQP_STATE_CHOLESKY_PENDING;
             return 1;
         }

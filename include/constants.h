@@ -63,6 +63,9 @@ extern "C" {
 // and any Hessian if n*eps*cond > DAQP_HESSIAN_COND_EPS
 #define DAQP_HESSIAN_COND_MAX 1e8
 #define DAQP_HESSIAN_COND_EPS 0.1
+// The inverse of the Cholesky factor is deferred if the bound of cond(H) from
+// its diagonal, times DAQP_COND_DEFER_MARGIN, is below the limits above
+#define DAQP_COND_DEFER_MARGIN 100
 
 // How the reduced problem of an equality elimination is posed
 #define DAQP_EQ_PATH_LDP 0 // Identity Hessian, no linear term (H PD on the null space)
@@ -73,7 +76,7 @@ extern "C" {
 // (neq > EQ_MIN_COUNT and EQ_MIN_RATIO*neq > n)
 #define DAQP_EQ_MIN_COUNT 5
 #define DAQP_EQ_MIN_RATIO 10
-#define DAQP_EQ_MIN_DIM 20
+#define DAQP_EQ_MIN_DIM 12
 // Diagonal Hessians require at least n/DAQP_EQ_DIAG_MIN_RATIO equalities
 #define DAQP_EQ_DIAG_MIN_RATIO 4
 

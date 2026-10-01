@@ -191,6 +191,36 @@ int main() {
         }
     }
 
+    // Soft constraints do not keep AUTO from reducing (they are never
+    // eliminated). Explicit soft weights are in the units of the constraints,
+    // so the solution is the same with and without the reduction
+    {
+        std::vector<c_float> sol[2];
+        for (int policy : {DAQP_EQ_REDUCTION_AUTO, DAQP_EQ_REDUCTION_OFF}) {
+            SizedProblem p(60, 30, 20, false);
+            const int soft = p.neq; // x[30] >= 2, violated since f pulls x[30] down
+            p.bl[soft] = 2.0;
+            p.sense[soft] = DAQP_SOFT;
+            p.f[30] = 10.0;
+            const bool reduced = setup_reduces(p, policy, work);
+            assert(reduced == (policy == DAQP_EQ_REDUCTION_AUTO));
+            std::vector<c_float> rho(p.m, 0.0), w(p.m, 0.0);
+            rho[soft] = 0.5;
+            w[soft] = 1.0;
+            assert(daqp_set_soft_weights(&work, rho.data(), nullptr, w.data(), nullptr));
+            std::vector<c_float> xs(p.n), lams(p.m);
+            DAQPResult res{};
+            res.x = xs.data();
+            res.lam = lams.data();
+            daqp_solve(&res, &work);
+            assert(res.exitflag == DAQP_EXIT_SOFT_OPTIMAL);
+            assert(xs[30] < 2.0 - 1e-3); // Violated
+            sol[policy == DAQP_EQ_REDUCTION_OFF] = xs;
+            cleanup(work);
+        }
+        for (int j = 0; j < 60; ++j) assert(std::abs(sol[0][j] - sol[1][j]) < 1e-8);
+    }
+
     // A singular Hessian is reduced as well (the proximal method then works
     // in the reduced space if the reduced Hessian is still singular)
     TestProblem singular(true, true);

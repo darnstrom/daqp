@@ -367,6 +367,7 @@ static int eq_is_diagonal(const DAQPProblem* qp, const c_float zero_tol){
 static int eq_is_worthwhile(const DAQPWorkspace* work, const DAQPProblem* qp, const int n_eq){
     const int n = qp->n;
     const int n_ineq = qp->m-qp->ms-n_eq;
+    if(n_eq >= n) return 1;
     if(n < DAQP_EQ_MIN_DIM || n_eq <= DAQP_EQ_MIN_COUNT ||
             DAQP_EQ_MIN_RATIO*n_eq <= n) return 0;
     if(eq_is_diagonal(qp,work->settings->zero_tol) &&
@@ -375,7 +376,7 @@ static int eq_is_worthwhile(const DAQPWorkspace* work, const DAQPProblem* qp, co
 }
 
 int daqp_eq_wanted(const DAQPWorkspace* work, const DAQPProblem* qp, const int mask){
-    int i, n_eq;
+    int n_eq;
     const int policy = work->settings->eq_reduction;
     if(policy == DAQP_EQ_REDUCTION_OFF) return 0;
     if(policy != DAQP_EQ_REDUCTION_ON && !(mask&DAQP_UPDATE_eliminate)) return 0;
