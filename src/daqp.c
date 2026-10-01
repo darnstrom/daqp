@@ -79,6 +79,12 @@ int daqp_ldp(DAQPWorkspace *work){
                     }
 
 
+                    // Check for incosistent dual
+                    if(daqp_inconsistent_dual(work)){
+                        exitflag = DAQP_EXIT_INFEASIBLE;
+                        break;
+                    }
+
                     // Softening was needed if a soft constraint ended up violated
                     work->soft_slack = daqp_max_soft_slack(work);
                     if(work->soft_slack > work->settings->primal_tol)

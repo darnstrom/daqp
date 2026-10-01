@@ -487,6 +487,21 @@ void daqp_compute_singular_direction(DAQPWorkspace *work){
 }
 
 
+// Whether -d_W'lam exceeds fval = ||u||^2 (its value at a solution) by more
+// than fval and the active residuals allowed by primal_tol
+int daqp_inconsistent_dual(DAQPWorkspace *work){
+    int i, id;
+    c_float dl = 0, tol = 0, l;
+    for(i = 0; i < work->n_active; i++){
+        id = work->WS[i];
+        if(DAQP_IS_SOFT(id)) return 0;
+        l = work->lam_star[i];
+        dl += l*(DAQP_IS_LOWER(id) ? work->dlower[id] : work->dupper[id]);
+        tol += (l < 0 ? -l : l)*(work->scaling != NULL ? work->scaling[id] : 1);
+    }
+    return -dl > 2*work->fval + work->settings->primal_tol*tol;
+}
+
 void daqp_pivot_last(DAQPWorkspace *work){
     const int rm_ind = work->n_active-2;
     if(work->n_active > 1 && work->sing_ind == DAQP_EMPTY_IND &&

@@ -27,6 +27,7 @@ void daqp_solve_working_set(DAQPWorkspace *work);
 void daqp_sub_working_set_rows(DAQPWorkspace *work, const c_float* dlam, c_float* y);
 void daqp_apply_Rinv(DAQPWorkspace *work, c_float* y);
 void daqp_compute_singular_direction(DAQPWorkspace *work);
+int daqp_inconsistent_dual(DAQPWorkspace *work);
 
 void daqp_pivot_last(DAQPWorkspace *work);
 
