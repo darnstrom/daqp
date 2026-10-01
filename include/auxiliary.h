@@ -15,6 +15,8 @@ void daqp_compute_primal_and_fval(DAQPWorkspace *work);
 // slack among them (in the units of the original problem)
 c_float daqp_soft_slack(DAQPWorkspace *work, const int i);
 c_float daqp_max_soft_slack(DAQPWorkspace *work);
+int daqp_set_noise_floor(DAQPWorkspace *work);
+c_float daqp_noise_floor(DAQPWorkspace *work);
 void daqp_compute_Mu(DAQPWorkspace *work);
 int daqp_add_infeasible(DAQPWorkspace *work);
 int daqp_remove_blocking(DAQPWorkspace *work);

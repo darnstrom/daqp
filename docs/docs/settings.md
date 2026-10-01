@@ -42,6 +42,7 @@ Table of contents
 
 |Value|Status |
 |:-:|:-------|
+|4|Optimal (inexact)|
 |2|Soft optimal|
 |1|Optimal |
 |-1|Infeasible|
