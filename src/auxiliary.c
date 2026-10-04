@@ -160,6 +160,7 @@ static void daqp_add_constraint_keep_slack(DAQPWorkspace *work,
 }
 
 void daqp_add_constraint(DAQPWorkspace *work, const int add_ind, c_float lam){
+    work->sense[add_ind] &= ~DAQP_SLACK_SWITCHED;
     // Mark whether the slack is zero, given the multiplier
     if(DAQP_IS_SOFT(add_ind)){
         DAQP_SET_MUTABLE(add_ind);
@@ -199,9 +200,11 @@ void daqp_compute_primal_and_fval(DAQPWorkspace *work){
             for(j=0,disp=work->n*(id-work->ms);j<work->n;j++)
                 work->u[j]-=work->M[disp++]*li;
         }
-        if(DAQP_IS_SOFT(id))
+        if(DAQP_IS_SOFT(id)){
             fval += has_l1 ? daqp_soft_penalty(work,id,li)
                 : work->settings->rho_soft*li*li;
+            work->sense[id] &= ~DAQP_SLACK_SWITCHED;
+        }
     }
     for(j=0;j<work->n;j++)
         fval+=work->u[j]*work->u[j];
@@ -316,10 +319,25 @@ void daqp_compute_Mu(DAQPWorkspace *work){
     for(; row<rows; row++)
         work->Mu[row] = daqp_dot_inline(work->M+row*n,work->u,n);
 }
-/* Take the step lam <- lam + alpha*(lam_star-lam) (lam + alpha*lam_star if the
- * CSP is singular), stopping at the first multiplier that reaches zero, which
- * removes the constraint, or that passes w, which switches the state of its
- * slack. Returns 0 if the full step can be taken. */
+// Lower bound sum rho*p_i^2 (free soft slacks) on the dual curvature along the
+// singular direction p = lam_star; zero if the slacks only carry rounding
+static c_float daqp_soft_curvature(DAQPWorkspace *work){
+    int i;
+    c_float c = 0, ps = 0, pp = 0;
+    for(i = 0; i <= work->sing_ind; i++){
+        const int id = work->WS[i];
+        const c_float p2 = work->lam_star[i]*work->lam_star[i];
+        pp += p2;
+        if(DAQP_IS_SOFT(id) && DAQP_IS_SLACK_FREE(id)){
+            c += daqp_soft_rho(work,id)*p2;
+            ps += p2;
+        }
+    }
+    return ps > DAQP_SOFT_CURV_TOL*pp ? c : 0;
+}
+
+// Step lam toward lam_star (along lam_star if singular) until a multiplier
+// reaches zero (removal) or passes w (slack switch). Returns 0 if full step
 int daqp_remove_blocking(DAQPWorkspace *work){
     int i, ind, rm_ind = DAQP_EMPTY_IND;
     const int singular = work->sing_ind != DAQP_EMPTY_IND;
@@ -352,6 +370,10 @@ int daqp_remove_blocking(DAQPWorkspace *work){
                     continue;
                 target = w; // A zero slack is released
             }
+            // Switching back at w without a primal step is rounding
+            if(!singular && w > 0 && target == w && (work->sense[ind] & DAQP_SLACK_SWITCHED) &&
+                    (lower ? -work->lam[i] : work->lam[i]) == w)
+                continue;
         }
 
         y = lower ? -work->lam[i] : work->lam[i];
@@ -364,7 +386,18 @@ int daqp_remove_blocking(DAQPWorkspace *work){
             rm_target = target;
         }
     }
-    if(rm_ind == DAQP_EMPTY_IND) return 0; // Either dual feasible or primal infeasible
+    if(rm_ind == DAQP_EMPTY_IND){
+        if(singular){
+            const c_float c = daqp_soft_curvature(work);
+            if(c > 0){ // Blocked by the slacks
+                if(work->D[work->sing_ind] < c) work->D[work->sing_ind] = c;
+                if(work->reuse_ind > work->sing_ind) work->reuse_ind = work->sing_ind;
+                work->sing_ind = DAQP_EMPTY_IND;
+                return 1;
+            }
+        }
+        return 0; // Either dual feasible or primal infeasible
+    }
 
     // A zero-length transition cannot make progress when the CSP is singular:
     // the zero slack is what makes the working set rank deficient
@@ -382,6 +415,10 @@ int daqp_remove_blocking(DAQPWorkspace *work){
     ind = work->WS[rm_ind];
     if(rm_target == 0){ // The constraint leaves the working set
         daqp_remove_constraint(work,rm_ind);
+        // Earlier slack switches are now genuine
+        if(has_l1)
+            for(i = 0; i < work->n_active; i++)
+                work->sense[work->WS[i]] &= ~DAQP_SLACK_SWITCHED;
         return 1;
     }
 
@@ -390,6 +427,7 @@ int daqp_remove_blocking(DAQPWorkspace *work){
     const int release = DAQP_IS_SLACK_FIXED(ind);
     if(release) DAQP_SET_SLACK_FREE(ind);
     else DAQP_SET_SLACK_FIXED(ind);
+    work->sense[ind] |= DAQP_SLACK_SWITCHED;
 
     // Nothing in the factorization depends on the diagonal of the last row,
     // so a slack there can switch without forming its row of M*M' again

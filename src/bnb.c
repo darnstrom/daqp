@@ -44,6 +44,44 @@ static void daqp_bnb_load_ws(const int* ids, const int n_ids, DAQPWorkspace* wor
     }
 }
 
+// Add fixed binary id; a dependent one is left out: returns 1 if added, 0 if
+// consistent, and -1 if inconsistent (the node is infeasible)
+static int daqp_bnb_add_fixed(const int id, DAQPWorkspace* work){
+    int j;
+    c_float residual = 0, scale = 1, term;
+    const c_float tol = work->settings->primal_tol;
+    daqp_add_upper_lower(id,work);
+    if(work->sing_ind == DAQP_EMPTY_IND){
+        DAQP_SET_IMMUTABLE(DAQP_REMOVE_LOWER_FLAG(id));
+        return 1;
+    }
+    daqp_compute_singular_direction(work);
+    for(j = 0; j < work->n_active; j++){
+        const int k = work->WS[j];
+        term = work->lam_star[j]*(DAQP_IS_LOWER(k) ? work->dlower[k] : work->dupper[k]);
+        residual += term;
+        scale += term < 0 ? -term : term;
+    }
+    daqp_drop_singular_last(work);
+    return (residual > tol*scale || residual < -tol*scale) ? -1 : 0;
+}
+
+// Add the fixed binaries of node (n_clean falls back to neq if one is left
+// out). Returns -1 if the node is infeasible
+static int daqp_bnb_add_fixed_ids(DAQPNode* node, DAQPWorkspace* work){
+    int i, flag, dropped = 0;
+    for(i=work->bnb->n_clean - work->bnb->neq; i< node->depth+1;i++){
+        flag = daqp_bnb_add_fixed(work->bnb->fixed_ids[i],work);
+        if(flag < 0){
+            work->bnb->n_clean = work->bnb->neq;
+            return -1;
+        }
+        dropped |= flag == 0;
+    }
+    work->bnb->n_clean = dropped ? work->bnb->neq : work->bnb->neq+node->depth;
+    return 0;
+}
+
 // The immutable constraints (e.g., equalities) are kept fixed as a prefix of
 // the working set throughout the tree. Returns the length of that prefix.
 static int daqp_bnb_setup_root(DAQPWorkspace* work){
@@ -205,14 +243,15 @@ int daqp_process_node(DAQPNode* node, DAQPWorkspace* work){
         if(work->bnb->n_nodes==0 || (node-1)->depth!=node->depth){
             // Sibling has been processed => need to fix workspace state
             work->bnb->n_clean += (node->depth-(node+1)->depth);
+            if(work->bnb->n_clean < work->bnb->neq) work->bnb->n_clean = work->bnb->neq;
             daqp_node_cleanup_workspace(work->bnb->n_clean,work);
-            daqp_warmstart_node(node,work);
+            if(daqp_warmstart_node(node,work) < 0) return DAQP_EXIT_INFEASIBLE;
         }
         else{
             daqp_add_upper_lower(node->bin_id,work);
             work->sense[DAQP_REMOVE_LOWER_FLAG(node->bin_id)] |= DAQP_IMMUTABLE; //Equality
             if(work->sing_ind != DAQP_EMPTY_IND){ // Need to cold start to not miss integer feasible
-                daqp_setup_cold_bnb(node,work);
+                if(daqp_setup_cold_bnb(node,work) < 0) return DAQP_EXIT_INFEASIBLE;
             }
         }
         // Add binary constraint
@@ -225,7 +264,7 @@ int daqp_process_node(DAQPNode* node, DAQPWorkspace* work){
         // A cycle can be caused by stale cached forward-substitution data.
         // Force the retained fixed prefix to be recomputed during repair.
         work->reuse_ind=0;
-        daqp_setup_cold_bnb(node,work);
+        if(daqp_setup_cold_bnb(node,work) < 0) return DAQP_EXIT_INFEASIBLE;
         exitflag = daqp_ldp(work);
         work->bnb->itercount += work->iterations;
     }
@@ -293,17 +332,13 @@ void daqp_node_cleanup_workspace(int n_clean, DAQPWorkspace* work){
 }
 
 
-void daqp_warmstart_node(DAQPNode* node, DAQPWorkspace* work){
-    int i;
+int daqp_warmstart_node(DAQPNode* node, DAQPWorkspace* work){
     // Add fixed constraints
-    for(i=work->bnb->n_clean - work->bnb->neq; i< node->depth+1;i++){
-        daqp_add_upper_lower(work->bnb->fixed_ids[i],work);
-        DAQP_SET_IMMUTABLE(DAQP_REMOVE_LOWER_FLAG(work->bnb->fixed_ids[i]));
-    }
-    work->bnb->n_clean = work->bnb->neq+node->depth;
+    if(daqp_bnb_add_fixed_ids(node,work) < 0) return -1;
     // Add free constraints
     daqp_bnb_load_ws(work->bnb->tree_WS+node->WS_start,node->WS_end-node->WS_start,work);
     work->bnb->nWS = node->WS_start; // always move up tree after warmstart
+    return 0;
 }
 
 void daqp_save_warmstart(DAQPNode* node, DAQPWorkspace* work){
@@ -326,12 +361,7 @@ int daqp_add_upper_lower(const int add_id, DAQPWorkspace* work){
     return 1;
 }
 
-void daqp_setup_cold_bnb(DAQPNode* node,DAQPWorkspace *work){
-    int i;
+int daqp_setup_cold_bnb(DAQPNode* node,DAQPWorkspace *work){
     daqp_node_cleanup_workspace(work->bnb->n_clean,work);
-    for(i=work->bnb->n_clean - work->bnb->neq; i< node->depth+1;i++){
-        daqp_add_upper_lower(work->bnb->fixed_ids[i],work);
-        DAQP_SET_IMMUTABLE(DAQP_REMOVE_LOWER_FLAG(work->bnb->fixed_ids[i]));
-    }
-    work->bnb->n_clean = work->bnb->neq+node->depth;
+    return daqp_bnb_add_fixed_ids(node,work);
 }

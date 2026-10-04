@@ -49,7 +49,12 @@ void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind, const c_float r
 
     work->D[work->n_active] = sum;
 
-    if(work->n_active==0) return;
+    if(work->n_active==0){
+        // A zero row is singular alone
+        if(sum < work->settings->sing_tol || work->n + ns_active <= 0)
+            work->sing_ind = 0;
+        return;
+    }
 
     // store l <-- Mk* m
     for(i=0;i<work->n_active;i++){
