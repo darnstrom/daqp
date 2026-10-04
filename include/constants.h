@@ -31,6 +31,8 @@ extern "C" {
 #define DAQP_DEFAULT_REL_SUBOPT 0
 #define DAQP_DEFAULT_ABS_SUBOPT 0
 #define DAQP_DEFAULT_SING_TOL (3.7e-11)
+// Weight of free soft slacks in a singular direction that is not rounding
+#define DAQP_SOFT_CURV_TOL 1.5e-8
 #define DAQP_DEFAULT_REFACTOR_TOL 1e-9
 #define DAQP_DEFAULT_EPS_PROX (-1e-6)
 
@@ -172,6 +174,9 @@ extern "C" {
 
 // Internal marker: ACTIVE and IMMUTABLE were set by bound equality detection.
 #define DAQP_AUTO_EQUALITY 128
+
+// Internal marker: soft slack switched at w, no primal step since
+#define DAQP_SLACK_SWITCHED 256
 
 # ifdef __cplusplus
 }

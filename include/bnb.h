@@ -15,10 +15,10 @@ int daqp_get_branch_id(DAQPWorkspace* work);
 void daqp_spawn_children(DAQPNode* node, const int branch_id, DAQPWorkspace* work);
 
 void daqp_node_cleanup_workspace(int n_clean, DAQPWorkspace* work);
-void daqp_warmstart_node(DAQPNode* node, DAQPWorkspace* work);
+int daqp_warmstart_node(DAQPNode* node, DAQPWorkspace* work);
 void daqp_save_warmstart(DAQPNode* node, DAQPWorkspace* work);
 int daqp_add_upper_lower(const int add_id, DAQPWorkspace* work);
-void daqp_setup_cold_bnb(DAQPNode* node, DAQPWorkspace* work);
+int daqp_setup_cold_bnb(DAQPNode* node, DAQPWorkspace* work);
 
 #define DAQP_LOWER_BIT 16
 #define DAQP_EXTRACT_LOWER_FLAG(x) (x>>(DAQP_LOWER_BIT-1))
