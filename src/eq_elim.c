@@ -416,8 +416,10 @@ static void eq_free_reduced_ldp(DAQPEqElim* eq){
     eq->rho_r = NULL;
 }
 
-// Storage of the LDP of the reduced problem (which has no simple bounds)
-static void eq_allocate_reduced_ldp(DAQPEqElim* eq, const int nb){
+// Storage of the LDP of the reduced problem (which has no simple bounds). Room
+// is made for every reduced constraint to be binary, since an update of the
+// senses can make constraints binary without forming the reduction anew.
+static void eq_allocate_reduced_ldp(DAQPEqElim* eq){
     DAQPLDPData* d = &eq->other;
     const int nz = eq->nz, mr = eq->mr;
     eq_free_reduced_ldp(eq);
@@ -431,7 +433,7 @@ static void eq_allocate_reduced_ldp(DAQPEqElim* eq, const int nb){
     d->sense = malloc(mr*sizeof(int));
     d->Rinv = (eq->qp.H != NULL) ? malloc(((size_t)nz*(nz+1)/2)*sizeof(c_float)) : NULL;
     d->v = (eq->qp.f != NULL) ? malloc(nz*sizeof(c_float)) : NULL;
-    d->bin_ids = (nb > 0) ? malloc(nb*sizeof(int)) : NULL;
+    d->bin_ids = malloc(mr*sizeof(int));
 }
 
 static void eq_free_rhs_cache(DAQPEqElim* eq){
@@ -610,7 +612,7 @@ static int eq_build_reduction(DAQPWorkspace* work, DAQPProblem* qp){
     DAQPEqElim* eq = work->eq;
     const int n = qp->n, m = qp->m, ms = qp->ms;
     const c_float zero_tol = work->settings->zero_tol;
-    int i, j, k, c, neq, nz, mI = 0, mtot, mr, nb = 0;
+    int i, j, k, c, neq, nz, mI = 0, mtot, mr;
     int use_twoside = 0, use_refl = 0, symmetric = 1, split = 0, nc = 0;
     int *gen_ids, *cid = NULL;
     c_float* L = NULL;
@@ -677,7 +679,7 @@ static int eq_build_reduction(DAQPWorkspace* work, DAQPProblem* qp){
         eq->qp.sense = eq->sr;
         eq->qp.nh = 1;
         eq->qp.problem_type = qp->problem_type;
-        eq_allocate_reduced_ldp(eq,0);
+        eq_allocate_reduced_ldp(eq);
         return 1;
     }
 
@@ -827,10 +829,7 @@ form_W:
     }
     eq->mr = mr;
     free(gen_ids);
-    for(c = 0; c < mr; c++){
-        eq->sr[c] = work->sense[eq->keep[c]];
-        if(eq->sr[c] & DAQP_BINARY) nb++;
-    }
+    for(c = 0; c < mr; c++) eq->sr[c] = work->sense[eq->keep[c]];
 
     // The reduced problem
     memset(&eq->qp,0,sizeof(DAQPProblem));
@@ -844,7 +843,7 @@ form_W:
     eq->qp.nh = 1;
     eq->qp.problem_type = qp->problem_type;
 
-    eq_allocate_reduced_ldp(eq,nb);
+    eq_allocate_reduced_ldp(eq);
     return 1;
 }
 

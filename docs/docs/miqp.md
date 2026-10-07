@@ -77,3 +77,7 @@ x, fval, exitflag, info = daqp.solve(H, f, A, bupper, blower, sense)
 ```
 
 The `info` struct contains a `nodes` field with the number of branch-and-bound nodes explored.
+
+The binary constraints follow the senses of the problem: an update of the senses (`DAQP_UPDATE_sense` in C,
+or the `sense` argument of `update` in Julia) can relax binary constraints, by clearing `DAQP_BINARY`, or
+make constraints binary, without setting up the problem anew.

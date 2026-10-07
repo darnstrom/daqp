@@ -340,6 +340,10 @@ void write_daqp_bnb_src(FILE*  f, DAQPBnB* bnb, const int n, const char* prefix)
     fprintf(f, "(int)%d, ", 0); // nodecount
     fprintf(f, "(int)%d, ", 0); // itercount
 
+    fprintf(f, "NULL, "); // root_WS
+    fprintf(f, "(int)%d, ", 0); // n_root_WS
+    fprintf(f, "(int)%d, ", bnb->nb); // nb_alloc (the static arrays above)
+
     fprintf(f, "};\n\n");
 }
 
