@@ -42,7 +42,7 @@ Table of contents
 
 |Value|Status |
 |:-:|:-------|
-|5|Feasible, optimality not proven (branch and bound terminated early, e.g., at the time limit)|
+|5|Feasible (e.g., BnB terminated early)|
 |4|Optimal (inexact)|
 |2|Soft optimal|
 |1|Optimal |
