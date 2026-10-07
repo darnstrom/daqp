@@ -815,8 +815,28 @@ end
     but = vcat(ones(nbt), fill(2.0, nt - nbt), center + width)
     blt = vcat(zeros(nbt), fill(-2.0, nt - nbt), center - width)
     st = vcat(fill(Cint(DAQPBase.BINARY), nbt), zeros(Cint, nt - nbt + mt))
+    _, fopt, exitflag, _ = quadprog(Ht, ft, At, but, blt, st)
+    @test exitflag == DAQPBase.OPTIMAL
     s = settings(DAQPBase.Model(), Dict(:time_limit => 1e-9))
-    _, _, exitflag, info = quadprog(Ht, ft, At, but, blt, st; settings=s)
+    x, fval, exitflag, info = quadprog(Ht, ft, At, but, blt, st; settings=s)
+    # An integer-feasible solution has been found before the limit, and the
+    # best one is returned
+    @test exitflag == DAQPBase.TIMELIMIT_FEASIBLE
+    @test info.status == :Time_Limit_Feasible
+    @test info.nodes <= 32
+    @test all(min.(abs.(x[1:nbt]), abs.(x[1:nbt] .- 1)) .< 1e-6)
+    @test all(blt[1:nt] .- 1e-6 .<= x .<= but[1:nt] .+ 1e-6)
+    @test all(blt[nt+1:end] .- 1e-6 .<= At * x .<= but[nt+1:end] .+ 1e-6)
+    @test abs(fval - (0.5 * dot(x, Ht, x) + dot(ft, x))) < 1e-6
+    @test fval >= fopt - 1e-6
+
+    # Without an integer-feasible solution at the limit, TIMELIMIT is returned
+    # (every binary variable is fractional at the root, and the first leaf of
+    # the tree is at depth nn)
+    nn = 40
+    _, _, exitflag, info = quadprog(Matrix(1.0I, nn, nn), fill(-0.5, nn), ones(1, nn),
+        vcat(ones(nn), 0.4nn), vcat(zeros(nn), -1e30),
+        vcat(fill(Cint(DAQPBase.BINARY), nn), Cint[0]); settings=s)
     @test exitflag == DAQPBase.TIMELIMIT
     @test info.nodes <= 32
 end
