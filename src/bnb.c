@@ -240,7 +240,8 @@ int daqp_bnb(DAQPWorkspace* work){
         work->settings->fval_bound = fval_bound0;
         // Let work->u point to the best feasible solution
         swp_ptr=work->u; work->u= work->xold; work->xold=swp_ptr;
-        return exitflag < DAQP_EXIT_INFEASIBLE ? exitflag : DAQP_EXIT_OPTIMAL;
+        // Exploration ended early (time/iteration limit, cycling) => not proven optimal
+        return exitflag < DAQP_EXIT_INFEASIBLE ? DAQP_EXIT_FEASIBLE : DAQP_EXIT_OPTIMAL;
     }
 }
 

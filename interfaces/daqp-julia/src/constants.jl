@@ -27,6 +27,7 @@ const DAQP_EQ_REDUCTION_AUTO = 0
 const DAQP_EQ_REDUCTION_ON = 1
 
 # Exit Flags
+const  FEASIBLE       = 5
 const  OPTIMAL_INEXACT   = 4
 const  CONSTRAINED_POINT   = 3
 const  SOFT_OPTIMAL   =  2
@@ -40,7 +41,8 @@ const  OVERDETERMINED = -6
 const  TIMELIMIT      = -7
 const  UNSUPPORTED    = -8
 
-const flag2status= Dict{Int,Symbol}(4 => :Optimal_Inexact,
+const flag2status= Dict{Int,Symbol}(5 => :Feasible,
+                                    4 => :Optimal_Inexact,
                                     3 => :Constrained_Point,
                                     2 => :Soft_Optimal,
                                     1 => :Optimal,
