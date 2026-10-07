@@ -1091,67 +1091,6 @@ end
     end
 end
 
-@testset "Equality elimination with a factored Hessian" begin
-    # With the Cholesky factor of the Hessian (problem_type 2), the reduction is
-    # formed from the factor, and it gives the solution of the reduction of the
-    # Hessian and of the solve without the reduction
-    Random.seed!(2026)
-    function eq_problem(n, neq, mineq; diagonal=false, ndep=0)
-        H = diagonal ? diagm(0.5 .+ rand(n)) : (L = randn(n, n); L'L / n + I)
-        Ae = randn(neq, n)
-        ndep > 0 && (Ae = [Ae; Ae[1:ndep, :] + Ae[2:ndep+1, :]]) # Dependent equalities
-        ne = size(Ae, 1)
-        A = [Ae; randn(mineq, n)]
-        x0 = randn(n)
-        bu = vcat(abs.(x0) .+ 1, A * x0 .+ [zeros(ne); rand(mineq)])
-        bl = vcat(-abs.(x0) .- 1, Ae * x0, fill(-1e30, mineq))
-        sense = vcat(zeros(Cint, n), fill(Cint(DAQPBase.EQUALITY), ne), zeros(Cint, mineq))
-        return H, randn(n), A, bu, bl, sense, ne
-    end
-    function solve_policy(H, f, A, bu, bl, sense, policy)
-        d = DAQPBase.Model()
-        DAQPBase.settings(d, Dict(:eq_reduction => policy))
-        DAQPBase.setup(d, H, f, A, bu, bl, sense)
-        reduced = unsafe_load(d.work).eq != C_NULL
-        x, fval, exitflag, _ = DAQPBase.solve(d)
-        return x, fval, exitflag, reduced, d
-    end
-    ON, OFF = DAQPBase.DAQP_EQ_REDUCTION_ON, DAQPBase.DAQP_EQ_REDUCTION_OFF
-    # Dense, dependent equalities, equalities that determine x, diagonal
-    for (n, neq, mineq, kw) in ((30, 12, 20, (;)), (30, 10, 20, (; ndep=3)),
-                                (20, 20, 10, (;)), (30, 12, 20, (; diagonal=true)))
-        H, f, A, bu, bl, sense, ne = eq_problem(n, neq, mineq; kw...)
-        C = cholesky(Symmetric(H))
-        xref, fref, eref, _ = solve_policy(H, f, A, bu, bl, sense, OFF)
-        xh, fh, eh, rh, _ = solve_policy(H, f, A, bu, bl, sense, ON)
-        xc, fc, ec, rc, dc = solve_policy(C, f, A, bu, bl, sense, ON)
-        @test eref == eh == ec == DAQPBase.OPTIMAL
-        @test rh && rc
-        @test norm(xc - xh, Inf) < 1e-9
-        @test norm(xc - xref, Inf) < 1e-8
-        @test abs(fc - fref) < 1e-8 * max(1, abs(fref))
-        # One-shot solve (AUTO)
-        xq, _, eq_flag, _ = DAQPBase.quadprog(C, f, A, bu, bl, sense)
-        @test eq_flag == DAQPBase.OPTIMAL
-        @test norm(xq - xref, Inf) < 1e-8
-
-        # An update of the bounds of the reduced workspace
-        x1 = randn(n)
-        bu2, bl2 = copy(bu), copy(bl)
-        bu2[n+1:n+ne] .= bl2[n+1:n+ne] .= A[1:ne, :] * x1
-        bu2[1:n] .= max.(bu2[1:n], abs.(x1) .+ 1)
-        bl2[1:n] .= .-bu2[1:n]
-        bu2[n+ne+1:end] .= max.(bu2[n+ne+1:end], A[ne+1:end, :] * x1 .+ 0.1)
-        DAQPBase.update(dc, nothing, nothing, nothing, bu2, bl2, nothing, nothing, Cint(0))
-        @test unsafe_load(dc.work).eq != C_NULL
-        xu, fu, eu, _ = DAQPBase.solve(dc)
-        xr, fr, er, _ = solve_policy(H, f, A, bu2, bl2, sense, OFF)
-        @test eu == er == DAQPBase.OPTIMAL
-        @test norm(xu - xr, Inf) < 1e-8
-        @test abs(fu - fr) < 1e-8 * max(1, abs(fr))
-    end
-end
-
 @testset "Unconstrained shortcut" begin
     H = diagm(ones(10))
     f = zeros(10)

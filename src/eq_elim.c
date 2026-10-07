@@ -41,9 +41,8 @@
  * DAQP_EQ_PATH_LP: For an LP, W = Z and the linear term is Z'f.
  *
  * A factored Hessian H = R'R (problem_type 2, R upper triangular and packed by
- * rows) is only used through R: L is formed by a QR factorization of RZ, which
- * forms neither H nor Z'HZ, and the identity of DAQP_EQ_PATH_LDP is passed as
- * a factor. Z'HZ is formed from L only for DAQP_EQ_PATH_QP.
+ * rows) is only used through R, with Z'HZ = (RZ)'(RZ). The reduced problem is
+ * then posed with an unfactored Hessian.
  *
  * Only the right-hand side (xp and the shifted bounds) depends on b and f, so
  * that an update of those does not redo the factorizations.
@@ -317,24 +316,11 @@ static c_float eq_dot(const c_float* a, const c_float* b, const int n){
 }
 
 // Y = R X for an upper triangular R (packed by rows) and cnt columns of length
-// n (column j at X+j*n), four columns per pass over R
-static DAQP_NOINLINE void eq_triu_times(const c_float* R, const int n, const c_float* X,
+// n (column j at X+j*n)
+static void eq_triu_times(const c_float* R, const int n, const c_float* X,
         const int cnt, c_float* Y){
-    int i, j, k;
-    for(j = 0; j+3 < cnt; j += 4){
-        const c_float *x0 = X+(size_t)j*n, *x1 = x0+n, *x2 = x1+n, *x3 = x2+n;
-        c_float *y0 = Y+(size_t)j*n, *y1 = y0+n, *y2 = y1+n, *y3 = y2+n;
-        for(i = 0; i < n; i++){
-            const c_float* Ri = R+DAQP_R_OFFSET(i,n);
-            c_float s0 = 0, s1 = 0, s2 = 0, s3 = 0;
-            for(k = i; k < n; k++){
-                const c_float r = Ri[k];
-                s0 += r*x0[k]; s1 += r*x1[k]; s2 += r*x2[k]; s3 += r*x3[k];
-            }
-            y0[i] = s0; y1[i] = s1; y2[i] = s2; y3[i] = s3;
-        }
-    }
-    for(; j < cnt; j++)
+    int i, j;
+    for(j = 0; j < cnt; j++)
         for(i = 0; i < n; i++)
             Y[(size_t)j*n+i] = eq_dot(R+DAQP_R_OFFSET(i,n)+i,X+(size_t)j*n+i,n-i);
 }
@@ -658,52 +644,6 @@ static DAQP_NOINLINE int eq_split_flat(const DAQPProblem* qp, c_float* Z, const 
 }
 
 /*
- * For a factored Hessian H = R'R: L with L L' = Z'HZ = (RZ)'(RZ), from the
- * Householder QR RZ = Q_Y L' (left-looking in panels of four columns, as in
- * eq_build_qr), with the diagonal of L made positive. This is the factor that
- * eq_chol forms from Z'HZ, without squaring the condition number. Returns 0 if
- * Z'HZ is not positive definite in the sense of eq_chol, whose pivots are the
- * squared diagonal entries of L (L is formed in full also then).
- */
-static DAQP_NOINLINE int eq_chol_factored(const DAQPProblem* qp, const c_float* Z,
-        const int nz, const c_float zero_tol, c_float* L){
-    const int n = qp->n;
-    c_float *Y = malloc((size_t)n*nz*sizeof(c_float)), *tau = malloc(nz*sizeof(c_float));
-    c_float min_pivot = DAQP_INF, max_pivot = 0;
-    int c, i, k, q;
-
-    eq_triu_times(qp->H,n,Z,nz,Y); // Column j of RZ at Y+j*n
-    for(c = 0; c < nz; c += 4){
-        const int cnt = (nz-c < 4) ? nz-c : 4;
-        eq_apply_QT_many(Y,tau,c,n,Y+(size_t)c*n,cnt,n);
-        for(k = c; k < c+cnt; k++){
-            c_float *col = Y+(size_t)k*n, alpha = 0, beta, d;
-            for(q = c; q < k; q++) eq_reflect(Y+(size_t)q*n,tau[q],q,n,col);
-            for(i = k; i < n; i++) alpha += col[i]*col[i];
-            if(alpha < min_pivot) min_pivot = alpha;
-            if(alpha > max_pivot) max_pivot = alpha;
-            alpha = sqrt(alpha);
-            if(alpha == 0){ tau[k] = 0; continue; } // col[k:] = 0 is kept
-            beta = (col[k] > 0) ? -alpha : alpha;
-            d = col[k]-beta;
-            tau[k] = -d/beta;
-            for(i = k+1; i < n; i++) col[i] /= d;
-            col[k] = beta;
-        }
-    }
-    // Row k of L is column k of the triangular factor, whose row i is negated
-    // if its diagonal entry is negative
-    for(k = 0; k < nz; k++){
-        const c_float* col = Y+(size_t)k*n;
-        c_float* Lk = L+(size_t)k*nz;
-        for(i = 0; i <= k; i++) Lk[i] = (Y[(size_t)i*n+i] < 0) ? -col[i] : col[i];
-        for(i = k+1; i < nz; i++) Lk[i] = 0;
-    }
-    free(Y); free(tau);
-    return min_pivot > zero_tol && min_pivot > zero_tol*max_pivot;
-}
-
-/*
  * Form the reduction of qp: the factorizations, the reduced constraints and the
  * storage of the reduced problem. Returns 0 if nothing can be eliminated, or if
  * a soft constraint would be left out: it only has to be consistent with the
@@ -780,7 +720,7 @@ static int eq_build_reduction(DAQPWorkspace* work, DAQPProblem* qp){
         memset(&eq->qp,0,sizeof(DAQPProblem));
         eq->qp.sense = eq->sr;
         eq->qp.nh = 1;
-        eq->qp.problem_type = qp->problem_type;
+        eq->qp.problem_type = factored ? 0 : qp->problem_type;
         eq_allocate_reduced_ldp(eq,0);
         return 1;
     }
@@ -821,19 +761,15 @@ static int eq_build_reduction(DAQPWorkspace* work, DAQPProblem* qp){
     free(eq->fr); eq->fr = NULL;
     if(qp->H == NULL) eq->path = DAQP_EQ_PATH_LP;
     else if(eq->metric) eq->path = DAQP_EQ_PATH_LDP;
-    else if(factored){
-        L = malloc((size_t)nz*nz*sizeof(c_float));
-        eq->path = DAQP_EQ_PATH_LDP;
-        if(!eq_chol_factored(qp,Z,nz,zero_tol,L)){
-            eq->Hr = malloc((size_t)nz*nz*sizeof(c_float));
-            eq_gemm_tn(nz,nz,nz,L,nz,L,nz,eq->Hr,nz,1); // Z'HZ = L L'
-            free(L); L = NULL;
-            eq->path = DAQP_EQ_PATH_QP;
-        }
-    }
     else{
         eq->Hr = malloc((size_t)nz*nz*sizeof(c_float));
-        if(split){
+        if(factored){
+            c_float* RZ = malloc((size_t)n*nz*sizeof(c_float)); // Column j = R z_j
+            eq_triu_times(qp->H,n,Z,nz,RZ);
+            eq_gemm_tn(n,nz,nz,RZ,n,RZ,n,eq->Hr,nz,1); // Z'HZ = (RZ)'(RZ)
+            free(RZ);
+        }
+        else if(split){
             eq_split_flat(qp,(c_float*)Z,n,nz,cid,nc,zero_tol,eq->Hr);
             use_refl = 0; // The rows (A Q)_2 refer to the unsplit Z
         }
@@ -873,30 +809,26 @@ form_W:
     if(L != NULL){
         eq_trsm_rows(L,nz,eq->W,n,nz);
         // Ill-conditioned Z'HZ => PATH_QP (where it is regularized). The squared
-        // column norms of W are the diagonal of (Z'HZ)^-1. A factored Hessian is
-        // not regularized (as in daqp_finish_Rinv), and its L is formed without
-        // squaring the condition number
+        // column norms of W are the diagonal of (Z'HZ)^-1
         const c_float eps_mach = sizeof(c_float) == sizeof(float) ? FLT_EPSILON : DBL_EPSILON;
         c_float wmax = 0, hmax = 0;
-        for(j = 0; j < nz && !factored; j++){
+        for(j = 0; j < nz; j++){
             c_float s2 = 0;
             for(i = 0; i < n; i++) s2 += eq->W[(size_t)i*nz+j]*eq->W[(size_t)i*nz+j];
             if(s2 > wmax) wmax = s2;
             if(eq->Hr[(size_t)j*nz+j] > hmax) hmax = eq->Hr[(size_t)j*nz+j];
         }
-        if(!factored && ((nc < n && wmax*hmax > DAQP_HESSIAN_COND_MAX) ||
-                nz*eps_mach*wmax*hmax > DAQP_HESSIAN_COND_EPS)){
+        if((nc < n && wmax*hmax > DAQP_HESSIAN_COND_MAX) ||
+                nz*eps_mach*wmax*hmax > DAQP_HESSIAN_COND_EPS){
             free(L); L = NULL;
             eq->path = DAQP_EQ_PATH_QP;
             goto form_W;
         }
     }
     if(eq->path == DAQP_EQ_PATH_LDP){
-        // The identity (a factor packed by rows if the Hessian is factored)
         if(eq->Hr == NULL) eq->Hr = calloc((size_t)nz*nz,sizeof(c_float));
         else for(i = 0; i < nz*nz; i++) eq->Hr[i] = 0;
-        for(i = 0; i < nz; i++)
-            eq->Hr[factored ? (size_t)DAQP_R_OFFSET(i,nz)+i : (size_t)i*nz+i] = 1;
+        for(i = 0; i < nz; i++) eq->Hr[(size_t)i*nz+i] = 1;
     }
     else eq->fr = malloc(nz*sizeof(c_float));
 
@@ -960,8 +892,7 @@ form_W:
     eq->qp.blower = eq->blr;
     eq->qp.sense = eq->sr;
     eq->qp.nh = 1;
-    // Z'HZ of a factored Hessian is not factored in PATH_QP
-    eq->qp.problem_type = (factored && eq->path == DAQP_EQ_PATH_QP) ? 0 : qp->problem_type;
+    eq->qp.problem_type = factored ? 0 : qp->problem_type; // Z'HZ is not factored
 
     eq_allocate_reduced_ldp(eq,nb);
     return 1;
