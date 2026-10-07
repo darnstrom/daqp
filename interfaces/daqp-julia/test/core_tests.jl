@@ -312,6 +312,48 @@ end
     end
 end
 
+@testset "BnB binary constraints relaxed and restored by updates" begin
+    # The first nbu variables can be binary, sum(x[1:nbu]) <= 2.6 makes
+    # branching necessary, and two equality constraints allow equality reduction
+    nu, nbu = 12, 6
+    Hu = Matrix(1.0I, nu, nu) .+ 0.3
+    fu = -Hu * [fill(0.5, nbu); fill(0.2, nu - nbu)]
+    Au = zeros(3, nu); Au[1, 1:nbu] .= 1
+    Au[2, 7] = 1; Au[2, 8] = -1; Au[3, 9] = 1; Au[3, 10] = 1
+    buu = [ones(nbu); fill(2.0, nu - nbu); 2.6; 0; 0.1]
+    blu = [zeros(nbu); fill(-2.0, nu - nbu); -1e30; 0; 0.1]
+    # Binary constraints on the variables first:nbu
+    sense_from(first) = Cint[[i >= first ? DAQPBase.BINARY : 0 for i in 1:nbu];
+                             zeros(Cint, nu - nbu + 1); DAQPBase.EQUALITY; DAQPBase.EQUALITY]
+    dist(x) = min.(abs.(x), abs.(x .- 1))
+    for eq_reduction in (DAQPBase.DAQP_EQ_REDUCTION_OFF, DAQPBase.DAQP_EQ_REDUCTION_ON)
+        s = Dict{Symbol,Any}(:eq_reduction => Cint(eq_reduction))
+        function setup_model(sense)
+            d = DAQPBase.Model()
+            DAQPBase.settings(d, s)
+            DAQPBase.setup(d, Hu, fu, Au, buu, blu, sense)
+            return d
+        end
+        d = setup_model(sense_from(1))
+        nodes = Int[]
+        # Relax two binary constraints, relax all, and restore them
+        for first in (1, 3, nbu + 1, 1)
+            sense = sense_from(first)
+            DAQPBase.update(d, nothing, nothing, nothing, nothing, nothing, sense)
+            x, _, exitflag, info = DAQPBase.solve(d)
+            xr, _, exitflagr, infor = DAQPBase.solve(setup_model(sense))
+            @test exitflag == exitflagr == DAQPBase.OPTIMAL
+            @test info.nodes == infor.nodes
+            @test norm(x - xr) < 1e-8
+            @test all(dist(x[first:nbu]) .< 1e-8)
+            first > 1 && @test maximum(dist(x[1:first-1])) > 1e-3
+            push!(nodes, info.nodes)
+        end
+        @test nodes[1] > nodes[2] > nodes[3] == 1
+        @test nodes[4] == nodes[1]
+    end
+end
+
 @testset "BnB root warm start" begin
     Random.seed!(4321)
     H,f,A,bu,bl,sense = generate_test_MIQP(20,60,20,10)

@@ -35,6 +35,7 @@ int setup_daqp_main(DAQPProblem *qp, DAQPWorkspace* work, c_float* setup_time, i
 int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem* qp, const int init_mask);
 void setup_daqp_hiqp(DAQPWorkspace *work, int* break_points, int nh);
 int setup_daqp_bnb(DAQPWorkspace* work, int* sense, int nb, int ns);
+int daqp_update_bnb(DAQPWorkspace* work, const int m);
 int setup_daqp_avi(DAQPAVI* avi, DAQPProblem* p, DAQPWorkspace* work, c_float* setup_time);
 
 void allocate_daqp_settings(DAQPWorkspace *work);

@@ -105,6 +105,8 @@ typedef struct{
 
     int* root_WS; // Working set of the latest root relaxation (warm starts the next solve)
     int n_root_WS;
+
+    int nb_alloc; // Number of binary constraints that bin_ids, tree, fixed_ids and tree_WS have room for
 }DAQPBnB;
 
 typedef struct{

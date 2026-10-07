@@ -263,7 +263,33 @@ int setup_daqp_bnb(DAQPWorkspace* work, int* sense, int nb, int ns){
         work->bnb->fixed_ids= malloc((nb+1)*sizeof(int));
         work->bnb->root_WS= malloc((work->n+ns+1)*sizeof(int));
         work->bnb->n_root_WS= 0;
+        work->bnb->nb_alloc = nb;
     }
+    return 1;
+}
+
+// Form the binary constraints of branch and bound from the senses of the m
+// constraints of the (original) problem, so that an update of the senses can
+// relax binary constraints or make constraints binary. The storage of the tree
+// is enlarged if there are more binary constraints than it has room for.
+int daqp_update_bnb(DAQPWorkspace* work, const int m){
+    int i, nb = 0, ns = 0;
+    DAQPBnB* bnb = work->bnb;
+    for(i = 0; i < m; i++){
+        if(work->sense[i] & DAQP_BINARY) nb++;
+        if(work->sense[i] & DAQP_SOFT) ns++;
+    }
+    if(bnb == NULL) return setup_daqp_bnb(work, work->sense, nb, ns);
+    if(nb > work->n) return DAQP_EXIT_OVERDETERMINED_INITIAL;
+    if(nb > bnb->nb_alloc){
+        bnb->bin_ids = realloc(bnb->bin_ids, nb*sizeof(int));
+        bnb->tree = realloc(bnb->tree, (nb+1)*sizeof(DAQPNode));
+        bnb->tree_WS = realloc(bnb->tree_WS, (work->n+ns+1)*(nb+1)*sizeof(int));
+        bnb->fixed_ids = realloc(bnb->fixed_ids, (nb+1)*sizeof(int));
+        bnb->nb_alloc = nb;
+    }
+    for(i = 0, bnb->nb = 0; i < m; i++)
+        if(work->sense[i] & DAQP_BINARY) bnb->bin_ids[bnb->nb++] = i;
     return 1;
 }
 

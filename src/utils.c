@@ -1,5 +1,6 @@
 #include "daqp.h"
 #include "utils.h"
+#include "api.h"
 #include <math.h>
 #include <float.h>
 #include <stdio.h>
@@ -292,6 +293,8 @@ int daqp_update_ldp(int mask, DAQPWorkspace *work, DAQPProblem* qp){
         if(qp->sense == NULL) for(i = 0; i < qp->m; i++) work->sense[i] = 0;
         else for(i = 0; i < qp->m; i++) work->sense[i] = qp->sense[i];
     }
+    // The binary constraints of branch and bound follow the senses
+    if(mask&DAQP_UPDATE_sense && (flag = daqp_update_bnb(work,qp->m)) < 0) return flag;
     if(daqp_eq_wanted(work,qp,mask)){
         flag = daqp_eq_update(work,qp,mask,daqp_update_ldp_core);
         if(flag != DAQP_EQ_NOT_REDUCED){
