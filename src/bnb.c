@@ -140,7 +140,7 @@ static c_float daqp_bnb_incumbent(DAQPWorkspace* work){
 }
 
 int daqp_bnb(DAQPWorkspace* work){
-    int branch_id, exitflag;
+    int branch_id, exitflag, cutoff = 0;
     DAQPNode* node;
     c_float *swp_ptr = NULL;
 
@@ -199,7 +199,11 @@ int daqp_bnb(DAQPWorkspace* work){
         }
 #endif
         // Cut conditions
-        if(exitflag==DAQP_EXIT_INFEASIBLE) continue; // Dominance cut
+        if(exitflag==DAQP_EXIT_INFEASIBLE){ // Dominance cut
+            // The node was pruned by the objective bound (not proven infeasible)
+            if(work->fval > 2*work->settings->fval_bound) cutoff = 1;
+            continue;
+        }
         if(exitflag<0) break; // Inner solver failed => exit loop
 
         // Find index to branch over
@@ -221,7 +225,9 @@ int daqp_bnb(DAQPWorkspace* work){
     work->bnb->n_clean = work->bnb->neq;
     if(swp_ptr==NULL){
         work->settings->fval_bound = fval_bound0;
-        return exitflag < 0 ? exitflag : DAQP_EXIT_INFEASIBLE;
+        if(exitflag < DAQP_EXIT_INFEASIBLE) return exitflag;
+        // Without an incumbent, only the user-provided fval_bound can prune a node
+        return cutoff ? DAQP_EXIT_CUTOFF : DAQP_EXIT_INFEASIBLE;
     }
     else{
         // Invert fval_bound = (0.5*fval_best - abs_subopt)*eps_r to recover fval_best

@@ -108,6 +108,10 @@ extern "C" {
 #define DAQP_EXIT_OVERDETERMINED_INITIAL -6
 #define DAQP_EXIT_TIMELIMIT -7
 #define DAQP_EXIT_UNSUPPORTED -8
+// Branch and bound found no integer-feasible solution with an objective below
+// fval_bound, and nodes were pruned by fval_bound (the problem is not proven
+// to be infeasible)
+#define DAQP_EXIT_CUTOFF -9
 
 // UPDATE LDP MASKS
 #define DAQP_UPDATE_Rinv 1
