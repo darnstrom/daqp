@@ -166,7 +166,7 @@ function solve(ws::AVIWorkspace)
         ldiv!(ws.x, ws.H2pI, ws.xtemp)
         k == ws.settings.iter_limit && (exitflag = -4)
     end
-    info = (status=flag2status[exitflag], AS=ASstar, outer_iterations=outer_iter, iterations=tot_iter, nkkt=nkkt)
+    info = (status=get(flag2status, exitflag, :Unknown), AS=ASstar, outer_iterations=outer_iter, iterations=tot_iter, nkkt=nkkt)
     return ws.x,λstar,exitflag,info
 end
 

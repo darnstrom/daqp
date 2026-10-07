@@ -45,7 +45,9 @@ is interpreted as
 * `xstar`       - solution
 * `fval`        - objective function value for `xstar`.
 * `exitflag`    - flag from solver (>0 success, <0 failure)
-* `info`        - tuple containing profiling information from the solver.
+* `info`        - tuple containing profiling information from the solver. `info.fval_ldp` is the
+  objective of the least-distance problem that DAQP solves internally, which the setting
+  `fval_bound` refers to.
 
 """
 function quadprog(H::Union{Matrix{Float64}, Cholesky},f::Vector{Float64},
@@ -78,7 +80,7 @@ function quadprog(qpj::QPj;settings=nothing)
 
     info = (x = xstar, λ=lam, fval=result[].fval,
             exitflag=result[].exitflag,
-            status = DAQPBase.flag2status[result[].exitflag],
+            status = get(DAQPBase.flag2status, result[].exitflag, :Unknown),
             solve_time = result[].solve_time,
             setup_time = result[].setup_time,
             iterations= result[].iter, nodes = result[].nodes)
@@ -301,9 +303,12 @@ function solve(daqp::DAQPBase.Model;setup_time=0.0)
     daqp.has_solved = true
 
     result = unsafe_load(Base.unsafe_convert(Ptr{DAQPResult}, result_ptr))
-    info = (x = daqp.x, λ=daqp.λ, fval=result.fval,
+    # Objective of the least-distance problem that DAQP solves, which is the
+    # quantity that the setting fval_bound refers to (0.5*work->fval)
+    fval_ldp = 0.5*unsafe_load(daqp.work).fval
+    info = (x = daqp.x, λ=daqp.λ, fval=result.fval, fval_ldp=fval_ldp,
             exitflag=result.exitflag,
-            status = DAQPBase.flag2status[result.exitflag],
+            status = get(DAQPBase.flag2status, result.exitflag, :Unknown),
             solve_time = result.solve_time,
             setup_time = setup_time,
             iterations= result.iter, nodes = result.nodes)

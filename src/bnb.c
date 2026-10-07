@@ -157,6 +157,7 @@ int daqp_bnb(DAQPWorkspace* work){
     c_float fval_bound0 = work->settings->fval_bound;
     c_float eps_r = 1/(1+work->settings->rel_subopt);
     work->settings->fval_bound = (fval_bound0 - work->settings->abs_subopt)*eps_r;
+    c_float fval_best = 0; // Internal objective (twice) of the best feasible solution
 
     // Start from a user-provided integer-feasible solution
     if(work->state & DAQP_STATE_INCUMBENT){
@@ -164,6 +165,7 @@ int daqp_bnb(DAQPWorkspace* work){
         c_float fval_inc = 0.5*daqp_bnb_incumbent(work);
         if(fval_inc >= 0 && fval_inc < fval_bound0){
             work->settings->fval_bound = (fval_inc - work->settings->abs_subopt)*eps_r;
+            fval_best = 2*fval_inc;
             swp_ptr = work->xold; // Marks that a feasible solution is stored in xold
         }
     }
@@ -206,6 +208,7 @@ int daqp_bnb(DAQPWorkspace* work){
         branch_id = daqp_get_branch_id(work);
         if(branch_id==DAQP_EMPTY_IND){// Nothing to branch over => integer feasible
             work->settings->fval_bound = (0.5*work->fval - work->settings->abs_subopt)*eps_r;
+            fval_best = work->fval;
             swp_ptr=work->xold; work->xold= work->u; work->u=swp_ptr; // Store feasible sol
         }
         else{
@@ -224,8 +227,9 @@ int daqp_bnb(DAQPWorkspace* work){
         return exitflag < 0 ? exitflag : DAQP_EXIT_INFEASIBLE;
     }
     else{
-        // Invert fval_bound = (0.5*fval_best - abs_subopt)*eps_r to recover fval_best
-        work->fval = 2*work->settings->fval_bound/eps_r + 2*work->settings->abs_subopt;
+        // Objective of the best feasible solution (recovering it from
+        // fval_bound would introduce rounding errors)
+        work->fval = fval_best;
         work->settings->fval_bound = fval_bound0;
         // Let work->u point to the best feasible solution
         swp_ptr=work->u; work->u= work->xold; work->xold=swp_ptr;

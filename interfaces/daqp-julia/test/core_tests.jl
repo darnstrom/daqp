@@ -246,6 +246,75 @@ end
 
 end
 
+@testset "Objective in the scale of fval_bound" begin
+    # A mixed-integer QP with a nonzero linear term: the first nbf variables
+    # are binary, sum(x[1:nbf]) <= 2.6 makes branching necessary, and two
+    # equality constraints allow equality reduction
+    nf, nbf = 12, 6
+    Hf = Matrix(1.0I, nf, nf) .+ 0.3
+    ff = -Hf * [fill(0.5, nbf); fill(0.2, nf - nbf)]
+    Af = zeros(3, nf); Af[1, 1:nbf] .= 1
+    Af[2, 7] = 1; Af[2, 8] = -1; Af[3, 9] = 1; Af[3, 10] = 1
+    buf = [ones(nbf); fill(2.0, nf - nbf); 2.6; 0; 0.1]
+    blf = [zeros(nbf); fill(-2.0, nf - nbf); -1e30; 0; 0.1]
+    sbin = Cint[fill(DAQPBase.BINARY, nbf); zeros(Cint, nf - nbf); 0; DAQPBase.EQUALITY; DAQPBase.EQUALITY]
+    sqp = Cint[zeros(Cint, nf + 1); DAQPBase.EQUALITY; DAQPBase.EQUALITY]
+    c = 0.5 * dot(ff, Hf \ ff)
+    off, on = DAQPBase.DAQP_EQ_REDUCTION_OFF, DAQPBase.DAQP_EQ_REDUCTION_ON
+    # Branch and bound reports a cutoff by fval_bound as infeasible, or with
+    # its own exit flag if there is one
+    cutoff_flag = isdefined(DAQPBase, :CUTOFF) ? DAQPBase.CUTOFF : DAQPBase.INFEASIBLE
+    function solve_with(sense, opts; bu = buf)
+        d = DAQPBase.Model()
+        DAQPBase.settings(d, opts)
+        DAQPBase.setup(d, Hf, ff, Af, bu, blf, sense)
+        DAQPBase.settings(d, opts)
+        return DAQPBase.solve(d)
+    end
+    for (sense, flag_below) in ((sbin, cutoff_flag), (sqp, DAQPBase.INFEASIBLE))
+        fval_ldps = Float64[]
+        for eq_reduction in (off, on)
+            opts = Dict{Symbol,Any}(:eq_reduction => Cint(eq_reduction))
+            x, fval, exitflag, info = solve_with(sense, opts)
+            @test exitflag == DAQPBase.OPTIMAL
+            push!(fval_ldps, info.fval_ldp)
+            # Without equality reduction, the offset is 0.5 f'H^-1 f
+            eq_reduction == off && @test abs(info.fval_ldp - (fval + c)) < 1e-9 * (1 + c)
+            δ = 1e-6 * (1 + abs(info.fval_ldp))
+            # A cutoff just above the optimal value keeps the solution
+            opts[:fval_bound] = info.fval_ldp + δ
+            x2, _, exitflag2, _ = solve_with(sense, opts)
+            @test exitflag2 == DAQPBase.OPTIMAL
+            @test norm(x2 - x) < 1e-8
+            # A cutoff just below the optimal value removes it
+            opts[:fval_bound] = info.fval_ldp - δ
+            _, _, exitflag3, _ = solve_with(sense, opts)
+            @test exitflag3 == flag_below
+        end
+        # With equality reduction, the offset is another one
+        @test abs(fval_ldps[1] - fval_ldps[2]) > 1e-3
+    end
+
+    # The penalty of a violated soft constraint is part of both objectives
+    ss = copy(sqp); ss[nf+1] = DAQPBase.SOFT
+    bus = copy(buf); bus[nf+1] = 1.0
+    opts = Dict{Symbol,Any}(:eq_reduction => Cint(off))
+    x, fval, exitflag, info = solve_with(ss, opts; bu = bus)
+    @test exitflag == DAQPBase.SOFT_OPTIMAL
+    @test abs(info.fval_ldp - (fval + c)) < 1e-9 * (1 + c)
+    opts[:fval_bound] = info.fval_ldp * (1 + 1e-6)
+    @test solve_with(ss, opts; bu = bus)[3] == DAQPBase.SOFT_OPTIMAL
+    opts[:fval_bound] = info.fval_ldp * (1 - 1e-6)
+    @test solve_with(ss, opts; bu = bus)[3] == DAQPBase.INFEASIBLE
+
+    # With suboptimality tolerances, the objective of the returned solution
+    opts = Dict{Symbol,Any}(:eq_reduction => Cint(off), :abs_subopt => 0.37, :rel_subopt => 0.013)
+    x, fval, exitflag, info = solve_with(sbin, opts)
+    @test exitflag == DAQPBase.OPTIMAL
+    @test abs(fval - (0.5 * dot(x, Hf, x) + dot(ff, x))) < 1e-9 * (1 + abs(fval))
+    @test abs(info.fval_ldp - (fval + c)) < 1e-9 * (1 + c)
+end
+
 @testset "BnB incumbent and warm start" begin
     rng_inc = MersenneTwister(1234)
     Random.seed!(1234)

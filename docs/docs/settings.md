@@ -25,7 +25,7 @@ Table of contents
 | `progress_tol` | Minimum change in objective function to consider it progress | 1e-6|
 | `cycle_tol` | Allowed number of iterations without progress before terminating| 10 |
 | `iter_limit` | Maximum number of iterations before terminating| 10000 |
-| `fval_bound` | Maximum allowed objective function value. The solver terminates if the dual objective exceeds this value (since it is a lower bound of the optimal value). | 1e30|
+| `fval_bound` | Maximum allowed objective function value. The solver terminates if the dual objective exceeds this value (since it is a lower bound of the optimal value). The value refers to the objective of the least-distance problem that DAQP solves internally, which the Julia interface returns as `info.fval_ldp`. | 1e30|
 | `eps_prox` | Proximal regularization. A negative value enables automatic regularization for singular problems. A positive forces proximal regularization. | -1e-6|
 | `eq_reduction` | Equality-reduction policy: `-1` disables reduction, `0` selects it automatically, and `1` forces it when eligible. The equality constraints are then eliminated from the problem before it is solved. | 0 |
 | `eta_prox` | Tolerance that determines if a fixed point has been reached during proximal-point iterations. A negative value selects an automatic tolerance: 1e-6 for the default `dual_tol`, otherwise the smaller of 1e-6 and `0.1*dual_tol`. A nonnegative value is used directly. | -1|
