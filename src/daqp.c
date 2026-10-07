@@ -4,7 +4,7 @@
 #endif
 
 int daqp_ldp(DAQPWorkspace *work){
-    int exitflag=DAQP_EXIT_ITERLIMIT,iter,i;
+    int exitflag=DAQP_EXIT_ITERLIMIT,iter,i,added;
     work->soft_slack = 0; // Only set when a solution is found
     int tried_repair=0, cycle_counter=0;
     int refine_adds=0; // Refinements without progress that added a constraint
@@ -34,7 +34,15 @@ int daqp_ldp(DAQPWorkspace *work){
                     break;
                 }
                 // Try to add infeasible constraint
-                if(!daqp_add_infeasible(work)){ //mu >= (i.e., primal feasible)
+                added = daqp_add_infeasible(work);
+                // A constraint that the working set implies is only added for
+                // rounding error in u: it is dropped and u is refined
+                if(added && refine_adds < 2 && daqp_drop_implied_last(work)){
+                    daqp_refine_active(work);
+                    refine_adds++;
+                    added = daqp_add_infeasible(work);
+                }
+                if(!added){ //mu >= (i.e., primal feasible)
                                            // All KKT-conditions satisfied -> optimum found
 
                     c_float min_D = work->D[0];
