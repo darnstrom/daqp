@@ -10,7 +10,7 @@
 
 // If branch and bound reaches the time limit after an integer-feasible
 // solution has been found, the best such solution is returned, converted to
-// the variables of the QP, with the exit flag DAQP_EXIT_TIMELIMIT_FEASIBLE.
+// the variables of the QP, with the exit flag DAQP_EXIT_FEASIBLE.
 // Without such a solution, the exit flag remains DAQP_EXIT_TIMELIMIT.
 //
 // A time limit of 1 ns is reached at the first check in the tree, after 32
@@ -101,7 +101,7 @@ int main() {
     assert(ref.nodes > 32); // The time limit below ends the exploration early
 
     DAQPResult res = solve(p, 1e-9, x);
-    assert(res.exitflag == DAQP_EXIT_TIMELIMIT_FEASIBLE);
+    assert(res.exitflag == DAQP_EXIT_FEASIBLE);
     assert(res.nodes <= 32);
     assert(is_integer_feasible(p, x, tol));
     assert(std::abs(res.fval - objective(p, x)) < tol * (1 + std::abs(res.fval)));

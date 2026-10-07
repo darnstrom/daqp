@@ -42,7 +42,7 @@ Table of contents
 
 |Value|Status |
 |:-:|:-------|
-|5|Time limit reached, best integer-feasible solution returned (branch and bound)|
+|5|Feasible, optimality not proven (branch and bound terminated early, e.g., at the time limit)|
 |4|Optimal (inexact)|
 |2|Soft optimal|
 |1|Optimal |
@@ -54,7 +54,6 @@ Table of contents
 |-6|Initial working set overdetermined|
 |-7|Time limit reached|
 |-8|Unsupported problem|
-|-9|No integer-feasible solution with an objective below `fval_bound` (branch and bound)|
 
 ## Constraint classification
 The type of a constraint is classified through an integer value (called sense), where the bits in this integer encode different properties: 

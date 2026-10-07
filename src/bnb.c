@@ -147,7 +147,7 @@ static c_float daqp_bnb_bound(c_float fval, c_float c, DAQPSettings* settings){
 }
 
 int daqp_bnb(DAQPWorkspace* work){
-    int branch_id, exitflag, cutoff = 0;
+    int branch_id, exitflag;
     DAQPNode* node;
     c_float *swp_ptr = NULL;
 
@@ -210,11 +210,7 @@ int daqp_bnb(DAQPWorkspace* work){
         }
 #endif
         // Cut conditions
-        if(exitflag==DAQP_EXIT_INFEASIBLE){ // Dominance cut
-            // The node was pruned by the objective bound (not proven infeasible)
-            if(work->fval > 2*work->settings->fval_bound) cutoff = 1;
-            continue;
-        }
+        if(exitflag==DAQP_EXIT_INFEASIBLE) continue; // Dominance cut
         if(exitflag<0) break; // Inner solver failed => exit loop
 
         // Find index to branch over
@@ -237,9 +233,7 @@ int daqp_bnb(DAQPWorkspace* work){
     work->bnb->n_clean = work->bnb->neq;
     if(swp_ptr==NULL){
         work->settings->fval_bound = fval_bound0;
-        if(exitflag < DAQP_EXIT_INFEASIBLE) return exitflag;
-        // Without an incumbent, only the user-provided fval_bound can prune a node
-        return cutoff ? DAQP_EXIT_CUTOFF : DAQP_EXIT_INFEASIBLE;
+        return exitflag < 0 ? exitflag : DAQP_EXIT_INFEASIBLE;
     }
     else{
         work->fval = fval_best;
@@ -247,7 +241,7 @@ int daqp_bnb(DAQPWorkspace* work){
         // Let work->u point to the best feasible solution
         swp_ptr=work->u; work->u= work->xold; work->xold=swp_ptr;
         // At the time limit, the best feasible solution found is returned
-        if(exitflag == DAQP_EXIT_TIMELIMIT) return DAQP_EXIT_TIMELIMIT_FEASIBLE;
+        if(exitflag == DAQP_EXIT_TIMELIMIT) return DAQP_EXIT_FEASIBLE;
         return exitflag < DAQP_EXIT_INFEASIBLE ? exitflag : DAQP_EXIT_OPTIMAL;
     }
 }

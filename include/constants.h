@@ -91,9 +91,9 @@ extern "C" {
 #define DAQP_R_OFFSET(X,Y) (((2*Y-X-1)*X)/2)
 
 // EXIT FLAGS
-// The time limit was reached in branch and bound, and the best integer-feasible
-// solution found until then is returned (it is not necessarily optimal)
-#define DAQP_EXIT_TIMELIMIT_FEASIBLE 5
+// An integer-feasible solution is returned, but its optimality is not proven
+// (branch and bound terminated early, e.g., at the time limit)
+#define DAQP_EXIT_FEASIBLE 5
 // Optimal, but found after cycling with the rounding level as the tolerance for
 // adding constraints, and the solution violates a constraint by more than
 // primal_tol (see DAQP_ADD_NOISE_GAIN)
@@ -108,10 +108,6 @@ extern "C" {
 #define DAQP_EXIT_OVERDETERMINED_INITIAL -6
 #define DAQP_EXIT_TIMELIMIT -7
 #define DAQP_EXIT_UNSUPPORTED -8
-// Branch and bound found no integer-feasible solution with an objective below
-// fval_bound, and nodes were pruned by fval_bound (the problem is not proven
-// to be infeasible)
-#define DAQP_EXIT_CUTOFF -9
 
 // UPDATE LDP MASKS
 #define DAQP_UPDATE_Rinv 1
