@@ -671,7 +671,7 @@ int daqp_first_violating(c_float* x, c_float* A, c_float* bu, c_float* bl, int n
 void daqp_primal_init_active(DAQPProblem* qp, c_float* x){
     int i,disp;
     c_float Ax, slack;
-    c_float tol= 1e-9;
+    c_float tol= DAQP_INIT_PRIM_TOL;
 
     // For MIQPs, x is only used as an incumbent (see daqp_set_primal_start)
     for(i=0; i < qp->m; i++)
@@ -715,7 +715,7 @@ void daqp_primal_init_active(DAQPProblem* qp, c_float* x){
 // based on a dual iterate
 void daqp_dual_init_active(DAQPProblem* qp, c_float* lam){
     int i;
-    c_float tol = 1e-12;
+    c_float tol = DAQP_INIT_DUAL_TOL;
     for(i=0; i < qp->m; i++){
         if(qp->sense[i] & DAQP_IMMUTABLE) continue;
         if(lam[i] > tol){
