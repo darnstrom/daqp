@@ -538,35 +538,39 @@ void daqp_extract_result(DAQPResult* res, DAQPWorkspace* work){
     // Extract primal solution
     for(i=0;i<work->n;i++) res->x[i] = work->x[i];
 
-    // Extract dual solution for ordinary QPs. Hierarchical QPs populate the
-    // output duals in daqp_hiqp(), where they represent the soft-level
-    // penalties used by the public interfaces.
-    if(res->lam != NULL && !DAQP_IS_HIERARCHICAL(work)){
-        for(i=0;i<work->m;i++)
-            res->lam[i] = 0;
-        for(i=0;i<work->n_active;i++){
-            const int id = work->WS[i];
-            const c_float lam = work->lam_star[i];
-            // Report a multiplier of the wrong sign (within dual_tol) as zero
-            if(!DAQP_IS_IMMUTABLE(id) && !DAQP_IS_SOFT(id) &&
-                    (DAQP_IS_LOWER(id) ? lam > 0 : lam < 0))
-                res->lam[id] = 0;
-            else
-                res->lam[id] = lam;
+    // The dual solution and the objective are only well-defined when a
+    // solution has been found (they are left untouched otherwise)
+    if(res->exitflag > 0){
+        // Extract dual solution for ordinary QPs. Hierarchical QPs populate the
+        // output duals in daqp_hiqp(), where they represent the soft-level
+        // penalties used by the public interfaces.
+        if(res->lam != NULL && !DAQP_IS_HIERARCHICAL(work)){
+            for(i=0;i<work->m;i++)
+                res->lam[i] = 0;
+            for(i=0;i<work->n_active;i++){
+                const int id = work->WS[i];
+                const c_float lam = work->lam_star[i];
+                // Report a multiplier of the wrong sign (within dual_tol) as zero
+                if(!DAQP_IS_IMMUTABLE(id) && !DAQP_IS_SOFT(id) &&
+                        (DAQP_IS_LOWER(id) ? lam > 0 : lam < 0))
+                    res->lam[id] = 0;
+                else
+                    res->lam[id] = lam;
+            }
         }
-    }
 
-    // Shift back function value
-    if(work->v != NULL &&
-            (work->avi == NULL || work->avi->is_symmetric) &&
-            (work->Rinv != NULL || work->RinvD != NULL)){ // QP or symmetric AVI
-        res->fval = work->fval;
-        for(i=0;i<work->n;i++) res->fval-=work->v[i]*work->v[i];
-        res->fval *=0.5;
-    }
-    else if(work->qp != NULL && work->qp->f != NULL ){ // LP
-        res->fval = 0;
-        for(i=0;i<work->n;i++) res->fval+=work->qp->f[i]*work->x[i];
+        // Shift back function value
+        if(work->v != NULL &&
+                (work->avi == NULL || work->avi->is_symmetric) &&
+                (work->Rinv != NULL || work->RinvD != NULL)){ // QP or symmetric AVI
+            res->fval = work->fval;
+            for(i=0;i<work->n;i++) res->fval-=work->v[i]*work->v[i];
+            res->fval *=0.5;
+        }
+        else if(work->qp != NULL && work->qp->f != NULL ){ // LP
+            res->fval = 0;
+            for(i=0;i<work->n;i++) res->fval+=work->qp->f[i]*work->x[i];
+        }
     }
 
     // info

@@ -38,7 +38,8 @@ if(TEST)
     add_executable(18_equality_warm_activation tests/18_equality_warm_activation.cpp)
     add_executable(19_fully_determined_eq tests/19_fully_determined_eq.cpp)
     add_executable(20_degenerate_cycling tests/20_degenerate_cycling.cpp)
-    add_executable(21_eq_reduction_factored tests/21_eq_reduction_factored.cpp)
+    add_executable(21_bnb_time_limit tests/21_bnb_time_limit.cpp)
+    add_executable(22_eq_reduction_factored tests/22_eq_reduction_factored.cpp)
 
     set(TARGETS
         00_basic_qp
@@ -62,7 +63,8 @@ if(TEST)
         18_equality_warm_activation
         19_fully_determined_eq
         20_degenerate_cycling
-        21_eq_reduction_factored
+        21_bnb_time_limit
+        22_eq_reduction_factored
     )
 
     foreach(TARGET ${TARGETS})

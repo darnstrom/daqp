@@ -1265,24 +1265,27 @@ void daqp_eq_expand(DAQPResult* res, DAQPWorkspace* work){
     for(i = 0; i < eq->n; i++) x[i] = eq->xp[i]+eq_dot(eq->W+(size_t)i*eq->nz,work->x,eq->nz);
     if(res->x != NULL) for(i = 0; i < eq->n; i++) res->x[i] = x[i];
 
-    // Objective function value (the reduced problem of PATH_LDP has no linear
-    // term, in which case daqp_extract_result leaves fval to be formed here)
-    fval_r = res->fval;
-    if(eq->path == DAQP_EQ_PATH_LDP && work->v == NULL) fval_r = 0.5*work->fval;
-    res->fval = fval_r + eq->fp;
-    if(work->avi != NULL && !work->avi->is_symmetric && qp->f != NULL)
-        res->fval = eq_dot(qp->f,x,eq->n); // As daqp_extract_result for an AVI
+    // As in daqp_extract_result, only when a solution has been found
+    if(res->exitflag > 0){
+        // Objective function value (the reduced problem of PATH_LDP has no linear
+        // term, in which case daqp_extract_result leaves fval to be formed here)
+        fval_r = res->fval;
+        if(eq->path == DAQP_EQ_PATH_LDP && work->v == NULL) fval_r = 0.5*work->fval;
+        res->fval = fval_r + eq->fp;
+        if(work->avi != NULL && !work->avi->is_symmetric && qp->f != NULL)
+            res->fval = eq_dot(qp->f,x,eq->n); // As daqp_extract_result for an AVI
 
-    // Multipliers of the original constraints (keep is ascending, so they can
-    // be scattered in place from the end)
-    if(res->lam != NULL && !DAQP_IS_HIERARCHICAL(work)){
-        for(i = eq->m-1; i >= eq->mr; i--) res->lam[i] = 0;
-        for(c = eq->mr-1; c >= 0; c--){
-            const c_float l = res->lam[c];
-            res->lam[c] = 0;
-            res->lam[eq->keep[c]] = l;
+        // Multipliers of the original constraints (keep is ascending, so they can
+        // be scattered in place from the end)
+        if(res->lam != NULL && !DAQP_IS_HIERARCHICAL(work)){
+            for(i = eq->m-1; i >= eq->mr; i--) res->lam[i] = 0;
+            for(c = eq->mr-1; c >= 0; c--){
+                const c_float l = res->lam[c];
+                res->lam[c] = 0;
+                res->lam[eq->keep[c]] = l;
+            }
+            eq_compute_lam_eq(work,qp,x,res->lam);
         }
-        eq_compute_lam_eq(work,qp,x,res->lam);
     }
 
     // Carry the working set over to the original constraints

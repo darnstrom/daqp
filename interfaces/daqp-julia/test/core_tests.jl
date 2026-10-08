@@ -312,6 +312,60 @@ end
     end
 end
 
+@testset "BnB suboptimality w.r.t. reported objective" begin
+    # x = [b, z, y], b binary, z >= max(0, b-0.6)
+    # J = 0.5b^2 - 0.6b + 0.5δz^2 + z + 0.5y^2 + py => J(b=0) = -0.5p^2, J(b=1) ≈ 0.3-0.5p^2
+    # 0.5f'H⁻¹f ≈ 0.5/δ is much larger than |J|, which must not affect the tolerances
+    δ = 1e-4
+    A = [1.0 -1.0 0.0]
+    bu = [1.0, 1e30, 1e30, 0.6]
+    bl = [0.0, 0.0, -1e30, -1e30]
+    sense = Cint[DAQPBase.BINARY, 0, 0, 0]
+    for p in (0.0, 1.0), rel in (0.0, 1e-3, 0.5)
+        H = Diagonal([1.0, δ, 1.0])
+        f = [-0.6, 1.0, p]
+        s = settings(DAQPBase.Model(), Dict(:rel_subopt => rel))
+        x,fval,ef,_ = quadprog(Matrix(H),f,A,bu,bl,sense; settings=s)
+        @test ef == DAQPBase.OPTIMAL
+        @test abs(x[1]) < 1e-6
+        @test abs(fval+0.5p^2) < 1e-6
+    end
+    # fval_bound refers to the reported objective
+    H, f = [1.0 0 0; 0 δ 0; 0 0 1.0], [-0.6, 1.0, 1.0]
+    for (fb, ef_exp) in ((-0.4, DAQPBase.OPTIMAL), (-0.6, DAQPBase.INFEASIBLE))
+        s = settings(DAQPBase.Model(), Dict(:fval_bound => fb))
+        x,fval,ef,_ = quadprog(H,f,A,bu,bl,sense; settings=s)
+        @test ef == ef_exp
+        ef == DAQPBase.OPTIMAL && @test abs(fval+0.5) < 1e-6
+    end
+    # ... also when equality elimination removes a part of the objective (w = 3 adds 4.5)
+    He = Matrix(Diagonal([1.0, δ, 1.0, 1.0]))
+    fe = [-0.6, 1.0, 1.0, 0.0]
+    Ae = [1.0 -1.0 0.0 0.0; 0.0 0.0 0.0 1.0]
+    bue, ble = [1.0, 1e30, 1e30, 1e30, 0.6, 3.0], [0.0, 0.0, -1e30, -1e30, -1e30, 3.0]
+    sensee = Cint[DAQPBase.BINARY, 0, 0, 0, 0, DAQPBase.EQUALITY]
+    for eqr in (-1, 1), (fb, ef_exp) in ((4.01, DAQPBase.OPTIMAL), (3.99, DAQPBase.INFEASIBLE))
+        s = settings(DAQPBase.Model(), Dict(:fval_bound => fb, :eq_reduction => eqr))
+        x,fval,ef,_ = quadprog(He,fe,Ae,bue,ble,sensee; settings=s)
+        @test ef == ef_exp
+        ef == DAQPBase.OPTIMAL && @test abs(fval-4.0) < 1e-6
+    end
+
+    # Random MIQPs: the result is within the allowed suboptimality
+    Random.seed!(1234)
+    for _ in 1:20
+        H,f,A,bu,bl,sense = generate_test_MIQP(20,60,20,10)
+        _,fopt,ef,_ = quadprog(H,f,A,bu,bl,sense)
+        @test ef == DAQPBase.OPTIMAL
+        for (rel,abs_) in ((1e-2,0.0), (0.0,1.0), (1e-1,1.0))
+            s = settings(DAQPBase.Model(), Dict(:rel_subopt => rel, :abs_subopt => abs_))
+            _,fs,efs,_ = quadprog(H,f,A,bu,bl,sense; settings=s)
+            @test efs == DAQPBase.OPTIMAL
+            @test fopt-1e-6 <= fs <= fopt + abs_ + rel*abs(fs) + 1e-6*(1+abs(fopt))
+        end
+    end
+end
+
 @testset "BnB root warm start" begin
     Random.seed!(4321)
     H,f,A,bu,bl,sense = generate_test_MIQP(20,60,20,10)
@@ -815,8 +869,28 @@ end
     but = vcat(ones(nbt), fill(2.0, nt - nbt), center + width)
     blt = vcat(zeros(nbt), fill(-2.0, nt - nbt), center - width)
     st = vcat(fill(Cint(DAQPBase.BINARY), nbt), zeros(Cint, nt - nbt + mt))
+    _, fopt, exitflag, _ = quadprog(Ht, ft, At, but, blt, st)
+    @test exitflag == DAQPBase.OPTIMAL
     s = settings(DAQPBase.Model(), Dict(:time_limit => 1e-9))
-    _, _, exitflag, info = quadprog(Ht, ft, At, but, blt, st; settings=s)
+    x, fval, exitflag, info = quadprog(Ht, ft, At, but, blt, st; settings=s)
+    # An integer-feasible solution has been found before the limit, and the
+    # best one is returned
+    @test exitflag == DAQPBase.FEASIBLE
+    @test info.status == :Feasible
+    @test info.nodes <= 32
+    @test all(min.(abs.(x[1:nbt]), abs.(x[1:nbt] .- 1)) .< 1e-6)
+    @test all(blt[1:nt] .- 1e-6 .<= x .<= but[1:nt] .+ 1e-6)
+    @test all(blt[nt+1:end] .- 1e-6 .<= At * x .<= but[nt+1:end] .+ 1e-6)
+    @test abs(fval - (0.5 * dot(x, Ht, x) + dot(ft, x))) < 1e-6
+    @test fval >= fopt - 1e-6
+
+    # Without an integer-feasible solution at the limit, TIMELIMIT is returned
+    # (every binary variable is fractional at the root, and the first leaf of
+    # the tree is at depth nn)
+    nn = 40
+    _, _, exitflag, info = quadprog(Matrix(1.0I, nn, nn), fill(-0.5, nn), ones(1, nn),
+        vcat(ones(nn), 0.4nn), vcat(zeros(nn), -1e30),
+        vcat(fill(Cint(DAQPBase.BINARY), nn), Cint[0]); settings=s)
     @test exitflag == DAQPBase.TIMELIMIT
     @test info.nodes <= 32
 end

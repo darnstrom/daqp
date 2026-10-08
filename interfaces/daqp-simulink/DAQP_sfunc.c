@@ -568,6 +568,7 @@ static void mdlOutputs(SimStruct *S, int_T tid)
     ldp2qp_solution(work);
 
     DAQPResult *result = (DAQPResult *)ssGetPWorkValue(S, 1);
+    result->exitflag = out_flag[0];
     daqp_extract_result(result, work);
 
 // DEBUG

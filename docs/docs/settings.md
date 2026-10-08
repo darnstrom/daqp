@@ -31,17 +31,18 @@ Table of contents
 | `eta_prox` | Tolerance that determines if a fixed point has been reached during proximal-point iterations. A negative value selects an automatic tolerance: 1e-6 for the default `dual_tol`, otherwise the smaller of 1e-6 and `0.1*dual_tol`. A nonnegative value is used directly. | -1|
 | `rho_soft` | Weight used for [soft constraints]({{ '/start/advanced/soft' | relative_url }}) (higher enables more violations) | 1e-6|
 | `w_soft` | Linear weight used for [soft constraints]({{ '/start/advanced/soft' | relative_url }}) (higher make the resulting penalty function more exact) | 0 |
-| `rel_subopt` | Allowed relative suboptimality in branch and bound | 0 |
-| `abs_subopt` | Allowed absolute suboptimality in branch and bound | 0 |
+| `rel_subopt` | Allowed relative suboptimality in branch and bound: nodes that cannot improve on the objective value `J` of the incumbent by more than `abs_subopt + rel_subopt*abs(J)` are pruned | 0 |
+| `abs_subopt` | Allowed absolute suboptimality in branch and bound (see `rel_subopt`) | 0 |
 | `sing_tol` | Tolerance for checking if the LDL' factorization is singular| 3.7e-11 |
 | `refactor_tol` | Tolerance for refactoring the LDL' factorization before terminating | 1e-9 |
-| `time_limit` | Maximum wall-clock time in seconds before terminating (0 means no limit) | 0 |
+| `time_limit` | Maximum wall-clock time in seconds before terminating (0 means no limit). If branch and bound reaches it after an integer-feasible solution has been found, the best such solution is returned (exit flag 5). | 0 |
 
 
 ## Exit flags 
 
 |Value|Status |
 |:-:|:-------|
+|5|Feasible (e.g., BnB terminated early)|
 |4|Optimal (inexact)|
 |2|Soft optimal|
 |1|Optimal |

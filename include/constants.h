@@ -91,6 +91,9 @@ extern "C" {
 #define DAQP_R_OFFSET(X,Y) (((2*Y-X-1)*X)/2)
 
 // EXIT FLAGS
+// An integer-feasible solution is returned, but its optimality is not proven
+// (branch and bound terminated early due to time/iteration limit or cycling)
+#define DAQP_EXIT_FEASIBLE 5
 // Optimal, but found after cycling with the rounding level as the tolerance for
 // adding constraints, and the solution violates a constraint by more than
 // primal_tol (see DAQP_ADD_NOISE_GAIN)
