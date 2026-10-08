@@ -755,6 +755,12 @@ static int eq_build_reduction(DAQPWorkspace* work, DAQPProblem* qp){
         }
         split = nc < nz; // Then some null directions have no curvature
     }
+    else if(factored){ // Row i of H = R'R is zero iff column i of R is
+        for(j = 0; j < n; j++){
+            for(i = 0; i <= j; i++) if(qp->H[DAQP_R_OFFSET(i,n)+j] != 0) break;
+            if(i <= j) nc++;
+        }
+    }
 
     // The reduced Hessian, and how the reduced problem is posed
     free(eq->Hr); eq->Hr = NULL;
