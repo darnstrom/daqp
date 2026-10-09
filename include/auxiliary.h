@@ -19,6 +19,7 @@ int daqp_set_noise_floor(DAQPWorkspace *work);
 c_float daqp_noise_floor(DAQPWorkspace *work);
 void daqp_compute_Mu(DAQPWorkspace *work);
 int daqp_add_infeasible(DAQPWorkspace *work);
+int daqp_drop_implied_last(DAQPWorkspace *work);
 int daqp_remove_blocking(DAQPWorkspace *work);
 void daqp_compute_CSP(DAQPWorkspace *work);
 void daqp_refine_active(DAQPWorkspace *work);
