@@ -289,6 +289,35 @@ int daqp_add_infeasible(DAQPWorkspace *work){
     return 1;
 }
 
+/*
+ * If the constraint that daqp_add_infeasible added makes the working set
+ * singular with bounds that are consistent along the dependency, the other
+ * active constraints imply it, so it cannot be violated in exact arithmetic and
+ * its violation is rounding error in u. It is then removed, lam_star is again
+ * the CSP of the working set, and 1 is returned.
+ */
+int daqp_drop_implied_last(DAQPWorkspace *work){
+    int i, id;
+    c_float residual = 0, scale = 1, term;
+    c_float *swp_ptr;
+    if(work->sing_ind == DAQP_EMPTY_IND) return 0;
+    daqp_compute_singular_direction(work);
+    for(i = 0; i <= work->sing_ind; i++){
+        id = work->WS[i];
+        term = work->lam_star[i]*(DAQP_IS_LOWER(id) ? work->dlower[id] : work->dupper[id]);
+        residual += term;
+        scale += term < 0 ? -term : term;
+    }
+    if(residual > work->settings->primal_tol*scale ||
+            residual < -work->settings->primal_tol*scale)
+        return 0; // The bounds conflict along the dependency
+    daqp_drop_singular_last(work);
+    // Undo the swap in daqp_add_infeasible
+    swp_ptr=work->lam; work->lam = work->lam_star; work->lam_star=swp_ptr;
+    for(i = 0; i < work->n_active; i++) work->lam[i] = work->lam_star[i];
+    return 1;
+}
+
 // Compute all general constraint products from the existing row-major M.
 // Four rows are accumulated together to reuse u and expose independent
 // accumulation chains.  A NULL Mu buffer keeps the row-wise fallback active.
