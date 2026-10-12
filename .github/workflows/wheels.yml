@@ -24,6 +24,11 @@ jobs:
             cibw_skip: "pp* *-musllinux*"
           - os: windows-2022
             cibw_skip: "pp* *-musllinux*"
+          # NumPy (needed by the tests) has no win_arm64 wheels for
+          # CPython 3.9 or 3.10, so those cannot be tested here.
+          - os: windows-11-arm
+            cibw_skip: "pp* *-musllinux* cp39-* cp310-*"
+            cibw_archs_windows: "ARM64"
 
     steps:
     - uses: actions/checkout@v4
@@ -48,6 +53,7 @@ jobs:
       uses: pypa/cibuildwheel@v3.4.0
       env:
         CIBW_SKIP: ${{ matrix.cibw_skip }}
+        CIBW_ARCHS_WINDOWS: ${{ matrix.cibw_archs_windows || 'auto' }}
         CIBW_ARCHS_MACOS: "x86_64 arm64"
         CIBW_TEST_REQUIRES: "pytest numpy"
         CIBW_TEST_COMMAND: "pytest -s {package}/test"
