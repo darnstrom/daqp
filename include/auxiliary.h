@@ -33,6 +33,7 @@ void daqp_pivot_last(DAQPWorkspace *work);
 
 int daqp_drop_singular_last(DAQPWorkspace *work);
 int daqp_activate_constraints(DAQPWorkspace *work);
+int daqp_reactivate_constraints(DAQPWorkspace *work);
 void daqp_deactivate_constraints(DAQPWorkspace *work);
 
 # ifdef __cplusplus

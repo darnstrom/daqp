@@ -271,17 +271,8 @@ static int daqp_update_ldp_core(int mask, DAQPWorkspace *work, DAQPProblem* qp){
 
     error_flag = 0;
     // An empty working set can be one that a reset left out
-    if(do_activate || work->n_active == 0){
-        reset_daqp_workspace(work);
-        if(!DAQP_IS_HIERARCHICAL(work))
-            error_flag = daqp_activate_constraints(work);
-        else{// Activate the first level (since those constraints are hard)
-            int m_tmp = work->m;
-            work->m = work->break_points[0];
-            error_flag = daqp_activate_constraints(work);
-            work->m = m_tmp;
-        }
-    }
+    if(do_activate || work->n_active == 0)
+        error_flag = daqp_reactivate_constraints(work);
     if(error_flag < 0) return error_flag;
     work->state &= ~DAQP_STATE_PENDING; // Everything has been formed
 
@@ -357,32 +348,18 @@ static int daqp_update_R(DAQPWorkspace *work, c_float* H, int is_factored, int d
         return 1;
     }
 
-    // Check if Diagonal
+    // Check if Diagonal (from the upper triangle, which is packed if H is factored)
     int is_diagonal = 1;
-    if(!is_factored){
-        for(i = 0, disp = 1; i < n && is_diagonal; i++, disp += i+1){
-            c_float abs_diag = H[i*n+i];
-            if(abs_diag < 0) abs_diag = -abs_diag;
-            if(abs_diag > hessian_scale) hessian_scale = abs_diag;
-            for(j = 1; j < n-i; j++, disp++){
-                if(H[disp] > zero_tol || H[disp] < -zero_tol){ is_diagonal = 0; break; }
-            }
-        }
-    } else {
-        for(i = 0, disp = 0; i < n; disp += n-i, i++){
-            for(j = 1; j < n-i; j++){
-                if(H[disp+j] > zero_tol || H[disp+j] < -zero_tol){
-                    is_diagonal = 0; break;
-                }
-            }
-            if(!is_diagonal) break;
+    for(i = 0, disp = 0; i < n && is_diagonal; disp += n-i, i++){
+        const c_float *Hi = is_factored ? H+disp : H+i*n+i; // H[i,i:n]
+        for(j = 1; j < n-i; j++){
+            if(Hi[j] > zero_tol || Hi[j] < -zero_tol){ is_diagonal = 0; break; }
         }
     }
+    if(!is_factored && (is_diagonal || force_prox))
+        hessian_scale = daqp_max_abs_diag(H,n);
 
     if(force_prox){
-        if(!is_factored && !is_diagonal){
-            hessian_scale = daqp_max_abs_diag(H,n);
-        }
         eps = proximal_regularization_scaled(work, hessian_scale);
         if(eps <= 0.0) return DAQP_EXIT_NONCONVEX;
         work->n_prox = n;
@@ -482,13 +459,7 @@ regularize_hessian:
         eps *= 2;
     }
     else{
-        hessian_scale = 0;
-        for(k = 0; k < n; k++){
-            c_float abs_diag = H[k*n+k];
-            if(abs_diag < 0) abs_diag = -abs_diag;
-            if(abs_diag > hessian_scale) hessian_scale = abs_diag;
-        }
-        eps = proximal_regularization_scaled(work,hessian_scale);
+        eps = proximal_regularization_scaled(work,daqp_max_abs_diag(H,n));
         if(eps <= 0) return DAQP_EXIT_NONCONVEX;
         regularize_all = 1;
         work->n_prox = n;
