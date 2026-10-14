@@ -633,6 +633,18 @@ int daqp_activate_constraints(DAQPWorkspace *work){
     return exitflag;
 }
 
+// Rebuild the working set from sense. For hierarchical problems, only the
+// constraints of the first level are activated (since those are hard)
+int daqp_reactivate_constraints(DAQPWorkspace *work){
+    int error_flag;
+    const int m = work->m;
+    reset_daqp_workspace(work);
+    if(DAQP_IS_HIERARCHICAL(work)) work->m = work->break_points[0];
+    error_flag = daqp_activate_constraints(work);
+    work->m = m;
+    return error_flag;
+}
+
 // Deactivate all active constraints that are mutable (i.e., not equality constraints)
 void daqp_deactivate_constraints(DAQPWorkspace *work){
     int i;

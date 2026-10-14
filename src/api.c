@@ -162,13 +162,7 @@ int setup_daqp_main(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time, i
     }
 
     errorflag = setup_daqp_bnb(work, qp->sense, nb, ns);
-    if(errorflag < 0){
-        if(own_settings==0) work->settings = NULL;
-        free_daqp_workspace(work);
-        return errorflag;
-    }
-
-    errorflag = setup_daqp_ldp(work,qp,init_mask);
+    if(errorflag >= 0) errorflag = setup_daqp_ldp(work,qp,init_mask);
     if(errorflag < 0){
         if(own_settings==0) work->settings = NULL;
         free_daqp_workspace(work);
@@ -272,15 +266,9 @@ void free_daqp_ldp(DAQPWorkspace *work){
     if(work->sense==NULL) return; // Already freed
     free_daqp_eq(work); // Restores the full LDP before it is freed
     free(work->sense);
-    if(work->Rinv != NULL){
-        free(work->Rinv);
-    }
-    if(work->RinvD != NULL){
-        free(work->RinvD);
-    }
-    if(work->v != NULL){
-        free(work->v);
-    }
+    free(work->Rinv);
+    free(work->RinvD);
+    free(work->v);
     if(work->scaling != NULL){
         free(work->scaling);
         free(work->M);
@@ -418,17 +406,7 @@ void daqp_refresh_soft_weights(DAQPWorkspace *work){
             break;
         }
     // Reset the factorization
-    if(rebuild){
-        reset_daqp_workspace(work);
-        if(DAQP_IS_HIERARCHICAL(work)){
-            const int m = work->m;
-            work->m = work->break_points[0];
-            daqp_activate_constraints(work);
-            work->m = m;
-        }
-        else
-            daqp_activate_constraints(work);
-    }
+    if(rebuild) daqp_reactivate_constraints(work);
     if(reduced) daqp_eq_restore(work);
 }
 
@@ -669,41 +647,24 @@ int daqp_first_violating(c_float* x, c_float* A, c_float* bu, c_float* bl, int n
 // Sets the starting active-set (by modifying sense)
 // based on a primal iterate
 void daqp_primal_init_active(DAQPProblem* qp, c_float* x){
-    int i,disp;
-    c_float Ax, slack;
+    int i;
+    c_float val, slack; // val = (A*x)_i
     c_float tol= 1e-9;
 
     // For MIQPs, x is only used as an incumbent (see daqp_set_primal_start)
     for(i=0; i < qp->m; i++)
         if(qp->sense[i] & DAQP_BINARY) return;
 
-    // Simple constraints
-    for(i=0; i < qp->ms; i++){
+    for(i=0; i < qp->m; i++){
         if(qp->sense[i] & DAQP_IMMUTABLE) continue;
-        slack = x[i]- qp->bupper[i];
+        val = (i < qp->ms) ? x[i] : daqp_dot_inline(x,qp->A+(size_t)(i-qp->ms)*qp->n,qp->n);
+        slack = val - qp->bupper[i];
         if (slack < tol && slack > -tol){
             qp->sense[i] |= DAQP_ACTIVE;
             qp->sense[i] &= ~DAQP_LOWER;
         }
         else{
-            slack = x[i] - qp->blower[i];
-            if (slack < tol && slack > -tol){
-                qp->sense[i] |= DAQP_ACTIVE+DAQP_LOWER;
-            }
-        }
-    }
-
-    // General constraints
-    for(i=qp->ms, disp=0; i < qp->m; i++, disp+=qp->n){
-        if(qp->sense[i] & DAQP_IMMUTABLE) continue;
-        Ax = daqp_dot_inline(x,qp->A+disp,qp->n);
-        slack = Ax - qp->bupper[i];
-        if (slack < tol && slack > -tol){
-            qp->sense[i] |= DAQP_ACTIVE;
-            qp->sense[i] &= ~DAQP_LOWER;
-        }
-        else{
-            slack = Ax - qp->blower[i];
+            slack = val - qp->blower[i];
             if (slack < tol && slack > -tol){
                 qp->sense[i] |= DAQP_ACTIVE+DAQP_LOWER;
             }
