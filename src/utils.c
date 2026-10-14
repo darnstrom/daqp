@@ -812,21 +812,9 @@ int daqp_check_unconstrained(DAQPWorkspace* work, const int mask){
             for(i = 0; i < n; i++) work->x[i] = 0.0;
         for(i = 0; i < n; i++) work->x[i] = -work->x[i];
     }
-    else if(work->v != NULL){
-        if(work->Rinv != NULL){
-            // Upper-triangular back-substitution: u[i] = sum_{j>=i} Rinv[i,j]*(-v[j])
-            for(i = 0, disp = 0; i < n; i++){
-                for(j = i, sum = 0; j < n; j++)
-                    sum += work->Rinv[disp++] * work->v[j];
-                work->x[i] = -sum;
-            }
-            if(work->state & DAQP_STATE_RINV_NORMALIZED)
-                for(i = 0; i < work->ms; i++) work->x[i] /= work->scaling[i];
-        } else if(work->RinvD != NULL){
-            for(i = 0; i < n; i++) work->x[i] = -work->RinvD[i] * work->v[i];
-        } else {
-            for(i = 0; i < n; i++) work->x[i] = -work->v[i];
-        }
+    else if(work->v != NULL){ // x = -Rinv*v
+        for(i = 0; i < n; i++) work->x[i] = -work->v[i];
+        daqp_apply_Rinv(work,work->x);
     } else {
         // No linear term: unconstrained optimum is x = 0
         for(i = 0; i < n; i++) work->x[i] = 0.0;
