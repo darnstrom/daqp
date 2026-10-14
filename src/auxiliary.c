@@ -757,7 +757,7 @@ static c_float daqp_active_residual(const DAQPWorkspace *work, const int id){
     return val - (DAQP_IS_LOWER(id) ? qp->blower[id] : qp->bupper[id]);
 }
 
-// y <-- Rinv*y (as ldp2qp_solution, without v)
+// y <-- Rinv*y (undoing the normalization of the simple bounds)
 void daqp_apply_Rinv(DAQPWorkspace *work, c_float* y){
     int i, j, disp;
     const int n = work->n;

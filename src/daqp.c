@@ -144,31 +144,15 @@ cycle_guard:
     return exitflag;
 }
 
-// Compute x = -R\(u+v)
+// Compute x = Rinv*(u-v)
 void ldp2qp_solution(DAQPWorkspace *work){
-    int i,j,disp;
-    // x* = Rinv*(u-v)
+    int i;
     if(work->v != NULL)
         for(i=0;i<work->n;i++) work->x[i]=work->u[i]-work->v[i];
     else
         for(i=0;i<work->n;i++) work->x[i]=work->u[i];
+    daqp_apply_Rinv(work,work->x);
 
-    if(work->Rinv != NULL){ // (Skip if LP since R = I)
-        for(i=0,disp=0;i<work->n;i++){
-            work->x[i]*=work->Rinv[disp++];
-            for(j=i+1;j<work->n;j++)
-                work->x[i]+=work->Rinv[disp++]*work->x[j];
-        }
-        if(work->scaling != NULL){
-            for(i=0;i<work->ms;i++)
-                work->x[i]/=work->scaling[i];
-        }
-    }
-    else if(work->RinvD != NULL)
-    {
-        for(i=0;i<work->n;i++)
-            work->x[i]*=work->RinvD[i];
-    }
     if(work->scaling != NULL){ // Correctly scale output
         for(i=0;i<work->n_active;i++)
             work->lam_star[i]*=work->scaling[work->WS[i]];
