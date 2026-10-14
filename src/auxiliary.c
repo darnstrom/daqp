@@ -775,10 +775,11 @@ void daqp_apply_Rinv(DAQPWorkspace *work, c_float* y){
     const int n = work->n;
     if(work->Rinv != NULL){
         for(i = 0, disp = 0; i < n; i++){
-            y[i] *= work->Rinv[disp++];
-            for(j = i+1; j < n; j++) y[i] += work->Rinv[disp++]*y[j];
+            c_float sum = y[i]*work->Rinv[disp++];
+            for(j = i+1; j < n; j++) sum += work->Rinv[disp++]*y[j];
+            y[i] = sum;
         }
-        if(work->scaling != NULL)
+        if(work->state & DAQP_STATE_RINV_NORMALIZED)
             for(i = 0; i < work->ms; i++) y[i] /= work->scaling[i];
     }
     else if(work->RinvD != NULL)
