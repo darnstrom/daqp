@@ -779,7 +779,8 @@ void daqp_apply_Rinv(DAQPWorkspace *work, c_float* y){
             for(j = i+1; j < n; j++) sum += work->Rinv[disp++]*y[j];
             y[i] = sum;
         }
-        if(work->state & DAQP_STATE_RINV_NORMALIZED)
+        // Generated workspaces store a normalized Rinv without the scaling array
+        if((work->state & DAQP_STATE_RINV_NORMALIZED) && work->scaling != NULL)
             for(i = 0; i < work->ms; i++) y[i] /= work->scaling[i];
     }
     else if(work->RinvD != NULL)
