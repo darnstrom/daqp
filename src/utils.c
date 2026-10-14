@@ -78,6 +78,18 @@ static void daqp_invert_R(DAQPWorkspace *work){
     }
 }
 
+// Largest magnitude of the diagonal of the n x n matrix H
+static c_float daqp_max_abs_diag(const c_float *H, const int n){
+    int i;
+    c_float scale = 0.0;
+    for(i = 0; i < n; i++){
+        c_float abs_diag = H[i*n+i];
+        if(abs_diag < 0.0) abs_diag = -abs_diag;
+        if(abs_diag > scale) scale = abs_diag;
+    }
+    return scale;
+}
+
 static int daqp_update_R(DAQPWorkspace *work, c_float *H,
         int is_factored, int defer_inverse);
 static int daqp_finish_Rinv(DAQPWorkspace *work, const c_float *H, int is_factored);
@@ -369,12 +381,7 @@ static int daqp_update_R(DAQPWorkspace *work, c_float* H, int is_factored, int d
 
     if(force_prox){
         if(!is_factored && !is_diagonal){
-            hessian_scale = 0.0;
-            for(i = 0; i < n; i++){
-                c_float abs_diag = H[i*n+i];
-                if(abs_diag < 0.0) abs_diag = -abs_diag;
-                if(abs_diag > hessian_scale) hessian_scale = abs_diag;
-            }
+            hessian_scale = daqp_max_abs_diag(H,n);
         }
         eps = proximal_regularization_scaled(work, hessian_scale);
         if(eps <= 0.0) return DAQP_EXIT_NONCONVEX;
@@ -426,12 +433,7 @@ static int daqp_update_R(DAQPWorkspace *work, c_float* H, int is_factored, int d
     if(work->RinvD != NULL){ work->Rinv = work->RinvD; work->RinvD = NULL; }
     if(!is_factored && !regularize_all && work->prox_mask != NULL && work->avi == NULL){
         // Zero rows of H are decoupled => regularize only them (semi-proximal)
-        hessian_scale = 0.0;
-        for(i = 0; i < n; i++){
-            c_float abs_diag = H[i*n+i];
-            if(abs_diag < 0.0) abs_diag = -abs_diag;
-            if(abs_diag > hessian_scale) hessian_scale = abs_diag;
-        }
+        hessian_scale = daqp_max_abs_diag(H,n);
         for(i = 0; i < n; i++){
             if(H[i*n+i] != 0) continue;
             for(j = 0; j < n && H[i*n+j] == 0 && H[j*n+i] == 0; j++);
@@ -524,7 +526,7 @@ static int daqp_finish_Rinv(DAQPWorkspace *work, const c_float *H, int is_factor
 
 c_float daqp_get_proximal_regularization(const DAQPWorkspace *work){
     int i;
-    c_float eps, recovered, rinv, scale = 0.0;
+    c_float eps, recovered, rinv;
 
     if(work->n_prox == 0 || work->qp == NULL || work->qp->H == NULL)
         return 0.0;
@@ -540,12 +542,8 @@ c_float daqp_get_proximal_regularization(const DAQPWorkspace *work){
         // scale-based floor directly. Avoid subtracting nearly equal large
         // diagonals from the factor, which would lose a small eps.
         if(work->qp->problem_type != 2){
-            for(i = 0; i < work->n; i++){
-                c_float abs_diag = work->qp->H[i*work->n+i];
-                if(abs_diag < 0.0) abs_diag = -abs_diag;
-                if(abs_diag > scale) scale = abs_diag;
-            }
-            eps = proximal_regularization_scaled(work, scale);
+            eps = proximal_regularization_scaled(work,
+                    daqp_max_abs_diag(work->qp->H,work->n));
         }
         return eps;
     }
@@ -564,12 +562,7 @@ c_float daqp_get_proximal_regularization(const DAQPWorkspace *work){
         rinv /= work->scaling[0];
     recovered = 1.0/(rinv*rinv) - work->qp->H[0];
 
-    for(i = 0; i < work->n; i++){
-        c_float abs_diag = work->qp->H[i*work->n+i];
-        if(abs_diag < 0.0) abs_diag = -abs_diag;
-        if(abs_diag > scale) scale = abs_diag;
-    }
-    eps = proximal_regularization_scaled(work, scale);
+    eps = proximal_regularization_scaled(work,daqp_max_abs_diag(work->qp->H,work->n));
     if(eps <= 0.0) return 0.0;
     while(1.5*eps < recovered) eps *= 2.0;
     return eps;

@@ -62,28 +62,32 @@ static void eq_reflect(const c_float* v, const c_float tau, const int k, const i
     for(i = k+1; i < n; i++) y[i] -= w*v[i];
 }
 
+// eq_reflect for the four vectors c0..c3, in one pass over v
+static inline void eq_reflect4(const c_float* v, const c_float tau, const int k, const int n,
+        c_float* c0, c_float* c1, c_float* c2, c_float* c3){
+    int i;
+    c_float w0 = c0[k], w1 = c1[k], w2 = c2[k], w3 = c3[k];
+    for(i = k+1; i < n; i++){
+        const c_float vi = v[i];
+        w0 += vi*c0[i]; w1 += vi*c1[i]; w2 += vi*c2[i]; w3 += vi*c3[i];
+    }
+    w0 *= tau; w1 *= tau; w2 *= tau; w3 *= tau;
+    c0[k] -= w0; c1[k] -= w1; c2[k] -= w2; c3[k] -= w3;
+    for(i = k+1; i < n; i++){
+        const c_float vi = v[i];
+        c0[i] -= w0*vi; c1[i] -= w1*vi; c2[i] -= w2*vi; c3[i] -= w3*vi;
+    }
+}
+
 // Y <-- Q'Y for cnt vectors of length n (stride ld) with the reflectors
 // 0..nr-1, four vectors per pass over a reflector
 static DAQP_NOINLINE void eq_apply_QT_many(const c_float* V, const c_float* tau,
         const int nr, const int n, c_float* Y, const int cnt, const size_t ld){
-    int i, j, k;
+    int j, k;
     for(j = 0; j+3 < cnt; j += 4){
         c_float *c0 = Y+j*ld, *c1 = c0+ld, *c2 = c1+ld, *c3 = c2+ld;
-        for(k = 0; k < nr; k++){
-            const c_float* v = V+(size_t)k*n;
-            const c_float tk = tau[k];
-            c_float w0 = c0[k], w1 = c1[k], w2 = c2[k], w3 = c3[k];
-            for(i = k+1; i < n; i++){
-                const c_float vi = v[i];
-                w0 += vi*c0[i]; w1 += vi*c1[i]; w2 += vi*c2[i]; w3 += vi*c3[i];
-            }
-            w0 *= tk; w1 *= tk; w2 *= tk; w3 *= tk;
-            c0[k] -= w0; c1[k] -= w1; c2[k] -= w2; c3[k] -= w3;
-            for(i = k+1; i < n; i++){
-                const c_float vi = v[i];
-                c0[i] -= w0*vi; c1[i] -= w1*vi; c2[i] -= w2*vi; c3[i] -= w3*vi;
-            }
-        }
+        for(k = 0; k < nr; k++)
+            eq_reflect4(V+(size_t)k*n,tau[k],k,n,c0,c1,c2,c3);
     }
     for(; j < cnt; j++)
         for(k = 0; k < nr; k++) eq_reflect(V+(size_t)k*n,tau[k],k,n,Y+j*ld);
@@ -102,17 +106,7 @@ static DAQP_NOINLINE void eq_accumulate_Z(c_float* V, const c_float* tau, const 
         const c_float tk = tau[k];
         for(j = nr; j+3 < n; j += 4){
             c_float *c0 = V+(size_t)j*n, *c1 = c0+n, *c2 = c1+n, *c3 = c2+n;
-            c_float w0 = c0[k], w1 = c1[k], w2 = c2[k], w3 = c3[k];
-            for(i = k+1; i < n; i++){
-                const c_float vi = v[i];
-                w0 += vi*c0[i]; w1 += vi*c1[i]; w2 += vi*c2[i]; w3 += vi*c3[i];
-            }
-            w0 *= tk; w1 *= tk; w2 *= tk; w3 *= tk;
-            c0[k] -= w0; c1[k] -= w1; c2[k] -= w2; c3[k] -= w3;
-            for(i = k+1; i < n; i++){
-                const c_float vi = v[i];
-                c0[i] -= w0*vi; c1[i] -= w1*vi; c2[i] -= w2*vi; c3[i] -= w3*vi;
-            }
+            eq_reflect4(v,tk,k,n,c0,c1,c2,c3);
         }
         for(; j < n; j++) eq_reflect(v,tk,k,n,V+(size_t)j*n);
     }
