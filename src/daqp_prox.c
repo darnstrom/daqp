@@ -83,6 +83,14 @@ int daqp_prox(DAQPWorkspace *work){
         if(work->settings->dual_tol != DAQP_DEFAULT_DUAL_TOL &&
            0.1 * work->settings->dual_tol < eta)
             eta = 0.1 * work->settings->dual_tol;
+        // eta bounds the stationarity residual, so make it relative to a
+        // large linear cost (which is at most twice the scale of the KKT terms)
+        if(work->qp->f != NULL){
+            c_float fmax = DAQP_AUTO_ETA_FSCALE;
+            for(i = 0; i < nx; i++)
+                if(fabs(work->qp->f[i]) > fmax) fmax = fabs(work->qp->f[i]);
+            eta *= fmax/DAQP_AUTO_ETA_FSCALE;
+        }
     }
 
     while(total_iter < work->settings->iter_limit){
