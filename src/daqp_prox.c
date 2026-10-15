@@ -386,7 +386,7 @@ static int prox_step(DAQPWorkspace* work, c_float* s_prev, c_float eps, int proj
                 for(k = 0; k < work->n; k++) work->x[k] += s*d[k];
                 moved = 1;
             }
-            else if(work->qp->H == NULL && !moved && !skipped)
+            else if(!moved && !skipped)
                 return DAQP_EXIT_UNBOUNDED;
             break;
         }
