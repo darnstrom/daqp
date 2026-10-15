@@ -38,8 +38,7 @@ int daqp_prox(DAQPWorkspace *work){
     c_float eta = work->settings->eta_prox;
     c_float eps;
 
-    // nh act as a counter for outer iterations
-    work->nh = 0;
+    work->outer_iter = 0;
 
     nx = work->n;
     is_lp = (work->Rinv == NULL && work->RinvD == NULL);
@@ -147,7 +146,7 @@ int daqp_prox(DAQPWorkspace *work){
          * Solve the (regularised) least-distance problem
          * ----------------------------------------------------------------*/
         work->u = work->x;
-        work->nh++;
+        work->outer_iter++;
         exitflag = daqp_ldp(work);
 
         total_iter += work->iterations;
@@ -209,7 +208,7 @@ int daqp_prox(DAQPWorkspace *work){
         if(work->iterations != 1){ // The working set has changed
             s_prev = -1;
             projected = !is_lp && work->avi == NULL && work->settings->eps_prox < 0 &&
-                work->nh >= DAQP_PROX_FACE_START && work->iterations <= 3 &&
+                work->outer_iter >= DAQP_PROX_FACE_START && work->iterations <= 3 &&
                 prox_project_step(work,eps);
         }
         if((work->iterations == 1 || projected) && work->n_active < nx &&
@@ -409,7 +408,7 @@ static int prox_step(DAQPWorkspace* work, c_float* s_prev, c_float eps, int proj
         if(work->sing_ind == DAQP_EMPTY_IND){
             // Along a null direction of H, continue on the new face
             if(null_direction && work->settings->eps_prox < 0 &&
-                    work->nh >= DAQP_PROX_FACE_START &&
+                    work->outer_iter >= DAQP_PROX_FACE_START &&
                     n_projections++ < DAQP_PROX_FACE_STEPS &&
                     prox_project_step(work,eps)){
                 projected = 1;

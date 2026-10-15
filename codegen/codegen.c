@@ -59,10 +59,10 @@ void render_daqp_workspace(DAQPWorkspace* work, const char *fname, const char *d
     // Write Hierarchical
     if(DAQP_IS_HIERARCHICAL(work)){
         fprintf(fh, "#define DAQP_HIERARCHICAL\n");
-        fprintf(fh, "extern int %sbreak_points[%d];\n", prefix, work->nh);
+        fprintf(fh, "extern int %sbreak_points[%d];\n", prefix, work->hierarchy->nh);
         char varname[256];
         snprintf(varname, sizeof(varname), "%sbreak_points", prefix);
-        write_int_array(fsrc,work->break_points, work->nh,varname);
+        write_int_array(fsrc,work->hierarchy->break_points, work->hierarchy->nh,varname);
     }
 
     // TODO Check soft constraints
@@ -93,9 +93,9 @@ void write_daqp_workspace_h(FILE *f, DAQPWorkspace* work, const char* prefix){
     // Account for soft constraints
     if(DAQP_IS_HIERARCHICAL(work)){
         int ns = 0, start=0;
-        for(i = 0; i < work->nh; i++){
-            ns = (ns  > work->break_points[i]-start) ? ns : work->break_points[i]-start;
-            start = work->break_points[i];
+        for(i = 0; i < work->hierarchy->nh; i++){
+            ns = (ns  > work->hierarchy->break_points[i]-start) ? ns : work->hierarchy->break_points[i]-start;
+            start = work->hierarchy->break_points[i];
         }
         ntot+=ns;
     }
@@ -229,6 +229,16 @@ void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work, const char* prefix){
 
     fprintf(f, "int %sprox_mask[%d];\n\n", prefix, n);
 
+    // Hierarchy and its buffers (see DAQPHierarchy)
+    if(DAQP_IS_HIERARCHICAL(work)){
+        fprintf(f, "c_float %shierarchy_M[%d];\n", prefix, m*n);
+        fprintf(f, "c_float %shierarchy_Mu[%d];\n", prefix, m);
+        fprintf(f, "c_float %shierarchy_V[%d];\n", prefix, n*(n+1)/2);
+        fprintf(f, "c_float %shierarchy_tau[%d];\n", prefix, n);
+        fprintf(f, "DAQPHierarchy %shierarchy = {%d, %sbreak_points, %shierarchy_M, %shierarchy_Mu, %shierarchy_V, %shierarchy_tau};\n\n",
+                prefix, work->hierarchy->nh, prefix, prefix, prefix, prefix, prefix);
+    }
+
     //Workspace struct
     fprintf(f, "DAQPWorkspace %swork= {\n", prefix);
     fprintf(f, "NULL,\n"); // DAQPProblem
@@ -251,11 +261,11 @@ void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work, const char* prefix){
         fprintf(f, "NULL,\n");
     else
         fprintf(f, "&%sbnb_work,\n", prefix);
-    // Hierarhical
+    // Outer iterations and hierarchy
     if(DAQP_IS_HIERARCHICAL(work))
-        fprintf(f, "%d,%sbreak_points,\n", work->nh, prefix);
+        fprintf(f, "1, &%shierarchy,\n", prefix);
     else
-        fprintf(f, "0, NULL,\n");
+        fprintf(f, "1, NULL,\n");
     // AVI
     fprintf(f, "NULL,\n"); // TODO: Generate for avi (also requires problem to be generated)
     // Equality elimination (not supported in generated code)

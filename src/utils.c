@@ -1,5 +1,6 @@
 #include "daqp.h"
 #include "utils.h"
+#include <stdlib.h>
 #include <math.h>
 #include <float.h>
 #include <stdio.h>
@@ -258,10 +259,8 @@ static int daqp_update_ldp_core(int mask, DAQPWorkspace *work, DAQPProblem* qp){
     }
 
     // Update hierarchy
-    if(mask&DAQP_UPDATE_hierarchy){
-        work->nh = qp->nh;
-        work->break_points = (qp->nh > 1) ? qp->break_points : NULL;
-    }
+    if(mask&DAQP_UPDATE_hierarchy)
+        if(daqp_set_hierarchy(work,qp->break_points,qp->nh) < 0) return DAQP_EXIT_UNSUPPORTED;
 
     // Hierarchies not allowed for prox + avi
     if(DAQP_IS_HIERARCHICAL(work) &&
@@ -845,6 +844,35 @@ int daqp_check_unconstrained(DAQPWorkspace* work, const int mask){
     // Switch back such that any warm starts a preserved
     swp_ptr = work->x; work->u = work->xold; work->x = work->xold; work->xold = swp_ptr;
     return 1;
+}
+
+// Set the hierarchy (see DAQPHierarchy), and allocate its buffers (for the
+// workspace) the first time. Returns -1 if they cannot be allocated
+int daqp_set_hierarchy(DAQPWorkspace *work, int* break_points, const int nh){
+    if(work->hierarchy == NULL){
+        if(nh <= 1) return 0;
+        const int n = work->n, m = work->m;
+        DAQPHierarchy *h = work->hierarchy = calloc(1,sizeof(DAQPHierarchy));
+        if(h == NULL) return -1;
+        h->M = malloc((size_t)m*n*sizeof(c_float));
+        h->Mu = malloc(m*sizeof(c_float));
+        h->V = malloc(((size_t)n*(n+1)/2)*sizeof(c_float));
+        h->tau = malloc(n*sizeof(c_float));
+        if(h->M == NULL || h->Mu == NULL || h->V == NULL || h->tau == NULL){
+            free_daqp_hierarchy(work);
+            return -1;
+        }
+    }
+    work->hierarchy->nh = nh;
+    work->hierarchy->break_points = break_points;
+    return 0;
+}
+
+void free_daqp_hierarchy(DAQPWorkspace *work){
+    DAQPHierarchy *h = work->hierarchy;
+    if(h == NULL) return;
+    free(h->M); free(h->Mu); free(h->V); free(h->tau); free(h);
+    work->hierarchy = NULL;
 }
 
 int daqp_update_avi(DAQPAVI* avi, DAQPProblem* p, c_float zero_tol){

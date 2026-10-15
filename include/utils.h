@@ -19,6 +19,8 @@ void daqp_normalize_Rinv(DAQPWorkspace *work);
 int daqp_normalize_M(DAQPWorkspace *work);
 int daqp_check_unconstrained(DAQPWorkspace* work, const int mask);
 
+int daqp_set_hierarchy(DAQPWorkspace *work, int* break_points, const int nh);
+void free_daqp_hierarchy(DAQPWorkspace *work);
 int daqp_update_avi(DAQPAVI *avi, DAQPProblem *problem, c_float zero_tol);
 int daqp_retry_avi_with_reduced_rho(DAQPWorkspace *work);
 int daqp_lu(c_float* A, int* P, int n);

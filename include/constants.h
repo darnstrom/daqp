@@ -99,6 +99,8 @@ extern "C" {
 // adding constraints, and the solution violates a constraint by more than
 // primal_tol (see DAQP_ADD_NOISE_GAIN)
 #define DAQP_EXIT_OPTIMAL_INEXACT 4
+// A hierarchical QP stopped early: the point satisfies the levels solved so far
+#define DAQP_EXIT_CONSTRAINED_POINT 3
 #define DAQP_EXIT_SOFT_OPTIMAL 2
 #define DAQP_EXIT_OPTIMAL 1
 #define DAQP_EXIT_INFEASIBLE -1
@@ -181,6 +183,14 @@ extern "C" {
 
 // Internal marker: soft slack switched at w, no primal step since
 #define DAQP_SLACK_SWITCHED 256
+
+// Internal markers of a hierarchical QP (hierarchical.c): a constraint that a
+// solved level made an equality, and one that is eliminated for the lower levels
+#define DAQP_HQ_FROZEN 512
+#define DAQP_HQ_ELIMINATED 1024
+
+#define DAQP_IS_HIERARCHICAL(work) \
+    ((work)->hierarchy != NULL && (work)->hierarchy->nh > 1)
 
 # ifdef __cplusplus
 }

@@ -163,9 +163,11 @@ void daqp_add_constraint(DAQPWorkspace *work, const int add_ind, c_float lam){
     work->sense[add_ind] &= ~DAQP_SLACK_SWITCHED;
     // Mark whether the slack is zero, given the multiplier
     if(DAQP_IS_SOFT(add_ind)){
-        DAQP_SET_MUTABLE(add_ind);
         const c_float w = daqp_soft_w(work,add_ind);
         if(w > 0){
+            // The slack switches when the constraint is removed (a soft equality
+            // with only a quadratic penalty stays immutable)
+            DAQP_SET_MUTABLE(add_ind);
             const c_float magnitude = (DAQP_IS_LOWER(add_ind) ? -lam : lam) >= w ? w : 0;
             lam = DAQP_IS_LOWER(add_ind) ? -magnitude : magnitude;
         }
@@ -639,7 +641,7 @@ int daqp_reactivate_constraints(DAQPWorkspace *work){
     int error_flag;
     const int m = work->m;
     reset_daqp_workspace(work);
-    if(DAQP_IS_HIERARCHICAL(work)) work->m = work->break_points[0];
+    if(DAQP_IS_HIERARCHICAL(work)) work->m = work->hierarchy->break_points[0];
     error_flag = daqp_activate_constraints(work);
     work->m = m;
     return error_flag;

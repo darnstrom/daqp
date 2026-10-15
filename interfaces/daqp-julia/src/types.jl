@@ -171,8 +171,8 @@ struct Workspace
 
     bnb::Ptr{Cvoid}
 
-    nh::Cint
-    break_points::Ptr{Cint}
+    outer_iter::Cint
+    hierarchy::Ptr{Cvoid}
     avi::Ptr{Cvoid}
     eq::Ptr{Cvoid}
     timer::Ptr{Cvoid}
