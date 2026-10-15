@@ -111,6 +111,20 @@ end
     end
 end
 
+@testset "Unbounded QP with singular Hessian" begin
+    # min 0.5 x1^2 - x2  s.t.  x1 + x2 >= 1, unbounded along x2 (issue #222)
+    H = [1.0 0.0; 0.0 0.0]
+    f = [0.0; -1.0]
+    A = [1.0 1.0]
+    bupper = [1e30; 1e30; 1e30]
+    blower = [-1e30; -1e30; 1.0]
+    sense = zeros(Cint,3)
+    _,_,exitflag,_ = quadprog(H,f,A,bupper,blower,sense)
+    @test exitflag == DAQPBase.UNBOUNDED
+    _,_,exitflag,_ = linprog(f,A,bupper,blower,sense)
+    @test exitflag == DAQPBase.UNBOUNDED
+end
+
 @testset "Quadprog (JL)" begin
     qpj = DAQPBase.QPj()
     for selection_rule in [DAQPBase.DANTZIG, DAQPBase.BLAND]
