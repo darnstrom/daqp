@@ -615,7 +615,6 @@ end
     x,fval,exitflag,info = solve(d)
     @test exitflag > 0
     @test info.nodes == 1
-    @test unsafe_load(d.work).nh == 4
 
     # An update that turns the Hessian singular must report it too. Nothing
     # downstream re-checks, so the caller is expected to act on the flag
@@ -624,7 +623,6 @@ end
 
     # The rejection must leave nh/break_points intact -- they outlive the
     # solve (later solves, codegen), so nothing may overwrite them on the way.
-    @test unsafe_load(d.work).nh == 4
     srcdir = tempname()
     DAQPBase.codegen(d,dir=srcdir)
     @test occursin("DAQP_HIERARCHICAL", read(joinpath(srcdir,"daqp_workspace.h"),String))
@@ -1239,4 +1237,230 @@ end
             end
         end
     end
+end
+
+# Exact lexicographic reference for a hierarchy (independent of daqp_hiqp):
+# each soft level is a QP with explicit slacks w >= 0 (the violations are
+# weighted as in DAQP's LDP, i.e., row i is scaled by 1/sqrt(a_i H^-1 a_i')),
+# and the solved levels are kept by shifting their bounds by the violations
+# (with a margin of 1e-5, for problems of unit scale, since exactly tight
+# bounds are degenerate). hq_reference returns nothing if a QP fails.
+function hq_level_costs(x,H,A,bu,bl,bps)
+    ms = length(bu)-size(A,1)
+    Hi = inv(H)
+    costs = zeros(length(bps))
+    for i in 1:length(bu)
+        a = i <= ms ? Matrix{Float64}(I,size(H,1),size(H,1))[i,:] : A[i-ms,:]
+        nu = sqrt(a'*Hi*a)
+        ax = a'*x
+        v = ax > bu[i] ? ax-bu[i] : (ax < bl[i] ? bl[i]-ax : 0.0)
+        l = findfirst(bp -> i <= bp, bps)
+        costs[l] += (v/nu)^2
+    end
+    return costs
+end
+function hq_reference(H,A,bu,bl,bps)
+    n = size(H,1); ms = length(bu)-size(A,1)
+    Afull = [Matrix{Float64}(I,n,n)[1:ms,:]; A]
+    Hi = inv(H)
+    nu = [sqrt(Afull[i,:]'*Hi*Afull[i,:]) for i in 1:size(Afull,1)]
+    An = Afull ./ nu; su = bu ./ nu; sl = [b < -1e29 ? -1e30 : b/nu[i] for (i,b) in enumerate(bl)]
+    x = zeros(n)
+    for l in 2:length(bps)
+        lo, hi = bps[l-1]+1, bps[l]; p = hi-lo+1
+        Hq = zeros(n+p,n+p); Hq[n+1:end,n+1:end] = I(p)
+        Aq = zeros(0,n+p); buq = Float64[]; blq = Float64[]
+        for i in 1:hi
+            row = zeros(n+p); row[1:n] = An[i,:]
+            if i < lo
+                Aq = [Aq; row']; push!(buq,su[i]); push!(blq,sl[i])
+            else
+                row[n+i-lo+1] = -1.0; Aq = [Aq; row']; push!(buq,su[i]); push!(blq,-1e30)
+                row[n+i-lo+1] = 1.0; Aq = [Aq; row']; push!(buq,1e30); push!(blq,sl[i])
+            end
+        end
+        Aq = [Aq; zeros(p,n) Matrix{Float64}(I,p,p)]; append!(buq,fill(1e30,p)); append!(blq,zeros(p))
+        z,_,ef,_ = DAQPBase.quadprog(Hq,zeros(n+p),Aq,buq,blq,zeros(Cint,length(buq)))
+        ef > 0 || return nothing
+        x = z[1:n]
+        for i in lo:hi # Keep the violations of this level
+            ax = An[i,:]'*x
+            ax > su[i] && (su[i] = ax+1e-5)
+            ax < sl[i] && (sl[i] = ax-1e-5)
+        end
+    end
+    xr,_,ef,_ = DAQPBase.quadprog(H,zeros(n),An,su,sl,zeros(Cint,length(su)))
+    return ef > 0 ? xr : nothing
+end
+# A random hierarchy: bounds and hard inequalities first, then soft levels with
+# equality (fraction eqf) and one-sided tasks (scaled by sc)
+function hq_problem(rng,n,nl,p;sc=1.0,loose=false,eqf=0.5)
+    L = randn(rng,n,n); H = L'L/n + I
+    m0 = 2; mA = m0+nl*p
+    A = randn(rng,mA,n)
+    bu = [ones(n); fill(0.5*sqrt(n),m0); zeros(nl*p)]
+    bl = [-ones(n); fill(-1e30,m0); zeros(nl*p)]
+    for i in n+m0+1:n+mA
+        t = 0.7*sqrt(n)*randn(rng)
+        bu[i] = t; bl[i] = rand(rng) < eqf ? t : -1e30
+    end
+    bps = Cint.(n+m0 .+ (0:nl).*p)
+    if loose # Loose, but finite, hard constraints
+        A = [A[1:m0,:]; randn(rng,2,n); A[m0+1:end,:]]
+        bu = [bu[1:n+m0]; 1e6; 1e6; bu[n+m0+1:end]]; bl = [bl[1:n+m0]; -1e6; -1e6; bl[n+m0+1:end]]
+        bps .+= 2
+    end
+    bu = [b < 1e29 ? sc*b : b for b in bu]; bl = [b > -1e29 ? sc*b : b for b in bl]
+    return H,A,bu,bl,bps
+end
+
+@testset "Hierarchical QP (lexicographic optimality)" begin
+    rng = MersenneTwister(3)
+    nchecked, N = 0, 30
+    for k in 1:N
+        # Levels of inequality tasks, of mixed tasks, and of equality tasks
+        n, nl, p, eqf = 8+k%5, 3+k%3, 4+k%3, (0.0,0.5,1.0)[1+k%3]
+        H,A,bu,bl,bps = hq_problem(rng,n,nl,p;eqf)
+        xr = hq_reference(H,A,bu,bl,bps)
+        # (a small linear soft penalty does not change the solution noticeably)
+        for w_soft in (0.0, 1.0)
+            d = DAQPBase.Model()
+            DAQPBase.settings(d,Dict(:w_soft => w_soft))
+            DAQPBase.setup(d,H,zeros(n),A,bu,bl,zeros(Cint,length(bu));break_points=bps)
+            x,_,ef,info = DAQPBase.solve(d); x = copy(x)
+            @test ef == 1 || ef == 2 # (and not 3, which a failed level returns)
+            isnothing(xr) && continue
+            nchecked += w_soft == 0
+            c, cr = hq_level_costs(x,H,A,bu,bl,bps), hq_level_costs(xr,H,A,bu,bl,bps)
+            @test c[1] < 1e-10 # The first level is hard
+            # Lexicographically no worse than the reference
+            for l in eachindex(c)
+                c[l] < cr[l]-1e-2*cr[l]-1e-8 && break
+                @test c[l] <= cr[l]+1e-2*cr[l]+1e-8
+            end
+        end
+    end
+    @test nchecked >= 0.9*N # (the reference rarely fails)
+end
+
+@testset "Hierarchical QP (scaling, loose bounds, warm start)" begin
+    rng = MersenneTwister(5)
+    n, nl, p = 10, 4, 5
+    H,A,bu,bl,bps = hq_problem(copy(rng),n,nl,p)
+    d = DAQPBase.Model()
+    DAQPBase.setup(d,H,zeros(n),A,bu,bl,zeros(Cint,length(bu));break_points=bps)
+    x1,_,ef,_ = DAQPBase.solve(d); x1 = copy(x1)
+    @test ef > 0
+    # The solution scales with the data
+    for sc in [1e-2, 1e2]
+        Hs,As,bus,bls,bpss = hq_problem(copy(rng),n,nl,p;sc)
+        ds = DAQPBase.Model()
+        DAQPBase.setup(ds,Hs,zeros(n),As,bus,bls,zeros(Cint,length(bus));break_points=bpss)
+        xs,_,efs,_ = DAQPBase.solve(ds)
+        @test efs > 0
+        # (up to the tolerances, the soft penalty rho_soft = 1e-6 is relative)
+        @test norm(xs-sc*x1) < 1e-5*sc*(1+norm(x1))
+    end
+    # Loose (but finite) bounds do not affect the solution
+    Hl,Al,bul,bll,bpsl = hq_problem(copy(rng),n,nl,p;loose=true)
+    dl = DAQPBase.Model()
+    DAQPBase.setup(dl,Hl,zeros(n),Al,bul,bll,zeros(Cint,length(bul));break_points=bpsl)
+    xl,_,efl,_ = DAQPBase.solve(dl)
+    @test efl > 0
+    xlr = hq_reference(Hl,Al,bul,bll,bpsl)
+    @test !isnothing(xlr)
+    cl, clr = hq_level_costs(xl,Hl,Al,bul,bll,bpsl), hq_level_costs(xlr,Hl,Al,bul,bll,bpsl)
+    for l in eachindex(cl)
+        cl[l] < clr[l]-1e-2*clr[l]-1e-8 && break
+        @test cl[l] <= clr[l]+1e-2*clr[l]+1e-8
+    end
+    # A warm re-solve gives the same solution, also for new targets
+    DAQPBase.update(d,nothing,nothing,nothing,nothing,nothing)
+    x2,_,ef2,_ = DAQPBase.solve(d)
+    @test ef2 > 0 && norm(x2-x1) < 1e-8*(1+norm(x1))
+    bu2 = copy(bu); bl2 = copy(bl)
+    for i in bps[1]+1:length(bu)
+        eq = bu2[i] == bl2[i]
+        bu2[i] += 0.05*randn(rng)
+        eq && (bl2[i] = bu2[i])
+    end
+    DAQPBase.update(d,nothing,nothing,nothing,bu2,bl2)
+    x3,_,ef3,_ = DAQPBase.solve(d); x3 = copy(x3)
+    dc = DAQPBase.Model()
+    DAQPBase.setup(dc,H,zeros(n),A,bu2,bl2,zeros(Cint,length(bu2));break_points=bps)
+    x4,_,ef4,_ = DAQPBase.solve(dc)
+    @test ef3 > 0 && ef4 > 0 && norm(x3-x4) < 1e-6*(1+norm(x4))
+end
+
+@testset "Hierarchical QP (no degrees of freedom left)" begin
+    # The first soft level fixes x, so the second one is not solved: its
+    # violation is still reported (as for a solved level, in the normalized LDP)
+    A = [1.0 0; 0 1; 1 1]
+    bu = [1.0; 2; 4]; bl = [1.0; 2; 4]
+    d = DAQPBase.Model()
+    DAQPBase.setup(d,Matrix{Float64}(I,2,2),zeros(2),A,bu,bl,zeros(Cint,3);break_points=Cint[0,2,3])
+    x,_,ef,info = DAQPBase.solve(d)
+    @test ef > 0
+    # (the soft levels are met up to the penalty: slacks ~ rho_soft*lambda)
+    @test norm(x-[1;2]) < 1e-5
+    @test abs(info.λ[3]-(-1/sqrt(2))) < 1e-5
+end
+
+# A hierarchy like a velocity IK of a floating-base robot with n-6 joints in
+# four limbs and a torso: velocity bounds (the base is unbounded) and collision
+# rows first, then foot contacts, CoM, hands, joint-limit avoidance (one-sided
+# rows on single joints) and a posture task on all joints
+function hq_robot(rng,n)
+    nj = n-6; nl = div(nj,5); limb(k) = 6+k*nl+1:6+(k+1)*nl; torso = 6+4*nl+1:n
+    sz = [12, 3, 12, div(nj,2), nj]; m0 = 4
+    A = zeros(m0+sum(sz),n); bu = zeros(n+size(A,1)); bl = zeros(n+size(A,1))
+    bu[1:6] .= 1e30; bl[1:6] .= -1e30; bu[7:n] .= 1; bl[7:n] .= -1
+    for i in 1:m0 # (mostly inactive)
+        A[i,limb(i%4)] = randn(rng,nl); A[i,limb((i+1)%4)] = -randn(rng,nl)
+        bu[n+i] = sqrt(2nl); bl[n+i] = -1e30
+    end
+    bps = Cint.(n+m0 .+ cumsum([0; sz])); r(i) = i-n
+    for i in bps[1]+1:bps[2] # Contacts (consistent)
+        A[r(i),1:6] = randn(rng,6); A[r(i),limb(div(i-bps[1]-1,6))] = randn(rng,nl)
+    end
+    for i in bps[2]+1:bps[3] # CoM
+        A[r(i),:] = 0.3*randn(rng,n); A[r(i),1:6] = randn(rng,6)
+        bu[i] = bl[i] = 0.3*randn(rng)
+    end
+    for i in bps[3]+1:bps[4] # Hands (often beyond the velocity bounds)
+        A[r(i),1:6] = randn(rng,6); A[r(i),torso] = randn(rng,length(torso))
+        A[r(i),limb(2+div(i-bps[3]-1,6))] = randn(rng,nl)
+        bu[i] = bl[i] = 0.8*sqrt(nl)*randn(rng)
+    end
+    for i in bps[4]+1:bps[5] # Joint-limit avoidance (20% have to move away)
+        A[r(i),6+rand(rng,1:nj)] = rand(rng,[-1,1])
+        bu[i] = rand(rng) < 0.2 ? -0.1-0.3*rand(rng) : 0.2+rand(rng); bl[i] = -1e30
+    end
+    for i in bps[5]+1:bps[6] # Posture
+        A[r(i),6+i-bps[5]] = 1; bu[i] = bl[i] = 0.3*randn(rng)
+    end
+    return Matrix{Float64}(I,n,n),A,bu,bl,bps
+end
+
+@testset "Hierarchical QP (robot-like hierarchy)" begin
+    rng = MersenneTwister(7)
+    nchecked, N = 0, 6
+    for k in 1:N
+        n = 26+2k # (>= 24 unknowns, for the blocked reflections)
+        H,A,bu,bl,bps = hq_robot(rng,n)
+        d = DAQPBase.Model()
+        DAQPBase.setup(d,H,zeros(n),A,bu,bl,zeros(Cint,length(bu));break_points=bps)
+        x,_,ef,_ = DAQPBase.solve(d); x = copy(x)
+        @test ef == 1 || ef == 2
+        xr = hq_reference(H,A,bu,bl,bps)
+        isnothing(xr) && continue
+        nchecked += 1
+        c, cr = hq_level_costs(x,H,A,bu,bl,bps), hq_level_costs(xr,H,A,bu,bl,bps)
+        @test c[1] < 1e-10
+        for l in eachindex(c)
+            c[l] < cr[l]-1e-2*cr[l]-1e-8 && break
+            @test c[l] <= cr[l]+1e-2*cr[l]+1e-8
+        end
+    end
+    @test nchecked >= N-1
 end

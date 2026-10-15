@@ -19,14 +19,13 @@ The hierarchy is specified through a `break_points` vector of length $$n_h + 1$$
 #include "api.h"
 
 int n = 2, m = 2, ms = 0;
-double f[2]     = {0.0, 0.0};
 double A[4]     = {1, 1, 1, -1};   // row-major: [1 1; 1 -1]
 double bupper[2]= {1.0, 3.0};
 double blower[2]= {-1.0, -3.0};
 int    sense[2] = {0, 0};
 int    bp[3]    = {0, 1, 2};       // level 1: row 0, level 2: row 1
 
-DAQPProblem qp = {n, m, ms, NULL, f, A, bupper, blower, sense, bp, 2, 0};
+DAQPProblem qp = {n, m, ms, NULL, NULL, A, bupper, blower, sense, bp, 3, 0};
 
 double x[2], lam[2];
 DAQPResult result = {x, lam};

@@ -229,6 +229,21 @@ typedef struct{
     DAQPLDPData other;
 }DAQPEqElim;
 
+/*
+ * Hierarchy of a hierarchical QP (see hierarchical.c): level i is formed by the
+ * constraints [break_points[i-1], break_points[i]), and level 0 is hard. The
+ * reflection of coordinate k is V[k*n-k*(k-1)/2 : +n-k] (with scalar tau[k]).
+ */
+typedef struct{
+    int nh; // Number of levels
+    int* break_points; // (not owned)
+
+    c_float* M; // Rows of all constraints, simple bounds included (m x n)
+    c_float* Mu; // M*u (m)
+    c_float* V; // Householder vectors of the eliminations (packed, n(n+1)/2)
+    c_float* tau; // Householder scalars (n)
+}DAQPHierarchy;
+
 typedef struct{
     DAQPProblem* qp;
     // LDP data
@@ -282,9 +297,9 @@ typedef struct{
 
     // BnB
     DAQPBnB* bnb;
-    // Hierarchical QP
-    int nh;
-    int* break_points;
+    int outer_iter; // Outer iterations (proximal and AVI solvers)
+    // Hierarchical QP (NULL if not hierarchical)
+    DAQPHierarchy* hierarchy;
     // AVI
     DAQPAVI* avi;
     // Equality elimination (NULL if the LDP is not reduced)
@@ -313,9 +328,6 @@ typedef struct{
 
     int state;
 }DAQPWorkspace;
-
-#define DAQP_IS_HIERARCHICAL(work) \
-    ((work)->break_points != NULL && (work)->nh > 1)
 
 # ifdef __cplusplus
 }

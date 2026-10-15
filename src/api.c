@@ -8,7 +8,7 @@
 // Solve problem from a given workspace and measure setup and solve time
 void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
     int reduced;
-    if(work->break_points == NULL) work->nh = 1;
+    work->outer_iter = 1;
     // A policy that no longer eliminates takes effect before the solve
     if(DAQP_IS_REDUCED(work) &&
             work->settings->eq_reduction == DAQP_EQ_REDUCTION_OFF &&
@@ -229,10 +229,7 @@ int setup_daqp_ldp(DAQPWorkspace *work, DAQPProblem *qp, const int init_mask){
 
 
 void setup_daqp_hiqp(DAQPWorkspace* work, int* break_points, int nh){
-    if(nh > 1){
-        work->nh = nh;
-        work->break_points= break_points;
-    }
+    if(nh > 1) daqp_set_hierarchy(work,break_points,nh);
 }
 
 int setup_daqp_bnb(DAQPWorkspace* work, int* sense, int nb, int ns){
@@ -345,8 +342,8 @@ void allocate_daqp_workspace(DAQPWorkspace *work, int n, int ns){
     work->w_us= NULL;
 
     work->bnb = NULL;
-    work->nh = 1;
-    work->break_points = NULL;
+    work->outer_iter = 1;
+    work->hierarchy = NULL;
     work->avi = NULL;
     work->eq = NULL;
     work->timer = NULL;
@@ -484,7 +481,7 @@ void free_daqp_workspace(DAQPWorkspace *work){
 
     free_daqp_bnb(work);
     free_daqp_avi(work);
-
+    free_daqp_hierarchy(work);
 }
 
 void free_daqp_avi(DAQPWorkspace* work){
@@ -559,7 +556,7 @@ void daqp_extract_result(DAQPResult* res, DAQPWorkspace* work){
     else if(DAQP_IS_HIERARCHICAL(work))
         res->nodes = 1;
     else
-        res->nodes = work->nh;
+        res->nodes = work->outer_iter;
 }
 
 void daqp_extract_active_duals(DAQPResult* res, DAQPWorkspace* work){

@@ -47,7 +47,6 @@ cdef extern from "types.h":
         int n
         int m
         int ms
-        int nh
         int* sense
         DAQPSettings* settings
 
