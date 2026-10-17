@@ -69,7 +69,7 @@ int daqp_prox(DAQPWorkspace *work){
         // Reset an eps that an earlier solve has changed (as in daqp_update_Rinv)
         c_float eps0 = work->settings->eps_prox < 0 ? -work->settings->eps_prox : work->settings->eps_prox;
         if(eps0 < sqrt(work->settings->zero_tol)*hmax) eps0 = sqrt(work->settings->zero_tol)*hmax;
-        if(eps > 1.01*eps0 || eps < 0.99*eps0){
+        if(eps > 1.01*eps0 || (work->settings->eps_prox < 0 && eps < 0.99*eps0)){
             prox_rescale(work,eps,eps0);
             eps = eps0;
             rescaled = 1;
