@@ -6,6 +6,10 @@
 // Delay the extra projection work until ordinary proximal steps are slow.
 #define DAQP_PROX_FACE_START 16
 #define DAQP_PROX_FACE_STEPS 3
+// Lower eps (by 10, down to DAQP_PROX_EPS_MIN*max H_ii) if the proximal step has not
+// halved during the last DAQP_PROX_STALL_ITERS outer iterations on an unchanged working set
+#define DAQP_PROX_STALL_ITERS 20
+#define DAQP_PROX_EPS_MIN 1e-9
 
 static int prox_project_step(DAQPWorkspace* work, c_float eps);
 static int prox_step(DAQPWorkspace* work, c_float* s_prev, c_float eps, int projected);
@@ -53,7 +57,7 @@ int daqp_prox(DAQPWorkspace *work){
     // A failed inner problem (often due to a small eps) is resolved with eps_max
     const int adaptive = !is_lp && !all_pd && work->avi == NULL &&
         work->prox_mask != NULL && work->n_prox < nx;
-    c_float eps_max = eps;
+    c_float eps_max = eps, eps_min = eps, dx_stall = -1; // eps_min = eps: not lowered
     int rescaled = 0;
     if(adaptive){
         c_float hmax = 0;
@@ -62,15 +66,16 @@ int daqp_prox(DAQPWorkspace *work){
             if(hii < 0) hii = -hii;
             if(hii > hmax) hmax = hii;
         }
-        // Reset an eps that an earlier solve has raised (as in daqp_update_Rinv)
+        // Reset an eps that an earlier solve has changed (as in daqp_update_Rinv)
         c_float eps0 = work->settings->eps_prox < 0 ? -work->settings->eps_prox : work->settings->eps_prox;
         if(eps0 < sqrt(work->settings->zero_tol)*hmax) eps0 = sqrt(work->settings->zero_tol)*hmax;
-        if(eps > 1.01*eps0){
+        if(eps > 1.01*eps0 || eps < 0.99*eps0){
             prox_rescale(work,eps,eps0);
             eps = eps0;
             rescaled = 1;
         }
         eps_max = DAQP_PROX_EPS_MAX*hmax > eps ? DAQP_PROX_EPS_MAX*hmax : eps;
+        if(work->settings->eps_prox < 0) eps_min = DAQP_PROX_EPS_MIN*hmax; // Automatic eps
     }
 
     // A negative eta selects an automatic tolerance. Preserve the established
@@ -156,6 +161,7 @@ int daqp_prox(DAQPWorkspace *work){
             prox_rescale(work,eps,eps_max);
             eps = eps_max;
             rescaled = 1;
+            eps_min = eps_max; // Not lowered again
             s_prev = -1;
             for(i = 0; i < nx; i++) work->x[i] = work->xold[i]; // The center
             continue;
@@ -199,6 +205,18 @@ int daqp_prox(DAQPWorkspace *work){
             break;
         }
 
+        // Slow progress: lower eps after this iteration (see DAQP_PROX_STALL_ITERS)
+        int stalled = 0;
+        if(eps > eps_min && work->outer_iter % DAQP_PROX_STALL_ITERS == 0){
+            c_float dx = 0;
+            for(i = 0; i < nx; i++){
+                max_diff = fabs(work->x[i] - work->xold[i]);
+                if(max_diff > dx) dx = max_diff;
+            }
+            stalled = work->iterations == 1 && dx_stall >= 0 && dx > 0.5*dx_stall;
+            dx_stall = dx;
+        }
+
         // Unchanged working set => accelerate by moving the center along the
         // step (relax the step for an AVI). Convergence is confirmed afterwards.
         // After many outer steps, also accelerate small working-set changes,
@@ -227,6 +245,14 @@ int daqp_prox(DAQPWorkspace *work){
                 }
                 center_relaxed = step_flag;
             }
+        }
+        if(stalled){
+            const c_float eps_new = eps/10 > eps_min ? eps/10 : eps_min;
+            prox_rescale(work,eps,eps_new);
+            eps = eps_new;
+            rescaled = 1;
+            s_prev = -1;
+            dx_stall = -1;
         }
     }
 
