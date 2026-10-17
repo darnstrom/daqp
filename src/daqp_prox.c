@@ -384,11 +384,11 @@ static int prox_blocking_constraint(DAQPWorkspace* work, c_float* s, int* lower)
  * d. x is therefore moved to the minimizer along d, or to the first blocking
  * constraint, which is added to the working set (dependent ones are set aside).
  *
- * Returns 1 if x was moved, 0 otherwise, and DAQP_EXIT_UNBOUNDED for an LP
- * with an unblocked descent direction.
+ * Returns 1 if x was moved, 0 otherwise, and DAQP_EXIT_UNBOUNDED for an
+ * unblocked descent direction without curvature.
  * --------------------------------------------------------------------------*/
 static int prox_step(DAQPWorkspace* work, c_float* s_prev, c_float eps, int projected){
-    int i, k, ind, lower = 0, moved = 0, skipped = 0, first = 1, n_projections = 0;
+    int i, k, ind, lower = 0, moved = 0, blocked = 0, skipped = 0, first = 1, n_projections = 0;
     c_float s;
     while((s = prox_curvature_step(work)) >= 0){
         const int null_direction = s >= DAQP_INF;
@@ -419,7 +419,8 @@ static int prox_step(DAQPWorkspace* work, c_float* s_prev, c_float eps, int proj
                 for(k = 0; k < work->n; k++) work->x[k] += s*d[k];
                 moved = 1;
             }
-            else if(!moved && !skipped)
+            // Dependent blocking constraints only block d through roundoff
+            else if(!blocked)
                 return DAQP_EXIT_UNBOUNDED;
             break;
         }
@@ -432,6 +433,7 @@ static int prox_step(DAQPWorkspace* work, c_float* s_prev, c_float eps, int proj
         else DAQP_SET_UPPER(ind);
         daqp_add_constraint(work, ind, lower ? -1.0 : 1.0);
         if(work->sing_ind == DAQP_EMPTY_IND){
+            blocked = 1;
             // Along a null direction of H, continue on the new face
             if(null_direction && work->settings->eps_prox < 0 &&
                     work->outer_iter >= DAQP_PROX_FACE_START &&
