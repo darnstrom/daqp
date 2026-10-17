@@ -32,7 +32,7 @@ void render_daqp_workspace(DAQPWorkspace* work, const char *fname, const char *d
     strcat(hguard, "_H");
     char *s = hguard;
     while(*s){
-        *s = toupper((unsigned char) *s);
+        *s = (char)toupper((unsigned char) *s);
         s++;
     }
     fprintf(fh, "#ifndef %s\n",   hguard);

@@ -143,7 +143,7 @@ int setup_daqp_main(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time, i
     if(qp->nh > 1){
         ns = 0; // Reset
         int start = 0;
-        for(int i = 0; i < qp->nh; i++){
+        for(i = 0; i < qp->nh; i++){
             ns = (ns  > qp->break_points[i]-start) ? ns : qp->break_points[i]-start;
             start = qp->break_points[i];
         }
@@ -557,14 +557,6 @@ void daqp_extract_result(DAQPResult* res, DAQPWorkspace* work){
         res->nodes = 1;
     else
         res->nodes = work->outer_iter;
-}
-
-void daqp_extract_active_duals(DAQPResult* res, DAQPWorkspace* work){
-    int i;
-    if(res->lam == NULL) return;
-    for(i=0;i<work->m;i++) res->lam[i] = 0;
-    for(i=0;i<work->n_active;i++)
-        res->lam[work->WS[i]] = work->lam_star[i];
 }
 
 void daqp_default_settings(DAQPSettings* settings){
