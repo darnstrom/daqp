@@ -14,10 +14,6 @@ static c_float dot_row(const c_float* a, const c_float* b, const int n){
     return (s0+s1)+(s2+s3);
 }
 
-c_float daqp_dot(const c_float* v1, const c_float* v2, const int n) {
-    return daqp_dot_inline(v1, v2, n);
-}
-
 void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind, const c_float rho){
     work->sing_ind = DAQP_EMPTY_IND;
     int i,j,disp,id;

@@ -58,7 +58,7 @@ Key data structures are in `include/types.h`: `DAQPProblem` (problem data), `DAQ
 The typical call sequence is:
 1. `setup_daqp(qp, work, ...)` — allocate workspace and factor the Hessian
 2. `daqp_solve(res, work)` — run the solver
-3. Optionally call `setup_daqp_bnb` / `setup_daqp_hiqp` / `setup_daqp_avi` before step 2 for specialized variants
+3. Optionally call `setup_daqp_bnb` / `setup_daqp_hiqp` before step 2 for specialized variants (AVIs are selected by setting `qp->problem_type = 1` before `setup_daqp`)
 
 ## Conventions
 

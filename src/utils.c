@@ -1028,7 +1028,6 @@ void daqp_minrep_work(int* is_redundant, DAQPWorkspace* work){
         reset_daqp_workspace(work);
         work->sense[i] = 5;
         daqp_add_constraint(work,i,1.0);
-        //work->dupper[i] += tol_weak; TODO support weaky infeasible constraints
         exitflag = daqp_ldp(work);
         if(exitflag== DAQP_EXIT_INFEASIBLE){
             is_redundant[i] = 1;
@@ -1041,7 +1040,6 @@ void daqp_minrep_work(int* is_redundant, DAQPWorkspace* work){
                 for(j=0; j < work->n_active; j++) // all active constraint must also be nonredundant
                     is_redundant[work->WS[j]] = 0;
         }
-        // work->dupper[i] -= tol_weak; // TODO support weakly infeasible constraints
         daqp_deactivate_constraints(work);
     }
 }
@@ -1092,7 +1090,7 @@ double get_time(DAQPtimer *timer){
     struct timespec diff;
     if ((timer->stop.tv_nsec - timer->start.tv_nsec) < 0) {
         diff.tv_sec  = timer->stop.tv_sec - timer->start.tv_sec - 1;
-        diff.tv_nsec = 1e9 + timer->stop.tv_nsec - timer->start.tv_nsec;
+        diff.tv_nsec = 1000000000L + timer->stop.tv_nsec - timer->start.tv_nsec;
     } else {
         diff.tv_sec  = timer->stop.tv_sec - timer->start.tv_sec;
         diff.tv_nsec = timer->stop.tv_nsec - timer->start.tv_nsec;
