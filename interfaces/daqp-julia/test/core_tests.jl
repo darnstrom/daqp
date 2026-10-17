@@ -724,6 +724,28 @@ end
     @test exitflag < 0
 end
 
+@testset "Zero row becomes nonzero after update" begin
+    # A zero constraint row is ignored at setup, but must be enforced again
+    # (or detected as infeasible) after an update
+    H, f = [1.0 0; 0 1], [-7.0, -7]
+    d = DAQPBase.Model()
+    DAQPBase.setup(d,H,f,[0.0 0.0],[25.0],[-1e30],zeros(Cint,1))
+    x, _, exitflag, _ = DAQPBase.solve(d)
+    @test exitflag == 1 && x ≈ [7.0, 7.0]
+
+    # Nonzero row: the constraint is active at the solution
+    DAQPBase.update(d,[0.25 -0.25; -0.25 1.25],[-7.0, 0],[56.0 14.0],[-220.0],[-1e30])
+    x, _, exitflag, _ = DAQPBase.solve(d)
+    @test exitflag == 1
+    @test 56*x[1]+14*x[2] ≤ -220 + 1e-6
+
+    # Zero row with bounds that exclude 0: infeasible
+    d = DAQPBase.Model()
+    DAQPBase.setup(d,H,f,[0.0 0.0],[25.0],[-1e30],zeros(Cint,1))
+    exitflag = DAQPBase.update(d,nothing,nothing,nothing,[-220.0],[-1e30])
+    @test exitflag == -1
+end
+
 @testset "Affine variational inequality" begin
     for _ in 1:10
         n = 100; m = 500
