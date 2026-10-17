@@ -139,6 +139,15 @@ int daqp_retry_avi_with_reduced_rho(DAQPWorkspace* work){
     return 1;
 }
 
+// A zero row is infeasible if its bounds cross (unless it is immutable, as in
+// daqp_check_bounds), or if 0 is outside its bounds (unless it is soft or ignored)
+static int daqp_zero_row_infeasible(DAQPWorkspace* work, int i, c_float* bupper, c_float* blower){
+    const int s = DAQP_ZERO_ROW_SENSE(work->sense[i]);
+    if(bupper[i]-blower[i] < -work->settings->primal_tol && !(s & DAQP_IMMUTABLE)) return 1;
+    return (bupper[i] < -work->settings->zero_tol || blower[i] > work->settings->zero_tol) &&
+        (s & (DAQP_IMMUTABLE | DAQP_ACTIVE)) != DAQP_IMMUTABLE && !(s & DAQP_SOFT);
+}
+
 /*
  * Form the LDP of qp, which is the problem that the solvers see (the reduced
  * problem of an equality elimination is passed here as it is).
@@ -172,10 +181,17 @@ static int daqp_update_ldp_core(int mask, DAQPWorkspace *work, DAQPProblem* qp){
         }
     }
 
+    // A new A might make zero rows nonzero => restore their sense
+    if(mask&DAQP_UPDATE_M)
+        for(i=work->ms;i<work->m;i++) work->sense[i] = DAQP_ZERO_ROW_SENSE(work->sense[i]);
+
     // Check bounds early
     if(mask&DAQP_UPDATE_M||mask&DAQP_UPDATE_v||mask&DAQP_UPDATE_d||mask&DAQP_UPDATE_sense){
         error_flag = daqp_check_bounds(work,qp->bupper,qp->blower);
-        if(error_flag<0) return error_flag;
+        if(error_flag<0){ // The sense might have changed => form the working set again
+            reset_daqp_workspace(work);
+            return error_flag;
+        }
         if(error_flag==1) do_activate = 1;
     }
 
@@ -694,6 +710,10 @@ int daqp_check_bounds(DAQPWorkspace* work, c_float* bupper, c_float* blower){
     int i;
     c_float diff;
     for(i =0;i<work->m;i++){
+        if(work->sense[i] & DAQP_ZERO_ROW){ // Only the new bounds need to be checked
+            if(daqp_zero_row_infeasible(work,i,bupper,blower)) return DAQP_EXIT_INFEASIBLE;
+            continue;
+        }
         if(DAQP_IS_IMMUTABLE(i) && !(work->sense[i] & DAQP_AUTO_EQUALITY)) continue;
         diff = bupper[i] - blower[i];
         // Check for trivial infeasibility
@@ -735,7 +755,7 @@ void daqp_normalize_Rinv(DAQPWorkspace* work){
     }
 }
 int daqp_normalize_M(DAQPWorkspace* work){
-    int i,j,disp;
+    int i,j,disp,sense_i;
     c_float scaling_i;
     c_float zero_tol = work->settings->zero_tol;
     // Normalize general constraints
@@ -748,12 +768,15 @@ int daqp_normalize_M(DAQPWorkspace* work){
             // that are deliberately omitted from the normalized LDP.
             work->scaling[i] = 1.0;
 #ifndef DAQP_ASSUME_VALID
-            if(work->qp->bupper[i] < -zero_tol || work->qp->blower[i] > zero_tol)
-                if((work->sense[i] & (DAQP_IMMUTABLE | DAQP_ACTIVE)) != DAQP_IMMUTABLE && !DAQP_IS_SOFT(i))
-                    return DAQP_EXIT_INFEASIBLE;
+            if(daqp_zero_row_infeasible(work,i,work->qp->bupper,work->qp->blower))
+                return DAQP_EXIT_INFEASIBLE;
 #endif
-            work->sense[i] = DAQP_IMMUTABLE; // ignore zero-row constraint
-            continue; // TODO: mark infeasibility if dupper & dlower are nonzero
+            // Ignore zero-row constraint (and keep its sense). An equality that
+            // was detected from the bounds is detected again (daqp_check_bounds)
+            sense_i = DAQP_ZERO_ROW_SENSE(work->sense[i]);
+            if(sense_i & DAQP_AUTO_EQUALITY) sense_i &= ~(DAQP_ACTIVE | DAQP_IMMUTABLE);
+            work->sense[i] = DAQP_ZERO_ROW_MARK(sense_i);
+            continue;
         }
         scaling_i = 1/sqrt(scaling_i);
         work->scaling[i]=scaling_i;

@@ -363,7 +363,7 @@ static void eq_hess_times(const DAQPProblem* qp, const int metric, const c_float
 // Whether the general constraint i is an equality constraint that can be
 // eliminated (the same criteria as daqp_check_bounds for equal bounds)
 static int eq_is_candidate(const DAQPWorkspace* work, const DAQPProblem* qp, const int i){
-    const int s = work->sense[i];
+    const int s = DAQP_ZERO_ROW_SENSE(work->sense[i]);
     if(s & (DAQP_SOFT+DAQP_BINARY)) return 0;
     if(qp->bupper[i] - qp->blower[i] < work->settings->zero_tol) return 1;
     if(s & DAQP_AUTO_EQUALITY) return 0; // Its bounds are no longer equal
@@ -702,7 +702,7 @@ static int eq_build_reduction(DAQPWorkspace* work, DAQPProblem* qp){
         eq->ndrop = 0;
         for(c = 0; c < ms+mI; c++){
             const int id = (c < ms) ? c : gen_ids[c-ms];
-            if(DAQP_IS_SOFT(id)){ free(gen_ids); return 0; }
+            if(DAQP_ZERO_ROW_SENSE(work->sense[id]) & DAQP_SOFT){ free(gen_ids); return 0; }
             eq->drop_ids[eq->ndrop++] = id;
         }
         free(gen_ids);
@@ -868,7 +868,7 @@ form_W:
         const int id = (c < ms) ? c : gen_ids[c-ms];
         const c_float* row = eq->Ar+(size_t)c*nz;
         if(eq_dot(row,row,nz) <= zero_tol){
-            if(DAQP_IS_SOFT(id)){ free(gen_ids); return 0; }
+            if(DAQP_ZERO_ROW_SENSE(work->sense[id]) & DAQP_SOFT){ free(gen_ids); return 0; }
             eq->drop_ids[eq->ndrop++] = id;
             continue;
         }
