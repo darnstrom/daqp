@@ -1059,7 +1059,9 @@ static int eq_reduce_rhs(DAQPWorkspace* work, DAQPProblem* qp, const int warm){
     for(c = 0; c < eq->ndrop; c++){
         const int id = eq->drop_ids[c];
         const c_float val = (id < ms) ? eq->xp[id] : eq_dot(qp->A+(size_t)(id-ms)*n,eq->xp,n);
-        if(qp->bupper[id]-val < -primal_tol || qp->blower[id]-val > primal_tol){
+        if(qp->bupper[id]-val < -primal_tol || qp->blower[id]-val > primal_tol ||
+                ((work->sense[id] & DAQP_BINARY) &&
+                 qp->bupper[id]-val > primal_tol && val-qp->blower[id] > primal_tol)){
             // An inconsistent dependent equality is reported the same way as
             // when it is detected while forming the working set
             return eq_is_candidate(work,qp,id) ? DAQP_EXIT_OVERDETERMINED_INITIAL
