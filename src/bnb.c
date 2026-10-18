@@ -48,8 +48,10 @@ static void daqp_bnb_load_ws(const int* ids, const int n_ids, DAQPWorkspace* wor
 // consistent, and -1 if inconsistent (the node is infeasible)
 static int daqp_bnb_add_fixed(const int id, DAQPWorkspace* work){
     int j;
-    c_float residual = 0, scale = 1, term;
-    const c_float tol = work->settings->primal_tol;
+    c_float residual = 0, term;
+    // Same tolerance as for the binary in daqp_get_branch_id
+    const c_float tol = work->settings->primal_tol*
+        (work->scaling != NULL ? work->scaling[DAQP_REMOVE_LOWER_FLAG(id)] : 1);
     daqp_add_upper_lower(id,work);
     if(work->sing_ind == DAQP_EMPTY_IND){
         DAQP_SET_IMMUTABLE(DAQP_REMOVE_LOWER_FLAG(id));
@@ -60,10 +62,9 @@ static int daqp_bnb_add_fixed(const int id, DAQPWorkspace* work){
         const int k = work->WS[j];
         term = work->lam_star[j]*(DAQP_IS_LOWER(k) ? work->dlower[k] : work->dupper[k]);
         residual += term;
-        scale += term < 0 ? -term : term;
     }
     daqp_drop_singular_last(work);
-    return (residual > tol*scale || residual < -tol*scale) ? -1 : 0;
+    return (residual > tol || residual < -tol) ? -1 : 0;
 }
 
 // Add the fixed binaries of node (n_clean falls back to neq if one is left

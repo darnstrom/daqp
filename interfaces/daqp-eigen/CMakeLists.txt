@@ -40,6 +40,7 @@ if(TEST)
     add_executable(20_degenerate_cycling tests/20_degenerate_cycling.cpp)
     add_executable(21_bnb_time_limit tests/21_bnb_time_limit.cpp)
     add_executable(22_eq_reduction_factored tests/22_eq_reduction_factored.cpp)
+    add_executable(23_bnb_dependent_binary tests/23_bnb_dependent_binary.cpp)
 
     set(TARGETS
         00_basic_qp
@@ -65,6 +66,7 @@ if(TEST)
         20_degenerate_cycling
         21_bnb_time_limit
         22_eq_reduction_factored
+        23_bnb_dependent_binary
     )
 
     foreach(TARGET ${TARGETS})
