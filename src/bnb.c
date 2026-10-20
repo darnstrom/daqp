@@ -291,7 +291,7 @@ int daqp_process_node(DAQPNode* node, DAQPWorkspace* work){
 int daqp_get_branch_id(DAQPWorkspace* work){
     int i;
     int id = DAQP_EMPTY_IND;
-    c_float diff, dist, tol, far;
+    c_float diff, dist, tol, dist_far;
     DAQPNode* node = work->bnb->tree+work->bnb->n_nodes; // Node being processed
 
     for(i=0; i < work->bnb->nb; i++){
@@ -312,10 +312,10 @@ int daqp_get_branch_id(DAQPWorkspace* work){
 
         // Bounds for the children (spawned in node/node+1) from KKT at u*:
         // ||u||^2 >= ||u*||^2 + (m_i'(u-u*))^2 since ||m_i|| = 1 (unless soft)
-        far = DAQP_IS_SOFT(id) ? 0 : work->dupper[id]-work->dlower[id]-dist-tol;
+        dist_far = DAQP_IS_SOFT(id) ? 0 : work->dupper[id]-work->dlower[id]-dist-tol;
         dist = DAQP_IS_SOFT(id) ? 0 : dist-tol;
         (node+1)->lb = work->fval + dist*dist; // Nearest endpoint
-        node->lb = work->fval + far*far;
+        node->lb = work->fval + dist_far*dist_far;
         // Explore the endpoint nearest to the relaxation first.
         return diff < 0 ? id : DAQP_ADD_LOWER_FLAG(id);
     }
