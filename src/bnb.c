@@ -187,6 +187,7 @@ int daqp_bnb(DAQPWorkspace* work){
     work->bnb->tree[0].WS_start=0;
     work->bnb->tree[0].WS_end=0;
     work->bnb->tree[0].bin_id=0;
+    work->bnb->tree[0].lb=-DAQP_INF; // Always process the root
     work->bnb->n_nodes=1;
     work->bnb->n_clean=work->bnb->neq;
     work->bnb->nWS=0;
@@ -196,6 +197,7 @@ int daqp_bnb(DAQPWorkspace* work){
     while( work->bnb->n_nodes > 0 ){
 
         node = work->bnb->tree+(--work->bnb->n_nodes);
+        if(node->lb > 2*work->settings->fval_bound) continue;
         exitflag = daqp_process_node(node,work); // Solve relaxation
         if(node->depth < 0 && exitflag > 0 && work->bnb->root_WS != NULL)
             work->bnb->n_root_WS = daqp_bnb_store_ws(work->bnb->root_WS,work);
@@ -255,8 +257,9 @@ int daqp_process_node(DAQPNode* node, DAQPWorkspace* work){
         // Setup relaxation
         if(work->bnb->n_nodes==0 || (node-1)->depth!=node->depth){
             // Sibling has been processed => need to fix workspace state
-            work->bnb->n_clean += (node->depth-(node+1)->depth);
-            if(work->bnb->n_clean < work->bnb->neq) work->bnb->n_clean = work->bnb->neq;
+            // Retain only fixed constraints of common ancestors (robust to pruned nodes)
+            if(work->bnb->n_clean > work->bnb->neq+node->depth)
+                work->bnb->n_clean = work->bnb->neq+node->depth;
             daqp_node_cleanup_workspace(work->bnb->n_clean,work);
             if(daqp_warmstart_node(node,work) < 0) return DAQP_EXIT_INFEASIBLE;
         }
@@ -288,7 +291,8 @@ int daqp_process_node(DAQPNode* node, DAQPWorkspace* work){
 int daqp_get_branch_id(DAQPWorkspace* work){
     int i;
     int id = DAQP_EMPTY_IND;
-    c_float diff, dist, tol;
+    c_float diff, dist, tol, dist_far;
+    DAQPNode* node = work->bnb->tree+work->bnb->n_nodes; // Node being processed
 
     for(i=0; i < work->bnb->nb; i++){
         id = work->bnb->bin_ids[i];
@@ -306,6 +310,12 @@ int daqp_get_branch_id(DAQPWorkspace* work){
         if(work->scaling != NULL) tol *= work->scaling[id];
         if(dist <= tol) continue;
 
+        // Bounds for the children (spawned in node/node+1) from KKT at u*:
+        // ||u||^2 >= ||u*||^2 + (m_i'(u-u*))^2 since ||m_i|| = 1 (unless soft)
+        dist_far = DAQP_IS_SOFT(id) ? 0 : work->dupper[id]-work->dlower[id]-dist-tol;
+        dist = DAQP_IS_SOFT(id) ? 0 : dist-tol;
+        (node+1)->lb = work->fval + dist*dist; // Nearest endpoint
+        node->lb = work->fval + dist_far*dist_far;
         // Explore the endpoint nearest to the relaxation first.
         return diff < 0 ? id : DAQP_ADD_LOWER_FLAG(id);
     }
