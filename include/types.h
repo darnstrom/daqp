@@ -106,6 +106,8 @@ typedef struct{
 
     int* root_WS; // Working set of the latest root relaxation (warm starts the next solve)
     int n_root_WS;
+
+    c_float* RinvD; // Diagonal R of an LP with a singular Hessian (see daqp_bnb_prox)
 }DAQPBnB;
 
 typedef struct{

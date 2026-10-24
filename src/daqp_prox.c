@@ -1,4 +1,5 @@
 #include "daqp_prox.h"
+#include "bnb.h"
 #include "auxiliary.h"
 #include "utils.h"
 #include <math.h>
@@ -13,7 +14,7 @@
 
 static int prox_project_step(DAQPWorkspace* work, c_float eps);
 static int prox_step(DAQPWorkspace* work, c_float* s_prev, c_float eps, int projected);
-static void prox_rescale(DAQPWorkspace* work, c_float eps, c_float eps_new);
+static void prox_rescale(DAQPWorkspace* work, c_float eps, c_float eps_new, int weigh);
 static int prox_is_infeasible(const DAQPWorkspace* work);
 
 /* --------------------------------------------------------------------------
@@ -70,7 +71,7 @@ int daqp_prox(DAQPWorkspace *work){
         c_float eps0 = work->settings->eps_prox < 0 ? -work->settings->eps_prox : work->settings->eps_prox;
         if(eps0 < sqrt(work->settings->zero_tol)*hmax) eps0 = sqrt(work->settings->zero_tol)*hmax;
         if(eps > 1.01*eps0 || (work->settings->eps_prox < 0 && eps < 0.99*eps0)){
-            prox_rescale(work,eps,eps0);
+            prox_rescale(work,eps,eps0,0);
             eps = eps0;
             rescaled = 1;
         }
@@ -158,7 +159,7 @@ int daqp_prox(DAQPWorkspace *work){
         if(adaptive && eps < eps_max && total_iter < work->settings->iter_limit &&
                 (exitflag == DAQP_EXIT_CYCLE ||
                  (exitflag == DAQP_EXIT_INFEASIBLE && !prox_is_infeasible(work)))){
-            prox_rescale(work,eps,eps_max);
+            prox_rescale(work,eps,eps_max,0);
             eps = eps_max;
             rescaled = 1;
             eps_min = eps_max; // Not lowered again
@@ -248,7 +249,7 @@ int daqp_prox(DAQPWorkspace *work){
         }
         if(stalled){
             const c_float eps_new = eps/10 > eps_min ? eps/10 : eps_min;
-            prox_rescale(work,eps,eps_new);
+            prox_rescale(work,eps,eps_new,0);
             eps = eps_new;
             rescaled = 1;
             s_prev = -1;
@@ -453,16 +454,23 @@ static int prox_step(DAQPWorkspace* work, c_float* s_prev, c_float eps, int proj
     return moved;
 }
 
+// 1/w^2, with w the width of the bounds of x_j (1 if x_j is not bounded)
+static c_float prox_weight(const DAQPWorkspace* work, const int j){
+    const c_float w = j < work->ms ? work->qp->bupper[j]-work->qp->blower[j] : 0;
+    return (w > 0 && w < DAQP_INF) ? 1/(w*w) : 1;
+}
+
 // Change eps of the semi-proximal directions to eps_new. The directions are
 // decoupled, so only their columns of Rinv and M are scaled (the working set
-// has to be refactored afterwards)
-static void prox_rescale(DAQPWorkspace* work, c_float eps, c_float eps_new){
+// has to be refactored afterwards). weigh > 0 (< 0) weights eps_new (eps)
+static void prox_rescale(DAQPWorkspace* work, c_float eps, c_float eps_new, int weigh){
     int i, j, disp;
     const int n = work->n, ms = work->ms;
     const int* mask = work->prox_mask;
     const c_float* H = work->qp->H;
     // The scaling of column j of Rinv
-#define DAQP_PROX_RATIO(j) sqrt((H[(size_t)(j)*n+(j)]+eps)/(H[(size_t)(j)*n+(j)]+eps_new))
+#define DAQP_PROX_RATIO(j) sqrt(((H != NULL ? H[(size_t)(j)*n+(j)] : 0)+eps*(weigh < 0 ? prox_weight(work,j) : 1))/\
+        ((H != NULL ? H[(size_t)(j)*n+(j)] : 0)+eps_new*(weigh > 0 ? prox_weight(work,j) : 1)))
     for(i = 0; i < n; i++){
         if(!mask[i]) continue;
         const c_float r = DAQP_PROX_RATIO(i);
@@ -514,4 +522,47 @@ static int prox_is_infeasible(const DAQPWorkspace* work){
         norm += q < 0 ? -q : q;
     }
     return wrong <= 1e-8*norm && gap > work->settings->primal_tol*norm;
+}
+
+/* BnB for a singular Hessian, regularized by eps_j/2*x_j^2. For decoupled
+ * directions, eps_j = eps/w_j^2 (w_j the width of the bounds of x_j), which
+ * bounds the suboptimality by n*eps/2 if each box contains 0. An LP is
+ * treated as H = 0 (R = I with eps0 = 1) through a temporary diagonal R. */
+int daqp_bnb_prox(DAQPWorkspace* work){
+    int i, exitflag;
+    const int n = work->n, is_lp = work->Rinv == NULL && work->RinvD == NULL;
+    const int weigh = work->Rinv == NULL || work->n_prox < n; // Decoupled
+    c_float eps = 0, eps0 = 1;
+
+    if(is_lp){
+        work->RinvD = work->bnb->RinvD;
+        for(i = 0; i < n; i++) work->RinvD[i] = work->prox_mask[i] = 1;
+    }
+    else eps0 = daqp_get_proximal_regularization(work);
+    if(weigh){ // eps relative to the scale of f (LP) or H for x_j/w_j
+        for(i = 0; i < n; i++)
+            eps = fmax(eps, is_lp ? fabs(work->qp->f[i])/sqrt(prox_weight(work,i)) :
+                    fabs(work->qp->H[(size_t)i*n+i])/prox_weight(work,i));
+        eps *= sqrt(work->settings->zero_tol);
+        if(!(eps > 0) || (!is_lp && eps < eps0)) eps = eps0;
+        prox_rescale(work,eps0,eps,1);
+        daqp_reactivate_constraints(work);
+    }
+    else eps = eps0;
+    daqp_update_v(work->qp->f,work);
+    daqp_update_d(work,work->qp->bupper,work->qp->blower);
+
+    exitflag = daqp_bnb(work);
+    if(exitflag > 0){
+        work->x = work->u; // u points to the best leaf (x might alias xold)
+        ldp2qp_solution(work);
+    }
+    if(weigh){ // Restore the regularization
+        prox_rescale(work,eps,eps0,-1);
+        if(is_lp) for(i = 0, work->RinvD = NULL; i < n; i++) work->prox_mask[i] = 0;
+        daqp_reactivate_constraints(work);
+    }
+    for(i = 0; exitflag > 0 && i < n; i++) // Remove the regularization from fval
+        if(work->prox_mask[i]) work->fval -= eps*(weigh ? prox_weight(work,i) : 1)*work->x[i]*work->x[i];
+    return exitflag;
 }
