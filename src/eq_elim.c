@@ -421,6 +421,8 @@ int daqp_eq_wanted(const DAQPWorkspace* work, const DAQPProblem* qp, const int m
     if(qp->A == NULL || qp->m <= qp->ms || work->sense == NULL) return 0;
     // A hierarchy refers to the constraints by their index
     if(qp->nh > 1 || DAQP_IS_HIERARCHICAL(work)) return 0;
+    // BnB with a singular Hessian is solved in full (see daqp_eq_update)
+    if(work->bnb != NULL && work->n_prox > 0) return 0;
     n_eq = eq_count_candidates(work,qp);
     if(n_eq == 0) return 0;
     if(policy == DAQP_EQ_REDUCTION_ON) return 1;
@@ -1206,6 +1208,8 @@ int daqp_eq_update(DAQPWorkspace* work, DAQPProblem* qp, int mask,
     if(flag >= 0 && work->bnb != NULL && work->n_prox > 0){
         daqp_eq_restore(work);
         daqp_eq_deactivate(work);
+        // The reduced factorization changed prox_mask (which is not swapped)
+        work->state |= DAQP_UPDATE_Rinv+DAQP_UPDATE_M+DAQP_UPDATE_v+DAQP_UPDATE_d;
         return DAQP_EQ_NOT_REDUCED;
     }
     // A singular reduced Hessian needs v for the proximal linear term (as in
