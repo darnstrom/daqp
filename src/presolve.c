@@ -230,11 +230,14 @@ void daqp_presolve_ldp(DAQPWorkspace* work){
     DAQPProblem* qp = work->qp, cp = *qp;
     const int n = qp->n, m = qp->m, ms = qp->ms, mA = m-ms;
     if(mA <= 0 || qp->A == NULL) return;
-    // Presolve a copy of the data (with the sense of qp, not of the workspace)
-    cp.A = malloc((size_t)mA*n*sizeof(c_float));
-    cp.bupper = malloc(m*sizeof(c_float));
-    cp.blower = malloc(m*sizeof(c_float));
-    cp.sense = malloc(m*sizeof(int));
+    // Presolve a copy of the data (with the sense of qp, not of the workspace) in
+    // scratch that is allocated once (the dimensions are fixed at setup)
+    if(work->bnb->ps_work == NULL)
+        work->bnb->ps_work = malloc(((size_t)mA*n+2*m)*sizeof(c_float)+m*sizeof(int));
+    cp.A = work->bnb->ps_work;
+    cp.bupper = cp.A+(size_t)mA*n;
+    cp.blower = cp.bupper+m;
+    cp.sense = (int*)(cp.blower+m);
     memcpy(cp.A,qp->A,(size_t)mA*n*sizeof(c_float));
     memcpy(cp.bupper,qp->bupper,m*sizeof(c_float));
     memcpy(cp.blower,qp->blower,m*sizeof(c_float));
@@ -248,7 +251,6 @@ void daqp_presolve_ldp(DAQPWorkspace* work){
             changed = 1;
         }
     }
-    free(cp.A); free(cp.bupper); free(cp.blower); free(cp.sense);
     if(changed){
         work->state |= DAQP_STATE_PRESOLVED;
         work->reuse_ind = 0;
