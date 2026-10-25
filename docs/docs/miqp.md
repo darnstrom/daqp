@@ -77,3 +77,12 @@ x, fval, exitflag, info = daqp.solve(H, f, A, bupper, blower, sense)
 ```
 
 The `info` struct contains a `nodes` field with the number of branch-and-bound nodes explored.
+
+### Singular Hessians
+Branch and bound requires a strictly convex objective. If the Hessian is singular (for example, a
+mixed-integer LP, or binary variables without a quadratic cost), the singular directions are
+regularized by a small quadratic term, scaled by the bounds of the variables. The solution is then
+optimal up to a small bias from this term, and the exit flag is `4` (optimal, inexact) unless the
+bias is within the allowed suboptimality `abs_subopt + rel_subopt*abs(J)` (see
+[settings]({{ '/parameters/' | relative_url }})). If eliminating the equality constraints makes
+the Hessian positive definite, the problem is solved exactly (exit flag `1`).

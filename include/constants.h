@@ -97,7 +97,9 @@ extern "C" {
 #define DAQP_EXIT_FEASIBLE 5
 // Optimal, but found after cycling with the rounding level as the tolerance for
 // adding constraints, and the solution violates a constraint by more than
-// primal_tol (see DAQP_ADD_NOISE_GAIN)
+// primal_tol (see DAQP_ADD_NOISE_GAIN). Also for branch and bound with a singular
+// Hessian, whose regularization can make the solution suboptimal by more than
+// abs_subopt + rel_subopt*|J| (see daqp_bnb_prox)
 #define DAQP_EXIT_OPTIMAL_INEXACT 4
 // A hierarchical QP stopped early: the point satisfies the levels solved so far
 #define DAQP_EXIT_CONSTRAINED_POINT 3
