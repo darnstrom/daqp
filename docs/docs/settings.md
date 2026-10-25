@@ -43,7 +43,7 @@ Table of contents
 |Value|Status |
 |:-:|:-------|
 |5|Feasible (e.g., BnB terminated early)|
-|4|Optimal (inexact, e.g., a mixed-integer problem with a singular Hessian, see [Mixed-Integer QP]({{ '/start/advanced/miqp' | relative_url }}))|
+|4|Optimal (inexact)|
 |2|Soft optimal|
 |1|Optimal |
 |-1|Infeasible|
