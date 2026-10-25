@@ -56,6 +56,15 @@ extern "C" {
 // The active constraints are refined at a solution if a pivot of the LDL' is
 // below this (independent of pivot_tol, since BnB does not refine x afterwards)
 #define DAQP_REFINE_PIVOT 1e-6
+// A new pivot of the LDL' is recomputed from an explicit residual (daqp_refine_pivot) if it
+// might be dominated by rounding errors, which are amplified by small pivots of the working
+// set: if it is below DAQP_PIVOT_REFINE_GAIN*eps/min(D)^2 (the rows of M are normalized).
+// Pivots at the rounding level (|D| <= DAQP_PIVOT_ZERO_GAIN*eps) are exact zeros, which are
+// correctly singular without refinement.
+#define DAQP_PIVOT_REFINE_GAIN 1e2
+#define DAQP_PIVOT_ZERO_GAIN 50
+// The working set is singular if the residual decreases by more than this factor when refined
+#define DAQP_PIVOT_REFINE_DECREASE 0.1
 // When cycling persists after the working set has been refactorized, a
 // constraint is only added if its violation also exceeds the rounding level of
 // u = -M'lam, about DAQP_ADD_NOISE_GAIN*eps*sum|lam| (the rows of M are

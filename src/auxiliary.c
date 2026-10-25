@@ -473,6 +473,17 @@ static void daqp_solve_Lt(const c_float *L, c_float *x, const int n){
         for(; j < i; j++) x[j] -= Li[j]*xi;
     }
 }
+// Row id of M (rows id < ms are rows of Rinv) times v
+static c_float daqp_row_dot(const DAQPWorkspace *work, const int id, const c_float* v){
+    int j, disp;
+    c_float s = 0;
+    if(id >= work->ms)
+        for(j = 0, disp = work->n*(id-work->ms); j < work->n; j++) s += work->M[disp++]*v[j];
+    else if(work->Rinv != NULL)
+        for(j = id, disp = DAQP_R_OFFSET(id,work->n); j < work->n; j++) s += work->Rinv[disp+j]*v[j];
+    else s = v[id];
+    return s;
+}
 
 void daqp_compute_CSP(DAQPWorkspace *work){
     int i,j,disp;
@@ -696,6 +707,36 @@ void daqp_sub_working_set_rows(DAQPWorkspace *work, const c_float* dlam, c_float
             for(j = 0, disp = work->n*(id-work->ms); j < work->n; j++)
                 y[j] -= work->M[disp++]*dl;
     }
+}
+
+// Recompute a suspicious pivot when row add_ind is added (the new row of L is at L+L_start):
+// c solves M_W M_W' c = M_W m (refined once) and the pivot is ||m - M_W'c||^2. If the residual
+// still decreases substantially in the refinement, the working set is singular.
+// (c is stored in the new row of L, and the residual r in zldl)
+void daqp_refine_pivot(DAQPWorkspace *work, const int add_ind, const int L_start){
+    int i, j, disp, it;
+    const int k = work->n_active, n = work->n;
+    c_float *c = work->L+L_start, *r = work->zldl, rr[2];
+    work->reuse_ind = 0; // xldl and zldl are used as scratch
+    daqp_solve_Lt(work->L, c, k); // c = L'\l
+    for(it = 0; it < 2; it++){
+        for(j = 0; j < n; j++) r[j] = 0; // r = m - M_W'c
+        if(add_ind >= work->ms)
+            for(j = 0, disp = n*(add_ind-work->ms); j < n; j++) r[j] = work->M[disp++];
+        else if(work->Rinv != NULL)
+            for(j = add_ind, disp = DAQP_R_OFFSET(add_ind,n); j < n; j++) r[j] = work->Rinv[disp+j];
+        else r[add_ind] = 1;
+        daqp_sub_working_set_rows(work, c, r);
+        for(j = 0, rr[it] = 0; j < n; j++) rr[it] += r[j]*r[j];
+        if(it == 1) break;
+        for(i = 0; i < k; i++) work->xldl[i] = -daqp_row_dot(work, work->WS[i], r);
+        daqp_solve_working_set(work);
+        for(i = 0; i < k; i++) c[i] -= work->xldl[i];
+    }
+    work->D[k] = rr[1] < DAQP_PIVOT_REFINE_DECREASE*rr[0] ? 0 : rr[1];
+    for(j = 0; j < k; j++) // New row of L: l = L'c (in place, since row j only uses c[i], i >= j)
+        for(i = j+1, disp = DAQP_ARSUM(i)+j; i < k; disp += ++i)
+            c[j] += work->L[disp]*c[i];
 }
 
 // One step of iterative refinement for active constraints.

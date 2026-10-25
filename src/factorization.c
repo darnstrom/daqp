@@ -1,4 +1,6 @@
 #include "factorization.h"
+#include "auxiliary.h"
+#include <float.h>
 
  // Necessary to retain accuracy when FAST_MATH is used 
 static c_float dot_row(const c_float* a, const c_float* b, const int n){
@@ -87,13 +89,20 @@ void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind, const c_float r
     // Scale: l_i <-- l_i/d_i
     // Update d_new -= l'Dl
     sum = work->D[work->n_active];
-    c_float tmp;
+    c_float tmp, min_D = 1;
     for (i =0,disp=new_L_start; i<work->n_active;i++,disp++){
         tmp = work->L[disp];
         work->L[disp] /= work->D[i];
         sum -= tmp*work->L[disp];
+        if(work->D[i] < min_D) min_D = work->D[i];
     }
     work->D[work->n_active]=sum;
+
+    // Refine the pivot if it might be dominated by rounding errors (see DAQP_PIVOT_REFINE_GAIN)
+    const c_float eps_mach = sizeof(c_float) == sizeof(float) ? FLT_EPSILON : DBL_EPSILON;
+    if(sum*min_D*min_D < DAQP_PIVOT_REFINE_GAIN*eps_mach && rho == 0 && ns_active == 0 &&
+            (sum > DAQP_PIVOT_ZERO_GAIN*eps_mach || sum < -DAQP_PIVOT_ZERO_GAIN*eps_mach))
+        daqp_refine_pivot(work, add_ind, new_L_start);
 
     // Check for singularity
     if(work->D[work->n_active] < work->settings->sing_tol ||
