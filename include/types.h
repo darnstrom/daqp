@@ -77,6 +77,9 @@ typedef struct{
 
     // Equality-reduction policy: DAQP_EQ_REDUCTION_{OFF,AUTO,ON}
     int eq_reduction;
+
+    // Presolve mixed-integer problems when they are set up or updated (1) or not (0)
+    int presolve;
 }DAQPSettings;
 
 

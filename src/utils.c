@@ -1,5 +1,6 @@
 #include "daqp.h"
 #include "utils.h"
+#include "presolve.h"
 #include <stdlib.h>
 #include <math.h>
 #include <float.h>
@@ -326,7 +327,14 @@ int daqp_update_ldp(int mask, DAQPWorkspace *work, DAQPProblem* qp){
         if(qp->H != NULL) mask |= DAQP_UPDATE_Rinv;
         if(qp->f != NULL) mask |= DAQP_UPDATE_v;
     }
-    return daqp_update_ldp_core(mask,work,qp);
+    // A presolved LDP is formed from qp again (and presolved for the new data)
+    if(work->bnb != NULL && (work->settings->presolve || (work->state & DAQP_STATE_PRESOLVED)))
+        mask |= DAQP_UPDATE_M+DAQP_UPDATE_d;
+    flag = daqp_update_ldp_core(mask,work,qp);
+    // (A singular Hessian is presolved after its regularization, in daqp_bnb_prox)
+    if(flag >= 0 && work->bnb != NULL && work->settings->presolve && work->n_prox == 0)
+        daqp_presolve_ldp(work);
+    return flag;
 }
 
 int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){

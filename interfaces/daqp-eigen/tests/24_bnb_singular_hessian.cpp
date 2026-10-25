@@ -56,7 +56,7 @@ struct Solution {
     std::vector<c_float> x;
 };
 
-Solution solve(Problem p, int policy, c_float rel_subopt = 0) {
+Solution solve(Problem p, int policy, c_float rel_subopt = 0, int presolve = 0) {
     Solution s{0, 0, std::vector<c_float>(p.n, 0)};
     std::vector<c_float> lam(p.m);
     DAQPResult res{};
@@ -66,6 +66,7 @@ Solution solve(Problem p, int policy, c_float rel_subopt = 0) {
     daqp_default_settings(&settings);
     settings.eq_reduction = policy;
     settings.rel_subopt = rel_subopt;
+    settings.presolve = presolve;
     DAQPProblem qp = p.qp();
     daqp_quadprog(&res, &qp, &settings);
     s.exitflag = res.exitflag;
@@ -156,6 +157,9 @@ int main() {
             assert(close(s.fval, J_best, 1e-6) && close(p.objective(s.x), J_best, 1e-6));
             assert(p.violation(s.x) < 1e-6);
             assert(solve(p, policy, 1e-3).exitflag == DAQP_EXIT_OPTIMAL);
+            Solution t = solve(p, policy, 0, 1); // With presolve
+            assert(t.exitflag == DAQP_EXIT_OPTIMAL_INEXACT && close(t.fval, J_best, 1e-6));
+            assert(p.violation(t.x) < 1e-6);
         }
     }
 
@@ -170,6 +174,14 @@ int main() {
             assert(p.violation(s.x) < 1e-5);
             assert(close(s.fval, s_off.fval, 1e-6) && close(p.objective(s.x), s.fval, 1e-6));
         }
+    }
+
+    // With presolve, whose tightened constraints are formed again for the regularized LDP
+    for (c_float x0 : {-6.0, -2.5, 0.5, 3.0, 7.5}) {
+        Problem p = hybrid_mpc(6, x0, 0);
+        Solution s = solve(p, DAQP_EQ_REDUCTION_AUTO), t = solve(p, DAQP_EQ_REDUCTION_AUTO, 0, 1);
+        assert(t.exitflag == s.exitflag && p.violation(t.x) < 1e-5);
+        assert(close(t.fval, s.fval, 1e-6) && close(p.objective(t.x), t.fval, 1e-6));
     }
 
     // Positive definite after eliminating the equalities (only z is singular): solved exactly

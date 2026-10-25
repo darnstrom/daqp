@@ -311,7 +311,8 @@ void write_daqp_settings_src(FILE*  f, DAQPSettings* settings, const char* prefi
     fprintf(f, "(c_float)%.20f,",  settings->refactor_tol);
     fprintf(f, "(c_float)%.20f,",  settings->time_limit);
     fprintf(f, "(c_float)%.20f,", settings->w_soft);
-    fprintf(f, "%d", settings->eq_reduction);
+    fprintf(f, "%d,", settings->eq_reduction);
+    fprintf(f, "%d", settings->presolve);
     fprintf(f, "};\n\n");
 }
 

@@ -42,6 +42,7 @@ cdef extern from "types.h":
 
         double w_soft;
         int eq_reduction;
+        int presolve;
 
     ctypedef struct DAQPWorkspace:
         int n

@@ -9,6 +9,7 @@ set(
     "${CMAKE_CURRENT_SOURCE_DIR}/eq_elim.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/factorization.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/hierarchical.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/presolve.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/utils.c"
 )
 set(daqp_src "${daqp_src}" PARENT_SCOPE)

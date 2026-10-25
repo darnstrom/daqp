@@ -1,5 +1,6 @@
 #include "daqp_prox.h"
 #include "bnb.h"
+#include "presolve.h"
 #include "auxiliary.h"
 #include "utils.h"
 #include <math.h>
@@ -553,6 +554,7 @@ int daqp_bnb_prox(DAQPWorkspace* work){
     else eps = eps0;
     daqp_update_v(work->qp->f,work);
     daqp_update_d(work,work->qp->bupper,work->qp->blower);
+    if(work->settings->presolve) daqp_presolve_ldp(work); // d is formed from the original bounds
 
     exitflag = daqp_bnb(work);
     if(exitflag > 0){

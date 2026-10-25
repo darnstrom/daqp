@@ -86,3 +86,22 @@ optimal up to a small bias from this term, and the exit flag is `4` (optimal, in
 bias is within the allowed suboptimality `abs_subopt + rel_subopt*abs(J)` (see
 [settings]({{ '/parameters/' | relative_url }})). If eliminating the equality constraints makes
 the Hessian positive definite, the problem is solved exactly (exit flag `1`).
+
+### Presolve
+Mixed-integer problems with big-M constraints, such as $$y \le M b$$ with a binary $$b$$, often have
+weak relaxations that make branch and bound explore many nodes. Setting `presolve = 1` tightens
+such problems before branch and bound:
+
+- bound propagation tightens the simple bounds (and fixes binaries) using the constraints;
+- coefficient tightening reduces the coefficients of binaries in one-sided constraints (e.g., a
+  loose $$M$$) as far as the bounds of the other variables allow.
+
+Neither changes the integer-feasible solutions, so the solution is the same, but the number of
+nodes can decrease substantially. The problem data is not changed: the presolve is applied to the
+internal representation of the problem when it is set up and whenever it is updated. Soft
+constraints are not relied on, and immutable constraints are not changed. With `presolve = 1`,
+equality constraints of mixed-integer problems are not eliminated (see `eq_reduction`).
+
+Presolve is not enabled by default, since it is mainly worthwhile for problems with larger
+branch-and-bound trees. For problems that are solved repeatedly with small trees (e.g., hybrid MPC),
+its cost per update can exceed what it saves.
