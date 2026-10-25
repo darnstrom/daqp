@@ -1200,6 +1200,14 @@ int daqp_eq_update(DAQPWorkspace* work, DAQPProblem* qp, int mask,
 
     daqp_eq_install(work);
     flag = update_ldp(mask_r,work,&eq->qp);
+    // BnB regularizes a singular Hessian relative to the simple bounds, which
+    // the reduced problem lacks (they are general constraints there), so the
+    // full problem is regularized instead
+    if(flag >= 0 && work->bnb != NULL && work->n_prox > 0){
+        daqp_eq_restore(work);
+        daqp_eq_deactivate(work);
+        return DAQP_EQ_NOT_REDUCED;
+    }
     // A singular reduced Hessian needs v for the proximal linear term (as in
     // setup_daqp_ldp)
     if(flag >= 0 && work->n_prox > 0 && work->v == NULL && work->qp->H != NULL)
