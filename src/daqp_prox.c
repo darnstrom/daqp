@@ -1,6 +1,5 @@
 #include "daqp_prox.h"
 #include "bnb.h"
-#include "presolve.h"
 #include "auxiliary.h"
 #include "utils.h"
 #include <math.h>
@@ -536,6 +535,7 @@ int daqp_bnb_prox(DAQPWorkspace* work){
     const int n = work->n, is_lp = work->Rinv == NULL && work->RinvD == NULL;
     const int weigh = work->Rinv == NULL || work->n_prox < n; // Decoupled
     c_float eps = 0, eps0 = 1;
+    const DAQPProblem* pq;
 
     if(is_lp){
         work->RinvD = work->bnb->RinvD;
@@ -553,8 +553,8 @@ int daqp_bnb_prox(DAQPWorkspace* work){
     }
     else eps = eps0;
     daqp_update_v(work->qp->f,work);
-    daqp_update_d(work,work->qp->bupper,work->qp->blower);
-    if(work->settings->presolve) daqp_presolve_ldp(work); // d is formed from the original bounds
+    pq = (work->state & DAQP_STATE_PRESOLVED) ? work->bnb->ps_qp : work->qp; // See daqp_presolve
+    daqp_update_d(work,pq->bupper,pq->blower);
 
     exitflag = daqp_bnb(work);
     if(exitflag > 0){

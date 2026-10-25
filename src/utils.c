@@ -302,6 +302,7 @@ static int daqp_update_ldp_core(int mask, DAQPWorkspace *work, DAQPProblem* qp){
  */
 int daqp_update_ldp(int mask, DAQPWorkspace *work, DAQPProblem* qp){
     int i, flag;
+    DAQPProblem* pq;
     const int was_reduced = DAQP_IS_REDUCED(work);
     daqp_eq_restore(work);
     work->qp = qp;
@@ -327,13 +328,13 @@ int daqp_update_ldp(int mask, DAQPWorkspace *work, DAQPProblem* qp){
         if(qp->H != NULL) mask |= DAQP_UPDATE_Rinv;
         if(qp->f != NULL) mask |= DAQP_UPDATE_v;
     }
-    // A presolved LDP is formed from qp again (and presolved for the new data)
-    if(work->bnb != NULL && (work->settings->presolve || (work->state & DAQP_STATE_PRESOLVED)))
-        mask |= DAQP_UPDATE_M+DAQP_UPDATE_d;
-    flag = daqp_update_ldp_core(mask,work,qp);
-    // (A singular Hessian is presolved after its regularization, in daqp_bnb_prox)
-    if(flag >= 0 && work->bnb != NULL && work->settings->presolve && work->n_prox == 0)
-        daqp_presolve_ldp(work);
+    // A mixed-integer problem is presolved into a copy that the LDP is formed from
+    // (all of it, since the tightenings depend on all of the data)
+    pq = (work->bnb != NULL && work->settings->presolve) ? daqp_presolve(work,qp) : qp;
+    if(pq != qp || (work->state & DAQP_STATE_PRESOLVED)) mask |= DAQP_UPDATE_M+DAQP_UPDATE_d;
+    flag = daqp_update_ldp_core(mask,work,pq);
+    work->qp = qp; // The solution is checked against qp
+    if(pq != qp) work->state |= DAQP_STATE_PRESOLVED;
     return flag;
 }
 

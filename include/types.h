@@ -111,7 +111,7 @@ typedef struct{
     int n_root_WS;
 
     c_float* RinvD; // Diagonal R of an LP with a singular Hessian (see daqp_bnb_prox)
-    c_float* ps_work; // Scratch for the presolve (see daqp_presolve_ldp)
+    DAQPProblem* ps_qp; // Presolved copy of the problem (see daqp_presolve)
 }DAQPBnB;
 
 typedef struct{

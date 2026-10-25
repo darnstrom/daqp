@@ -174,86 +174,26 @@ static int presolve_problem(DAQPProblem* qp){
 }
 
 /* --------------------------------------------------------------------------
- * daqp_presolve_ldp  --  presolve applied to the LDP (settings->presolve)
+ * daqp_presolve  --  presolve for the LDP (settings->presolve)
  *
- * The problem data (qp) is left untouched: presolve_problem is applied to a copy,
- * and the tightened bounds and rows are formed in d and M (with the scaling),
- * which daqp_update_ldp forms from qp again before the next presolve (since a
- * tightening can be invalid for other data). If the presolve finds the problem
- * infeasible, the LDP is left as it is (and BnB finds it infeasible).
+ * qp is presolved into a copy (in scratch allocated once, since the dimensions
+ * are fixed at setup), which the LDP is formed from instead of qp. qp itself is
+ * left untouched (and the solution is checked against it). Returns the copy, or
+ * qp if the presolve changed nothing or found the problem infeasible (BnB then
+ * finds it infeasible).
  * --------------------------------------------------------------------------*/
-
-// Form constraint i (row i-ms of M, or a simple bound) with the coefficients a
-// (for a row) and the bounds bu, bl
-static void presolve_form(DAQPWorkspace* work, const int i, const c_float* a,
-        const c_float bu, const c_float bl){
-    int j, k;
-    const int n = work->n, ms = work->ms;
-    const int ns = (work->state & DAQP_STATE_RINV_NORMALIZED) ? ms : 0;
-    c_float sc, off = 0, norm2 = 0, sum, *m;
-    if(i < ms){ // d = b*scaling + (Rinv*v)_i (as in daqp_update_d)
-        sc = work->scaling[i];
-        if(work->v != NULL){
-            if(work->Rinv != NULL) for(j = i; j < n; j++) off += work->Rinv[DAQP_R_OFFSET(i,n)+j]*work->v[j];
-            else off = work->v[i];
-        }
-    }
-    else{ // m = Rinv'*a (with the scaling of normalized rows of Rinv undone), normalized
-        m = work->M+(size_t)(i-ms)*n;
-        if(work->Rinv != NULL){
-            for(j = n-1; j >= 0; j--){
-                for(k = 0, sum = 0; k <= j; k++)
-                    sum += (k < ns ? a[k]/work->scaling[k] : a[k])*work->Rinv[DAQP_R_OFFSET(k,n)+j];
-                m[j] = sum;
-            }
-        }
-        else for(j = 0; j < n; j++) m[j] = work->RinvD != NULL ? a[j]*work->RinvD[j] : a[j];
-        for(j = 0; j < n; j++) norm2 += m[j]*m[j];
-        if(norm2 < work->settings->zero_tol){ // A zero row is redundant (presolve_problem checked it)
-            for(j = 0; j < n; j++) m[j] = 0;
-            work->scaling[i] = 1;
-            work->dupper[i] = DAQP_INF;
-            work->dlower[i] = -DAQP_INF;
-            return;
-        }
-        sc = 1/sqrt(norm2);
-        for(j = 0; j < n; j++) m[j] *= sc;
-        work->scaling[i] = sc;
-        for(j = 0; work->v != NULL && j < n; j++) off += m[j]*work->v[j];
-    }
-    work->dupper[i] = (bu >= DAQP_INF) ? DAQP_INF : bu*sc + off;
-    work->dlower[i] = (bl <= -DAQP_INF) ? -DAQP_INF : bl*sc + off;
-}
-
-void daqp_presolve_ldp(DAQPWorkspace* work){
-    int i, changed = 0;
-    DAQPProblem* qp = work->qp, cp = *qp;
-    const int n = qp->n, m = qp->m, ms = qp->ms, mA = m-ms;
-    if(mA <= 0 || qp->A == NULL) return;
-    // Presolve a copy of the data (with the sense of qp, not of the workspace) in
-    // scratch that is allocated once (the dimensions are fixed at setup)
-    if(work->bnb->ps_work == NULL)
-        work->bnb->ps_work = malloc(((size_t)mA*n+2*m)*sizeof(c_float)+m*sizeof(int));
-    cp.A = work->bnb->ps_work;
-    cp.bupper = cp.A+(size_t)mA*n;
-    cp.blower = cp.bupper+m;
-    cp.sense = (int*)(cp.blower+m);
-    memcpy(cp.A,qp->A,(size_t)mA*n*sizeof(c_float));
-    memcpy(cp.bupper,qp->bupper,m*sizeof(c_float));
-    memcpy(cp.blower,qp->blower,m*sizeof(c_float));
-    for(i = 0; i < m; i++) cp.sense[i] = qp->sense != NULL ? qp->sense[i] : work->sense[i];
-    if(presolve_problem(&cp) > 0){
-        for(i = 0; i < m; i++){ // Form the tightened constraints
-            const c_float* a = i < ms ? NULL : cp.A+(size_t)(i-ms)*n;
-            if(cp.bupper[i] == qp->bupper[i] && cp.blower[i] == qp->blower[i] &&
-                    (i < ms || memcmp(a,qp->A+(size_t)(i-ms)*n,n*sizeof(c_float)) == 0)) continue;
-            presolve_form(work,i,a,cp.bupper[i],cp.blower[i]);
-            changed = 1;
-        }
-    }
-    if(changed){
-        work->state |= DAQP_STATE_PRESOLVED;
-        work->reuse_ind = 0;
-        daqp_reactivate_constraints(work); // M changed => refactor the working set
-    }
+DAQPProblem* daqp_presolve(DAQPWorkspace* work, DAQPProblem* qp){
+    const int n = qp->n, m = qp->m, mA = m-qp->ms;
+    DAQPProblem* cp = work->bnb->ps_qp;
+    if(mA <= 0 || qp->A == NULL) return qp;
+    if(cp == NULL)
+        cp = work->bnb->ps_qp = malloc(sizeof(DAQPProblem)+((size_t)mA*n+2*m)*sizeof(c_float));
+    *cp = *qp; // H, f and the sense are shared
+    cp->A = (c_float*)(cp+1);
+    cp->bupper = cp->A+(size_t)mA*n;
+    cp->blower = cp->bupper+m;
+    memcpy(cp->A,qp->A,(size_t)mA*n*sizeof(c_float));
+    memcpy(cp->bupper,qp->bupper,m*sizeof(c_float));
+    memcpy(cp->blower,qp->blower,m*sizeof(c_float));
+    return presolve_problem(cp) > 0 ? cp : qp;
 }

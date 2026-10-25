@@ -8,7 +8,7 @@ extern "C" {
 #include "types.h"
 #include "constants.h"
 
-void daqp_presolve_ldp(DAQPWorkspace* work);
+DAQPProblem* daqp_presolve(DAQPWorkspace* work, DAQPProblem* qp);
 
 # ifdef __cplusplus
 }

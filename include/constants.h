@@ -152,7 +152,7 @@ extern "C" {
 // Constraints are only added above the rounding level of u (set by daqp_ldp when
 // cycling persists, see DAQP_ADD_NOISE_GAIN)
 #define DAQP_STATE_NOISE_FLOOR 8192
-// M and d are presolved (see daqp_presolve_ldp)
+// The LDP is formed from the presolved copy of qp (see daqp_presolve)
 #define DAQP_STATE_PRESOLVED 16384
 
 // CONSTRAINT MASKS
