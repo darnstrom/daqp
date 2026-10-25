@@ -41,6 +41,7 @@ if(TEST)
     add_executable(21_bnb_time_limit tests/21_bnb_time_limit.cpp)
     add_executable(22_eq_reduction_factored tests/22_eq_reduction_factored.cpp)
     add_executable(23_bnb_dependent_binary tests/23_bnb_dependent_binary.cpp)
+    add_executable(24_bnb_singular_hessian tests/24_bnb_singular_hessian.cpp)
 
     set(TARGETS
         00_basic_qp
@@ -67,6 +68,7 @@ if(TEST)
         21_bnb_time_limit
         22_eq_reduction_factored
         23_bnb_dependent_binary
+        24_bnb_singular_hessian
     )
 
     foreach(TARGET ${TARGETS})

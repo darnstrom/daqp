@@ -10,6 +10,7 @@ extern "C" {
 #include "daqp.h"
 
 int daqp_prox(DAQPWorkspace *work);
+int daqp_bnb_prox(DAQPWorkspace* work);
 
 # ifdef __cplusplus
 }
