@@ -713,11 +713,14 @@ void daqp_sub_working_set_rows(DAQPWorkspace *work, const c_float* dlam, c_float
 // c solves M_W M_W' c = M_W m (refined once) and the pivot is ||m - M_W'c||^2. If the residual
 // still decreases substantially in the refinement, the working set is singular.
 // (c is stored in the new row of L, and the residual r in zldl)
+// Only a singular verdict changes the factorization: otherwise the original row of L and pivot
+// are kept (the row is saved in the unused next row of L, which exists since n_active < n)
 void daqp_refine_pivot(DAQPWorkspace *work, const int add_ind, const int L_start){
     int i, j, disp, it;
     const int k = work->n_active, n = work->n;
-    c_float *c = work->L+L_start, *r = work->zldl, rr[2];
+    c_float *c = work->L+L_start, *l = c+k+1, *r = work->zldl, rr[2];
     work->reuse_ind = 0; // xldl and zldl are used as scratch
+    for(i = 0; i < k; i++) l[i] = c[i];
     daqp_solve_Lt(work->L, c, k); // c = L'\l
     for(it = 0; it < 2; it++){
         for(j = 0; j < n; j++) r[j] = 0; // r = m - M_W'c
@@ -733,7 +736,11 @@ void daqp_refine_pivot(DAQPWorkspace *work, const int add_ind, const int L_start
         daqp_solve_working_set(work);
         for(i = 0; i < k; i++) c[i] -= work->xldl[i];
     }
-    work->D[k] = rr[1] < DAQP_PIVOT_REFINE_DECREASE*rr[0] ? 0 : rr[1];
+    if(rr[1] >= DAQP_PIVOT_REFINE_DECREASE*rr[0]){ // Nonsingular: keep the original row
+        for(i = 0; i < k; i++) c[i] = l[i];
+        return;
+    }
+    work->D[k] = 0;
     for(j = 0; j < k; j++) // New row of L: l = L'c (in place, since row j only uses c[i], i >= j)
         for(i = j+1, disp = DAQP_ARSUM(i)+j; i < k; disp += ++i)
             c[j] += work->L[disp]*c[i];
