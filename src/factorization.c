@@ -1,4 +1,6 @@
 #include "factorization.h"
+#include "auxiliary.h"
+#include <float.h>
 
  // Necessary to retain accuracy when FAST_MATH is used 
 static c_float dot_row(const c_float* a, const c_float* b, const int n){
@@ -94,6 +96,16 @@ void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind, const c_float r
         sum -= tmp*work->L[disp];
     }
     work->D[work->n_active]=sum;
+
+    // Refine the pivot if it might be dominated by rounding errors (see DAQP_PIVOT_REFINE_GAIN)
+    // (Pivots below sing_tol are already singular, and so is the working set if n_active >= n)
+    if(rho == 0 && ns_active == 0 && sum >= work->settings->sing_tol && work->n_active < work->n){
+        const c_float eps_mach = sizeof(c_float) == sizeof(float) ? FLT_EPSILON : DBL_EPSILON;
+        c_float min_D = 1; // (in a separate pass, so that the loop above is not changed)
+        for(i = 0; i < work->n_active; i++) if(work->D[i] < min_D) min_D = work->D[i];
+        if(sum*min_D < DAQP_PIVOT_REFINE_GAIN*eps_mach)
+            daqp_refine_pivot(work, add_ind, new_L_start);
+    }
 
     // Check for singularity
     if(work->D[work->n_active] < work->settings->sing_tol ||
