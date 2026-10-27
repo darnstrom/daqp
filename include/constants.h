@@ -58,7 +58,7 @@ extern "C" {
 #define DAQP_REFINE_PIVOT 1e-6
 // A new pivot of the LDL' is recomputed from an explicit residual (daqp_refine_pivot) if it
 // might be dominated by rounding errors, which are amplified by small pivots of the working
-// set: if it is below DAQP_PIVOT_REFINE_GAIN*eps/min(D)^2 (the rows of M are normalized).
+// set: if it is below DAQP_PIVOT_REFINE_GAIN*eps/min(D) (the rows of M are normalized).
 // Pivots below sing_tol are singular without refinement.
 #define DAQP_PIVOT_REFINE_GAIN 1e2
 // The working set is singular if the residual decreases by more than this factor when refined

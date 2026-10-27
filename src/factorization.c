@@ -101,7 +101,7 @@ void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind, const c_float r
     // Refine the pivot if it might be dominated by rounding errors (see DAQP_PIVOT_REFINE_GAIN)
     const c_float eps_mach = sizeof(c_float) == sizeof(float) ? FLT_EPSILON : DBL_EPSILON;
     // (Pivots below sing_tol are already singular, and so is the working set if n_active >= n)
-    if(sum*min_D*min_D < DAQP_PIVOT_REFINE_GAIN*eps_mach && rho == 0 && ns_active == 0 &&
+    if(sum*min_D < DAQP_PIVOT_REFINE_GAIN*eps_mach && rho == 0 && ns_active == 0 &&
             sum >= work->settings->sing_tol && work->n_active < work->n)
         daqp_refine_pivot(work, add_ind, new_L_start);
 
