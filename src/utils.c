@@ -740,7 +740,8 @@ int daqp_check_bounds(DAQPWorkspace* work, c_float* bupper, c_float* blower){
             return DAQP_EXIT_INFEASIBLE;
         }
         // Check for unmarked equality constraint (blower == bupper)
-        else if (diff < work->settings->zero_tol && !DAQP_IS_SOFT(i)){
+        // (not binaries, e.g., fixed by the presolve, which BnB handles as binaries)
+        else if (diff < work->settings->zero_tol && !DAQP_IS_SOFT(i) && !DAQP_IS_BINARY(i)){
             if(!(work->sense[i] & DAQP_AUTO_EQUALITY) || !DAQP_IS_ACTIVE(i))
                 do_activate = 1;
             work->sense[i] |= DAQP_ACTIVE | DAQP_IMMUTABLE | DAQP_AUTO_EQUALITY;
