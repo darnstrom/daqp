@@ -77,6 +77,9 @@ typedef struct{
 
     // Equality-reduction policy: DAQP_EQ_REDUCTION_{OFF,AUTO,ON}
     int eq_reduction;
+
+    // Presolve mixed-integer problems when they are set up or updated (1) or not (0)
+    int presolve;
 }DAQPSettings;
 
 
@@ -108,6 +111,7 @@ typedef struct{
     int n_root_WS;
 
     c_float* RinvD; // Diagonal R of an LP with a singular Hessian (see daqp_bnb_prox)
+    DAQPProblem* ps_qp; // Presolved copy of the problem (see daqp_presolve)
 }DAQPBnB;
 
 typedef struct{

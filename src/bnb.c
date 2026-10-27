@@ -34,6 +34,8 @@ static int daqp_bnb_store_ws(int* ids, DAQPWorkspace* work){
 static void daqp_bnb_load_ws(const int* ids, const int n_ids, DAQPWorkspace* work){
     int i;
     for(i=0; i < n_ids; i++){
+        // E.g., a binary that the new bounds fix is already active (as an equality)
+        if(DAQP_IS_ACTIVE(DAQP_REMOVE_LOWER_FLAG(ids[i]))) continue;
         daqp_add_upper_lower(ids[i],work);
         if(work->sing_ind != DAQP_EMPTY_IND) {
             work->n_active--;

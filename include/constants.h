@@ -70,6 +70,13 @@ extern "C" {
 // degenerate working set can swap constraints indefinitely
 #define DAQP_ADD_NOISE_GAIN 10
 
+// Presolve (settings->presolve): tightened bounds are relaxed by DAQP_PRESOLVE_MARGIN
+// (relative), and only kept if they improve by DAQP_PRESOLVE_MIN_IMPROVEMENT (relative
+// to the width). DAQP_PRESOLVE_FEAS_TOL is the tolerance for infeasibility
+#define DAQP_PRESOLVE_MARGIN 1e-9
+#define DAQP_PRESOLVE_MIN_IMPROVEMENT 1e-3
+#define DAQP_PRESOLVE_FEAS_TOL 1e-6
+
 // eps (relative to max(H_ii)) used when a semi-proximal inner problem fails
 #define DAQP_PROX_EPS_MAX 1e-3
 // Regularize a reduced Hessian of an H with zero rows if cond > DAQP_HESSIAN_COND_MAX,
@@ -148,6 +155,8 @@ extern "C" {
 // Constraints are only added above the rounding level of u (set by daqp_ldp when
 // cycling persists, see DAQP_ADD_NOISE_GAIN)
 #define DAQP_STATE_NOISE_FLOOR 8192
+// The LDP is formed from the presolved copy of qp (see daqp_presolve)
+#define DAQP_STATE_PRESOLVED 16384
 
 // CONSTRAINT MASKS
 #define DAQP_ACTIVE 1
