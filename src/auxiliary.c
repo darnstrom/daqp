@@ -599,6 +599,25 @@ int daqp_drop_singular_last(DAQPWorkspace *work){
     return id;
 }
 
+// Whether the other constraints of a singular working set imply the last one: the bounds are
+// consistent along the dependency, and no mutable constraint can leave along it (as in
+// daqp_remove_blocking), so that the dependency would otherwise certify infeasibility
+int daqp_implied_last(DAQPWorkspace *work){
+    int i, id;
+    c_float residual = 0, scale = 1, term;
+    daqp_compute_singular_direction(work);
+    for(i = 0; i <= work->sing_ind; i++){
+        id = work->WS[i];
+        term = work->lam_star[i]*(DAQP_IS_LOWER(id) ? work->dlower[id] : work->dupper[id]);
+        residual += term;
+        scale += term < 0 ? -term : term;
+        if(i < work->sing_ind && !DAQP_IS_IMMUTABLE(id) && (DAQP_IS_SOFT(id) ||
+                    (DAQP_IS_LOWER(id) ? -work->lam_star[i] : work->lam_star[i]) < -work->settings->zero_tol))
+            return 0; // Can leave
+    }
+    return residual <= work->settings->primal_tol*scale && residual >= -work->settings->primal_tol*scale;
+}
+
 // Activate the constraints that are marked active in sense
 // Equalities are activated before inequalities
 int daqp_activate_constraints(DAQPWorkspace *work){
@@ -611,27 +630,11 @@ int daqp_activate_constraints(DAQPWorkspace *work){
         }
         daqp_activate_constraint(work,i);
         if(work->sing_ind != DAQP_EMPTY_IND){
-            c_float dependency_residual = 0.0;
-            c_float dependency_scale = 1.0;
-
             //  The new equality is linearly dependent on the active equalities
-            daqp_compute_singular_direction(work);
-            for(j = 0; j < work->n_active; j++){
-                int id = work->WS[j];
-                c_float bound = DAQP_IS_LOWER(id)
-                    ? work->dlower[id] : work->dupper[id];
-                c_float term = work->lam_star[j] * bound;
-                dependency_residual += term;
-                dependency_scale += term < 0 ? -term : term;
-            }
-
             // Dependency might only be numerical => keep as mutable constraint
+            const int implied = daqp_implied_last(work);
             daqp_drop_singular_last(work);
-            if(dependency_residual >
-                        work->settings->primal_tol*dependency_scale ||
-                    dependency_residual <
-                        -work->settings->primal_tol*dependency_scale)
-                exitflag = DAQP_EXIT_OVERDETERMINED_INITIAL;
+            if(!implied) exitflag = DAQP_EXIT_OVERDETERMINED_INITIAL;
         }
     }
 
