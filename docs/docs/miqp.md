@@ -88,3 +88,26 @@ bias is within the allowed suboptimality `abs_subopt + rel_subopt*abs(J)` (see
 of the relaxation of the problem without the regularization (which is then solved as well, and
 gives a lower bound). If eliminating the equality constraints makes
 the Hessian positive definite, the problem is solved exactly (exit flag `1`).
+
+### Presolve
+Mixed-integer problems with big-M constraints, such as $$y \le M b$$ with a binary $$b$$, often have
+weak relaxations that make branch and bound explore many nodes. Setting `presolve = 1` tightens
+such problems before branch and bound:
+
+- bound propagation tightens the simple bounds (and fixes binaries) using the constraints;
+- coefficient tightening reduces the coefficients of binaries in one-sided constraints (e.g., a
+  loose $$M$$) as far as the bounds of the other variables allow.
+
+Neither changes the integer-feasible solutions, so the solution is the same, but the number of
+nodes can decrease substantially. The problem data is not changed: the presolve is applied to the
+internal representation of the problem when it is set up and whenever it is updated. Soft
+constraints are not relied on, and immutable constraints are not changed. Equality constraints
+are eliminated (see `eq_reduction`) from the presolved problem.
+
+Presolve is enabled by default. Besides reducing the number of nodes, it makes branch and bound
+more robust for loose big-M constants, which otherwise make the problem badly scaled. Its cost
+is about that of setting up the problem, and it is done whenever the problem is updated (an update
+of only the bounds then also forms the constraint matrix of the LDP again). For problems that are
+solved repeatedly with small trees and tight big-M constants (e.g., hybrid MPC), this cost can
+exceed what it saves, and `presolve = 0` can be faster. Generated code (see code generation) is
+formed from the problem itself, since the presolve depends on the data at the time of generation.

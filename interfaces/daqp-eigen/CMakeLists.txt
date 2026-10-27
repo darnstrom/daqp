@@ -42,6 +42,7 @@ if(TEST)
     add_executable(22_eq_reduction_factored tests/22_eq_reduction_factored.cpp)
     add_executable(23_bnb_dependent_binary tests/23_bnb_dependent_binary.cpp)
     add_executable(24_bnb_singular_hessian tests/24_bnb_singular_hessian.cpp)
+    add_executable(25_presolve tests/25_presolve.cpp)
     add_executable(26_bnb_robustness tests/26_bnb_robustness.cpp)
 
     set(TARGETS
@@ -70,6 +71,7 @@ if(TEST)
         22_eq_reduction_factored
         23_bnb_dependent_binary
         24_bnb_singular_hessian
+        25_presolve
         26_bnb_robustness
     )
 

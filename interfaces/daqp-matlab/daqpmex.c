@@ -30,7 +30,8 @@ const char* SETTINGS_FIELDS[] = {
   "sing_tol",
   "refactor_tol",
   "time_limit",
-  "eq_reduction"
+  "eq_reduction",
+  "presolve"
 };
 
 
@@ -189,6 +190,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		mxSetField(s, 0, "rel_subopt", mxCreateDoubleScalar(work->settings->rel_subopt));
 		mxSetField(s, 0, "time_limit", mxCreateDoubleScalar(work->settings->time_limit));
 		mxSetField(s, 0, "eq_reduction", mxCreateDoubleScalar(work->settings->eq_reduction));
+		mxSetField(s, 0, "presolve", mxCreateDoubleScalar(work->settings->presolve));
 		plhs[0] = s;
 	  }
 	}
@@ -212,6 +214,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	  work->settings->rel_subopt= (c_float)mxGetScalar(mxGetField(s, 0, "rel_subopt"));
 	  work->settings->time_limit= (c_float)mxGetScalar(mxGetField(s, 0, "time_limit"));
 	  work->settings->eq_reduction= (int)mxGetScalar(mxGetField(s, 0, "eq_reduction"));
+	  work->settings->presolve= (int)mxGetScalar(mxGetField(s, 0, "presolve"));
 	  if(work->settings->rho_soft != old_rho_soft ||
 	     work->settings->w_soft != old_w_soft)
 	    daqp_refresh_soft_weights(work);

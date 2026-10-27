@@ -58,12 +58,26 @@ extern "C" {
 // The active constraints are refined at a solution if a pivot of the LDL' is
 // below this (independent of pivot_tol, since BnB does not refine x afterwards)
 #define DAQP_REFINE_PIVOT 1e-6
+// A new pivot of the LDL' is recomputed from an explicit residual (daqp_refine_pivot) if it
+// might be dominated by rounding errors, which are amplified by small pivots of the working
+// set: if it is below DAQP_PIVOT_REFINE_GAIN*eps/min(D) (the rows of M are normalized).
+// Pivots below sing_tol are singular without refinement.
+#define DAQP_PIVOT_REFINE_GAIN 1e2
+// The working set is singular if the residual decreases by more than this factor when refined
+#define DAQP_PIVOT_REFINE_DECREASE 0.1
 // When cycling persists after the working set has been refactorized, a
 // constraint is only added if its violation also exceeds the rounding level of
 // u = -M'lam, about DAQP_ADD_NOISE_GAIN*eps*sum|lam| (the rows of M are
 // normalized). Below it, the computed violation is rounding noise, on which a
 // degenerate working set can swap constraints indefinitely
 #define DAQP_ADD_NOISE_GAIN 10
+
+// Presolve (settings->presolve): tightened bounds are relaxed by DAQP_PRESOLVE_MARGIN
+// (relative), and only kept if they improve by DAQP_PRESOLVE_MIN_IMPROVEMENT (relative
+// to the width). DAQP_PRESOLVE_FEAS_TOL is the tolerance for infeasibility
+#define DAQP_PRESOLVE_MARGIN 1e-9
+#define DAQP_PRESOLVE_MIN_IMPROVEMENT 1e-3
+#define DAQP_PRESOLVE_FEAS_TOL 1e-6
 
 // eps (relative to max(H_ii)) used when a semi-proximal inner problem fails
 #define DAQP_PROX_EPS_MAX 1e-3
@@ -143,6 +157,8 @@ extern "C" {
 // Constraints are only added above the rounding level of u (set by daqp_ldp when
 // cycling persists, see DAQP_ADD_NOISE_GAIN)
 #define DAQP_STATE_NOISE_FLOOR 8192
+// The LDP is formed from the presolved copy of qp (see daqp_presolve)
+#define DAQP_STATE_PRESOLVED 16384
 
 // CONSTRAINT MASKS
 #define DAQP_ACTIVE 1

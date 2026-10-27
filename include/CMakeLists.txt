@@ -10,6 +10,7 @@ set(
     "${CMAKE_CURRENT_SOURCE_DIR}/eq_elim.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/factorization.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/hierarchical.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/presolve.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/types.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/utils.h"
 )

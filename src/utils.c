@@ -1,5 +1,6 @@
 #include "daqp.h"
 #include "utils.h"
+#include "presolve.h"
 #include <stdlib.h>
 #include <math.h>
 #include <float.h>
@@ -299,8 +300,16 @@ static int daqp_update_ldp_core(int mask, DAQPWorkspace *work, DAQPProblem* qp){
  * constraints are to be eliminated (see eq_elim.h), the LDP is formed for the
  * reduced problem, and the workspace keeps describing qp otherwise.
  */
+// Mark if the LDP is formed from the presolved copy (after it is formed, which resets the state)
+#define DAQP_SET_PRESOLVED(work,on) ((work)->state = (on) ? (work)->state | DAQP_STATE_PRESOLVED :\
+        (work)->state & ~DAQP_STATE_PRESOLVED)
+// Inconsistent equalities of a presolved problem (which include the binaries that the presolve
+// fixed) mean that the mixed-integer problem is infeasible
+#define DAQP_PRESOLVED_FLAG(flag,presolved) (((presolved) && (flag) == DAQP_EXIT_OVERDETERMINED_INITIAL) ?\
+        DAQP_EXIT_INFEASIBLE : (flag))
 int daqp_update_ldp(int mask, DAQPWorkspace *work, DAQPProblem* qp){
     int i, flag;
+    DAQPProblem* pq;
     const int was_reduced = DAQP_IS_REDUCED(work);
     daqp_eq_restore(work);
     work->qp = qp;
@@ -310,13 +319,20 @@ int daqp_update_ldp(int mask, DAQPWorkspace *work, DAQPProblem* qp){
         if(qp->sense == NULL) for(i = 0; i < qp->m; i++) work->sense[i] = 0;
         else for(i = 0; i < qp->m; i++) work->sense[i] = qp->sense[i];
     }
-    if(daqp_eq_wanted(work,qp,mask)){
-        flag = daqp_eq_update(work,qp,mask,daqp_update_ldp_core);
+    // A mixed-integer problem is presolved into a copy that the LDP (and the elimination
+    // of its equalities) is formed from (all of it, since the tightenings depend on all
+    // of the data). The equality constraints are the same in the copy
+    pq = (work->bnb != NULL && work->settings->presolve) ? daqp_presolve(work,qp) : qp;
+    if(pq != qp || (work->state & DAQP_STATE_PRESOLVED)) mask |= DAQP_UPDATE_M+DAQP_UPDATE_d;
+    if(daqp_eq_wanted(work,pq,mask)){
+        flag = daqp_eq_update(work,pq,mask,daqp_update_ldp_core);
         if(flag != DAQP_EQ_NOT_REDUCED){
             work->n = qp->n;
             work->m = qp->m;
             work->ms = qp->ms;
-            return flag;
+            work->qp = qp; // As below (the equality constraints are the same in pq)
+            DAQP_SET_PRESOLVED(work,pq != qp);
+            return DAQP_PRESOLVED_FLAG(flag,pq != qp);
         }
     }
     else daqp_eq_deactivate(work);
@@ -326,7 +342,10 @@ int daqp_update_ldp(int mask, DAQPWorkspace *work, DAQPProblem* qp){
         if(qp->H != NULL) mask |= DAQP_UPDATE_Rinv;
         if(qp->f != NULL) mask |= DAQP_UPDATE_v;
     }
-    return daqp_update_ldp_core(mask,work,qp);
+    flag = daqp_update_ldp_core(mask,work,pq);
+    work->qp = qp; // The solution is checked against qp
+    DAQP_SET_PRESOLVED(work,pq != qp);
+    return DAQP_PRESOLVED_FLAG(flag,pq != qp);
 }
 
 int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
@@ -721,7 +740,8 @@ int daqp_check_bounds(DAQPWorkspace* work, c_float* bupper, c_float* blower){
             return DAQP_EXIT_INFEASIBLE;
         }
         // Check for unmarked equality constraint (blower == bupper)
-        else if (diff < work->settings->zero_tol && !DAQP_IS_SOFT(i)){
+        // (not binaries, e.g., fixed by the presolve, which BnB handles as binaries)
+        else if (diff < work->settings->zero_tol && !DAQP_IS_SOFT(i) && !DAQP_IS_BINARY(i)){
             if(!(work->sense[i] & DAQP_AUTO_EQUALITY) || !DAQP_IS_ACTIVE(i))
                 do_activate = 1;
             work->sense[i] |= DAQP_ACTIVE | DAQP_IMMUTABLE | DAQP_AUTO_EQUALITY;

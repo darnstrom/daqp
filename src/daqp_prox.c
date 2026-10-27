@@ -539,14 +539,19 @@ static c_float bnb_prox_objective(const DAQPWorkspace* work, const int is_lp){
 static c_float bnb_prox_relaxation(DAQPWorkspace* work, const int is_lp){
     int i, exitflag;
     DAQPBnB* bnb = work->bnb;
+    DAQPProblem* qp = work->qp;
     c_float J = -DAQP_INF, *x = work->x, *xold = work->xold, *u = work->u;
     for(i = 0; is_lp && i < work->m; i++) if(work->sense[i] & DAQP_SOFT) return J; // (see above)
     for(i = 0; i < work->n; i++) bnb->xtmp[i] = x[i]; // An incumbent (see daqp_set_primal_start)
+    // A presolved LDP is formed from the presolved copy (see daqp_presolve), whose relaxation
+    // is tighter but has the same integer-feasible points (so J is still a lower bound)
+    if(work->state & DAQP_STATE_PRESOLVED) work->qp = bnb->ps_qp;
     work->bnb = NULL; // The binaries are relaxed
     exitflag = daqp_prox(work);
     if(exitflag == DAQP_EXIT_OPTIMAL || exitflag == DAQP_EXIT_SOFT_OPTIMAL)
         J = bnb_prox_objective(work,is_lp);
     work->bnb = bnb;
+    work->qp = qp;
     work->x = x; work->xold = xold; work->u = u; // (swapped and aliased by daqp_prox)
     for(i = 0; i < work->n; i++) x[i] = bnb->xtmp[i];
     return J;
@@ -564,6 +569,7 @@ int daqp_bnb_prox(DAQPWorkspace* work){
     const int n = work->n, is_lp = work->Rinv == NULL && work->RinvD == NULL;
     const int weigh = work->Rinv == NULL || work->n_prox < n; // Decoupled
     c_float eps = 0, eps0 = 1;
+    const DAQPProblem* pq;
     c_float lb = bnb_prox_relaxation(work,is_lp);
 
     if(is_lp){
@@ -582,7 +588,8 @@ int daqp_bnb_prox(DAQPWorkspace* work){
     }
     else eps = eps0;
     daqp_update_v(work->qp->f,work);
-    daqp_update_d(work,work->qp->bupper,work->qp->blower);
+    pq = (work->state & DAQP_STATE_PRESOLVED) ? work->bnb->ps_qp : work->qp; // See daqp_presolve
+    daqp_update_d(work,pq->bupper,pq->blower);
 
     // The regularization is removed from the objective J of rel_subopt (see daqp_bnb)
     for(i = 0; work->bnb->reg != NULL && i < n; i++)
