@@ -398,6 +398,19 @@ end
         ef == DAQPBase.OPTIMAL && @test abs(fval-4.0) < 1e-6
     end
 
+    # Binaries without cost (regularized by DAQP): rel_subopt is relative to J, not to
+    # the regularized objective. b1+b2 >= 1, b2 = 1 => x >= 1 (J = 1), b1 = 1 => x >= 0 (J = 0)
+    Hs = [2.0 0 0; 0 0 0; 0 0 0]
+    As = [0.0 1.0 1.0; -1.0 0.0 1e4; -1.0 1e4 0.0]
+    bus, bls = [1e4, 1, 1, 1e30, 1e4-1, 1e4], [-1e4, 0, 0, 1, -1e30, -1e30]
+    senses = Cint[0, DAQPBase.BINARY, DAQPBase.BINARY, 0, 0, 0]
+    for rel in (0.0, 1e-2)
+        s = settings(DAQPBase.Model(), Dict(:rel_subopt => rel))
+        x,fval,ef,_ = quadprog(Hs,zeros(3),As,bus,bls,senses; settings=s)
+        @test ef > 0
+        @test abs(fval) < 1e-6
+    end
+
     # Random MIQPs: the result is within the allowed suboptimality
     Random.seed!(1234)
     for _ in 1:20

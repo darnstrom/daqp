@@ -140,11 +140,42 @@ static c_float daqp_bnb_incumbent(DAQPWorkspace* work){
     return fval;
 }
 
+// The regularization sum_j reg_j/2*x_j^2 of daqp_bnb_prox at u, which is not part of
+// the objective J of rel_subopt (only needed if rel_subopt > 0)
+static c_float daqp_bnb_reg(const c_float* u, DAQPWorkspace* work){
+    int i;
+    c_float val = 0, *x = work->bnb->xtmp;
+    if(work->n_prox == 0 || x == NULL || work->settings->rel_subopt <= 0) return 0;
+    for(i = 0; i < work->n; i++) x[i] = work->v != NULL ? u[i]-work->v[i] : u[i];
+    daqp_apply_Rinv(work,x);
+    for(i = 0; i < work->n; i++) val += 0.5*work->bnb->reg[i]*x[i]*x[i];
+    return val;
+}
+
 // Nodes must improve on the objective J by more than abs_subopt + rel_subopt*|J|.
 // The bound is in the scale 0.5*fval = J + c used by daqp_ldp
 static c_float daqp_bnb_bound(c_float fval, c_float c, DAQPSettings* settings){
     c_float J = 0.5*fval - c;
     return 0.5*fval - settings->abs_subopt - settings->rel_subopt*(J < 0 ? -J : J);
+}
+
+// Fixing binaries that dominate a row of M (e.g., big-M or small curvature on the binaries)
+// leaves the fraction r of its squared norm that is on the other variables. Pivots of such
+// rows are hence about r, and the singularity tolerance is made relative to the smallest r
+static c_float daqp_bnb_sing_tol(DAQPWorkspace* work){
+    int i, k;
+    c_float rmin = 1, sb, tol;
+    if(work->n_prox > 0) return work->settings->sing_tol; // Not for daqp_bnb_prox
+    for(i = 0; i < work->m-work->ms; i++){ // The rows of M have unit norm => r = 1-sb
+        const c_float* Mi = work->M+(size_t)i*work->n;
+        for(k = 0, sb = 0; k < work->bnb->nb; k++)
+            if(work->bnb->bin_ids[k] < work->ms) sb += Mi[work->bnb->bin_ids[k]]*Mi[work->bnb->bin_ids[k]];
+        if(sb > 0 && 1-sb > 0 && 1-sb < rmin) rmin = 1-sb;
+    }
+    tol = rmin*work->settings->sing_tol;
+    if(tol < DAQP_BNB_MIN_SING_TOL) // Limit by the accuracy of the pivots
+        tol = work->settings->sing_tol < DAQP_BNB_MIN_SING_TOL ? work->settings->sing_tol : DAQP_BNB_MIN_SING_TOL;
+    return tol;
 }
 
 int daqp_bnb(DAQPWorkspace* work){
@@ -155,6 +186,8 @@ int daqp_bnb(DAQPWorkspace* work){
     exitflag = daqp_bnb_setup_root(work);
     if(exitflag < 0) return exitflag;
     work->bnb->neq = exitflag;
+    const c_float sing_tol0 = work->settings->sing_tol;
+    work->settings->sing_tol = daqp_bnb_sing_tol(work);
 
     // Warm start the root with the root working set of the previous solve
     // (unless a warm start has been provided)
@@ -175,7 +208,8 @@ int daqp_bnb(DAQPWorkspace* work){
         work->state &= ~DAQP_STATE_INCUMBENT;
         fval_best = daqp_bnb_incumbent(work);
         if(fval_best >= 0 && 0.5*fval_best < work->settings->fval_bound){
-            work->settings->fval_bound = daqp_bnb_bound(fval_best,c,work->settings);
+            work->settings->fval_bound = daqp_bnb_bound(fval_best,c+daqp_bnb_reg(work->xold,work),
+                    work->settings);
             swp_ptr = work->xold; // Marks that a feasible solution is stored in xold
         }
     }
@@ -220,7 +254,8 @@ int daqp_bnb(DAQPWorkspace* work){
         branch_id = daqp_get_branch_id(work);
         if(branch_id==DAQP_EMPTY_IND){// Nothing to branch over => integer feasible
             fval_best = work->fval;
-            work->settings->fval_bound = daqp_bnb_bound(fval_best,c,work->settings);
+            work->settings->fval_bound = daqp_bnb_bound(fval_best,c+daqp_bnb_reg(work->u,work),
+                    work->settings);
             swp_ptr=work->xold; work->xold= work->u; work->u=swp_ptr; // Store feasible sol
         }
         else{
@@ -236,11 +271,13 @@ int daqp_bnb(DAQPWorkspace* work){
     work->bnb->n_clean = work->bnb->neq;
     if(swp_ptr==NULL){
         work->settings->fval_bound = fval_bound0;
+        work->settings->sing_tol = sing_tol0;
         return exitflag < 0 ? exitflag : DAQP_EXIT_INFEASIBLE;
     }
     else{
         work->fval = fval_best;
         work->settings->fval_bound = fval_bound0;
+        work->settings->sing_tol = sing_tol0;
         // Let work->u point to the best feasible solution
         swp_ptr=work->u; work->u= work->xold; work->xold=swp_ptr;
         // Exploration ended early (time/iteration limit, cycling) => not proven optimal

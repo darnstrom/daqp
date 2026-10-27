@@ -554,6 +554,9 @@ int daqp_bnb_prox(DAQPWorkspace* work){
     daqp_update_v(work->qp->f,work);
     daqp_update_d(work,work->qp->bupper,work->qp->blower);
 
+    // The regularization is removed from the objective J of rel_subopt (see daqp_bnb)
+    for(i = 0; work->bnb->reg != NULL && i < n; i++)
+        work->bnb->reg[i] = work->prox_mask[i] ? eps*(weigh ? prox_weight(work,i) : 1) : 0;
     exitflag = daqp_bnb(work);
     if(exitflag > 0){
         work->x = work->u; // u points to the best leaf (x might alias xold)

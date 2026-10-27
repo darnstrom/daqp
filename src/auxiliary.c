@@ -551,6 +551,11 @@ void daqp_pivot_last(DAQPWorkspace *work){
         // Ensure that binaries never swap order (since this order is exploited)
         if(DAQP_IS_BINARY(ind_old) && DAQP_IS_BINARY(work->WS[work->n_active-1])) return;
         if(work->bnb != NULL && rm_ind < work->bnb->n_clean) return;
+        // Do not swap if it would make the working set singular: the pivot of
+        // the swapped constraint becomes D[rm]*D[last]/(D[last]+l^2*D[rm])
+        const c_float l = work->L[DAQP_ARSUM(work->n_active-1)+rm_ind];
+        const c_float d_last = work->D[work->n_active-1];
+        if(work->D[rm_ind]*d_last < work->settings->sing_tol*(d_last+l*l*work->D[rm_ind])) return;
 
         c_float lam_old = work->lam[rm_ind];
         daqp_remove_constraint(work,rm_ind); // pivot_last might be recursively called here
