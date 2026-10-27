@@ -8,7 +8,8 @@
 #include <vector>
 
 // Regressions: branch and bound with binaries that dominate the constraints (big-M with
-// little curvature on the binaries), and degenerate working sets in daqp_pivot_last
+// little curvature on the binaries), degenerate working sets in daqp_pivot_last, and exact
+// solutions of problems with zero-cost binaries (that were reported as inexact)
 
 namespace {
 
@@ -116,4 +117,13 @@ int main() {
     const int nc = sizeof(xc) / sizeof(xc[0]), mc = sizeof(buc) / sizeof(buc[0]) - nc;
     Problem c(nc, mc, Hc, fc, Ac, buc, blc, nullptr);
     check(c, c.objective(std::vector<c_float>(xc, xc + nc)));
+
+    // Zero-cost binaries b_1, b_2 (a singular Hessian, regularized in daqp_bnb_prox):
+    // min x_0^2 - x_0 s.t. -10 <= x_0 <= 10, b_1 + b_2 >= 1 and x_0 <= 10 b_1. The relaxation
+    // attains the optimum J = -0.25, which shows that the solution is exact
+    const c_float Hz[9] = {2, 0, 0, 0, 0, 0, 0, 0, 0}, fz[3] = {-1, 0, 0};
+    const c_float Az[6] = {0, 1, 1, 1, -10, 0};
+    const c_float buz[5] = {10, 1, 1, 1e30, 0}, blz[5] = {-10, 0, 0, 1, -1e30};
+    const int sensez[5] = {0, DAQP_BINARY, DAQP_BINARY, 0, 0};
+    check(Problem(3, 2, Hz, fz, Az, buz, blz, sensez), -0.25);
 }
