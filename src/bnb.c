@@ -272,15 +272,13 @@ int daqp_bnb(DAQPWorkspace* work){
     // be reused for subsequent solves
     daqp_node_cleanup_workspace(work->bnb->neq,work);
     work->bnb->n_clean = work->bnb->neq;
+    work->settings->fval_bound = fval_bound0;
+    work->settings->sing_tol = sing_tol0;
     if(swp_ptr==NULL){
-        work->settings->fval_bound = fval_bound0;
-        work->settings->sing_tol = sing_tol0;
         return exitflag < 0 ? exitflag : DAQP_EXIT_INFEASIBLE;
     }
     else{
         work->fval = fval_best;
-        work->settings->fval_bound = fval_bound0;
-        work->settings->sing_tol = sing_tol0;
         // Let work->u point to the best feasible solution
         swp_ptr=work->u; work->u= work->xold; work->xold=swp_ptr;
         // Exploration ended early (time/iteration limit, cycling) => not proven optimal

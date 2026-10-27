@@ -524,28 +524,28 @@ static int prox_is_infeasible(const DAQPWorkspace* work){
     return wrong <= 1e-8*norm && gap > work->settings->primal_tol*norm;
 }
 
-// The objective 0.5*x'*H*x+f'*x of the problem itself
-static c_float bnb_prox_objective(const DAQPWorkspace* work, const c_float* x){
-    int i, j;
-    const int n = work->n;
-    const DAQPProblem* qp = work->qp;
-    c_float J = 0, hx;
-    for(i = 0; i < n; i++){
-        for(j = 0, hx = 0; qp->H != NULL && j < n; j++) hx += qp->H[(size_t)i*n+j]*x[j];
-        J += (0.5*hx + (qp->f != NULL ? qp->f[i] : 0))*x[i];
-    }
-    return J;
+// The objective of the solution, as in daqp_extract_result (for a QP, it includes the
+// penalties of soft constraints, which an LP does not)
+static c_float bnb_prox_objective(const DAQPWorkspace* work, const int is_lp){
+    int i;
+    c_float J = is_lp ? 0 : work->fval;
+    for(i = 0; i < work->n; i++)
+        J += is_lp ? work->qp->f[i]*work->x[i] : -work->v[i]*work->v[i];
+    return is_lp ? J : 0.5*J;
 }
 
 // The objective of the relaxation without the regularization (a lower bound on the objective
 // of the problem), or -DAQP_INF if it is not found. The workspace is left as for daqp_bnb_prox
-static c_float bnb_prox_relaxation(DAQPWorkspace* work){
-    int i;
+static c_float bnb_prox_relaxation(DAQPWorkspace* work, const int is_lp){
+    int i, exitflag;
     DAQPBnB* bnb = work->bnb;
     c_float J = -DAQP_INF, *x = work->x, *xold = work->xold, *u = work->u;
+    for(i = 0; is_lp && i < work->m; i++) if(work->sense[i] & DAQP_SOFT) return J; // (see above)
     for(i = 0; i < work->n; i++) bnb->xtmp[i] = x[i]; // An incumbent (see daqp_set_primal_start)
     work->bnb = NULL; // The binaries are relaxed
-    if(daqp_prox(work) > 0) J = bnb_prox_objective(work,work->x);
+    exitflag = daqp_prox(work);
+    if(exitflag == DAQP_EXIT_OPTIMAL || exitflag == DAQP_EXIT_SOFT_OPTIMAL)
+        J = bnb_prox_objective(work,is_lp);
     work->bnb = bnb;
     work->x = x; work->xold = xold; work->u = u; // (swapped and aliased by daqp_prox)
     for(i = 0; i < work->n; i++) x[i] = bnb->xtmp[i];
@@ -564,7 +564,7 @@ int daqp_bnb_prox(DAQPWorkspace* work){
     const int n = work->n, is_lp = work->Rinv == NULL && work->RinvD == NULL;
     const int weigh = work->Rinv == NULL || work->n_prox < n; // Decoupled
     c_float eps = 0, eps0 = 1;
-    c_float lb = bnb_prox_relaxation(work);
+    c_float lb = bnb_prox_relaxation(work,is_lp);
 
     if(is_lp){
         work->RinvD = work->bnb->RinvD;
@@ -610,7 +610,7 @@ int daqp_bnb_prox(DAQPWorkspace* work){
                 B += 0.5*eps*(weigh ? prox_weight(work,id) : 1)*fabs(work->qp->bupper[id]*work->qp->bupper[id]
                         - work->qp->blower[id]*work->qp->blower[id]);
         }
-        J = bnb_prox_objective(work,work->x); // unless x is within it of the lower bound
+        J = bnb_prox_objective(work,is_lp);   // unless x is within it of the lower bound
         tol = work->settings->abs_subopt + work->settings->rel_subopt*fabs(J);
         if(B > tol && J-lb > tol) exitflag = DAQP_EXIT_OPTIMAL_INEXACT;
     }
