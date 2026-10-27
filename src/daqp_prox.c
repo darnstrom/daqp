@@ -564,7 +564,7 @@ int daqp_bnb_prox(DAQPWorkspace* work){
     const int n = work->n, is_lp = work->Rinv == NULL && work->RinvD == NULL;
     const int weigh = work->Rinv == NULL || work->n_prox < n; // Decoupled
     c_float eps = 0, eps0 = 1;
-    const c_float lb = bnb_prox_relaxation(work);
+    c_float lb = bnb_prox_relaxation(work);
 
     if(is_lp){
         work->RinvD = work->bnb->RinvD;
@@ -587,7 +587,10 @@ int daqp_bnb_prox(DAQPWorkspace* work){
     // The regularization is removed from the objective J of rel_subopt (see daqp_bnb)
     for(i = 0; work->bnb->reg != NULL && i < n; i++)
         work->bnb->reg[i] = work->prox_mask[i] ? eps*(weigh ? prox_weight(work,i) : 1) : 0;
+    // The search stops when an incumbent is within the allowed suboptimality of lb
+    if(lb > -DAQP_INF) work->bnb->lb = &lb;
     exitflag = daqp_bnb(work);
+    work->bnb->lb = NULL;
     if(exitflag > 0){
         work->x = work->u; // u points to the best leaf (x might alias xold)
         ldp2qp_solution(work);

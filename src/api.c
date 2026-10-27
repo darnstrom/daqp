@@ -257,6 +257,7 @@ int setup_daqp_bnb(DAQPWorkspace* work, int* sense, int nb, int ns){
         work->bnb->RinvD= malloc(work->n*sizeof(c_float));
         work->bnb->reg= malloc(work->n*sizeof(c_float));
         work->bnb->xtmp= malloc(work->n*sizeof(c_float));
+        work->bnb->lb= NULL;
     }
     return 1;
 }

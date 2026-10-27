@@ -110,6 +110,7 @@ typedef struct{
     c_float* RinvD; // Diagonal R of an LP with a singular Hessian (see daqp_bnb_prox)
     c_float* reg; // eps_j of the regularization eps_j/2*x_j^2 in daqp_bnb_prox
     c_float* xtmp; // Workspace for x
+    c_float* lb; // Lower bound on the objective (see daqp_bnb_prox), or NULL
 }DAQPBnB;
 
 typedef struct{
