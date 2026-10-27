@@ -326,15 +326,19 @@ int daqp_process_node(DAQPNode* node, DAQPWorkspace* work){
 }
 
 int daqp_get_branch_id(DAQPWorkspace* work){
-    int i;
+    int i, j;
     int id = DAQP_EMPTY_IND;
     c_float diff, dist, tol, dist_far;
     DAQPNode* node = work->bnb->tree+work->bnb->n_nodes; // Node being processed
 
     for(i=0; i < work->bnb->nb; i++){
         id = work->bnb->bin_ids[i];
-        // Skip fixed binary constraints
+        // Skip fixed binary constraints (also those dropped from the working set since
+        // their bounds are implied, which may still be off by rounding)
         if(DAQP_IS_ACTIVE(id)) continue;
+        for(j = 0; j <= node->depth; j++)
+            if(DAQP_REMOVE_LOWER_FLAG(work->bnb->fixed_ids[j]) == id) break;
+        if(j <= node->depth) continue;
 
         // Compute signed distance from midpoint between bounds
         diff = daqp_binary_diff(id,work);
