@@ -165,6 +165,26 @@ int main() {
             if (fb > 4) assert(std::fabs(rg.fval - 4) < 1e-6);
         }
 
+        Problem c(3, 2); // Strictly convex only after the equality x_1 = x_0 + b is eliminated
+        c.H[0] = 1; c.H[8] = 1e-2;
+        c.f[0] = -1; c.f[1] = -1; c.f[2] = 2 - 0.5e-2;
+        c.sense[2] = DAQP_BINARY;
+        for (int i = 0; i < 3; ++i) { c.bl[i] = 0; c.bu[i] = i < 2 ? 20 : 1; }
+        c.a(0, 0) = -1; c.a(0, 1) = 1; c.a(0, 2) = -1; c.bu[3] = c.bl[3] = 0;
+        c.a(1, 0) = 1; c.a(1, 2) = -10; c.bu[4] = 0; // x_0 <= 10 b (tightened by the presolve)
+        {
+            std::vector<c_float> xs(3), ls(5);
+            DAQPResult rs{};
+            rs.x = xs.data(); rs.lam = ls.data();
+            DAQPSettings ss;
+            daqp_default_settings(&ss);
+            ss.presolve = 1; ss.eq_reduction = DAQP_EQ_REDUCTION_ON;
+            DAQPProblem sq = c.qp();
+            daqp_quadprog(&rs, &sq, &ss);
+            assert(rs.exitflag == DAQP_EXIT_OPTIMAL);
+            assert(std::fabs(xs[0] - 2) < 1e-9 && std::fabs(xs[1] - 3) < 1e-9 && xs[2] == 1);
+        }
+
         Problem f = p; // Infeasible: the demand exceeds the capacity
         f.bu[f.ms + k] = -(k + 1) * U;
         assert(solve(f).exitflag == DAQP_EXIT_INFEASIBLE && solve(f, 1).exitflag == DAQP_EXIT_INFEASIBLE);

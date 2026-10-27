@@ -423,8 +423,6 @@ int daqp_eq_wanted(const DAQPWorkspace* work, const DAQPProblem* qp, const int m
     if(qp->nh > 1 || DAQP_IS_HIERARCHICAL(work)) return 0;
     // BnB with a singular Hessian is solved in full (see daqp_eq_update)
     if(work->bnb != NULL && work->n_prox > 0) return 0;
-    // The presolve of mixed-integer problems applies to the full problem
-    if(work->bnb != NULL && work->settings->presolve) return 0;
     n_eq = eq_count_candidates(work,qp);
     if(n_eq == 0) return 0;
     if(policy == DAQP_EQ_REDUCTION_ON) return 1;

@@ -99,8 +99,8 @@ such problems before branch and bound:
 Neither changes the integer-feasible solutions, so the solution is the same, but the number of
 nodes can decrease substantially. The problem data is not changed: the presolve is applied to the
 internal representation of the problem when it is set up and whenever it is updated. Soft
-constraints are not relied on, and immutable constraints are not changed. With `presolve = 1`,
-equality constraints of mixed-integer problems are not eliminated (see `eq_reduction`).
+constraints are not relied on, and immutable constraints are not changed. Equality constraints
+are eliminated (see `eq_reduction`) from the presolved problem.
 
 Presolve is not enabled by default, since it is mainly worthwhile for problems with larger
 branch-and-bound trees. For problems that are solved repeatedly with small trees (e.g., hybrid MPC),

@@ -300,6 +300,9 @@ static int daqp_update_ldp_core(int mask, DAQPWorkspace *work, DAQPProblem* qp){
  * constraints are to be eliminated (see eq_elim.h), the LDP is formed for the
  * reduced problem, and the workspace keeps describing qp otherwise.
  */
+// Mark if the LDP is formed from the presolved copy (after it is formed, which resets the state)
+#define DAQP_SET_PRESOLVED(work,on) ((work)->state = (on) ? (work)->state | DAQP_STATE_PRESOLVED :\
+        (work)->state & ~DAQP_STATE_PRESOLVED)
 int daqp_update_ldp(int mask, DAQPWorkspace *work, DAQPProblem* qp){
     int i, flag;
     DAQPProblem* pq;
@@ -312,12 +315,19 @@ int daqp_update_ldp(int mask, DAQPWorkspace *work, DAQPProblem* qp){
         if(qp->sense == NULL) for(i = 0; i < qp->m; i++) work->sense[i] = 0;
         else for(i = 0; i < qp->m; i++) work->sense[i] = qp->sense[i];
     }
-    if(daqp_eq_wanted(work,qp,mask)){
-        flag = daqp_eq_update(work,qp,mask,daqp_update_ldp_core);
+    // A mixed-integer problem is presolved into a copy that the LDP (and the elimination
+    // of its equalities) is formed from (all of it, since the tightenings depend on all
+    // of the data). The equality constraints are the same in the copy
+    pq = (work->bnb != NULL && work->settings->presolve) ? daqp_presolve(work,qp) : qp;
+    if(pq != qp || (work->state & DAQP_STATE_PRESOLVED)) mask |= DAQP_UPDATE_M+DAQP_UPDATE_d;
+    if(daqp_eq_wanted(work,pq,mask)){
+        flag = daqp_eq_update(work,pq,mask,daqp_update_ldp_core);
         if(flag != DAQP_EQ_NOT_REDUCED){
             work->n = qp->n;
             work->m = qp->m;
             work->ms = qp->ms;
+            work->qp = qp; // As below (the equality constraints are the same in pq)
+            DAQP_SET_PRESOLVED(work,pq != qp);
             return flag;
         }
     }
@@ -328,13 +338,9 @@ int daqp_update_ldp(int mask, DAQPWorkspace *work, DAQPProblem* qp){
         if(qp->H != NULL) mask |= DAQP_UPDATE_Rinv;
         if(qp->f != NULL) mask |= DAQP_UPDATE_v;
     }
-    // A mixed-integer problem is presolved into a copy that the LDP is formed from
-    // (all of it, since the tightenings depend on all of the data)
-    pq = (work->bnb != NULL && work->settings->presolve) ? daqp_presolve(work,qp) : qp;
-    if(pq != qp || (work->state & DAQP_STATE_PRESOLVED)) mask |= DAQP_UPDATE_M+DAQP_UPDATE_d;
     flag = daqp_update_ldp_core(mask,work,pq);
     work->qp = qp; // The solution is checked against qp
-    if(pq != qp) work->state |= DAQP_STATE_PRESOLVED;
+    DAQP_SET_PRESOLVED(work,pq != qp);
     return flag;
 }
 
