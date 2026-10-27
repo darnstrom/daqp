@@ -102,6 +102,10 @@ internal representation of the problem when it is set up and whenever it is upda
 constraints are not relied on, and immutable constraints are not changed. Equality constraints
 are eliminated (see `eq_reduction`) from the presolved problem.
 
-Presolve is not enabled by default, since it is mainly worthwhile for problems with larger
-branch-and-bound trees. For problems that are solved repeatedly with small trees (e.g., hybrid MPC),
-its cost per update can exceed what it saves.
+Presolve is enabled by default. Besides reducing the number of nodes, it makes branch and bound
+more robust for loose big-M constants, which otherwise make the problem badly scaled. Its cost
+is about that of setting up the problem, and it is done whenever the problem is updated (an update
+of only the bounds then also forms the constraint matrix of the LDP again). For problems that are
+solved repeatedly with small trees and tight big-M constants (e.g., hybrid MPC), this cost can
+exceed what it saves, and `presolve = 0` can be faster. Generated code (see code generation) is
+formed from the problem itself, since the presolve depends on the data at the time of generation.

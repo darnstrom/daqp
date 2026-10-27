@@ -587,7 +587,7 @@ void daqp_default_settings(DAQPSettings* settings){
     settings->refactor_tol = DAQP_DEFAULT_REFACTOR_TOL;
     settings->time_limit = 0;
     settings->eq_reduction = DAQP_EQ_REDUCTION_AUTO;
-    settings->presolve = 0;
+    settings->presolve = 1;
 }
 
 /* Remove redundant constraints*/

@@ -6,9 +6,16 @@
 #include "types.h"
 #include <math.h>
 #include "api.h"
+#include "utils.h"
 
 
 void render_daqp_workspace(DAQPWorkspace* work, const char *fname, const char *dir, const char *prefix){
+    // The generated code forms the LDP for new bounds, for which a presolved problem
+    // (tightened with the current bounds) need not hold, so the problem itself is generated
+    const int presolve = work->settings->presolve;
+    work->settings->presolve = 0;
+    if(work->state & DAQP_STATE_PRESOLVED)
+        daqp_update_ldp(DAQP_IS_REDUCED(work) ? DAQP_UPDATE_eliminate : 0,work,work->qp);
     // If the equality constraints are eliminated, the reduced problem is generated
     const int reduced = daqp_eq_install(work);
     char *hfname= malloc(strlen(dir)+strlen(fname) + 3); // two chars for .h and 1 for terminator
@@ -82,6 +89,7 @@ void render_daqp_workspace(DAQPWorkspace* work, const char *fname, const char *d
     free(cfname);
     free(hguard);
     if(reduced) daqp_eq_restore(work);
+    work->settings->presolve = presolve; // Applied by the next update
 }
 
 void write_daqp_workspace_h(FILE *f, DAQPWorkspace* work, const char* prefix){

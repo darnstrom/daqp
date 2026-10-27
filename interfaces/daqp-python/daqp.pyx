@@ -82,7 +82,7 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
           rel_subopt = DAQP_DEFAULT_REL_SUBOPT, abs_subopt = DAQP_DEFAULT_ABS_SUBOPT,
           sing_tol = DAQP_DEFAULT_SING_TOL, refactor_tol = DAQP_DEFAULT_REFACTOR_TOL,
           time_limit = 0, primal_start=None, dual_start=None,
-          eq_reduction = DAQP_EQ_REDUCTION_AUTO, presolve = 0):
+          eq_reduction = DAQP_EQ_REDUCTION_AUTO, presolve = 1):
     """
     Solve the quadratic program      minimize       0.5 x'*H*x + f' x
                                     subject to   blower <= A x <= bupper

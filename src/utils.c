@@ -303,6 +303,10 @@ static int daqp_update_ldp_core(int mask, DAQPWorkspace *work, DAQPProblem* qp){
 // Mark if the LDP is formed from the presolved copy (after it is formed, which resets the state)
 #define DAQP_SET_PRESOLVED(work,on) ((work)->state = (on) ? (work)->state | DAQP_STATE_PRESOLVED :\
         (work)->state & ~DAQP_STATE_PRESOLVED)
+// Inconsistent equalities of a presolved problem (which include the binaries that the presolve
+// fixed) mean that the mixed-integer problem is infeasible
+#define DAQP_PRESOLVED_FLAG(flag,presolved) (((presolved) && (flag) == DAQP_EXIT_OVERDETERMINED_INITIAL) ?\
+        DAQP_EXIT_INFEASIBLE : (flag))
 int daqp_update_ldp(int mask, DAQPWorkspace *work, DAQPProblem* qp){
     int i, flag;
     DAQPProblem* pq;
@@ -328,7 +332,7 @@ int daqp_update_ldp(int mask, DAQPWorkspace *work, DAQPProblem* qp){
             work->ms = qp->ms;
             work->qp = qp; // As below (the equality constraints are the same in pq)
             DAQP_SET_PRESOLVED(work,pq != qp);
-            return flag;
+            return DAQP_PRESOLVED_FLAG(flag,pq != qp);
         }
     }
     else daqp_eq_deactivate(work);
@@ -341,7 +345,7 @@ int daqp_update_ldp(int mask, DAQPWorkspace *work, DAQPProblem* qp){
     flag = daqp_update_ldp_core(mask,work,pq);
     work->qp = qp; // The solution is checked against qp
     DAQP_SET_PRESOLVED(work,pq != qp);
-    return flag;
+    return DAQP_PRESOLVED_FLAG(flag,pq != qp);
 }
 
 int daqp_update_Rinv(DAQPWorkspace *work, c_float* H, int is_factored){
