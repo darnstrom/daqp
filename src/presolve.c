@@ -68,7 +68,7 @@ static int presolve_propagate(DAQPProblem* qp, const int r){
     const int n = qp->n, id = qp->ms+r;
     const c_float* a = qp->A+(size_t)r*n;
     const c_float ru = qp->bupper[id], rl = qp->blower[id];
-    c_float amin = 0, amax = 0, scale = 0, lo, hi, rest;
+    c_float amin = 0, amax = 0, scale = 0, span = 0, lo, hi, rest;
     if(qp->sense[id] & DAQP_SOFT) return 0;
     for(j = 0; j < n; j++){ // Smallest and largest value of a'x (and number of infinite terms)
         if(a[j] == 0) continue;
@@ -77,11 +77,16 @@ static int presolve_propagate(DAQPProblem* qp, const int r){
         if(DAQP_PRESOLVE_IS_INF(lo)) nmin++; else amin += a[j]*lo;
         if(DAQP_PRESOLVE_IS_INF(hi)) nmax++; else amax += a[j]*hi;
         if(fabs(a[j]) > scale) scale = fabs(a[j]);
+        if(a[j]*(hi-lo) > span) span = a[j]*(hi-lo); // Largest range of a term
     }
     if(nmin == 0 && ru < DAQP_INF && amin > ru + DAQP_PRESOLVE_FEAS_TOL*scale*(1+fabs(ru)))
         return DAQP_EXIT_INFEASIBLE;
     if(nmax == 0 && rl > -DAQP_INF && amax < rl - DAQP_PRESOLVE_FEAS_TOL*scale*(1+fabs(rl)))
         return DAQP_EXIT_INFEASIBLE;
+    // A bound can only be tightened if the slack of the row is less than the range of
+    // its term (the slack is infinite if more than one term is unbounded)
+    if((ru >= DAQP_INF || nmin > 1 || (nmin == 0 && ru-amin >= span)) &&
+            (rl <= -DAQP_INF || nmax > 1 || (nmax == 0 && amax-rl >= span))) return 0;
     for(j = 0; j < n; j++){
         // A bound from a negligible coefficient would mostly be amplified rounding
         if(fabs(a[j]) <= DAQP_PRESOLVE_MARGIN*scale) continue;
@@ -149,27 +154,20 @@ static int presolve_coefficients(DAQPProblem* qp, const int r){
 }
 
 static int presolve_problem(DAQPProblem* qp){
-    int i, r, flag, changed, round, pass, total = 0, nb = 0;
+    int i, r, flag, total = 0, nb = 0;
     const int mA = qp->m-qp->ms;
     if(qp->sense == NULL || qp->A == NULL || mA <= 0 || qp->nh > 1 || qp->problem_type == 1)
         return 0;
     for(i = 0; i < qp->m; i++) if(qp->sense[i] & DAQP_BINARY) nb++;
     if(nb == 0) return 0; // Only mixed-integer problems are presolved
 
-    for(round = 0; round < DAQP_PRESOLVE_ROUNDS; round++){
-        // Propagate the bounds to a fixed point, then tighten the coefficients
-        for(pass = 0; pass < DAQP_PRESOLVE_PASSES; pass++){
-            for(r = 0, changed = 0; r < mA; r++){
-                if((flag = presolve_propagate(qp,r)) < 0) return flag;
-                changed += flag;
-            }
-            total += changed;
-            if(changed == 0) break;
-        }
-        for(r = 0, changed = 0; r < mA; r++) changed += presolve_coefficients(qp,r);
-        total += changed;
-        if(changed == 0) break;
+    // One pass of bound propagation, then one of coefficient tightening (further
+    // passes mostly give small tightenings, which cost more than they save)
+    for(r = 0; r < mA; r++){
+        if((flag = presolve_propagate(qp,r)) < 0) return flag;
+        total += flag;
     }
+    for(r = 0; r < mA; r++) total += presolve_coefficients(qp,r);
     return total;
 }
 
