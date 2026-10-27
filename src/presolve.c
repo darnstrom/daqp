@@ -12,7 +12,8 @@
  * (and fixes binaries), and coefficient tightening strengthens the
  * coefficients of binaries in one-sided constraints (e.g., big-M constraints).
  * Neither changes the set of integer-feasible points, but both tighten the
- * relaxations, which reduces the number of nodes. qp is modified in place.
+ * relaxations, which reduces the number of nodes. qp is modified in place, and
+ * the coefficients are tightened with the (unpropagated) bounds of bq.
  * Soft constraints and bounds are not relied on, and immutable ones (and the
  * Hessian) are not changed.
  *
@@ -110,8 +111,11 @@ static int presolve_propagate(DAQPProblem* qp, const int r){
 // row as rest + c*b <= beta, where x_k = l + (u-l)*b and b in {0,1}, the
 // constraint is redundant for b = 1 (c < 0) or b = 0 (c > 0) if the largest
 // value R of rest is small enough, and c (and beta) can then be reduced until
-// the constraint holds with equality at R. Returns the number of changes
-static int presolve_coefficients(DAQPProblem* qp, const int r){
+// the constraint holds with equality at R. R is formed from the bounds of bq (the
+// problem before the bounds were propagated), since a row that holds with equality
+// at the propagated bounds makes them degenerate (which can lead to cycling).
+// Returns the number of changes
+static int presolve_coefficients(DAQPProblem* qp, const DAQPProblem* bq, const int r){
     int j, k, changed = 0;
     const int n = qp->n, id = qp->ms+r;
     c_float* a = qp->A+(size_t)r*n;
@@ -130,7 +134,7 @@ static int presolve_coefficients(DAQPProblem* qp, const int r){
         beta = (upper ? qp->bupper[id] : -qp->blower[id]) - s*a[k]*l;
         for(j = 0, R = 0; j < n; j++){ // Largest value of the other terms
             if(j == k || a[j] == 0) continue;
-            v = s*a[j] > 0 ? presolve_upper(qp,j) : presolve_lower(qp,j);
+            v = s*a[j] > 0 ? presolve_upper(bq,j) : presolve_lower(bq,j);
             if(DAQP_PRESOLVE_IS_INF(v)) break;
             R += s*a[j]*v;
         }
@@ -153,7 +157,7 @@ static int presolve_coefficients(DAQPProblem* qp, const int r){
     return changed;
 }
 
-static int presolve_problem(DAQPProblem* qp){
+static int presolve_problem(DAQPProblem* qp, const DAQPProblem* bq){
     int i, r, flag, total = 0, nb = 0;
     const int mA = qp->m-qp->ms;
     if(qp->sense == NULL || qp->A == NULL || mA <= 0 || qp->nh > 1 || qp->problem_type == 1)
@@ -167,7 +171,7 @@ static int presolve_problem(DAQPProblem* qp){
         if((flag = presolve_propagate(qp,r)) < 0) return flag;
         total += flag;
     }
-    for(r = 0; r < mA; r++) total += presolve_coefficients(qp,r);
+    for(r = 0; r < mA; r++) total += presolve_coefficients(qp,bq,r);
     return total;
 }
 
@@ -193,5 +197,5 @@ DAQPProblem* daqp_presolve(DAQPWorkspace* work, DAQPProblem* qp){
     memcpy(cp->A,qp->A,(size_t)mA*n*sizeof(c_float));
     memcpy(cp->bupper,qp->bupper,m*sizeof(c_float));
     memcpy(cp->blower,qp->blower,m*sizeof(c_float));
-    return presolve_problem(cp) > 0 ? cp : qp;
+    return presolve_problem(cp,qp) > 0 ? cp : qp;
 }
