@@ -595,9 +595,7 @@ int daqp_bnb_prox(DAQPWorkspace* work){
     for(i = 0; work->bnb->reg != NULL && i < n; i++)
         work->bnb->reg[i] = work->prox_mask[i] ? eps*(weigh ? prox_weight(work,i) : 1) : 0;
     // The search stops when an incumbent is within the allowed suboptimality of lb
-    if(lb > -DAQP_INF) work->bnb->lb = &lb;
-    exitflag = daqp_bnb(work);
-    work->bnb->lb = NULL;
+    exitflag = daqp_bnb(work,lb);
     if(exitflag > 0){
         work->x = work->u; // u points to the best leaf (x might alias xold)
         ldp2qp_solution(work);

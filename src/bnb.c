@@ -144,10 +144,10 @@ static c_float daqp_bnb_incumbent(DAQPWorkspace* work){
 
 // The regularization sum_j reg_j/2*x_j^2 of daqp_bnb_prox at u, which is not part of
 // the objective J (only needed if rel_subopt > 0 or for the lower bound lb)
-static c_float daqp_bnb_reg(const c_float* u, DAQPWorkspace* work){
+static c_float daqp_bnb_reg(const c_float* u, const c_float lb, DAQPWorkspace* work){
     int i;
     c_float val = 0, *x = work->bnb->xtmp;
-    if(work->n_prox == 0 || x == NULL || (work->settings->rel_subopt <= 0 && work->bnb->lb == NULL))
+    if(work->n_prox == 0 || x == NULL || (work->settings->rel_subopt <= 0 && lb <= -DAQP_INF))
         return 0;
     for(i = 0; i < work->n; i++) x[i] = work->v != NULL ? u[i]-work->v[i] : u[i];
     daqp_apply_Rinv(work,x);
@@ -158,10 +158,10 @@ static c_float daqp_bnb_reg(const c_float* u, DAQPWorkspace* work){
 // Nodes must improve on the objective J by more than abs_subopt + rel_subopt*|J|.
 // The bound is in the scale 0.5*fval = J + c used by daqp_ldp. If J is within this of
 // the lower bound lb, no node can, and all are pruned
-static c_float daqp_bnb_bound(c_float fval, c_float c, const c_float* lb, DAQPSettings* settings){
+static c_float daqp_bnb_bound(c_float fval, c_float c, const c_float lb, DAQPSettings* settings){
     const c_float J = 0.5*fval - c;
     const c_float tol = settings->abs_subopt + settings->rel_subopt*(J < 0 ? -J : J);
-    return (lb != NULL && J - *lb <= tol) ? -DAQP_INF : 0.5*fval - tol;
+    return (lb > -DAQP_INF && J - lb <= tol) ? -DAQP_INF : 0.5*fval - tol;
 }
 
 // Fixing binaries that dominate a row of M (e.g., big-M or small curvature on the binaries)
@@ -183,7 +183,7 @@ static c_float daqp_bnb_sing_tol(DAQPWorkspace* work){
     return tol;
 }
 
-int daqp_bnb(DAQPWorkspace* work){
+int daqp_bnb(DAQPWorkspace* work, const c_float lb){
     int branch_id, exitflag;
     DAQPNode* node;
     c_float *swp_ptr = NULL;
@@ -202,7 +202,7 @@ int daqp_bnb(DAQPWorkspace* work){
     // Objective J = 0.5*fval - c, with c = 0.5*||v||^2 - fp, where fp is the objective
     // removed by equality elimination (only needed for rel_subopt, fval_bound and lb)
     c_float fval_bound0 = work->settings->fval_bound, fval_best = 0, c = 0;
-    if(work->settings->rel_subopt > 0 || fval_bound0 < DAQP_INF || work->bnb->lb != NULL){
+    if(work->settings->rel_subopt > 0 || fval_bound0 < DAQP_INF || lb > -DAQP_INF){
         if(work->v != NULL) for(int i=0; i < work->n; i++) c += 0.5*work->v[i]*work->v[i];
         if(work->eq != NULL && work->eq->installed) c -= work->eq->fp;
     }
@@ -213,8 +213,8 @@ int daqp_bnb(DAQPWorkspace* work){
         work->state &= ~DAQP_STATE_INCUMBENT;
         fval_best = daqp_bnb_incumbent(work);
         if(fval_best >= 0 && 0.5*fval_best < work->settings->fval_bound){
-            work->settings->fval_bound = daqp_bnb_bound(fval_best,c+daqp_bnb_reg(work->xold,work),
-                    work->bnb->lb,work->settings);
+            work->settings->fval_bound = daqp_bnb_bound(fval_best,c+daqp_bnb_reg(work->xold,lb,work),
+                    lb,work->settings);
             swp_ptr = work->xold; // Marks that a feasible solution is stored in xold
         }
     }
@@ -259,8 +259,8 @@ int daqp_bnb(DAQPWorkspace* work){
         branch_id = daqp_get_branch_id(work);
         if(branch_id==DAQP_EMPTY_IND){// Nothing to branch over => integer feasible
             fval_best = work->fval;
-            work->settings->fval_bound = daqp_bnb_bound(fval_best,c+daqp_bnb_reg(work->u,work),
-                    work->bnb->lb,work->settings);
+            work->settings->fval_bound = daqp_bnb_bound(fval_best,c+daqp_bnb_reg(work->u,lb,work),
+                    lb,work->settings);
             swp_ptr=work->xold; work->xold= work->u; work->u=swp_ptr; // Store feasible sol
         }
         else{

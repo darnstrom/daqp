@@ -9,7 +9,8 @@ extern "C" {
 #include "constants.h"
 #include "daqp.h"
 
-int daqp_bnb(DAQPWorkspace* work);
+// lb is a lower bound on the objective, or -DAQP_INF (see daqp_bnb_prox)
+int daqp_bnb(DAQPWorkspace* work, const c_float lb);
 int daqp_process_node(DAQPNode* node, DAQPWorkspace* work);
 int daqp_get_branch_id(DAQPWorkspace* work);
 void daqp_spawn_children(DAQPNode* node, const int branch_id, DAQPWorkspace* work);
