@@ -157,8 +157,9 @@ int main() {
             assert(close(s.fval, J_best, 1e-6) && close(p.objective(s.x), J_best, 1e-6));
             assert(p.violation(s.x) < 1e-6);
             assert(solve(p, policy, 1e-3).exitflag == DAQP_EXIT_OPTIMAL);
-            Solution t = solve(p, policy, 0, 1); // With presolve
-            assert(t.exitflag == DAQP_EXIT_OPTIMAL_INEXACT && close(t.fval, J_best, 1e-6));
+            // With presolve, the (tighter) relaxation certifies the solution as optimal
+            Solution t = solve(p, policy, 0, 1);
+            assert(t.exitflag == DAQP_EXIT_OPTIMAL && close(t.fval, J_best, 1e-6));
             assert(p.violation(t.x) < 1e-6);
         }
     }

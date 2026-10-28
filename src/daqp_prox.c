@@ -524,18 +524,53 @@ static int prox_is_infeasible(const DAQPWorkspace* work){
     return wrong <= 1e-8*norm && gap > work->settings->primal_tol*norm;
 }
 
+// The objective of the solution, as in daqp_extract_result (for a QP, it includes the
+// penalties of soft constraints, which an LP does not)
+static c_float bnb_prox_objective(const DAQPWorkspace* work, const int is_lp){
+    int i;
+    c_float J = is_lp ? 0 : work->fval;
+    for(i = 0; i < work->n; i++)
+        J += is_lp ? work->qp->f[i]*work->x[i] : -work->v[i]*work->v[i];
+    return is_lp ? J : 0.5*J;
+}
+
+// The objective of the relaxation without the regularization (a lower bound on the objective
+// of the problem), or -DAQP_INF if it is not found. The workspace is left as for daqp_bnb_prox
+static c_float bnb_prox_relaxation(DAQPWorkspace* work, const int is_lp){
+    int i, exitflag;
+    DAQPBnB* bnb = work->bnb;
+    DAQPProblem* qp = work->qp;
+    c_float J = -DAQP_INF, *x = work->x, *xold = work->xold, *u = work->u;
+    for(i = 0; is_lp && i < work->m; i++) if(work->sense[i] & DAQP_SOFT) return J; // (see above)
+    for(i = 0; i < work->n; i++) bnb->xtmp[i] = x[i]; // An incumbent (see daqp_set_primal_start)
+    // A presolved LDP is formed from the presolved copy (see daqp_presolve), whose relaxation
+    // is tighter but has the same integer-feasible points (so J is still a lower bound)
+    if(work->state & DAQP_STATE_PRESOLVED) work->qp = bnb->ps_qp;
+    work->bnb = NULL; // The binaries are relaxed
+    exitflag = daqp_prox(work);
+    if(exitflag == DAQP_EXIT_OPTIMAL || exitflag == DAQP_EXIT_SOFT_OPTIMAL)
+        J = bnb_prox_objective(work,is_lp);
+    work->bnb = bnb;
+    work->qp = qp;
+    work->x = x; work->xold = xold; work->u = u; // (swapped and aliased by daqp_prox)
+    for(i = 0; i < work->n; i++) x[i] = bnb->xtmp[i];
+    return J;
+}
+
 /* BnB for a singular Hessian, regularized by eps_j/2*x_j^2. For decoupled
  * directions, eps_j = eps/w_j^2 (w_j the width of the bounds of x_j), which
  * bounds the suboptimality by n*eps/2 if each box contains 0. An LP is
  * treated as H = 0 (R = I with eps0 = 1) through a temporary diagonal R.
  * The result is reported as inexact if the regularization of the binaries can
- * change which binary values are optimal by more than abs/rel_subopt allows. */
+ * change which binary values are optimal by more than abs/rel_subopt allows, unless
+ * the relaxation (without the regularization) shows that it is optimal. */
 int daqp_bnb_prox(DAQPWorkspace* work){
     int i, exitflag;
     const int n = work->n, is_lp = work->Rinv == NULL && work->RinvD == NULL;
     const int weigh = work->Rinv == NULL || work->n_prox < n; // Decoupled
     c_float eps = 0, eps0 = 1;
     const DAQPProblem* pq;
+    c_float lb = bnb_prox_relaxation(work,is_lp);
 
     if(is_lp){
         work->RinvD = work->bnb->RinvD;
@@ -556,7 +591,11 @@ int daqp_bnb_prox(DAQPWorkspace* work){
     pq = (work->state & DAQP_STATE_PRESOLVED) ? work->bnb->ps_qp : work->qp; // See daqp_presolve
     daqp_update_d(work,pq->bupper,pq->blower);
 
-    exitflag = daqp_bnb(work);
+    // The regularization is removed from the objective J of rel_subopt (see daqp_bnb)
+    for(i = 0; work->bnb->reg != NULL && i < n; i++)
+        work->bnb->reg[i] = work->prox_mask[i] ? eps*(weigh ? prox_weight(work,i) : 1) : 0;
+    // The search stops when an incumbent is within the allowed suboptimality of lb
+    exitflag = daqp_bnb(work,lb);
     if(exitflag > 0){
         work->x = work->u; // u points to the best leaf (x might alias xold)
         ldp2qp_solution(work);
@@ -569,22 +608,16 @@ int daqp_bnb_prox(DAQPWorkspace* work){
     for(i = 0; exitflag > 0 && i < n; i++) // Remove the regularization from fval
         if(work->prox_mask[i]) work->fval -= eps*(weigh ? prox_weight(work,i) : 1)*work->x[i]*work->x[i];
     if(exitflag == DAQP_EXIT_OPTIMAL){ // Inexact if the regularization of the binaries can
-        c_float B = 0, J = 0;          // bias the choice between them by more than allowed
+        c_float B = 0, J, tol;         // bias the choice between them by more than allowed,
         for(i = 0; i < work->bnb->nb; i++){
             const int id = work->bnb->bin_ids[i];
             if(id < work->ms && (is_lp || work->prox_mask[id]))
                 B += 0.5*eps*(weigh ? prox_weight(work,id) : 1)*fabs(work->qp->bupper[id]*work->qp->bupper[id]
                         - work->qp->blower[id]*work->qp->blower[id]);
         }
-        if(B > 0 && work->settings->rel_subopt > 0){ // J as in daqp_extract_result
-            if(is_lp) for(i = 0; i < n; i++) J += work->qp->f[i]*work->x[i];
-            else{
-                for(i = 0, J = work->fval; i < n; i++) J -= work->v[i]*work->v[i];
-                J *= 0.5;
-            }
-        }
-        if(B > work->settings->abs_subopt + work->settings->rel_subopt*fabs(J))
-            exitflag = DAQP_EXIT_OPTIMAL_INEXACT;
+        J = bnb_prox_objective(work,is_lp);   // unless x is within it of the lower bound
+        tol = work->settings->abs_subopt + work->settings->rel_subopt*fabs(J);
+        if(B > tol && J-lb > tol) exitflag = DAQP_EXIT_OPTIMAL_INEXACT;
     }
     return exitflag;
 }

@@ -84,7 +84,9 @@ mixed-integer LP, or binary variables without a quadratic cost), the singular di
 regularized by a small quadratic term, scaled by the bounds of the variables. The solution is then
 optimal up to a small bias from this term, and the exit flag is `4` (optimal, inexact) unless the
 bias is within the allowed suboptimality `abs_subopt + rel_subopt*abs(J)` (see
-[settings]({{ '/parameters/' | relative_url }})). If eliminating the equality constraints makes
+[settings]({{ '/parameters/' | relative_url }})), or the objective of the solution is within it
+of the relaxation of the problem without the regularization (which is then solved as well, and
+gives a lower bound). If eliminating the equality constraints makes
 the Hessian positive definite, the problem is solved exactly (exit flag `1`).
 
 ### Presolve

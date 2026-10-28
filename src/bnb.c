@@ -142,14 +142,48 @@ static c_float daqp_bnb_incumbent(DAQPWorkspace* work){
     return fval;
 }
 
-// Nodes must improve on the objective J by more than abs_subopt + rel_subopt*|J|.
-// The bound is in the scale 0.5*fval = J + c used by daqp_ldp
-static c_float daqp_bnb_bound(c_float fval, c_float c, DAQPSettings* settings){
-    c_float J = 0.5*fval - c;
-    return 0.5*fval - settings->abs_subopt - settings->rel_subopt*(J < 0 ? -J : J);
+// The regularization sum_j reg_j/2*x_j^2 of daqp_bnb_prox at u, which is not part of
+// the objective J (only needed if rel_subopt > 0 or for the lower bound lb)
+static c_float daqp_bnb_reg(const c_float* u, const c_float lb, DAQPWorkspace* work){
+    int i;
+    c_float val = 0, *x = work->bnb->xtmp;
+    if(work->n_prox == 0 || x == NULL || (work->settings->rel_subopt <= 0 && lb <= -DAQP_INF))
+        return 0;
+    for(i = 0; i < work->n; i++) x[i] = work->v != NULL ? u[i]-work->v[i] : u[i];
+    daqp_apply_Rinv(work,x);
+    for(i = 0; i < work->n; i++) val += 0.5*work->bnb->reg[i]*x[i]*x[i];
+    return val;
 }
 
-int daqp_bnb(DAQPWorkspace* work){
+// Nodes must improve on the objective J by more than abs_subopt + rel_subopt*|J|.
+// The bound is in the scale 0.5*fval = J + c used by daqp_ldp. If J is within this of
+// the lower bound lb, no node can, and all are pruned
+static c_float daqp_bnb_bound(c_float fval, c_float c, const c_float lb, DAQPSettings* settings){
+    const c_float J = 0.5*fval - c;
+    const c_float tol = settings->abs_subopt + settings->rel_subopt*(J < 0 ? -J : J);
+    return (lb > -DAQP_INF && J - lb <= tol) ? -DAQP_INF : 0.5*fval - tol;
+}
+
+// Fixing binaries that dominate a row of M (e.g., big-M or small curvature on the binaries)
+// leaves the fraction r of its squared norm that is on the other variables. Pivots of such
+// rows are hence about r, and the singularity tolerance is made relative to the smallest r
+static c_float daqp_bnb_sing_tol(DAQPWorkspace* work){
+    int i, k;
+    c_float rmin = 1, sb, tol;
+    if(work->n_prox > 0) return work->settings->sing_tol; // Not for daqp_bnb_prox
+    for(i = 0; i < work->m-work->ms; i++){ // The rows of M have unit norm => r = 1-sb
+        const c_float* Mi = work->M+(size_t)i*work->n;
+        for(k = 0, sb = 0; k < work->bnb->nb; k++)
+            if(work->bnb->bin_ids[k] < work->ms) sb += Mi[work->bnb->bin_ids[k]]*Mi[work->bnb->bin_ids[k]];
+        if(sb > 0 && 1-sb > 0 && 1-sb < rmin) rmin = 1-sb;
+    }
+    tol = rmin*work->settings->sing_tol;
+    if(tol < DAQP_BNB_MIN_SING_TOL) // Limit by the accuracy of the pivots
+        tol = work->settings->sing_tol < DAQP_BNB_MIN_SING_TOL ? work->settings->sing_tol : DAQP_BNB_MIN_SING_TOL;
+    return tol;
+}
+
+int daqp_bnb(DAQPWorkspace* work, const c_float lb){
     int branch_id, exitflag;
     DAQPNode* node;
     c_float *swp_ptr = NULL;
@@ -157,6 +191,8 @@ int daqp_bnb(DAQPWorkspace* work){
     exitflag = daqp_bnb_setup_root(work);
     if(exitflag < 0) return exitflag;
     work->bnb->neq = exitflag;
+    const c_float sing_tol0 = work->settings->sing_tol;
+    work->settings->sing_tol = daqp_bnb_sing_tol(work);
 
     // Warm start the root with the root working set of the previous solve
     // (unless a warm start has been provided)
@@ -164,9 +200,9 @@ int daqp_bnb(DAQPWorkspace* work){
         daqp_bnb_load_ws(work->bnb->root_WS,work->bnb->n_root_WS,work);
 
     // Objective J = 0.5*fval - c, with c = 0.5*||v||^2 - fp, where fp is the objective
-    // removed by equality elimination (only needed for rel_subopt and fval_bound)
+    // removed by equality elimination (only needed for rel_subopt, fval_bound and lb)
     c_float fval_bound0 = work->settings->fval_bound, fval_best = 0, c = 0;
-    if(work->settings->rel_subopt > 0 || fval_bound0 < DAQP_INF){
+    if(work->settings->rel_subopt > 0 || fval_bound0 < DAQP_INF || lb > -DAQP_INF){
         if(work->v != NULL) for(int i=0; i < work->n; i++) c += 0.5*work->v[i]*work->v[i];
         if(work->eq != NULL && work->eq->installed) c -= work->eq->fp;
     }
@@ -177,7 +213,8 @@ int daqp_bnb(DAQPWorkspace* work){
         work->state &= ~DAQP_STATE_INCUMBENT;
         fval_best = daqp_bnb_incumbent(work);
         if(fval_best >= 0 && 0.5*fval_best < work->settings->fval_bound){
-            work->settings->fval_bound = daqp_bnb_bound(fval_best,c,work->settings);
+            work->settings->fval_bound = daqp_bnb_bound(fval_best,c+daqp_bnb_reg(work->xold,lb,work),
+                    lb,work->settings);
             swp_ptr = work->xold; // Marks that a feasible solution is stored in xold
         }
     }
@@ -222,7 +259,8 @@ int daqp_bnb(DAQPWorkspace* work){
         branch_id = daqp_get_branch_id(work);
         if(branch_id==DAQP_EMPTY_IND){// Nothing to branch over => integer feasible
             fval_best = work->fval;
-            work->settings->fval_bound = daqp_bnb_bound(fval_best,c,work->settings);
+            work->settings->fval_bound = daqp_bnb_bound(fval_best,c+daqp_bnb_reg(work->u,lb,work),
+                    lb,work->settings);
             swp_ptr=work->xold; work->xold= work->u; work->u=swp_ptr; // Store feasible sol
         }
         else{
@@ -236,13 +274,13 @@ int daqp_bnb(DAQPWorkspace* work){
     // be reused for subsequent solves
     daqp_node_cleanup_workspace(work->bnb->neq,work);
     work->bnb->n_clean = work->bnb->neq;
+    work->settings->fval_bound = fval_bound0;
+    work->settings->sing_tol = sing_tol0;
     if(swp_ptr==NULL){
-        work->settings->fval_bound = fval_bound0;
         return exitflag < 0 ? exitflag : DAQP_EXIT_INFEASIBLE;
     }
     else{
         work->fval = fval_best;
-        work->settings->fval_bound = fval_bound0;
         // Let work->u point to the best feasible solution
         swp_ptr=work->u; work->u= work->xold; work->xold=swp_ptr;
         // Exploration ended early (time/iteration limit, cycling) => not proven optimal
@@ -291,15 +329,19 @@ int daqp_process_node(DAQPNode* node, DAQPWorkspace* work){
 }
 
 int daqp_get_branch_id(DAQPWorkspace* work){
-    int i;
+    int i, j;
     int id = DAQP_EMPTY_IND;
     c_float diff, dist, tol, dist_far;
     DAQPNode* node = work->bnb->tree+work->bnb->n_nodes; // Node being processed
 
     for(i=0; i < work->bnb->nb; i++){
         id = work->bnb->bin_ids[i];
-        // Skip fixed binary constraints
+        // Skip fixed binary constraints (also those dropped from the working set since
+        // their bounds are implied, which may still be off by rounding)
         if(DAQP_IS_ACTIVE(id)) continue;
+        for(j = 0; j <= node->depth; j++)
+            if(DAQP_REMOVE_LOWER_FLAG(work->bnb->fixed_ids[j]) == id) break;
+        if(j <= node->depth) continue;
 
         // Compute signed distance from midpoint between bounds
         diff = daqp_binary_diff(id,work);
