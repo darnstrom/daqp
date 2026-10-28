@@ -31,7 +31,7 @@ void daqp_solve(DAQPResult *res, DAQPWorkspace *work){
         if(work->n_prox==0){
             if(work->avi == NULL || work->avi->is_symmetric){
                 if(work->bnb != NULL)
-                    res->exitflag = daqp_bnb(work,-DAQP_INF);
+                    res->exitflag = daqp_bnb(work);
                 else if(DAQP_IS_HIERARCHICAL(work))
                     res->exitflag = daqp_hiqp(work,res->lam);
                 else

@@ -183,7 +183,11 @@ static c_float daqp_bnb_sing_tol(DAQPWorkspace* work){
     return tol;
 }
 
-int daqp_bnb(DAQPWorkspace* work, const c_float lb){
+int daqp_bnb(DAQPWorkspace* work){
+    return daqp_bnb_lb(work,-DAQP_INF);
+}
+
+int daqp_bnb_lb(DAQPWorkspace* work, const c_float lb){
     int branch_id, exitflag;
     DAQPNode* node;
     c_float *swp_ptr = NULL;
