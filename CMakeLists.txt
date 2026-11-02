@@ -125,6 +125,8 @@ if(JULIA)
     add_custom_target(sync_julia_interface ALL
         COMMAND ${CMAKE_COMMAND} -E copy_directory "${JULIA_INTERFACE_DIR}" "${JULIA_BINARY_DIR}"
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:daqp> "${JULIA_BINARY_DIR}/libdaqp${CMAKE_SHARED_LIBRARY_SUFFIX}"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/src" "${JULIA_BINARY_DIR}/csrc/src"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/include" "${JULIA_BINARY_DIR}/csrc/include"
         DEPENDS daqp
         COMMENT "Syncing Julia files and library..."
     )

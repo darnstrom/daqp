@@ -458,13 +458,47 @@ function codegen(d::DAQPBase.Model; fname="daqp_workspace", dir="codegen", prefi
             push!(hfiles,"hierarchical.h")
         end
 
-        # Copy source files from GitHub
+        copy_c_sources(dir, cfiles, hfiles)
+    end
+end
+
+# Version of the DAQP_jll package (e.g. "0.10.3"), with the build suffix stripped.
+function daqp_jll_version()
+    toml = joinpath(pkgdir(DAQP_jll), "Project.toml")
+    isfile(toml) || return nothing
+    m = match(r"^version\s*=\s*\"([^\"+]+)"m, read(toml, String))
+    return isnothing(m) ? nothing : m.captures[1]
+end
+
+# Copy the C source files used for code generation into `dir`.
+# The sources have to match the libdaqp that rendered the workspace, so:
+#  1. If the package ships sources (placed in `csrc/` by the CMake build
+#     together with a local libdaqp), use those.
+#  2. Otherwise, download the sources from the git tag matching DAQP_jll.
+function copy_c_sources(dir, cfiles, hfiles)
+    csrc = joinpath(@__DIR__, "..", "csrc")
+    if isdir(csrc)
         for f in cfiles
-            Downloads.download("https://raw.githubusercontent.com/darnstrom/daqp/master/src/"*f, dir*f)
+            cp(joinpath(csrc, "src", f), joinpath(dir, f); force=true)
         end
         for f in hfiles
-            Downloads.download("https://raw.githubusercontent.com/darnstrom/daqp/master/include/"*f, dir*f)
+            cp(joinpath(csrc, "include", f), joinpath(dir, f); force=true)
         end
+        return
+    end
+    ver = daqp_jll_version()
+    if isnothing(ver)
+        @warn "DAQPBase: could not determine the DAQP_jll version, downloading sources from master"
+        ref = "master"
+    else
+        ref = "v" * ver
+    end
+    base = "https://raw.githubusercontent.com/darnstrom/daqp/" * ref
+    for f in cfiles
+        Downloads.download(base * "/src/" * f, joinpath(dir, f))
+    end
+    for f in hfiles
+        Downloads.download(base * "/include/" * f, joinpath(dir, f))
     end
 end
 

@@ -553,8 +553,7 @@ end
     d = DAQPBase.Model()
     DAQPBase.setup(d,H,f,A,bupper,blower,sense)
     srcdir = tempname();
-    DAQPBase.codegen(d,dir=srcdir,src=!local_lib)
-    local_lib && get_local_sources(srcdir)
+    DAQPBase.codegen(d,dir=srcdir,src=true)
     src = [f for f in readdir(srcdir) if last(f,1) == "c"]
     if(!isnothing(Sys.which("gcc")))
         testlib = "daqptestlib."* Base.Libc.Libdl.dlext
@@ -575,8 +574,7 @@ end
     d = DAQPBase.Model()
     DAQPBase.setup(d,diagm(5*ones(n)),f,A,bupper,blower,sense)
     srcdir = tempname();
-    DAQPBase.codegen(d,dir=srcdir,src=!local_lib)
-    local_lib && get_local_sources(srcdir)
+    DAQPBase.codegen(d,dir=srcdir,src=true)
     src = [f for f in readdir(srcdir) if last(f,1) == "c"]
     if(!isnothing(Sys.which("gcc")))
         testlib = "daqptestlib."* Base.Libc.Libdl.dlext
@@ -599,8 +597,7 @@ end
 
     # Test codegen
     srcdir = tempname();
-    DAQPBase.codegen(d,dir=srcdir,src=!local_lib)
-    local_lib && get_local_sources(srcdir)
+    DAQPBase.codegen(d,dir=srcdir,src=true)
     src = [f for f in readdir(srcdir) if last(f,1) == "c"]
 
     if(!isnothing(Sys.which("gcc")))
@@ -1292,8 +1289,7 @@ end
         DAQPBase.soft_weights(d;rho_l=[0.0,0.2],rho_u=[0.0,0.1],
                                 w_l=[0.0,3.0],w_u=[0.0,2.0])
         mktempdir() do dir
-            DAQPBase.codegen(d;dir)
-            get_local_sources(dir)
+            DAQPBase.codegen(d;dir,src=true)
             library = joinpath(dir,"generated."*Base.Libc.Libdl.dlext)
             run(`gcc -shared -fPIC -I$dir $(joinpath(dir,"daqp_workspace.c")) -o $library`)
             handle = Base.Libc.Libdl.dlopen(library)
