@@ -192,16 +192,3 @@ function generate_test_avi(n,m)
     return x,H,f,A,b
 end
 ## Source files
-function get_local_sources(srcdir)
-    # Get local source
-    # <repo>/interfaces/daqp-julia/test -> <repo>
-    daqp_dir = joinpath(dirname(@__FILE__), "..","..","..","..")
-    cfiles = ["daqp.c","auxiliary.c","factorization.c", "bnb.c", "hierarchical.c"]
-    hfiles = ["daqp.h","auxiliary.h","factorization.h", "bnb.h", "hierarchical.h","constants.h", "types.h"]
-    for cf in cfiles
-        cp(joinpath(daqp_dir,"src",cf), joinpath(srcdir,cf))
-    end
-    for hf in hfiles
-        cp(joinpath(daqp_dir,"include",hf), joinpath(srcdir,hf))
-    end
-end
