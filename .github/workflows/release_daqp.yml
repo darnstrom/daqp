@@ -1,0 +1,119 @@
+# Release a new version of DAQP:
+#  1. bump the version in CMakeLists.txt and the Python interface and commit
+#     it to master,
+#  2. tag the commit, which triggers wheels.yml (PyPI) and release.yml (MATLAB),
+#  3. once both of those succeed, open a PR to Yggdrasil that updates DAQP_jll
+#     to the new version.
+# Re-running with the same version skips the steps that are already done.
+#
+# Requires the secret RELEASE_TOKEN: a personal access token (classic, scope
+# `public_repo`) of an admin of this repository who owns a fork of
+# JuliaPackaging/Yggdrasil. GITHUB_TOKEN does not suffice since it cannot push
+# to the protected master or to the fork, and since tags pushed with it do not
+# trigger other workflows.
+name: Release DAQP
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "New version, without the leading v (e.g. 0.11.0)"
+        required: true
+        type: string
+
+concurrency: release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ inputs.version }}
+      GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Bump version
+        run: |
+          set -euo pipefail
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid version: $VERSION"; exit 1; }
+          sed -i -E "s/^project\(daqp VERSION [0-9.]+\)/project(daqp VERSION $VERSION)/" CMakeLists.txt
+          sed -i -E "s/^(\s*version=')[0-9.]+(',)/\1$VERSION\2/" interfaces/daqp-python/setup.py
+          grep -q "project(daqp VERSION $VERSION)" CMakeLists.txt
+          grep -q "version='$VERSION'" interfaces/daqp-python/setup.py
+          if git diff --quiet; then
+            echo "Version is already $VERSION"
+          else
+            git diff
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -am "Bump version to v$VERSION"
+            git push origin HEAD:master
+          fi
+
+      - name: Tag
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" >/dev/null; then
+            echo "Tag v$VERSION already exists"
+          else
+            git tag "v$VERSION"
+            git push origin "v$VERSION"
+          fi
+
+      # Only update DAQP_jll if the PyPI and MATLAB releases of the tag succeeded
+      - name: Wait for wheels and MATLAB release
+        timeout-minutes: 180
+        run: |
+          set -euo pipefail
+          SHA=$(gh api "repos/${{ github.repository }}/commits/v$VERSION" --jq .sha)
+          for WF in wheels.yml release.yml; do
+            ID=""
+            for _ in $(seq 60); do # The runs can take a while to show up
+              ID=$(gh run list -R "${{ github.repository }}" --workflow "$WF" --commit "$SHA" \
+                     --json databaseId,headBranch --jq "[.[] | select(.headBranch == \"v$VERSION\")][0].databaseId // empty")
+              [ -n "$ID" ] && break
+              sleep 10
+            done
+            [ -n "$ID" ] || { echo "No run of $WF found for v$VERSION"; exit 1; }
+            echo "Waiting for $WF (run $ID)"
+            gh run watch "$ID" -R "${{ github.repository }}" --exit-status --interval 60 > /dev/null \
+              || { echo "$WF failed for v$VERSION: https://github.com/${{ github.repository }}/actions/runs/$ID"; exit 1; }
+            echo "$WF succeeded"
+          done
+
+      - name: Open PR to Yggdrasil
+        run: |
+          set -euo pipefail
+          RECIPE=D/DAQP/build_tarballs.jl
+          TITLE="[DAQP] Update to v$VERSION"
+          if gh api "repos/JuliaPackaging/Yggdrasil/contents/$RECIPE" -H "Accept: application/vnd.github.raw" \
+               | grep -q "^version = v\"$VERSION\""; then
+            echo "Yggdrasil already builds v$VERSION"; exit 0
+          fi
+          if [ -n "$(gh pr list -R JuliaPackaging/Yggdrasil --state open --search "$TITLE in:title" --json number --jq '.[].number')" ]; then
+            echo "Yggdrasil PR already open"; exit 0
+          fi
+
+          FORK_OWNER=$(gh api user --jq .login)
+          SHA=$(gh api "repos/${{ github.repository }}/commits/v$VERSION" --jq .sha)
+          BRANCH="daqp-v$VERSION"
+
+          gh repo sync "$FORK_OWNER/Yggdrasil" --source JuliaPackaging/Yggdrasil --branch master
+          git clone --depth 1 "https://x-access-token:$GH_TOKEN@github.com/$FORK_OWNER/Yggdrasil.git" ygg
+          cd ygg
+          git config user.name "$FORK_OWNER"
+          git config user.email "$FORK_OWNER@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          sed -i -E "s/^version = v\"[0-9.]+\"/version = v\"$VERSION\"/" "$RECIPE"
+          sed -i -E "s|(GitSource\(\"https://github.com/darnstrom/daqp.git\", \")[0-9a-f]{40}|\1$SHA|" "$RECIPE"
+          grep -q "^version = v\"$VERSION\"" "$RECIPE"
+          grep -q "$SHA" "$RECIPE"
+          git diff
+          git commit -am "$TITLE"
+          git push -f origin "$BRANCH"
+          gh pr create -R JuliaPackaging/Yggdrasil --base master --head "$FORK_OWNER:$BRANCH" \
+            --title "$TITLE" \
+            --body "Updates DAQP to [v$VERSION](https://github.com/${{ github.repository }}/releases/tag/v$VERSION)."
