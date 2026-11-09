@@ -45,7 +45,7 @@ jobs:
         cp LICENSE interfaces/daqp-python/LICENSE
 
     - name: Build wheels
-      uses: pypa/cibuildwheel@v3.4.0
+      uses: pypa/cibuildwheel@v4.3.5
       env:
         CIBW_SKIP: ${{ matrix.cibw_skip }}
         CIBW_ARCHS_MACOS: "x86_64 arm64"
