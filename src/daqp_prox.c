@@ -617,7 +617,10 @@ int daqp_bnb_prox(DAQPWorkspace* work){
         }
         J = bnb_prox_objective(work,is_lp);   // unless x is within it of the lower bound
         tol = work->settings->abs_subopt + work->settings->rel_subopt*fabs(J);
-        if(B > tol && J-lb > tol) exitflag = DAQP_EXIT_OPTIMAL_INEXACT;
+        // J is only as accurate as the solution (feasible within primal_tol), so it can
+        // exceed a tight lb (e.g., after presolve) by more than rounding when tol is 0
+        if(B > tol && J-lb > tol + work->settings->primal_tol*(1+fabs(J)))
+            exitflag = DAQP_EXIT_OPTIMAL_INEXACT;
     }
     return exitflag;
 }
