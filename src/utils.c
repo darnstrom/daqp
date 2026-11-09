@@ -5,6 +5,7 @@
 #include <math.h>
 #include <float.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #ifndef DAQP_AVI_PIVOT_TRIGGER
 #define DAQP_AVI_PIVOT_TRIGGER ((c_float)0.05)
@@ -196,6 +197,14 @@ static int daqp_update_ldp_core(int mask, DAQPWorkspace *work, DAQPProblem* qp){
         if(error_flag==1) do_activate = 1;
     }
 
+    // Asymmetric AVI: the DR iterations form v and d themselves => skip them
+    // unless H or A change (or equality constraints, whose activation reads d, exist)
+    const int is_asym_avi = work->avi != NULL && !work->avi->is_symmetric;
+    int skip_vd = is_asym_avi && !(mask&(DAQP_UPDATE_Rinv|DAQP_UPDATE_M))
+        && !DAQP_IS_HIERARCHICAL(work) && !DAQP_IS_REDUCED(work);
+    for(i = 0; skip_vd && i < work->m; i++)
+        if(DAQP_IS_IMMUTABLE(i)) skip_vd = 0;
+
     // Form R first; dense QPs defer inversion until after the candidate check.
     if(mask&DAQP_UPDATE_Rinv){
         if(work->avi == NULL)
@@ -218,7 +227,7 @@ static int daqp_update_ldp_core(int mask, DAQPWorkspace *work, DAQPProblem* qp){
 
     // Update v (moved before M to enable early-exit check below). If Rinv
     // still holds R, the unconstrained check forms v itself.
-    if(!(work->state & DAQP_STATE_CHOLESKY_PENDING) &&
+    if(!skip_vd && !(work->state & DAQP_STATE_CHOLESKY_PENDING) &&
             (mask&DAQP_UPDATE_Rinv || mask&DAQP_UPDATE_v))
         daqp_update_v(qp->f,work);
 
@@ -251,6 +260,8 @@ static int daqp_update_ldp_core(int mask, DAQPWorkspace *work, DAQPProblem* qp){
 
     // Update M
     if(mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M){
+        if(is_asym_avi && !(mask&DAQP_UPDATE_Rinv)) // A changed (H: in daqp_update_avi)
+            daqp_avi_reset_kkt_cache(work->avi, work->n, work->m);
         error_flag = daqp_update_M(work,qp->A);
         if(error_flag<0) return error_flag;
         do_activate = 1; // daqp_update_M cleared the working set
@@ -261,7 +272,10 @@ static int daqp_update_ldp_core(int mask, DAQPWorkspace *work, DAQPProblem* qp){
     // Update d
     if(mask&DAQP_UPDATE_Rinv||mask&DAQP_UPDATE_M
             ||mask&DAQP_UPDATE_v||mask&DAQP_UPDATE_d){
-        if(unconstrained_flag == 1){ // Already computed d, just need to normalize
+        if(skip_vd){
+            work->reuse_ind = 0; // (the only other effect of daqp_update_d)
+        }
+        else if(unconstrained_flag == 1){ // Already computed d, just need to normalize
             if(work->scaling != NULL){
                 for(i = 0; i < work->m; i++){
                     work->dupper[i]*=work->scaling[i];
@@ -291,6 +305,7 @@ static int daqp_update_ldp_core(int mask, DAQPWorkspace *work, DAQPProblem* qp){
         error_flag = daqp_reactivate_constraints(work);
     if(error_flag < 0) return error_flag;
     work->state &= ~DAQP_STATE_PENDING; // Everything has been formed
+    if(skip_vd) work->state |= DAQP_UPDATE_v|DAQP_UPDATE_d; // ...except v and d
 
     return 0;
 }
@@ -918,6 +933,21 @@ void free_daqp_hierarchy(DAQPWorkspace *work){
     work->hierarchy = NULL;
 }
 
+// Invalidate the AVI KKT caches (H^{-1}A', factors of S); (re)allocate if grown
+void daqp_avi_reset_kkt_cache(DAQPAVI* avi, const int n, const int m){
+    int i;
+    if(m > avi->HinvAT_m || n > avi->HinvAT_n){
+        free(avi->HinvAT);
+        free(avi->HinvAT_valid);
+        avi->HinvAT = malloc((size_t)m*n*sizeof(c_float));
+        avi->HinvAT_valid = malloc(m*sizeof(int));
+        avi->HinvAT_m = m;
+        avi->HinvAT_n = n;
+    }
+    for(i = 0; i < m; i++) avi->HinvAT_valid[i] = 0;
+    avi->kkt_nAS = -1;
+}
+
 int daqp_update_avi(DAQPAVI* avi, DAQPProblem* p, c_float zero_tol){
     const int n = p->n;
     // Setup matrices Hsym, Hs_rho, and H_rho, LU_H
@@ -954,6 +984,7 @@ int daqp_update_avi(DAQPAVI* avi, DAQPProblem* p, c_float zero_tol){
 
     // Detect possible problematic rho from LU pivots
     int lu_status = daqp_lu(avi->LU_H, avi->P_H, n);
+    daqp_avi_reset_kkt_cache(avi, n, p->m); // LU_H changed
     if(lu_status == 0 && min_diag > 0.0){
         c_float min_lu_pivot = DAQP_INF;
         for(i = 0; i < n; i++){
@@ -1022,17 +1053,17 @@ int daqp_lu(c_float* A, int* P, int n) {
 void daqp_lu_solve(c_float* LU, int* P, c_float* b, c_float* x, int n) {
     // Solve Ly = Pb
     for (int i = 0; i < n; i++) {
-        x[i] = b[P[i]]; // Apply permutation to b
-        for (int j = 0; j < i; j++) {
-            x[i] -= LU[i * n + j] * x[j];
-        }
+        const c_float* LU_i = LU + i*n;
+        c_float sum = b[P[i]]; // Apply permutation to b
+        for (int j = 0; j < i; j++) sum -= LU_i[j] * x[j];
+        x[i] = sum;
     }
     // Solve Ux = y
     for (int i = n - 1; i >= 0; i--) {
-        for (int j = i + 1; j < n; j++) {
-            x[i] -= LU[i * n + j] * x[j];
-        }
-        x[i] /= LU[i * n + i];
+        const c_float* LU_i = LU + i*n;
+        c_float sum = x[i];
+        for (int j = i + 1; j < n; j++) sum -= LU_i[j] * x[j];
+        x[i] = sum / LU_i[i];
     }
 }
 

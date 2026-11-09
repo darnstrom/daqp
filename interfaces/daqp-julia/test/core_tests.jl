@@ -807,7 +807,8 @@ end
         x,fval,exitflag,info = solve(d)
         @test norm(xref-x) < tol;
         x,fval,exitflag,info = solve(d)
-        @test info.iterations == 5
+        # Warm started at the solution => solved by the KKT shortcut
+        @test info.iterations == 1 && info.nodes == 0
         @test norm(xref-x) < tol;
     end
 

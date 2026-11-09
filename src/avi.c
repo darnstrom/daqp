@@ -11,11 +11,24 @@ int daqp_solve_avi(DAQPWorkspace *work) {
     c_float val,sum,sum2;
     int tot_iter = 0;
     int counter = 0;
-    int terminate_limit = 5;
+    int terminate_limit = 2;
     int retry_requested = 0;
     c_float minimum_newton_residual = DAQP_INF;
 
     work->outer_iter = 0;
+
+    // Shortcut: return directly if the (warm-started) working set is optimal
+    // (not if it has a dependent constraint, which daqp_ldp drops first)
+    if(work->sing_ind == DAQP_EMPTY_IND && work->n_active <= n){
+        for(i = 0; i < work->n_active; i++) avi->lam_buffer[i] = work->lam_star[i];
+        daqp_solve_avi_kkt(work);
+        if(daqp_check_optimal_avi(work)){
+            for(i = 0; i < n; i++) work->x[i] = avi->x[i];
+            work->iterations = 1;
+            return 1;
+        }
+        for(i = 0; i < work->n_active; i++) work->lam_star[i] = avi->lam_buffer[i];
+    }
 
     // Initial avi iterate
     for(i=0; i < work->n; i++) work->avi->x[i] = work->x[i];
@@ -94,12 +107,9 @@ int daqp_solve_avi(DAQPWorkspace *work) {
             avi->y[i] -= avi->x[i];
         }
         for (i = 0; i < n; i++) {
-            avi->xtemp[i] += 0.5*avi->Hsym[i * n + i] * avi->y[i]; // diagonal
-            for (j = i + 1; j < n; j++) {
-                val = 0.5*avi->Hsym[i * n + j];
-                avi->xtemp[i] += val * avi->y[j];
-                avi->xtemp[j] += val * avi->y[i];
-            }
+            const c_float* Hsym_i = avi->Hsym + i*n;
+            for (j = 0, sum = 0.0; j < n; j++) sum += Hsym_i[j]*avi->y[j];
+            avi->xtemp[i] += 0.5*sum;
         }
         daqp_lu_solve(avi->H_rho, avi->P_H2, avi->xtemp, avi->x, n);
     }
@@ -124,6 +134,25 @@ int daqp_solve_avi(DAQPWorkspace *work) {
     return exitflag;
 }
 
+// H^{-1}a_i (a_i = e_i for simple bounds), computed when first needed
+static const c_float* daqp_avi_hinv_row(DAQPWorkspace* work, const int row){
+    DAQPAVI* avi = work->avi;
+    const int n = work->n;
+    c_float* Yi = avi->HinvAT + (size_t)row*n;
+    if(!avi->HinvAT_valid[row]){
+        if(row < work->ms){ // Simple bound
+            int j;
+            for(j = 0; j < n; j++) avi->unit[j] = 0;
+            avi->unit[row] = 1.0;
+            daqp_lu_solve(avi->LU_H, avi->P_H, avi->unit, Yi, n);
+        }
+        else
+            daqp_lu_solve(avi->LU_H, avi->P_H, work->qp->A + (size_t)(row-work->ms)*n, Yi, n);
+        avi->HinvAT_valid[row] = 1;
+    }
+    return Yi;
+}
+
 void daqp_solve_avi_kkt(DAQPWorkspace* work) {
     DAQPAVI* avi = work->avi;
     int i, j, k, disp,row_idx;
@@ -137,31 +166,32 @@ void daqp_solve_avi_kkt(DAQPWorkspace* work) {
     c_float* temp = avi->xtemp;
     int* WS = work->WS;
 
-    // Compute S = A_WS * H^-1 * A_WS^T
-    for (i = 0; i < nAS; i++) {
-        // temp = H^-1 * A_row_WS[i]^T
-        row_idx = WS[i];
-
-        if(row_idx < work->ms){ // Simple bound
-            for(j=0;j<n;j++) rhs[j] = 0;
-            rhs[row_idx] = 1.0;
-            daqp_lu_solve(avi->LU_H, avi->P_H, rhs, temp, n);
-        }
-        else
-            daqp_lu_solve(avi->LU_H, avi->P_H, work->qp->A + (row_idx-work->ms) * n, temp, n);
-
-
-        for (j = 0; j < nAS; j++) {
-            row_idx = WS[j];
-            if(row_idx < work->ms) // Simple bound
-                sum = temp[row_idx];
-            else{ // General constraint
-                sum = 0.0;
-                disp = (row_idx-work->ms)*n;
-                for (k = 0; k < n; k++) sum += work->qp->A[disp++] * temp[k];
+    // Form and factorize S = A_WS * H^-1 * A_WS^T (unless cached for this WS)
+    int reuse = (avi->kkt_nAS == nAS);
+    for (i = 0; reuse && i < nAS; i++) reuse = (avi->kkt_WS[i] == WS[i]);
+    if(!reuse){
+        int has_soft = 0;
+        for (i = 0; i < nAS; i++) {
+            const c_float* Yi = daqp_avi_hinv_row(work, WS[i]);
+            for (j = 0; j < nAS; j++) {
+                row_idx = WS[j];
+                if(row_idx < work->ms) // Simple bound
+                    sum = Yi[row_idx];
+                else{ // General constraint
+                    const c_float* a_j = work->qp->A + (size_t)(row_idx-work->ms)*n;
+                    for (k = 0, sum = 0.0; k < n; k++) sum += a_j[k]*Yi[k];
+                }
+                S[j * nAS + i] = sum;
             }
-            S[j * nAS + i] = sum;
+            // Soft constraints -> diagonal of S gets regularized
+            if(DAQP_IS_SOFT(WS[i])){
+                S[i*(nAS+1)] += work->settings->rho_soft/(work->scaling[WS[i]] * work->scaling[WS[i]]);
+                has_soft = 1;
+            }
         }
+        daqp_lu(S, avi->P_S, nAS);
+        for (i = 0; i < nAS; i++) avi->kkt_WS[i] = WS[i];
+        avi->kkt_nAS = has_soft ? -1 : nAS; // (soft weights may change)
     }
 
     // Form rhs for Schur system: rhs = -A_WS * H^-1 * f - b_WS
@@ -180,31 +210,18 @@ void daqp_solve_avi_kkt(DAQPWorkspace* work) {
             }
         }
         rhs[i] = -sum;
-
-        // Soft constraints -> diagonal of S gets regularized
-        if(DAQP_IS_SOFT(row_idx))
-            S[i*(nAS+1)]+=work->settings->rho_soft/(work->scaling[row_idx] * work->scaling[row_idx]);
     }
 
     // Get lambda by solving S * lambda = rhs
-    daqp_lu(S, avi->P_S, nAS);
     daqp_lu_solve(S, avi->P_S, rhs, lambda, nAS);
 
-    // Get x by solving for: H * x = -f - A_WS^T * lambda
-    for (i = 0; i < n; i++) temp[i] = -work->qp->f[i];
+    // x = -H^-1 f - sum_j lambda_j H^-1 a_j
+    for (i = 0; i < n; i++) x[i] = -temp[i];
     for (j = 0; j < nAS; j++) {
-        c_float lj = lambda[j];
-        row_idx = WS[j];
-        if(row_idx < work->ms)
-            temp[row_idx] -= lj;
-        else{
-            disp = (row_idx-work->ms) * n;
-            for (i = 0; i < n; i++) temp[i] -= work->qp->A[disp++] * lj;
-        }
+        const c_float* Yj = daqp_avi_hinv_row(work, WS[j]);
+        const c_float lj = lambda[j];
+        for (i = 0; i < n; i++) x[i] -= lj*Yj[i];
     }
-
-    // Final back-substitution to get x
-    daqp_lu_solve(avi->LU_H, avi->P_H, temp, x, n);
 }
 
 

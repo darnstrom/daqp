@@ -130,11 +130,19 @@ typedef struct{
 
     c_float* kkt_buffer;
     int* P_S;
+    int* kkt_WS; // Working set of the LU factors of S in kkt_buffer
+    int kkt_nAS; // (-1 if none)
+
+    c_float* HinvAT; // Rows H^{-1}a_i, computed lazily
+    int* HinvAT_valid;
+    int HinvAT_m, HinvAT_n; // Allocated dimensions
 
     c_float* xtemp;
     c_float* Hx;
     c_float* x;
     c_float* y;
+    c_float* unit; // Scratch
+    c_float* lam_buffer; // Duals saved during the KKT shortcut
 
     c_float rho;
 }DAQPAVI;
