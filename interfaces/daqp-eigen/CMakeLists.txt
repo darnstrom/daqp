@@ -44,6 +44,7 @@ if(TEST)
     add_executable(24_bnb_singular_hessian tests/24_bnb_singular_hessian.cpp)
     add_executable(25_presolve tests/25_presolve.cpp)
     add_executable(26_bnb_robustness tests/26_bnb_robustness.cpp)
+    add_executable(27_minrep_near_parallel tests/27_minrep_near_parallel.cpp)
 
     set(TARGETS
         00_basic_qp
@@ -73,6 +74,7 @@ if(TEST)
         24_bnb_singular_hessian
         25_presolve
         26_bnb_robustness
+        27_minrep_near_parallel
     )
 
     foreach(TARGET ${TARGETS})

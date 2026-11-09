@@ -62,6 +62,8 @@ int daqp_ldp(DAQPWorkspace *work){
                         tried_repair = 1;
                         // Correct LOWER/UPPER (important for equality constraints)
                         for(i = 0; i < work->n_active; i++){
+                            if(work->dupper[work->WS[i]]-work->dlower[work->WS[i]] > work->settings->zero_tol)
+                                continue; // Not an equality
                             if (work->lam[i] >= 0)
                                 DAQP_SET_UPPER(work->WS[i]);
                             else
