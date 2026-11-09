@@ -450,12 +450,21 @@ void allocate_daqp_avi(DAQPAVI* avi, const int n){
 
     avi->kkt_buffer = malloc((n*n+2*n)*sizeof(c_float));
     avi->P_S = malloc(n*sizeof(int));
+    avi->kkt_WS = malloc(n*sizeof(int));
+    avi->kkt_nAS = -1;
+
+    // (H^{-1}A' is allocated in daqp_avi_reset_kkt_cache)
+    avi->HinvAT = NULL;
+    avi->HinvAT_valid = NULL;
+    avi->HinvAT_m = avi->HinvAT_n = 0;
 
     // Allocate iterate (maybe reuse from normal workspace...)
     avi->Hx = malloc(n*sizeof(c_float));
     avi->x = malloc(n*sizeof(c_float));
     avi->y = malloc(n*sizeof(c_float));
     avi->xtemp = malloc(n*sizeof(c_float));
+    avi->unit = malloc(n*sizeof(c_float));
+    avi->lam_buffer = malloc(n*sizeof(c_float));
 }
 
 
@@ -504,11 +513,17 @@ void free_daqp_avi(DAQPWorkspace* work){
 
         free(work->avi->kkt_buffer);
         free(work->avi->P_S);
+        free(work->avi->kkt_WS);
+
+        free(work->avi->HinvAT);
+        free(work->avi->HinvAT_valid);
 
         free(work->avi->Hx);
         free(work->avi->x);
         free(work->avi->y);
         free(work->avi->xtemp);
+        free(work->avi->unit);
+        free(work->avi->lam_buffer);
         free(work->avi);
         work->avi = NULL;
     }
