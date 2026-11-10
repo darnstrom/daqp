@@ -292,34 +292,10 @@ int daqp_add_infeasible(DAQPWorkspace *work){
 }
 
 // Compute all general constraint products from the existing row-major M.
-// Four rows are accumulated together to reuse u and expose independent
-// accumulation chains.  A NULL Mu buffer keeps the row-wise fallback active.
+// A NULL Mu buffer keeps the row-wise fallback active.
 void daqp_compute_Mu(DAQPWorkspace *work){
     if(work->Mu == NULL) return;
-
-    const int rows = work->m-work->ms;
-    const int n = work->n;
-    int row = 0;
-    for(; row+3 < rows; row+=4){
-        const c_float *m0 = work->M+(row+0)*n;
-        const c_float *m1 = work->M+(row+1)*n;
-        const c_float *m2 = work->M+(row+2)*n;
-        const c_float *m3 = work->M+(row+3)*n;
-        c_float sum0=0, sum1=0, sum2=0, sum3=0;
-        for(int k=0; k<n; k++){
-            const c_float uk = work->u[k];
-            sum0 += m0[k]*uk;
-            sum1 += m1[k]*uk;
-            sum2 += m2[k]*uk;
-            sum3 += m3[k]*uk;
-        }
-        work->Mu[row+0] = sum0;
-        work->Mu[row+1] = sum1;
-        work->Mu[row+2] = sum2;
-        work->Mu[row+3] = sum3;
-    }
-    for(; row<rows; row++)
-        work->Mu[row] = daqp_dot_inline(work->M+row*n,work->u,n);
+    daqp_M_times(work->M,work->u,work->m-work->ms,work->n,work->Mu,NULL);
 }
 // Lower bound sum rho*p_i^2 (free soft slacks) on the dual curvature along the
 // singular direction p = lam_star; zero if the slacks only carry rounding

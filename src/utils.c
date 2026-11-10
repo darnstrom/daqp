@@ -729,12 +729,8 @@ int daqp_update_d(DAQPWorkspace *work, c_float *bupper, c_float *blower){
         }
     }
     //General bounds
-    for(i = work->ms, disp=0;i<work->m;i++){
-        for(j=0, sum=0;j<n;j++)
-            sum+=work->M[disp++]*work->v[j];
-        work->dupper[i]+=sum;
-        work->dlower[i]+=sum;
-    }
+    daqp_M_times(work->M,work->v,work->m-work->ms,n,
+            work->dupper+work->ms,work->dlower+work->ms);
     return do_activate;
 }
 
