@@ -183,8 +183,11 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
     if sense is None:
         sense = np.zeros(m, dtype=np.intc)
     # Setup output buffers (np.empty avoids zeroing; the solver fills all entries)
-    cdef double[::1] x = np.empty(n)
-    cdef double[::1] lam = np.empty(m) if m > 0 else np.empty(0)
+    # Keep the ndarrays to return them directly (np.asarray on a memoryview is slow)
+    x_np = np.empty(n)
+    lam_np = np.empty(m)
+    cdef double[::1] x = x_np
+    cdef double[::1] lam = lam_np
 
     # Build C-level structs — all pointer arithmetic from this point on
     cdef double *H_ptr = NULL if H is None else &H[0,0]
@@ -221,10 +224,10 @@ def solve(double[:, :] H, double[:] f, double[:, :] A,
         _solve_warm_start(&problem, &settings, &res, sense, m,
                           primal_start, dual_start)
 
-    return (np.asarray(x), res.fval, res.exitflag,
+    return (x_np, res.fval, res.exitflag,
             {'solve_time': res.solve_time, 'setup_time': res.setup_time,
              'iterations': res.iter, 'nodes': res.nodes,
-             'lam': np.asarray(lam)})
+             'lam': lam_np})
 cdef class Model:
     """
     Wraps a DAQP workspace for efficient reuse across similar problems.
@@ -271,6 +274,8 @@ cdef class Model:
     # Pre-allocated result buffers
     cdef double[::1]    _x
     cdef double[::1]    _lam
+    cdef object         _x_np
+    cdef object         _lam_np
 
     cdef bint _has_model
     cdef bint _has_solved
@@ -364,8 +369,10 @@ cdef class Model:
         self._break_points = np.ascontiguousarray(np.asarray(break_points), dtype=np.intc)
 
         # Pre-allocate result buffers
-        self._x   = np.zeros(n, dtype=np.double)
-        self._lam = np.zeros(m, dtype=np.double)
+        self._x_np   = np.zeros(n, dtype=np.double)
+        self._lam_np = np.zeros(m, dtype=np.double)
+        self._x   = self._x_np
+        self._lam = self._lam_np
 
         # ---- save current settings before any teardown ----
         if self._work.settings != NULL:
@@ -482,9 +489,9 @@ cdef class Model:
             'setup_time': 0.0,
             'iterations': res.iter,
             'nodes':      res.nodes,
-            'lam':        np.asarray(self._lam).copy(),
+            'lam':        self._lam_np.copy(),
         }
-        return np.asarray(self._x).copy(), res.fval, res.exitflag, info
+        return self._x_np.copy(), res.fval, res.exitflag, info
 
     def update(self, H=None, f=None, A=None, bupper=None, blower=None,
                sense=None, break_points=None):
