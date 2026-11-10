@@ -452,6 +452,11 @@ void allocate_daqp_avi(DAQPAVI* avi, const int n){
     avi->P_S = malloc(n*sizeof(int));
     avi->kkt_WS = malloc(n*sizeof(int));
     avi->kkt_nAS = -1;
+    avi->kkt_raw = malloc(n*n*sizeof(c_float));
+    avi->kkt_raw_old = malloc(n*n*sizeof(c_float));
+    avi->kkt_pos = malloc(n*sizeof(int));
+    avi->Hinv_f = malloc(n*sizeof(c_float));
+    avi->Hinv_f_valid = 0;
 
     // (H^{-1}A' is allocated in daqp_avi_reset_kkt_cache)
     avi->HinvAT = NULL;
@@ -514,6 +519,10 @@ void free_daqp_avi(DAQPWorkspace* work){
         free(work->avi->kkt_buffer);
         free(work->avi->P_S);
         free(work->avi->kkt_WS);
+        free(work->avi->kkt_raw);
+        free(work->avi->kkt_raw_old);
+        free(work->avi->kkt_pos);
+        free(work->avi->Hinv_f);
 
         free(work->avi->HinvAT);
         free(work->avi->HinvAT_valid);
