@@ -119,4 +119,6 @@ Eigen::VectorXd bl = (Eigen::VectorXd(4) << -1,-2,-3,-4).finished();
 // Solve problem
 EigenDAQPResult result = daqp_solve(H,f,A,bu,bl);
 ```
-The primal solution can obtain with `result.get_primal()`, and the dual solution can be obtain with `result.get_dual()`.
+The primal solution can obtain with `result.get_primal()`, and the dual solution can be obtain with `result.get_dual()`. Settings can be passed as a last argument, e.g. `daqp_solve(H,f,A,bu,bl,&settings)`.
+
+To solve a sequence of problems, use a `DAQP` object, which is updated with each new problem (`solver.update(H,f,A,bu,bl,sense,break_points)`, which returns a negative value if the update failed). The data is referenced, not copied, so it must stay alive until the next update; the exception is an `A` that is not row-major, which is copied into the object. Binary constraints (`DAQP_BINARY` in `sense`) are handled with branch and bound.
