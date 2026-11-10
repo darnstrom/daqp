@@ -104,7 +104,7 @@ EigenDAQPResult daqp_solve(Eigen::MatrixXd const& H,
 
     assert(bu.size() == bl.size());
     assert(ms <= n);
-    assert(n_tasks == 0 || break_points(Eigen::last) == m);
+    assert(n_tasks == 0 || break_points(Eigen::placeholders::last) == m);
 
     EigenDAQPResult result(n, m);
 
@@ -219,7 +219,7 @@ int DAQP::update(Eigen::MatrixXd const& H,
 
     assert(bu.size() == bl.size());
     assert(ms <= n);
-    assert(n_tasks == 0 || break_points(Eigen::last) == m);
+    assert(n_tasks == 0 || break_points(Eigen::placeholders::last) == m);
 
     // Get correct pointers (using const_cast because DAQP C API expects non-const pointers but doesn't modify the data)
     double* H_ptr  = H.size() == 0 ? nullptr : const_cast<double*>(H.data());
