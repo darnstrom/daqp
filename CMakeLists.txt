@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(daqp VERSION 0.11.1)
+project(daqp VERSION 0.11.2)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
