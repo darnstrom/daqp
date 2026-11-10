@@ -48,6 +48,7 @@ int main() {
     // Test DAQP class
     DAQP solver(3, 50, 5);
     result     = solver.solve(A, bu, bl, break_points);
+    result.set_slack(solver.get_slack());
     bool test2 = verify_slack(result);
 
     // Pure bounds are represented by a 0-by-n general constraint matrix.
