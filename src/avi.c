@@ -1,6 +1,12 @@
 #include "avi.h"
 #include "daqp.h"
 #include "utils.h"
+#include "auxiliary.h"
+
+// Max pivots to repair a warm-started working set before the DR iterations
+#ifndef DAQP_AVI_MAX_REPAIR
+#define DAQP_AVI_MAX_REPAIR 4
+#endif
 
 // Solve AVI
 int daqp_solve_avi(DAQPWorkspace *work) {
@@ -16,15 +22,27 @@ int daqp_solve_avi(DAQPWorkspace *work) {
     c_float minimum_newton_residual = DAQP_INF;
 
     work->outer_iter = 0;
+    avi->Hinv_f_valid = 0;
 
     // Shortcut: return directly if the (warm-started) working set is optimal
     // (not if it has a dependent constraint, which daqp_ldp drops first)
     if(work->sing_ind == DAQP_EMPTY_IND && work->n_active <= n){
         for(i = 0; i < work->n_active; i++) avi->lam_buffer[i] = work->lam_star[i];
+        // Otherwise, try to repair a warm-started working set by pivoting on violated constraints
+        int optimal, pivots = 0, max_pivots = work->n_active > 0 ? DAQP_AVI_MAX_REPAIR : 0;
         daqp_solve_avi_kkt(work);
-        if(daqp_check_optimal_avi(work)){
+        while(!(optimal = daqp_check_optimal_avi(work)) && pivots++ < max_pivots){
+            if(avi->viol < 0) daqp_remove_constraint(work, -avi->viol-1);
+            else{
+                if(avi->viol & 1) DAQP_SET_UPPER(avi->viol >> 1); else DAQP_SET_LOWER(avi->viol >> 1);
+                daqp_add_constraint(work, avi->viol >> 1, (avi->viol & 1) ? 1.0 : -1.0);
+            }
+            if(work->sing_ind != DAQP_EMPTY_IND) break; // (daqp_ldp drops the dependent constraint)
+            daqp_solve_avi_kkt(work);
+        }
+        if(optimal){
             for(i = 0; i < n; i++) work->x[i] = avi->x[i];
-            work->iterations = 1;
+            work->iterations = 1 + pivots;
             return 1;
         }
         for(i = 0; i < work->n_active; i++) work->lam_star[i] = avi->lam_buffer[i];
@@ -163,7 +181,7 @@ void daqp_solve_avi_kkt(DAQPWorkspace* work) {
     c_float* x = avi->x;
     c_float* S = avi->kkt_buffer;
     c_float* rhs = avi->kkt_buffer+nAS*nAS;
-    c_float* temp = avi->xtemp;
+    c_float* temp = avi->Hinv_f;
     int* WS = work->WS;
 
     // Form and factorize S = A_WS * H^-1 * A_WS^T (unless cached for this WS)
@@ -171,16 +189,27 @@ void daqp_solve_avi_kkt(DAQPWorkspace* work) {
     for (i = 0; reuse && i < nAS; i++) reuse = (avi->kkt_WS[i] == WS[i]);
     if(!reuse){
         int has_soft = 0;
+        // Reuse entries of S for constraints that were in the previous working set
+        int* pos = avi->kkt_pos;
+        for (i = 0; i < nAS; i++)
+            for (pos[i] = -1, j = 0; j < avi->kkt_nAS; j++)
+                if(avi->kkt_WS[j] == WS[i]){ pos[i] = j; break; }
         for (i = 0; i < nAS; i++) {
-            const c_float* Yi = daqp_avi_hinv_row(work, WS[i]);
+            const c_float* Yi = NULL;
             for (j = 0; j < nAS; j++) {
-                row_idx = WS[j];
-                if(row_idx < work->ms) // Simple bound
-                    sum = Yi[row_idx];
-                else{ // General constraint
-                    const c_float* a_j = work->qp->A + (size_t)(row_idx-work->ms)*n;
-                    for (k = 0, sum = 0.0; k < n; k++) sum += a_j[k]*Yi[k];
+                if(pos[i] >= 0 && pos[j] >= 0)
+                    sum = avi->kkt_raw_old[pos[j]*n + pos[i]];
+                else{
+                    if(Yi == NULL) Yi = daqp_avi_hinv_row(work, WS[i]);
+                    row_idx = WS[j];
+                    if(row_idx < work->ms) // Simple bound
+                        sum = Yi[row_idx];
+                    else{ // General constraint
+                        const c_float* a_j = work->qp->A + (size_t)(row_idx-work->ms)*n;
+                        for (k = 0, sum = 0.0; k < n; k++) sum += a_j[k]*Yi[k];
+                    }
                 }
+                avi->kkt_raw[j*n + i] = sum;
                 S[j * nAS + i] = sum;
             }
             // Soft constraints -> diagonal of S gets regularized
@@ -189,13 +218,17 @@ void daqp_solve_avi_kkt(DAQPWorkspace* work) {
                 has_soft = 1;
             }
         }
+        c_float* swp = avi->kkt_raw; avi->kkt_raw = avi->kkt_raw_old; avi->kkt_raw_old = swp;
         daqp_lu(S, avi->P_S, nAS);
         for (i = 0; i < nAS; i++) avi->kkt_WS[i] = WS[i];
         avi->kkt_nAS = has_soft ? -1 : nAS; // (soft weights may change)
     }
 
     // Form rhs for Schur system: rhs = -A_WS * H^-1 * f - b_WS
-    daqp_lu_solve(avi->LU_H, avi->P_H, work->qp->f, temp, n);
+    if(!avi->Hinv_f_valid){
+        daqp_lu_solve(avi->LU_H, avi->P_H, work->qp->f, temp, n);
+        avi->Hinv_f_valid = 1;
+    }
 
     for (i = 0; i < nAS; i++) {
         row_idx = WS[i];
@@ -233,17 +266,17 @@ int daqp_check_optimal_avi(DAQPWorkspace* work){
     for(i=0; i < work->n_active; i++){
         if(DAQP_IS_IMMUTABLE(work->WS[i])) continue;
         if(DAQP_IS_LOWER(work->WS[i])){
-            if(work->lam_star[i] > dual_tol) return 0;
+            if(work->lam_star[i] > dual_tol){ work->avi->viol = -1-i; return 0; }
         }
         else{
-            if(work->lam_star[i] < -dual_tol) return 0;
+            if(work->lam_star[i] < -dual_tol){ work->avi->viol = -1-i; return 0; }
         }
     }
     // Simple constraints
     for(i=0; i < work->ms; i++){
         if(DAQP_IS_ACTIVE(i)) continue;
-        if(work->avi->x[i] > work->qp->bupper[i] + primal_tol) return 0;
-        if(work->avi->x[i] < work->qp->blower[i] - primal_tol) return 0;
+        if(work->avi->x[i] > work->qp->bupper[i] + primal_tol){ work->avi->viol = 2*i+1; return 0; }
+        if(work->avi->x[i] < work->qp->blower[i] - primal_tol){ work->avi->viol = 2*i; return 0; }
     }
 
     // General constraints
@@ -254,8 +287,8 @@ int daqp_check_optimal_avi(DAQPWorkspace* work){
         }
         c_float Ax = 0.0;
         for(j=0; j < work->n; j++) Ax += work->qp->A[disp++]*work->avi->x[j];
-        if(Ax > work->qp->bupper[i] + primal_tol) return 0;
-        if(Ax < work->qp->blower[i] - primal_tol) return 0;
+        if(Ax > work->qp->bupper[i] + primal_tol){ work->avi->viol = 2*i+1; return 0; }
+        if(Ax < work->qp->blower[i] - primal_tol){ work->avi->viol = 2*i; return 0; }
     }
     // All checks passed -> optimal KKT point found
     return 1;

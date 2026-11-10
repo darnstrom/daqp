@@ -132,6 +132,12 @@ typedef struct{
     int* P_S;
     int* kkt_WS; // Working set of the LU factors of S in kkt_buffer
     int kkt_nAS; // (-1 if none)
+    c_float* kkt_raw; // Unfactored S for kkt_WS (stride n)
+    c_float* kkt_raw_old;
+    int* kkt_pos;
+    c_float* Hinv_f;
+    int Hinv_f_valid;
+    int viol; // Violation from daqp_check_optimal_avi: -1-i for WS[i], 2*id+is_upper for id
 
     c_float* HinvAT; // Rows H^{-1}a_i, computed lazily
     int* HinvAT_valid;
