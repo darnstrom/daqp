@@ -45,6 +45,7 @@ if(TEST)
     add_executable(25_presolve tests/25_presolve.cpp)
     add_executable(26_bnb_robustness tests/26_bnb_robustness.cpp)
     add_executable(27_minrep_near_parallel tests/27_minrep_near_parallel.cpp)
+    add_executable(28_interface_features tests/28_interface_features.cpp)
 
     set(TARGETS
         00_basic_qp
@@ -75,6 +76,7 @@ if(TEST)
         25_presolve
         26_bnb_robustness
         27_minrep_near_parallel
+        28_interface_features
     )
 
     foreach(TARGET ${TARGETS})

@@ -1,6 +1,8 @@
 #include "daqp.hpp"
 #include "utils.h"
+#include <algorithm>
 #include <utility>
+#include <vector>
 
 
 EigenDAQPResult::EigenDAQPResult()
@@ -88,7 +90,8 @@ EigenDAQPResult daqp_solve(Eigen::MatrixXd const& H,
                            Eigen::VectorXd const& bu,
                            Eigen::VectorXd const& bl,
                            Eigen::VectorXi const& sense,
-                           Eigen::VectorXi const& break_points) {
+                           Eigen::VectorXi const& break_points,
+                           DAQPSettings* settings) {
     int n       = A.cols();
     int m       = bu.size();
     int ms      = m - A.rows();
@@ -104,12 +107,12 @@ EigenDAQPResult daqp_solve(Eigen::MatrixXd const& H,
 
     assert(bu.size() == bl.size());
     assert(ms <= n);
-    assert(n_tasks == 0 || break_points(Eigen::last) == m);
+    assert(n_tasks == 0 || break_points(Eigen::placeholders::last) == m);
 
     EigenDAQPResult result(n, m);
 
     DAQPProblem qp = {n, m, ms, H_ptr, f_ptr, A_ptr, bu_ptr, bl_ptr, sense_ptr, bp_ptr, n_tasks};
-    daqp_quadprog(&result, &qp, nullptr);
+    daqp_quadprog(&result, &qp, settings);
 
     result.set_slack(compute_slacks(A, bu, bl, result.get_primal()));
     return result;
@@ -121,20 +124,22 @@ EigenDAQPResult daqp_solve(Eigen::MatrixXd const& H,
                            Eigen::VectorXd const& f,
                            Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> const& A,
                            Eigen::VectorXd const& bu,
-                           Eigen::VectorXd const& bl) {
+                           Eigen::VectorXd const& bl,
+                           DAQPSettings* settings) {
     Eigen::VectorXi sense(0);
     Eigen::VectorXi break_points(0);
-    return daqp_solve(H, f, A, bu, bl, sense, break_points);
+    return daqp_solve(H, f, A, bu, bl, sense, break_points, settings);
 }
 
 EigenDAQPResult daqp_solve(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> const& A,
                            Eigen::VectorXd const& bu,
                            Eigen::VectorXd const& bl,
-                           Eigen::VectorXi const& break_points) {
+                           Eigen::VectorXi const& break_points,
+                           DAQPSettings* settings) {
     Eigen::MatrixXd H(0, 0);
     Eigen::VectorXd f(0);
     Eigen::VectorXi sense(0);
-    return daqp_solve(H, f, A, bu, bl, sense, break_points);
+    return daqp_solve(H, f, A, bu, bl, sense, break_points, settings);
 }
 
 
@@ -170,23 +175,28 @@ DAQP::~DAQP() {
     free_daqp_ldp(&work_);
 }
 
-int DAQP::resize_result(int const n, int const m, Eigen::VectorXi const& break_points) {
+int DAQP::resize_result(int const n, int const m, Eigen::VectorXi const& sense, Eigen::VectorXi const& break_points) {
     // Ensure that the new dimensions is not too large
     if (n > max_variables_) {
-        return 1;
+        return DAQP_EIGEN_TOO_MANY_VARIABLES;
     }
     if (m > max_constraints_) {
-        return 2;
+        return DAQP_EIGEN_TOO_MANY_CONSTRAINTS;
     }
 
-    // Check if maximum soft constraints exceeds limit
+    // Check if the soft constraints (or the largest level) exceed the limit (as in setup_daqp_main)
     int ns = 0;
-    for (int i = 0, prev = 0; i < break_points.size(); i++) {
-        ns   = (ns > break_points(i) - prev) ? ns : break_points(i) - prev;
-        prev = break_points(i);
+    if (break_points.size() > 1) {
+        for (int i = 0, prev = 0; i < break_points.size(); i++) {
+            ns   = (ns > break_points(i) - prev) ? ns : break_points(i) - prev;
+            prev = break_points(i);
+        }
+    } else {
+        for (int i = 0; i < sense.size(); i++)
+            if (sense(i) & DAQP_SOFT) ns++;
     }
     if (ns > max_constraints_in_level_) {
-        return 3;
+        return DAQP_EIGEN_TOO_MANY_IN_LEVEL;
     }
 
     // Resize primal and dual variables
@@ -201,6 +211,26 @@ int DAQP::resize_result(int const n, int const m, Eigen::VectorXi const& break_p
         result_.resize_dual(m);
     }
     return 0;
+}
+
+// Set up branch and bound for the binary constraints in sense (if they changed)
+int DAQP::update_bnb(int const* sense, int n, int m) {
+    std::vector<int> bin_ids;
+    for (int i = 0; sense != nullptr && i < m; i++)
+        if (sense[i] & DAQP_BINARY) bin_ids.push_back(i);
+    const int nb = static_cast<int>(bin_ids.size());
+    if (nb > n) return DAQP_EXIT_OVERDETERMINED_INITIAL;
+    if (work_.bnb != nullptr && work_.bnb->nb == nb &&
+        std::equal(bin_ids.begin(), bin_ids.end(), work_.bnb->bin_ids))
+        return 1;
+    free_daqp_bnb(&work_);
+    if (nb == 0) return 1;
+    // Allocate for the largest problem, like the other buffers
+    const int n_work = work_.n;
+    work_.n = max_variables_;
+    const int status = setup_daqp_bnb(&work_, const_cast<int*>(sense), nb, max_constraints_in_level_);
+    work_.n = n_work;
+    return status;
 }
 
 // Update the workspace with a new problem
@@ -219,7 +249,7 @@ int DAQP::update(Eigen::MatrixXd const& H,
 
     assert(bu.size() == bl.size());
     assert(ms <= n);
-    assert(n_tasks == 0 || break_points(Eigen::last) == m);
+    assert(n_tasks == 0 || break_points(Eigen::placeholders::last) == m);
 
     // Get correct pointers (using const_cast because DAQP C API expects non-const pointers but doesn't modify the data)
     double* H_ptr  = H.size() == 0 ? nullptr : const_cast<double*>(H.data());
@@ -230,9 +260,8 @@ int DAQP::update(Eigen::MatrixXd const& H,
     int* sense_ptr = sense.size() == 0 ? nullptr : const_cast<int*>(sense.data());
     int* bp_ptr    = break_points.size() == 0 ? nullptr : const_cast<int*>(break_points.data());
 
-    //
-    int resize_status = resize_result(n, m, break_points);
-    assert(resize_status == 0);
+    int resize_status = resize_result(n, m, sense, break_points);
+    if (resize_status < 0) return resize_status;
 
     if (update_mask < 0) {
         // Assume that everything should be updated, but only include Rinv/v
@@ -287,6 +316,12 @@ int DAQP::update(Eigen::MatrixXd const& H,
                 } 
             }
         }
+    }
+
+    // Branch and bound for binary constraints (the sense of the workspace is kept if not updated)
+    if ((update_mask & DAQP_UPDATE_sense) && sense_ptr != work_.sense) {
+        int bnb_status = update_bnb(sense_ptr, n, m);
+        if (bnb_status < 0) return bnb_status;
     }
 
     qp_ = {n, m, ms, H_ptr, f_ptr, A_ptr, bu_ptr, bl_ptr, sense_ptr, bp_ptr, n_tasks};
@@ -393,6 +428,11 @@ void DAQP::set_w_soft(double val) {
 
 void DAQP::set_eq_reduction(int val) {
     settings_.eq_reduction = val;
+    is_solved_ = false;
+}
+
+void DAQP::set_presolve(int val) {
+    settings_.presolve = val;
     is_solved_ = false;
 }
 
@@ -507,6 +547,27 @@ int DAQP::get_iterations() {
         solve();
     }
     return result_.iter;
+}
+
+int DAQP::get_nodes() {
+    if (!is_solved_) {
+        solve();
+    }
+    return result_.nodes;
+}
+
+double DAQP::get_objective() {
+    if (!is_solved_) {
+        solve();
+    }
+    return result_.fval;
+}
+
+double DAQP::get_soft_slack() {
+    if (!is_solved_) {
+        solve();
+    }
+    return result_.soft_slack;
 }
 
 double DAQP::get_solve_time() {
