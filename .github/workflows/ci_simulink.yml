@@ -1,0 +1,52 @@
+name: Simulink CI
+on:
+  pull_request:
+    branches:
+      - master
+    paths-ignore:
+      - "docs/**"
+  push:
+    branches:
+      - master
+    tags: "*"
+    paths-ignore:
+      - "docs/**"
+jobs:
+  core:
+    name: Test S-function logic (C, sanitizers)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Build and run
+        working-directory: interfaces/daqp-simulink/test
+        run: |
+          gcc -g -O1 -Wall -fsanitize=address,undefined -fno-sanitize-recover=all \
+            -I../../../include -I.. test_sfunc_core.c ../daqp_sfunc_core.c ../../../src/*.c \
+            -lm -o test_sfunc_core
+          ./test_sfunc_core
+  simulink:
+    name: Build and test S-function in Simulink
+    runs-on: ubuntu-latest
+    env:
+      # Code generation (Simulink Coder) is not covered by the license for public
+      # projects => it is only tested if a MathWorks batch licensing token is given
+      MLM_LICENSE_TOKEN: ${{ secrets.MLM_LICENSE_TOKEN }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up MATLAB
+        uses: matlab-actions/setup-matlab@v3
+        with:
+          products: Simulink Simulink_Coder MATLAB_Coder
+      - name: Compile S-function as in generated code
+        run: |
+          MATLAB_ROOT="$(dirname "$(dirname "$(readlink -f "$(which matlab)")")")"
+          interfaces/daqp-simulink/test/compile_codegen_sfunc.sh "$MATLAB_ROOT"
+      - name: Build and run tests
+        uses: matlab-actions/run-command@v3
+        with:
+          command: >
+            cd interfaces/daqp-simulink,
+            if isempty(getenv('MLM_LICENSE_TOKEN')), run_all_tests('example'),
+            else, run_all_tests('codegen', 'example'), end
