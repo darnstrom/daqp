@@ -26,8 +26,12 @@ jobs:
             -lm -o test_sfunc_core
           ./test_sfunc_core
   simulink:
-    name: Build and test S-function in Simulink (incl. code generation)
+    name: Build and test S-function in Simulink
     runs-on: ubuntu-latest
+    env:
+      # Code generation (Simulink Coder) is not covered by the license for public
+      # projects => it is only tested if a MathWorks batch licensing token is given
+      MLM_LICENSE_TOKEN: ${{ secrets.MLM_LICENSE_TOKEN }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -38,4 +42,7 @@ jobs:
       - name: Build and run tests
         uses: matlab-actions/run-command@v3
         with:
-          command: cd interfaces/daqp-simulink, run_all_tests('codegen', 'example')
+          command: >
+            cd interfaces/daqp-simulink,
+            if isempty(getenv('MLM_LICENSE_TOKEN')), run_all_tests('example'),
+            else, run_all_tests('codegen', 'example'), end
