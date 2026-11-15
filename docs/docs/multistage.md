@@ -108,6 +108,7 @@ With binary constraints in `sense`, the problem is solved by DAQP's [branch and 
 * `res.lam` is zero and `daqp_multistage_duals` returns 0 (no multipliers or costates).
 * Problems that need proximal-point iterations are not supported (`DAQP_EXIT_NONCONVEX`).
 * Bounds on a fixed $$x_0$$ cannot be binary, and the number of binary constraints can be at most the total number of inputs.
+* `binary_horizon` $$> 0$$ keeps the binary constraints of the stages $$t <$$ `binary_horizon` only, and relaxes those of the later stages to their ranges (set at setup). In MPC, where only the first input is applied, this reduces the size of the tree with the horizon length (a horizon-tail relaxation).
 * The inputs of the latest solution (one stage earlier with `DAQP_MULTISTAGE_UPDATE_SHIFT`, the last one repeated), applied from the new $$x_0$$, are a candidate: if its binary constraints are at a bound and the other constraints hold, its objective bounds the tree, which prunes the nodes that cannot be better (without eliminated equalities and a free $$x_0$$). For a closed loop of a double integrator with thrusters that have a minimum thrust ($$N = 30$$, 60 binaries), this saved about 25-70% of the time per solve.
 
 ## How it works

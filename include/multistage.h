@@ -36,6 +36,7 @@ typedef struct{
     c_float **Ex, **Eu, **Fx, **Fu, **lc, **uc;
 
     int *sense; // DAQP_SOFT or DAQP_BINARY per constraint (NULL: all hard)
+    int binary_horizon; // DAQP_BINARY only at stages t < binary_horizon, relaxed at the others (0: at all stages)
 
     // BLASFEO matrices that the solver reads (referenced; daqp_multistage_pack forms them):
     // BAbt = [B'; A'], RSQrq = [R S; S' Q] (lower), DCt = [D'; C'], Et = [Eu'; Ex'], Ft = [Fu'; Fx']

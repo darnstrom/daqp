@@ -1929,7 +1929,10 @@ static int multistage_setup(DAQPMultistage *user, DAQPWorkspace *work, void *mem
     work->dlower = ow->dlower;
     work->Mu = ow->Mu;
     work->sense = ow->sense;
-    for(i = 0; i < ow->m; i++) work->sense[i] = user->sense != NULL ? user->sense[i] : 0;
+    for(i = 0; i < ow->m; i++){
+        work->sense[i] = user->sense != NULL ? user->sense[i] : 0;
+        if(user->binary_horizon > 0 && ow->ct[i] - ow->x0free >= user->binary_horizon) work->sense[i] &= ~DAQP_BINARY;
+    }
     work->scaling = ow->scale; // Row normalization
     ow->op.data = ow;
     ow->op.row = multistage_row;
