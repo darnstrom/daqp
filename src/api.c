@@ -355,6 +355,7 @@ void allocate_daqp_workspace(DAQPWorkspace *work, int n, int ns){
     work->avi = NULL;
     work->eq = NULL;
     work->timer = NULL;
+    work->Mop = NULL;
 
     reset_daqp_workspace(work);
 }

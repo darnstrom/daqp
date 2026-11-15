@@ -252,6 +252,20 @@ typedef struct{
     DAQPLDPData other;
 }DAQPEqElim;
 
+// Implicit M for the general constraints (e.g. multistage.c): rows of the working set
+// and products M*u are computed on demand
+typedef struct{
+    void* data;
+    // Row id of M (only the first *len entries can be nonzero; valid while id is active)
+    const c_float* (*row)(void* data, const int id, int* len);
+    // Mu = M*u for all general constraints
+    void (*product)(void* data, const c_float* u, c_float* Mu);
+    // Proximal-point iterations (prox_center NULL: unsupported), Hessian + prox_eps*I:
+    c_float prox_eps;
+    void (*prox_center)(void* data); // LDP of the next inner problem around the center
+    c_float (*prox_primal)(void* data); // Solution becomes the center; returns its change
+}DAQPMOperator;
+
 /*
  * Hierarchy of a hierarchical QP (see hierarchical.c): level i is formed by the
  * constraints [break_points[i-1], break_points[i]), and level 0 is hard. The
@@ -350,6 +364,9 @@ typedef struct{
     c_float *w_us;
 
     int state;
+
+    // Implicit M (NULL if M is formed); last, to keep the layout above
+    DAQPMOperator* Mop;
 }DAQPWorkspace;
 
 # ifdef __cplusplus

@@ -42,11 +42,14 @@ int daqp_prox(DAQPWorkspace *work){
     c_float max_diff, tol_stat;
     c_float eta = work->settings->eta_prox;
     c_float eps;
+    // Implicit M with its own proximal terms (see DAQPMOperator)
+    const DAQPMOperator *op = (work->Mop != NULL && work->Mop->prox_center != NULL) ?
+        work->Mop : NULL;
 
     work->outer_iter = 0;
 
     nx = work->n;
-    is_lp = (work->Rinv == NULL && work->RinvD == NULL);
+    is_lp = op == NULL && (work->Rinv == NULL && work->RinvD == NULL);
     eps = is_lp ? 1.0 : daqp_get_proximal_regularization(work);
 
     // For a QP whose Hessian is already positive definite (n_prox == 0),
@@ -90,7 +93,7 @@ int daqp_prox(DAQPWorkspace *work){
             eta = 0.1 * work->settings->dual_tol;
         // eta bounds the stationarity residual, so make it relative to a
         // large linear cost (which is at most twice the scale of the KKT terms)
-        if(work->qp->f != NULL){
+        if(op == NULL && work->qp->f != NULL){
             c_float fmax = DAQP_AUTO_ETA_FSCALE;
             for(i = 0; i < nx; i++)
                 if(fabs(work->qp->f[i]) > fmax) fmax = fabs(work->qp->f[i]);
@@ -102,7 +105,9 @@ int daqp_prox(DAQPWorkspace *work){
         /* ----------------------------------------------------------------
          * Perturb the problem: form v = R'\(f - eps_mask * x_old)
          * ----------------------------------------------------------------*/
-        if(is_lp){
+        if(op != NULL)
+            op->prox_center(op->data);
+        else if(is_lp){
             // No Hessian factor.  Adapt eps heuristically: grow when the
             // inner LP stalls (iterations==1), shrink otherwise to improve
             // accuracy. Keep the deterministic initial value for the first
@@ -138,7 +143,7 @@ int daqp_prox(DAQPWorkspace *work){
             daqp_update_v(work->v, work);
         }
 
-        daqp_update_d(work, work->qp->bupper, work->qp->blower);
+        if(op == NULL) daqp_update_d(work, work->qp->bupper, work->qp->blower);
         if(rescaled){ // The working set is factored anew after a rescaling
             reset_daqp_workspace(work);
             daqp_activate_constraints(work);
@@ -146,12 +151,14 @@ int daqp_prox(DAQPWorkspace *work){
         }
 
         // xold <-- x  (pointer swap avoids copying)
-        swp_ptr = work->xold; work->xold = work->x; work->x = swp_ptr;
+        if(op == NULL){
+            swp_ptr = work->xold; work->xold = work->x; work->x = swp_ptr;
+            work->u = work->x;
+        }
 
         /* ----------------------------------------------------------------
          * Solve the (regularised) least-distance problem
          * ----------------------------------------------------------------*/
-        work->u = work->x;
         work->outer_iter++;
         exitflag = daqp_ldp(work);
 
@@ -169,7 +176,8 @@ int daqp_prox(DAQPWorkspace *work){
         }
         if(exitflag < 0)
             break;              // Inner solver failed -- propagate error
-        ldp2qp_solution(work); // Recover QP primal from LDP dual
+        if(op != NULL) max_diff = op->prox_primal(op->data);
+        else ldp2qp_solution(work); // Recover QP primal from LDP dual
 
         if(eps == 0) break;     // No regularisation -> single outer step
 
@@ -192,6 +200,13 @@ int daqp_prox(DAQPWorkspace *work){
          * as optimal.
          * ----------------------------------------------------------------*/
         tol_stat = is_lp ? eta*eps : eta/eps;
+        if(op != NULL){ // (no acceleration: it needs H and A)
+            if(max_diff <= tol_stat){
+                exitflag = DAQP_EXIT_OPTIMAL;
+                break;
+            }
+            continue;
+        }
         for(i = 0; i < nx; i++){
             max_diff = work->x[i] - work->xold[i];
             if(max_diff > tol_stat || max_diff < -tol_stat) break;
@@ -259,6 +274,8 @@ int daqp_prox(DAQPWorkspace *work){
 
     // Finalize
     if(total_iter >= work->settings->iter_limit) exitflag = DAQP_EXIT_ITERLIMIT;
+    work->iterations = total_iter;
+    if(op != NULL) return exitflag; // (the operator forms the solution)
     // Refine x (skipped for short solves)
     if(exitflag > 0 && total_iter > DAQP_REFINE_MIN_ITER) daqp_refine_primal(work);
     if(is_lp){
@@ -278,7 +295,6 @@ int daqp_prox(DAQPWorkspace *work){
         }
         work->fval += eps*prox_norm;
     }
-    work->iterations = total_iter;
     return exitflag;
 }
 

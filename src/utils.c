@@ -548,6 +548,8 @@ c_float daqp_get_proximal_regularization(const DAQPWorkspace *work){
     int i;
     c_float eps, recovered, rinv;
 
+    if(work->n_prox > 0 && work->Mop != NULL && work->Mop->prox_center != NULL)
+        return work->Mop->prox_eps;
     if(work->n_prox == 0 || work->qp == NULL || work->qp->H == NULL)
         return 0.0;
 

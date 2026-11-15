@@ -187,4 +187,6 @@ struct Workspace
     w_us::Ptr{Cdouble}
 
     state::Cint
+
+    Mop::Ptr{Cvoid} # Implicit M (see multistage.c)
 end

@@ -21,36 +21,6 @@
 #define DAQP_HAS_L1(work) ((work)->settings->w_soft != 0)
 #endif
 
-// Reciprocal quadratic weight of the active side of constraint id (zero
-// selects settings->rho_soft, which is given in the normalized formulation)
-static inline c_float daqp_soft_rho(DAQPWorkspace *work, const int id){
-#ifdef DAQP_SOFT_WEIGHTS
-    if(work->rho_ls != NULL){
-        const c_float rho = DAQP_IS_LOWER(id) ? work->rho_ls[id] : work->rho_us[id];
-        if(rho != 0)
-            return work->scaling ? rho*work->scaling[id]*work->scaling[id] : rho;
-    }
-#else
-    (void)id;
-#endif
-    return work->settings->rho_soft;
-}
-
-// Linear weight of the active side of constraint id, i.e. what the multiplier
-// has to exceed for the slack to become nonzero (zero selects settings->w_soft)
-static inline c_float daqp_soft_w(DAQPWorkspace *work, const int id){
-#ifdef DAQP_SOFT_WEIGHTS
-    if(work->w_ls != NULL){
-        const c_float w = DAQP_IS_LOWER(id) ? work->w_ls[id] : work->w_us[id];
-        if(w != 0)
-            return work->scaling ? w/work->scaling[id] : w;
-    }
-#else
-    (void)id;
-#endif
-    return work->settings->w_soft;
-}
-
 // Signed violation of a free soft constraint for multiplier lam. At lam = 0,
 // its negative is the shift of the dual linear term.
 static inline c_float daqp_soft_residual(DAQPWorkspace *work, const int id,
@@ -199,8 +169,10 @@ void daqp_compute_primal_and_fval(DAQPWorkspace *work){
             else work->u[id]-=li; // Hessian is identity
         }
         else{ // General constraint
-            for(j=0,disp=work->n*(id-work->ms);j<work->n;j++)
-                work->u[j]-=work->M[disp++]*li;
+            int len;
+            const c_float* Mi = daqp_M_row(work,id,&len);
+            for(j=0;j<len;j++)
+                work->u[j]-=Mi[j]*li;
         }
         if(DAQP_IS_SOFT(id)){
             fval += has_l1 ? daqp_soft_penalty(work,id,li)
@@ -328,6 +300,10 @@ int daqp_add_infeasible(DAQPWorkspace *work){
 // A NULL Mu buffer keeps the row-wise fallback active.
 void daqp_compute_Mu(DAQPWorkspace *work){
     if(work->Mu == NULL) return;
+    if(work->Mop != NULL){
+        work->Mop->product(work->Mop->data,work->u,work->Mu);
+        return;
+    }
     daqp_M_times(work->M,work->u,work->m-work->ms,work->n,work->Mu,NULL);
 }
 // Lower bound sum rho*p_i^2 (free soft slacks) on the dual curvature along the
@@ -486,11 +462,13 @@ static void daqp_solve_Lt(const c_float *L, c_float *x, const int n){
     }
 }
 // Row id of M (rows id < ms are rows of Rinv) times v
-static c_float daqp_row_dot(const DAQPWorkspace *work, const int id, const c_float* v){
+static c_float daqp_row_dot(DAQPWorkspace *work, const int id, const c_float* v){
     int j, disp;
     c_float s = 0;
-    if(id >= work->ms)
-        for(j = 0, disp = work->n*(id-work->ms); j < work->n; j++) s += work->M[disp++]*v[j];
+    if(id >= work->ms){
+        const c_float* Mi = daqp_M_row(work,id,&disp);
+        s = daqp_dot_inline(Mi,v,disp);
+    }
     else if(work->Rinv != NULL)
         for(j = id, disp = DAQP_R_OFFSET(id,work->n); j < work->n; j++) s += work->Rinv[disp+j]*v[j];
     else s = v[id];
@@ -723,9 +701,12 @@ void daqp_sub_working_set_rows(DAQPWorkspace *work, const c_float* dlam, c_float
             }
             else y[id] -= dl;
         }
-        else
-            for(j = 0, disp = work->n*(id-work->ms); j < work->n; j++)
-                y[j] -= work->M[disp++]*dl;
+        else{
+            int len;
+            const c_float* Mi = daqp_M_row(work,id,&len);
+            for(j = 0; j < len; j++)
+                y[j] -= Mi[j]*dl;
+        }
     }
 }
 
@@ -744,8 +725,10 @@ void daqp_refine_pivot(DAQPWorkspace *work, const int add_ind, const int L_start
     daqp_solve_Lt(work->L, c, k); // c = L'\l
     for(it = 0; it < 2; it++){
         for(j = 0; j < n; j++) r[j] = 0; // r = m - M_W'c
-        if(add_ind >= work->ms)
-            for(j = 0, disp = n*(add_ind-work->ms); j < n; j++) r[j] = work->M[disp++];
+        if(add_ind >= work->ms){
+            const c_float* Mi = daqp_M_row(work,add_ind,&disp);
+            for(j = 0; j < disp; j++) r[j] = Mi[j];
+        }
         else if(work->Rinv != NULL)
             for(j = add_ind, disp = DAQP_R_OFFSET(add_ind,n); j < n; j++) r[j] = work->Rinv[disp+j];
         else r[add_ind] = 1;
@@ -794,9 +777,11 @@ void daqp_refine_active(DAQPWorkspace *work){
                 Mu = work->u[id];
             }
         } else {
+            int len;
+            const c_float* Mi = daqp_M_row(work,id,&len);
             Mu = 0;
-            for(j=0, disp=work->n*(id-work->ms); j<work->n; j++)
-                Mu += work->M[disp++] * work->u[j];
+            for(j=0; j<len; j++)
+                Mu += Mi[j] * work->u[j];
         }
         d = DAQP_IS_LOWER(id) ? work->dlower[id] : work->dupper[id];
         work->xldl[i] = Mu - d; // RHS: +r[i] (positive, so L*D*L'*dlam=r gives u-=M'*dlam zeroes residual)

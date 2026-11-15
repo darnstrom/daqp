@@ -8,6 +8,36 @@ extern "C" {
 #include "types.h"
 #include "constants.h"
 
+// Reciprocal quadratic weight of the active side of constraint id (zero
+// selects settings->rho_soft, which is given in the normalized formulation)
+static inline c_float daqp_soft_rho(DAQPWorkspace *work, const int id){
+#ifdef DAQP_SOFT_WEIGHTS
+    if(work->rho_ls != NULL){
+        const c_float rho = DAQP_IS_LOWER(id) ? work->rho_ls[id] : work->rho_us[id];
+        if(rho != 0)
+            return work->scaling ? rho*work->scaling[id]*work->scaling[id] : rho;
+    }
+#else
+    (void)id;
+#endif
+    return work->settings->rho_soft;
+}
+
+// Linear weight of the active side of constraint id, i.e. what the multiplier
+// has to exceed for the slack to become nonzero (zero selects settings->w_soft)
+static inline c_float daqp_soft_w(DAQPWorkspace *work, const int id){
+#ifdef DAQP_SOFT_WEIGHTS
+    if(work->w_ls != NULL){
+        const c_float w = DAQP_IS_LOWER(id) ? work->w_ls[id] : work->w_us[id];
+        if(w != 0)
+            return work->scaling ? w/work->scaling[id] : w;
+    }
+#else
+    (void)id;
+#endif
+    return work->settings->w_soft;
+}
+
 void daqp_remove_constraint(DAQPWorkspace* work, const int rm_ind);
 void daqp_add_constraint(DAQPWorkspace *work, const int add_ind, c_float lam);
 void daqp_compute_primal_and_fval(DAQPWorkspace *work);
