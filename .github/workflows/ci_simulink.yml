@@ -1,0 +1,41 @@
+name: Simulink CI
+on:
+  pull_request:
+    branches:
+      - master
+    paths-ignore:
+      - "docs/**"
+  push:
+    branches:
+      - master
+    tags: "*"
+    paths-ignore:
+      - "docs/**"
+jobs:
+  core:
+    name: Test S-function logic (C, sanitizers)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Build and run
+        working-directory: interfaces/daqp-simulink/test
+        run: |
+          gcc -g -O1 -Wall -fsanitize=address,undefined -fno-sanitize-recover=all \
+            -I../../../include -I.. test_sfunc_core.c ../daqp_sfunc_core.c ../../../src/*.c \
+            -lm -o test_sfunc_core
+          ./test_sfunc_core
+  simulink:
+    name: Build and test S-function in Simulink (incl. code generation)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up MATLAB
+        uses: matlab-actions/setup-matlab@v3
+        with:
+          products: Simulink Simulink_Coder MATLAB_Coder
+      - name: Build and run tests
+        uses: matlab-actions/run-command@v3
+        with:
+          command: cd interfaces/daqp-simulink, run_all_tests('codegen', 'example')

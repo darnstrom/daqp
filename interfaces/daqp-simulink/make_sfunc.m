@@ -12,47 +12,19 @@ if nargin == 0
     do_debug = false;
 end
 
-current_dir = pwd;
+% Get path of this file and the daqp sources
+this_dir  = fileparts(mfilename('fullpath'));
+daqp_root = fullfile(this_dir, '..', '..');
+include_dir = fullfile(daqp_root, 'include');
+source_files = dir(fullfile(daqp_root, 'src', '*.c'));
+source_files = fullfile({source_files.folder}, {source_files.name});
 
-% Get path of this file
-this_file = mfilename('fullpath');
-this_dir  = fileparts(this_file);
-
-% Get the path of the daqp solver
-daqp_root = fullfile('..','..');
-include_dir  = {fullfile(daqp_root, 'include')};
-source_dir   = fullfile(daqp_root, 'src');
-source_files = {'daqp.c', ...
-                'factorization.c',...
-                'utils.c',...
-                'api.c',...
-                'auxiliary.c',...
-                'daqp_prox.c',...
-                'bnb.c'};
-
-
-sfunc = 'DAQP_sfunc.c';
-
-% Construct compile command
+args = {'-outdir', this_dir, ['-I' include_dir], ['-I' this_dir]};
 if do_debug
-    cmd = [ 'mex -D__DEBUG__ -g ', sfunc ];
-else
-    cmd = [ 'mex ', sfunc ];
+    args = [args, {'-g'}];
 end
 
-% Add source file path
-for ii = 1:length(source_files)
-    cmd = sprintf('%s "%s"', cmd, fullfile(source_dir,source_files{ii}));
-end
-
-% Add include directories
-for ii = 1:length( include_dir )
-    cmd = sprintf('%s -I"%s"', cmd, include_dir{ii});
-end
-
-% Compile daqp for Simulink
-cd(this_dir)
-eval(cmd)
-cd(current_dir)
+mex(args{:}, fullfile(this_dir, 'DAQP_sfunc.c'), ...
+    fullfile(this_dir, 'daqp_sfunc_core.c'), source_files{:});
 
 end
