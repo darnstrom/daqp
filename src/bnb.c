@@ -81,7 +81,8 @@ static int daqp_bnb_add_fixed_ids(DAQPNode* node, DAQPWorkspace* work){
         }
         dropped |= flag == 0;
     }
-    work->bnb->n_clean = dropped ? work->bnb->neq : work->bnb->neq+node->depth;
+    // (the root, depth -1, has no fixed binaries: the clean prefix is the equalities)
+    work->bnb->n_clean = dropped || node->depth < 0 ? work->bnb->neq : work->bnb->neq+node->depth;
     return 0;
 }
 
