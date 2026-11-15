@@ -92,6 +92,13 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -Wall -Wextra")
 
 target_link_libraries(daqpstat daqp)
 
+# C tests (random problems: number of tests and seed as arguments)
+if(TEST)
+  add_executable(soft_duplicates_test test/soft_duplicates_test.c)
+  target_link_libraries(soft_duplicates_test daqpstat $<$<NOT:$<C_COMPILER_ID:MSVC>>:m>)
+  add_test(NAME SoftDuplicates COMMAND soft_duplicates_test 1000 1)
+endif()
+
 # Install
 install(TARGETS daqpstat EXPORT  ${PROJECT_NAME}Config
   ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"

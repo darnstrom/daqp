@@ -212,6 +212,36 @@ void daqp_compute_primal_and_fval(DAQPWorkspace *work){
         fval+=work->u[j]*work->u[j];
     work->fval = fval;
 }
+// Add a violated soft constraint with a linear weight w (violation v > 0) in the slack state of the multiplier it
+// would take alone, in the one-dimensional problem along it with the curvature d of its new pivot: free if v > w d,
+// else zero (adding it with a zero slack whenever v <= w releases most of them again in the next iteration)
+static void daqp_add_soft(DAQPWorkspace *work, const int id, const c_float v){
+    const int k = work->n_active;
+    const c_float w = daqp_soft_w(work,id);
+    c_float mag = 0;
+    int i, ns_active = 1;
+    work->sense[id] &= ~DAQP_SLACK_SWITCHED;
+    DAQP_SET_MUTABLE(id);
+    DAQP_SET_SLACK_FIXED(id);
+    DAQP_SET_ACTIVE(id);
+    daqp_update_LDL_add(work,id,0);
+    if(v > w*work->D[k]){
+        // A free slack adds rho to the diagonal of the new (last) row, and relaxes the singularity as in
+        // daqp_update_LDL_add
+        DAQP_SET_SLACK_FREE(id);
+        work->D[k] += daqp_soft_rho(work,id);
+        mag = w;
+        if(work->sing_ind == k){
+            for(i = 0; i < k; i++) if(DAQP_IS_SOFT(work->WS[i]) && DAQP_IS_SLACK_FREE(work->WS[i])) ns_active++;
+            if(work->D[k] >= work->settings->sing_tol && k < work->n + ns_active) work->sing_ind = DAQP_EMPTY_IND;
+        }
+    }
+    work->WS[k] = id;
+    work->lam[k] = DAQP_IS_LOWER(id) ? -mag : mag;
+    work->n_active++;
+    daqp_pivot_last(work);
+}
+
 int daqp_add_infeasible(DAQPWorkspace *work){
     int j,disp;
     c_float ep = -work->settings->primal_tol;
@@ -287,7 +317,10 @@ int daqp_add_infeasible(DAQPWorkspace *work){
     // Set lam = lam_star
     c_float *swp_ptr;
     swp_ptr=work->lam; work->lam = work->lam_star; work->lam_star=swp_ptr;
-    daqp_add_constraint(work,add_ind,isupper ? -min_val : min_val);
+    if(DAQP_IS_SOFT(add_ind) && work->bnb == NULL && daqp_soft_w(work,add_ind) > 0)
+        daqp_add_soft(work,add_ind,-min_val);
+    else
+        daqp_add_constraint(work,add_ind,isupper ? -min_val : min_val);
     return 1;
 }
 
@@ -314,8 +347,10 @@ static c_float daqp_soft_curvature(DAQPWorkspace *work){
     return ps > DAQP_SOFT_CURV_TOL*pp ? c : 0;
 }
 
-// Step lam toward lam_star (along lam_star if singular) until a multiplier
-// reaches zero (removal) or passes w (slack switch). Returns 0 if full step
+/* Step lam toward lam_star (along lam_star if singular) until a multiplier
+ * reaches zero (removal) or passes w (slack switch). A singular direction
+ * through free slacks is blocked by them (its pivot is restored). Returns 0 if
+ * the full step is taken (singular: infeasible), 1 if the working set changed. */
 int daqp_remove_blocking(DAQPWorkspace *work){
     int i, ind, rm_ind = DAQP_EMPTY_IND;
     const int singular = work->sing_ind != DAQP_EMPTY_IND;
@@ -348,7 +383,8 @@ int daqp_remove_blocking(DAQPWorkspace *work){
                     continue;
                 target = w; // A zero slack is released
             }
-            // Switching back at w without a primal step is rounding
+            // Switching back at w without a primal step is rounding (avoids
+            // ping-pong, e.g. for duplicate soft constraints)
             if(!singular && w > 0 && target == w && (work->sense[ind] & DAQP_SLACK_SWITCHED) &&
                     (lower ? -work->lam[i] : work->lam[i]) == w)
                 continue;
@@ -393,7 +429,7 @@ int daqp_remove_blocking(DAQPWorkspace *work){
     ind = work->WS[rm_ind];
     if(rm_target == 0){ // The constraint leaves the working set
         daqp_remove_constraint(work,rm_ind);
-        // Earlier slack switches are now genuine
+        // Earlier slack switches are now genuine (only L1 slacks switch)
         if(has_l1)
             for(i = 0; i < work->n_active; i++)
                 work->sense[work->WS[i]] &= ~DAQP_SLACK_SWITCHED;
