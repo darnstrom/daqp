@@ -314,41 +314,41 @@ void free_daqp_bnb(DAQPWorkspace* work){
 
 // Allocate memory for iterates
 void allocate_daqp_workspace(DAQPWorkspace *work, int n, int ns){
-    work->n = n;
-    n = n + ns; //To account for soft_constraints
-    work->Rinv = NULL;
-    work->RinvD = NULL;
-    work->v = NULL;
-    work->scaling = NULL;
-    work->Mu = NULL;
+    const int nt = n + ns; //To account for soft_constraints
+    work->lam = malloc((nt+1)*sizeof(c_float));
+    work->lam_star = malloc((nt+1)*sizeof(c_float));
 
-    work->lam = malloc((n+1)*sizeof(c_float));
-    work->lam_star = malloc((n+1)*sizeof(c_float));
+    work->WS= malloc((nt+1)*sizeof(int));
 
-    work->WS= malloc((n+1)*sizeof(int));
+    work->D= malloc((nt+1)*sizeof(c_float));
+    work->xldl= malloc((nt+1)*sizeof(c_float));
+    work->zldl= malloc((nt+1)*sizeof(c_float));
+    work->L= malloc(((nt+1)*(nt+2)/2)*sizeof(c_float));
 
-    work->D= malloc((n+1)*sizeof(c_float));
-    work->xldl= malloc((n+1)*sizeof(c_float));
-    work->zldl= malloc((n+1)*sizeof(c_float));
-    work->L= malloc(((n+1)*(n+2)/2)*sizeof(c_float));
-
-
-
-    work->u= calloc(work->n,sizeof(c_float)); // calloc -> uninitialized itearte is 0
-    work->x = work->u;
-
-    work->xold= malloc(work->n*sizeof(c_float));
-
-    work->prox_mask = calloc(work->n, sizeof(int)); // all zeros initially
-    work->n_prox = 0;
-    work->state = 0;
-    work->soft_slack = 0;
+    work->u= calloc(n,sizeof(c_float)); // calloc -> uninitialized itearte is 0
+    work->xold= malloc(n*sizeof(c_float));
+    work->prox_mask = calloc(n, sizeof(int)); // all zeros initially
 
     work->rho_ls= NULL;
     work->rho_us= NULL;
     work->w_ls= NULL;
     work->w_us= NULL;
 
+    init_daqp_workspace(work, n);
+}
+
+// Initialize a workspace whose arrays are already set (the iterate x is u)
+void init_daqp_workspace(DAQPWorkspace *work, int n){
+    work->n = n;
+    work->Rinv = NULL;
+    work->RinvD = NULL;
+    work->v = NULL;
+    work->scaling = NULL;
+    work->Mu = NULL;
+    work->x = work->u;
+    work->n_prox = 0;
+    work->state = 0;
+    work->soft_slack = 0;
     work->bnb = NULL;
     work->outer_iter = 1;
     work->hierarchy = NULL;

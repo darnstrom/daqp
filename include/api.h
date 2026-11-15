@@ -38,6 +38,7 @@ int setup_daqp_bnb(DAQPWorkspace* work, int* sense, int nb, int ns);
 
 void allocate_daqp_settings(DAQPWorkspace *work);
 void allocate_daqp_workspace(DAQPWorkspace *work, int n, int ns);
+void init_daqp_workspace(DAQPWorkspace *work, int n);
 void allocate_daqp_ldp(DAQPWorkspace *work, int n, int m, int ms, int alloc_R, int alloc_v);
 void allocate_daqp_avi(DAQPAVI *avi, int n);
 // Per-constraint soft weights (both return 0 if the build has no support)

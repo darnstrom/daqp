@@ -1856,25 +1856,6 @@ int daqp_multistage_nvmax(const DAQPMultistage *prob){
     return n;
 }
 
-// The core workspace whose arrays (lam, lam_star, WS, L, D, xldl, zldl, u, and the soft weights) are given
-static void multistage_workspace_init(DAQPWorkspace *work, const int n){
-    work->n = n;
-    work->Rinv = work->RinvD = work->v = work->scaling = work->Mu = NULL;
-    work->x = work->u;
-    work->xold = NULL;
-    work->prox_mask = NULL; // (the proximal iterations of Mop shift all directions)
-    work->n_prox = work->state = 0;
-    work->soft_slack = 0;
-    work->bnb = NULL;
-    work->outer_iter = 1;
-    work->hierarchy = NULL;
-    work->avi = NULL;
-    work->eq = NULL;
-    work->timer = NULL;
-    work->Mop = NULL;
-    reset_daqp_workspace(work);
-}
-
 // Set up in mem (size bytes), or in a block that is allocated (mem NULL)
 static int multistage_setup(DAQPMultistage *user, DAQPWorkspace *work, void *mem, size_t size){
     const int nx0 = user->nx[0], nu0 = DAQP_MULTISTAGE_NU(user,0), own = mem == NULL;
@@ -1932,10 +1913,14 @@ static int multistage_setup(DAQPMultistage *user, DAQPWorkspace *work, void *mem
     if(own){
         allocate_daqp_settings(work);
         allocate_daqp_workspace(work, ow->nvmax, ns);
-        free(work->prox_mask); // (unused, as in multistage_workspace_init; xold holds the incumbent of BnB)
+        free(work->prox_mask); // (unused: the proximal iterations of Mop shift all directions; xold holds the incumbent of BnB)
         work->prox_mask = NULL;
     }
-    else multistage_workspace_init(work, ow->nvmax);
+    else{ // (the arrays lam, lam_star, WS, L, D, xldl, zldl, u, and the soft weights are given)
+        init_daqp_workspace(work, ow->nvmax);
+        work->xold = NULL;
+        work->prox_mask = NULL;
+    }
     work->m = ow->m;
     work->ms = 0;
     work->n = ow->nv;
