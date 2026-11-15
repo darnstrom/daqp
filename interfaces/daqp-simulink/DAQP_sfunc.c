@@ -423,8 +423,13 @@ static void mdlOutputs(SimStruct *S, int_T tid)
 
 static void mdlTerminate(SimStruct *S)
 {
-    daqp_sfunc_free((DAQPSfunc *)ssGetPWorkValue(S, 0));
-    ssSetPWorkValue(S, 0, NULL);
+    // (Also called without mdlStart, e.g., when the parameters are checked,
+    // when the work vector is not allocated)
+    void **pwork = ssGetPWork(S);
+    if (pwork == NULL)
+        return;
+    daqp_sfunc_free((DAQPSfunc *)pwork[0]);
+    pwork[0] = NULL;
 }
 
 /*=============================*
