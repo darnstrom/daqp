@@ -1,0 +1,42 @@
+name: Multistage CI
+
+on:
+  push:
+    branches: ["master"]
+    paths-ignore:
+      - "docs/**"
+  pull_request:
+    branches: ["master"]
+    paths-ignore:
+      - "docs/**"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # GENERIC: the plain C kernels of BLASFEO (as on ARM)
+        target: [GENERIC, X64_INTEL_HASWELL]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build BLASFEO
+      run: |
+        git clone https://github.com/giaf/blasfeo.git ${{ runner.temp }}/blasfeo
+        git -C ${{ runner.temp }}/blasfeo checkout 0a3df8683c6bf9d98168d616e0c5d05938c9d51c
+        cmake -S ${{ runner.temp }}/blasfeo -B ${{ runner.temp }}/blasfeo-build -DTARGET=${{ matrix.target }} \
+          -DBLASFEO_EXAMPLES=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+          -DCMAKE_INSTALL_PREFIX=${{ runner.temp }}/blasfeo-install
+        cmake --build ${{ runner.temp }}/blasfeo-build -j4
+        cmake --install ${{ runner.temp }}/blasfeo-build
+
+    - name: Configure CMake
+      run: cmake -B ${{ github.workspace }}/build -DCMAKE_BUILD_TYPE=Release -DTEST=ON -DDAQP_MULTISTAGE=ON -DCMAKE_PREFIX_PATH=${{ runner.temp }}/blasfeo-install
+
+    - name: Build
+      run: cmake --build ${{ github.workspace }}/build -j4
+
+    - name: Test
+      working-directory: ${{ github.workspace }}/build
+      run: ctest -V

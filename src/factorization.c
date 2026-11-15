@@ -20,10 +20,10 @@ void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind, const c_float r
     work->sing_ind = DAQP_EMPTY_IND;
     int i,j,disp,id;
     int new_L_start= DAQP_ARSUM(work->n_active);
-    int start_col;
+    int start_col, end_col = work->n, end_k;
     int ns_active=0;
     c_float sum;
-    c_float *Mi, *Mk;
+    const c_float *Mi, *Mk;
 
     // di <-- Mi' Mi
     // If normalized this will always be 1...
@@ -32,12 +32,12 @@ void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind, const c_float r
         start_col = add_ind;
     }
     else{
-        Mi = work->M+work->n*(add_ind-work->ms);
+        Mi = daqp_M_row(work,add_ind,&end_col);
         start_col = 0;
     }
     if(Mi==NULL) sum = 1;
     else
-        sum = dot_row(Mi+start_col,Mi+start_col,work->n-start_col);
+        sum = dot_row(Mi+start_col,Mi+start_col,end_col-start_col);
 
     // A nonzero rho marks a free soft slack and contributes to the diagonal
     if(rho != 0){
@@ -48,7 +48,7 @@ void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind, const c_float r
     work->D[work->n_active] = sum;
 
     if(work->n_active==0){
-        // A zero row is singular alone
+        // A zero row (possible with an implicit M) is singular alone
         if(sum < work->settings->sing_tol || work->n + ns_active <= 0)
             work->sing_ind = 0;
         return;
@@ -62,18 +62,21 @@ void daqp_update_LDL_add(DAQPWorkspace *work, const int add_ind, const c_float r
         if(id < work->ms){ 
             Mk = (work->Rinv) ? work->Rinv+DAQP_R_OFFSET(id,work->n): NULL;
             j= (start_col > id) ? start_col : id;
+            end_k = work->n;
         }
         else{
-            Mk = work->M+work->n*(id-work->ms);
+            Mk = daqp_M_row(work,id,&end_k);
             j= start_col;
         }
+        // Rows can only overlap where both can be nonzero
+        if(end_k > end_col) end_k = end_col;
         // Multiply Mk*Mi (NULL signify unity)
         if(Mk == NULL)
             sum = (Mi ==NULL) ? 0 : Mi[j];
         else if(Mi == NULL)
             sum = Mk[j];
         else
-            sum = dot_row(Mk+j,Mi+j,work->n-j);
+            sum = j < end_k ? dot_row(Mk+j,Mi+j,end_k-j) : 0;
 
         work->L[new_L_start+i] = sum;
     }

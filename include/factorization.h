@@ -13,6 +13,13 @@ static inline c_float daqp_dot_inline(const c_float* v1, const c_float* v2, cons
     for (int i = 0; i < n; i++) sum += v1[i] * v2[i];
     return sum;
 }
+// Row of M for general constraint id; only the first *len elements can be nonzero
+static inline const c_float* daqp_M_row(DAQPWorkspace *work, const int id, int* len){
+    if(work->Mop != NULL)
+        return work->Mop->row(work->Mop->data, id-work->ms, len);
+    *len = work->n;
+    return work->M+(size_t)work->n*(id-work->ms);
+}
 // y <-- M*x for the row-major rows x n matrix M, or, if y2 is not NULL, both
 // y and y2 are incremented by M*x. Four rows are accumulated together to
 // reuse x and expose independent accumulation chains.
