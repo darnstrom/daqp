@@ -6,6 +6,17 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 include(GNUInstallDirs)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/codegen)
+# The structure-exploiting solver for multistage QPs (as in optimal control)
+# (src/multistage.c, include/multistage.h), which uses matrices in the format of HPIPM and
+# acados directly. It requires BLASFEO: the blasfeo target (as in acados, where
+# it is then built by default) or an installed BLASFEO. The rest of DAQP has no
+# dependencies
+if(TARGET blasfeo)
+  set(DAQP_MULTISTAGE_DEFAULT ON)
+else()
+  set(DAQP_MULTISTAGE_DEFAULT OFF)
+endif()
+option(DAQP_MULTISTAGE "Solver for multistage QPs, as in optimal control (requires BLASFEO)" ${DAQP_MULTISTAGE_DEFAULT})
 add_subdirectory(src)
 add_subdirectory(include)
 add_subdirectory(codegen)
@@ -91,12 +102,26 @@ set(CMAKE_C_STANDARD_LIBRARIES "${CMAKE_C_STANDARD_LIBRARIES}") # math for C api
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -Wall -Wextra")
 
 target_link_libraries(daqpstat daqp)
+if(DAQP_MULTISTAGE)
+  if(NOT TARGET blasfeo)
+    find_package(blasfeo REQUIRED)
+  endif()
+  target_link_libraries(daqp blasfeo)
+  target_link_libraries(daqpstat blasfeo)
+  target_compile_definitions(daqp PUBLIC DAQP_MULTISTAGE)
+  target_compile_definitions(daqpstat PUBLIC DAQP_MULTISTAGE)
+endif()
 
 # C tests (random problems: number of tests and seed as arguments)
 if(TEST)
   add_executable(soft_duplicates_test test/soft_duplicates_test.c)
   target_link_libraries(soft_duplicates_test daqpstat $<$<NOT:$<C_COMPILER_ID:MSVC>>:m>)
   add_test(NAME SoftDuplicates COMMAND soft_duplicates_test 1000 1)
+  if(DAQP_MULTISTAGE)
+    add_executable(multistage_test test/multistage_test.c)
+    target_link_libraries(multistage_test daqpstat $<$<NOT:$<C_COMPILER_ID:MSVC>>:m>)
+    add_test(NAME Multistage COMMAND multistage_test 1000 1)
+  endif()
 endif()
 
 # Install
