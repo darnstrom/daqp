@@ -67,10 +67,10 @@ static int test_setup(DAQPMultistage* o, DAQPWorkspace* w){
     const int nn = n + ns + 1;
     const size_t size = daqp_multistage_memsize(o, ns);
     ext_block = malloc(size);
-    double *d = ext_d = calloc(5*nn + nn*(nn+1)/2 + n + 4*m, sizeof(double));
+    double *d = ext_d = calloc(5*nn + nn*(nn+1)/2 + 2*n + 4*m, sizeof(double));
     w->WS = ext_i = calloc(nn, sizeof(int));
     w->lam = d; d += nn; w->lam_star = d; d += nn; w->D = d; d += nn; w->xldl = d; d += nn; w->zldl = d; d += nn;
-    w->L = d; d += nn*(nn+1)/2; w->u = d; d += n;
+    w->L = d; d += nn*(nn+1)/2; w->u = d; d += n; w->xold = d; d += n;
     w->rho_ls = d; d += m; w->rho_us = d; d += m; w->w_ls = d; d += m; w->w_us = d;
     for(int i = 0; i < m; i++) w->rho_ls[i] = w->rho_us[i] = DAQP_DEFAULT_RHO_SOFT;
     daqp_default_settings(&ext_settings);
@@ -662,6 +662,49 @@ static void ms_solve(DAQPResult* res, DAQPWorkspace* w){
 // Chattering (working sets that alternate): a double integrator whose input saturates at its upper bound for one
 // initial state and at its lower bound for the next. The solutions alternate, and once the alternation is detected,
 // the warm start (the working set of two solves back) needs at most one iteration per solve
+// Stage of constraint id
+static int ms_stage(const DAQPMultistage* o, int id){
+    int t = 0;
+    for(; t < o->N; t++){
+        const int nt = o->nb[t] + (o->ng != NULL ? o->ng[t] : 0) + (o->nc != NULL ? o->nc[t] : 0);
+        if(id < nt) break;
+        id -= nt;
+    }
+    return t;
+}
+
+// binary_horizon: the same solution as with DAQP_BINARY removed from the constraints of the later stages
+static int test_binary_horizon(Gen* g){
+    DAQPMultistage* o = &g->prob;
+    const int H = ms_stage(o, g->bin[g->nbin/2]); // (the binaries from the middle one on relaxed)
+    int *s0 = o->sense, *s1 = malloc(g->m*sizeof(int)), ok = 1, nh = 0;
+    for(int i = 0; i < g->m; i++){
+        s1[i] = ms_stage(o, i) >= H ? s0[i] & ~DAQP_BINARY : s0[i];
+        nh += (s1[i] & DAQP_BINARY) != 0;
+    }
+    double *z = malloc(g->nz*sizeof(double));
+    DAQPWorkspace wh, wr; wh.settings = wr.settings = NULL;
+    DAQPResult rh, rr; memset(&rh, 0, sizeof(rh)); memset(&rr, 0, sizeof(rr)); rh.x = rr.x = z;
+    ext_mem = 0;
+    o->binary_horizon = H;
+    const int eh = setup_daqp_multistage(o, &wh);
+    o->binary_horizon = 0;
+    o->sense = s1;
+    const int er = setup_daqp_multistage(o, &wr);
+    o->sense = s0;
+    if(eh < 0 || er < 0) ok = eh == er;
+    else{
+        ok = (wh.bnb != NULL ? wh.bnb->nb : 0) == nh && (wr.bnb != NULL ? wr.bnb->nb : 0) == nh;
+        daqp_multistage_solve(&rh, &wh);
+        daqp_multistage_solve(&rr, &wr);
+        ok &= (rh.exitflag > 0) == (rr.exitflag > 0) && (rh.exitflag <= 0 || fabs(rh.fval - rr.fval) <= 1e-6*(1 + fabs(rr.fval)));
+    }
+    if(eh >= 0) free_daqp_multistage(&wh);
+    if(er >= 0) free_daqp_multistage(&wr);
+    free(s1); free(z);
+    return ok;
+}
+
 static int test_chattering(const int refactor, const int extra){
     enum { N = 15, nx = 2, nu = 1, steps = 16 };
     double Ad[4] = {1, 0.1, 0, 1}, Bd[2] = {0.005, 0.1}, Qd[4] = {1, 0, 0, 1}, Rd[1] = {0.01};
@@ -940,7 +983,7 @@ int main(int argc, char** argv){
         if(feat & F_BIN) solve_dense(&g, zd, &fd, &td); // (the condensed QP of the problem again)
 
         DAQPWorkspace work; work.settings = NULL;
-        ext_mem = k%2 && !(feat & F_BIN) ? 1 + (k/2)%2 : 0; // (every other test in given memory)
+        ext_mem = (feat & F_BIN) ? (k/12)%2 : k%2 ? 1 + (k/2)%2 : 0; // (every other test in given memory)
         int es = setup_daqp_multistage(&g.prob, &work);
         if(es >= 0 && g.rl != NULL) daqp_set_soft_weights(&work, g.rl, g.ru, g.wl, g.wu);
         double* lam = malloc((g.m+1)*sizeof(double));
@@ -1161,8 +1204,9 @@ int main(int argc, char** argv){
             }
             free_daqp_multistage(&work);
         }
-        daqp_multistage_pack_free(&g.prob);
         ext_release();
+        if((feat & F_BIN) && g.nbin > 1 && !test_binary_horizon(&g)){ ok = 0; printf("test %d: binary_horizon\n", k); }
+        daqp_multistage_pack_free(&g.prob);
         fails += !ok;
         free(zd); free(zo); free(lam);
     }

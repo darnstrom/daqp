@@ -1916,9 +1916,8 @@ static int multistage_setup(DAQPMultistage *user, DAQPWorkspace *work, void *mem
         free(work->prox_mask); // (unused: the proximal iterations of Mop shift all directions; xold holds the incumbent of BnB)
         work->prox_mask = NULL;
     }
-    else{ // (the arrays lam, lam_star, WS, L, D, xldl, zldl, u, and the soft weights are given)
+    else{ // (the arrays lam, lam_star, WS, L, D, xldl, zldl, u, the soft weights, and xold with binaries are given)
         init_daqp_workspace(work, ow->nvmax);
-        work->xold = NULL;
         work->prox_mask = NULL;
     }
     work->m = ow->m;
@@ -1930,7 +1929,10 @@ static int multistage_setup(DAQPMultistage *user, DAQPWorkspace *work, void *mem
     work->dlower = ow->dlower;
     work->Mu = ow->Mu;
     work->sense = ow->sense;
-    for(i = 0; i < ow->m; i++) work->sense[i] = user->sense != NULL ? user->sense[i] : 0;
+    for(i = 0; i < ow->m; i++){
+        work->sense[i] = user->sense != NULL ? user->sense[i] : 0;
+        if(user->binary_horizon > 0 && ow->ct[i] - ow->x0free >= user->binary_horizon) work->sense[i] &= ~DAQP_BINARY;
+    }
     work->scaling = ow->scale; // Row normalization
     ow->op.data = ow;
     ow->op.row = multistage_row;
@@ -1938,9 +1940,10 @@ static int multistage_setup(DAQPMultistage *user, DAQPWorkspace *work, void *mem
     ow->op.prox_center = multistage_prox_center;
     ow->op.prox_primal = multistage_prox_primal;
     work->Mop = &ow->op;
-    // Binary constraints: branch and bound (sized for nvmax; allocated, so not with given memory)
+    // Binary constraints: branch and bound (sized for nvmax; allocated, also with given memory)
     for(i = 0, k = 0; i < ow->m; i++) k += (work->sense[i] & DAQP_BINARY) != 0;
-    k = k == 0 ? 1 : own ? setup_daqp_bnb(work, work->sense, k, ns) : DAQP_EXIT_UNSUPPORTED;
+    if(!own && k == 0) work->xold = NULL;
+    k = k == 0 ? 1 : !own && work->xold == NULL ? DAQP_EXIT_UNSUPPORTED : setup_daqp_bnb(work, work->sense, k, ns);
 
     // The bounds on a fixed x_0 alone are left out of the LDP
     for(i = 0; !ow->x0free && i < DAQP_MULTISTAGE_NB(user,0); i++)
@@ -2346,6 +2349,7 @@ void free_daqp_multistage(DAQPWorkspace *work){
         work->rho_ls = work->rho_us = work->w_ls = work->w_us = NULL;
         free_daqp_workspace(work);
     }
+    else free_daqp_bnb(work); // (allocated, also with given memory)
 }
 
 /* BLASFEO matrices of DAQPMultistage from its row-major matrices, in one block starting with BAbt.
