@@ -225,12 +225,13 @@ static int getDimensions(SimStruct *S, Dimensions *dim)
 static void mdlInitializeSizes(SimStruct *S)
 {
     int i;
-    ssSetNumSFcnParams(S, -1); // 1-3 parameters (checked below)
+    // 1-3 parameters => accept the number that is given (after checking it)
 #if defined(MATLAB_MEX_FILE)
     mdlCheckParameters(S);
     if (ssGetErrorStatus(S) != NULL)
         return;
 #endif
+    ssSetNumSFcnParams(S, ssGetSFcnParamsCount(S));
     for (i = 0; i < ssGetSFcnParamsCount(S); i++)
         ssSetSFcnParamTunable(S, i, SS_PRM_NOT_TUNABLE);
 
