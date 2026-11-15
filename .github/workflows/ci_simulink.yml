@@ -39,6 +39,10 @@ jobs:
         uses: matlab-actions/setup-matlab@v3
         with:
           products: Simulink Simulink_Coder MATLAB_Coder
+      - name: Compile S-function as in generated code
+        run: |
+          MATLAB_ROOT="$(dirname "$(dirname "$(readlink -f "$(which matlab)")")")"
+          interfaces/daqp-simulink/test/compile_codegen_sfunc.sh "$MATLAB_ROOT"
       - name: Build and run tests
         uses: matlab-actions/run-command@v3
         with:

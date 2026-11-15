@@ -116,5 +116,21 @@ classdef core_test < matlab.unittest.TestCase
             end
             testCase.verifyEqual(warm.x, cold.x, 'AbsTol', 1e-6);
         end
+
+        function rtwmakecfg_sources(testCase)
+            % The build of generated code should include all DAQP sources
+            here = fileparts(mfilename('fullpath'));
+            info = rtwmakecfg();
+            srcs = dir(fullfile(here, '..', '..', '..', 'src', '*.c'));
+            testCase.verifyEqual(sort(info.sources), ...
+                sort([{srcs.name}, {'daqp_sfunc_core.c'}]));
+            for p = [info.sourcePath, info.includePath]
+                testCase.verifyTrue(isfolder(p{1}), p{1});
+            end
+            for f = info.sources
+                found = cellfun(@(d) isfile(fullfile(d, f{1})), info.sourcePath);
+                testCase.verifyTrue(any(found), f{1});
+            end
+        end
     end
 end
