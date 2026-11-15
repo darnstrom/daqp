@@ -67,10 +67,10 @@ static int test_setup(DAQPMultistage* o, DAQPWorkspace* w){
     const int nn = n + ns + 1;
     const size_t size = daqp_multistage_memsize(o, ns);
     ext_block = malloc(size);
-    double *d = ext_d = calloc(5*nn + nn*(nn+1)/2 + n + 4*m, sizeof(double));
+    double *d = ext_d = calloc(5*nn + nn*(nn+1)/2 + 2*n + 4*m, sizeof(double));
     w->WS = ext_i = calloc(nn, sizeof(int));
     w->lam = d; d += nn; w->lam_star = d; d += nn; w->D = d; d += nn; w->xldl = d; d += nn; w->zldl = d; d += nn;
-    w->L = d; d += nn*(nn+1)/2; w->u = d; d += n;
+    w->L = d; d += nn*(nn+1)/2; w->u = d; d += n; w->xold = d; d += n;
     w->rho_ls = d; d += m; w->rho_us = d; d += m; w->w_ls = d; d += m; w->w_us = d;
     for(int i = 0; i < m; i++) w->rho_ls[i] = w->rho_us[i] = DAQP_DEFAULT_RHO_SOFT;
     daqp_default_settings(&ext_settings);
@@ -940,7 +940,7 @@ int main(int argc, char** argv){
         if(feat & F_BIN) solve_dense(&g, zd, &fd, &td); // (the condensed QP of the problem again)
 
         DAQPWorkspace work; work.settings = NULL;
-        ext_mem = k%2 && !(feat & F_BIN) ? 1 + (k/2)%2 : 0; // (every other test in given memory)
+        ext_mem = (feat & F_BIN) ? (k/12)%2 : k%2 ? 1 + (k/2)%2 : 0; // (every other test in given memory)
         int es = setup_daqp_multistage(&g.prob, &work);
         if(es >= 0 && g.rl != NULL) daqp_set_soft_weights(&work, g.rl, g.ru, g.wl, g.wu);
         double* lam = malloc((g.m+1)*sizeof(double));

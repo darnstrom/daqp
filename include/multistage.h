@@ -54,7 +54,8 @@ int setup_daqp_multistage(DAQPMultistage *prob, DAQPWorkspace *work);
 size_t daqp_multistage_memsize(const DAQPMultistage *prob, const int ns);
 // As setup_daqp_multistage, in mem (size bytes): nothing is allocated. work->settings is given, and the arrays
 // of the core workspace for n = daqp_multistage_nvmax(prob) (or daqp_multistage_nv(prob)) and ns soft
-// constraints (lam, lam_star, WS, L, D, xldl, zldl, u, and the soft weights if ns > 0). Not with binary constraints
+// constraints (lam, lam_star, WS, L, D, xldl, zldl, u, and the soft weights if ns > 0). With binary constraints,
+// also xold (n), and branch and bound is allocated
 int setup_daqp_multistage_mem(DAQPMultistage *prob, DAQPWorkspace *work, void *mem, size_t size);
 // Largest number of variables of the LDP (x_0 free)
 int daqp_multistage_nvmax(const DAQPMultistage *prob);
