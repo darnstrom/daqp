@@ -10,6 +10,9 @@
 #include "bnb.h"
 #include "api.h"
 #include <blasfeo.h>
+#ifndef D_PS
+#define D_PS 4
+#endif
 
 /*
  * Structure-exploiting multistage backend: DAQP's dual active-set method on the LDP in
@@ -1160,7 +1163,7 @@ static int multistage_activate(DAQPMultistageWork *ow){
         b = n - j0 < DAQP_MULTISTAGE_ACT_COLS ? n - j0 : DAQP_MULTISTAGE_ACT_COLS;
         for(kr = 0; kr < kb && len[kr] <= j0; kr++);
         if(kr == kb) continue; // (no row reaches into the block)
-        rs = kr/4*4;
+        rs = kr/D_PS*D_PS;
         for(i = rs; i < kb; i++){
             c = len[i] - j0 < b ? len[i] - j0 : b;
             if(c < 0) c = 0;
@@ -1181,10 +1184,10 @@ static int multistage_activate(DAQPMultistageWork *ow){
         if(moved) multistage_cache_clear(ow); // (C overwrote the rows)
         return daqp_activate_constraints(work);
     }
-    // L (unit lower, packed by rows) and D of DAQP: l_ij = c_ij/c_jj, d_i = c_ii^2. By panels of four rows of C, copied
+    // L (unit lower, packed by rows) and D of DAQP: l_ij = c_ij/c_jj, d_i = c_ii^2. By panels of rows of C, copied
     // first (C is in the memory it is converted into: the rows of L up to a panel end before it)
-    for(b = 0; b < kb; b += 4){
-        const int r = kb - b < 4 ? kb - b : 4;
+    for(b = 0; b < kb; b += D_PS){
+        const int r = kb - b < D_PS ? kb - b : D_PS;
         blasfeo_unpack_dmat(r, b+r, &G, b, 0, ow->sAb.pA, r);
         for(c = 0; c < r; c++){
             c_float *Li = (moved ? ow->rows : work->L) + DAQP_ARSUM(b+c);
@@ -1719,9 +1722,9 @@ static void multistage_memory(DAQPMultistageWork *ow, MultistageMem *M){
     ow->dlower = multistage_take(M, m*sizeof(c_float));
     ow->Mu = multistage_take(M, m*sizeof(c_float));
     ow->sense = multistage_take(M, m*sizeof(int));
-    // (multistage_activate packs blocks of at most min(nv, DAQP_MULTISTAGE_ACT_COLS) columns, and panels of 4 rows of L)
+    // (multistage_activate packs blocks of at most min(nv, DAQP_MULTISTAGE_ACT_COLS) columns, and panels of rows of L)
     multistage_new_mat(M, &ow->sAb, nv + ow->nsmax,
-            nv < DAQP_MULTISTAGE_ACT_COLS ? (nv > 4 ? nv : 4) : DAQP_MULTISTAGE_ACT_COLS);
+            nv < DAQP_MULTISTAGE_ACT_COLS ? (nv > D_PS ? nv : D_PS) : DAQP_MULTISTAGE_ACT_COLS);
     ow->sic = multistage_take(M, (nv + ow->nsmax + 1)*sizeof(c_float));
     ow->rows = multistage_take(M, (size_t)ow->nslots*nv*sizeof(c_float));
 }
