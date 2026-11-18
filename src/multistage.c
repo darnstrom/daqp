@@ -94,9 +94,9 @@ typedef struct{
     int ric_sqrt; // Square-root recursion (P_t = Lxx Lxx' in D)
     c_float eps; // Prox regularization of the Hessian (0: none)
     // Branch and bound: the bound each binary constraint is at in the latest solution (1: lower, 2: upper, 0: none),
-    // and its bounds while a candidate fixes it (multistage_bnb_candidate)
+    // its bounds while a candidate fixes it, and the solution v of the best candidate (multistage_bnb_candidate)
     unsigned char *bside;
-    c_float *bsave;
+    c_float *bsave, *vcand;
     c_float *pic, *lamv; // Costates and multipliers of the latest solve
     int pi_valid, lam_valid;
     int lam_done; // lamv is complete (else: the eliminated equalities and the bounds fixing x_0 are missing)
@@ -119,8 +119,8 @@ typedef struct{
     // Warm start (multistage_ws_record): final working sets of the latest solves (newest first), as the state of each
     // constraint (wsc: its DAQP_MULTISTAGE_WS_BITS, 0 if inactive) and the list of the active ones (wsh, wsl of them)
     int ws_n, ws_alt, ws_two;
-    // Shifted warm start (as in MPC): the constraint of the next stage whose state each constraint takes (-1: none;
-    // wsdst is the inverse), and whether the shifted working set fit the latest solution better
+    // DAQP_MULTISTAGE_UPDATE_SHIFT: the constraint of the next stage whose state each constraint takes (-1: none; wsdst
+    // is the inverse), and whether the shifted working set fit the latest solution better
     int *wssrc, *wsdst, ws_shift;
     unsigned char *wsc[3];
     int *wsh[3], wsl[3]; // (at most nvmax + nsmax + 1 constraints, as DAQP's WS)
@@ -1310,7 +1310,7 @@ static void multistage_normalize(DAQPMultistageWork *ow){
 static int multistage_ws_mutable(const DAQPMultistageWork *ow, const int i){
     return !(ow->work->sense[i] & DAQP_IMMUTABLE) && !(ow->eqf[i] & (DAQP_MULTISTAGE_EQ_X0 | DAQP_MULTISTAGE_EQ_ELIM));
 }
-// The shift of the warm start, for a problem moved by one stage: constraint d of stage t takes the state of the
+// DAQP_MULTISTAGE_UPDATE_SHIFT, for a problem shifted by one stage: constraint d of stage t takes the state of the
 // constraint wssrc[d] of stage t+1 on the same variables (a bound on the same entry of [u; x], one to one; the general
 // and coupling constraint with the same index, if the stages have as many); -1 for the others, and those of the last
 // stage. wsdst is the inverse
@@ -1379,8 +1379,8 @@ static void multistage_ws_record(DAQPMultistageWork *ow, const int ok){
     if(ow->ws_n < 3) ow->ws_n++;
     d1 = ow->ws_n >= 2 ? multistage_ws_diff(ow, 0, 1) : 0;
     d2 = ow->ws_n == 3 ? multistage_ws_diff(ow, 0, 2) : 0;
-    // The working set of the previous solve shifted by one stage (multistage_ws_shift): used at the next update if it
-    // fit the latest solution better than the previous one did (fewer differing constraints)
+    // The working set of the previous solve shifted by one stage (multistage_ws_shift): used at a shift if it fit the
+    // latest solution better than the previous one did (fewer differing constraints)
     // (over the constraints in either working set: the others are inactive in both)
     for(i = 0, ds = 0; ow->ws_n >= 2 && i < n; i++){
         const int src = multistage_ws_src(ow, l[i]);
@@ -1720,6 +1720,7 @@ static void multistage_memory(DAQPMultistageWork *ow, MultistageMem *M){
     ow->vlast = multistage_take(M, nv*sizeof(c_float));
     ow->bside = multistage_take(M, m*sizeof(unsigned char));
     ow->bsave = multistage_take(M, 2*nv*sizeof(c_float)); // (at most nv binary constraints)
+    ow->vcand = multistage_take(M, nv*sizeof(c_float));
     ow->dupper = multistage_take(M, m*sizeof(c_float));
     ow->dlower = multistage_take(M, m*sizeof(c_float));
     ow->Mu = multistage_take(M, m*sizeof(c_float));
@@ -1991,11 +1992,14 @@ int daqp_multistage_update(DAQPWorkspace *work, const int mask){
     if(ow->elim_bad && !ow->no_elim) refactor = 1; // Found inaccurate by the dual pass: keep the equalities in the working set
     // Warm start: the working set of the latest solve, or of two solves back (multistage_ws_record); other equalities
     // make the history of other problems
-    if(reset) multistage_ws_forget(ow);
+    if(reset){
+        multistage_ws_forget(ow);
+        memset(ow->bside, 0, ow->m); // (and the binary assignment of branch and bound)
+    }
     ws_switch = multistage_ws_apply(ow);
-    // A shifted problem (as in MPC): the working set and the multipliers one stage earlier, if that fit the latest
-    // solutions better (and unless they alternate)
-    if(!ws_switch && !reset && work->bnb == NULL && ow->ws_shift){
+    // A shifted problem: the working set and the multipliers one stage earlier (if that fit the latest solutions
+    // better, and unless they alternate)
+    if(!ws_switch && (mask & DAQP_MULTISTAGE_UPDATE_SHIFT) && !reset && work->bnb == NULL && ow->ws_shift){
         multistage_ws_shift(ow);
         ws_switch = 1;
     }
@@ -2145,26 +2149,35 @@ static void multistage_duals(DAQPMultistageWork *ow, const int full){
     if(full) ow->lam_done = 1;
 }
 
-// Branch and bound: whether the problem with the binary constraints fixed at the bounds of the latest solution (shift:
-// those of the same constraint one stage later) is feasible, with its objective (as fval_bound) in *f
-static int multistage_bnb_candidate(DAQPMultistageWork *ow, const int shift, c_float *f){
+// Branch and bound: the bound binary constraint i is at in the latest solution (shift: that of the same constraint one
+// stage later), or 0 if none
+static int multistage_bnb_side(const DAQPMultistageWork *ow, const int i, const int shift){
+    const int s = ow->wssrc[i];
+    return shift && s >= 0 && ow->bside[s] ? ow->bside[s] : ow->bside[i];
+}
+
+// Branch and bound: solve the problem with the binary constraints fixed at their bounds in the latest solution (shift:
+// one stage later), bounded by fb. Returns whether it is feasible, with its objective (as fval_bound) in *f and its
+// solution in vcand
+static int multistage_bnb_candidate(DAQPMultistageWork *ow, const int shift, const c_float fb, c_float *f){
     DAQPWorkspace *work = ow->work;
     DAQPBnB *b = work->bnb;
     int i, j, side, exitflag = -1;
     if(b->nb > ow->nv) return 0; // (bsave)
     for(j = 0; j < b->nb; j++){ // (the bounds of the binaries are fixed, and restored below)
         i = b->bin_ids[j];
-        side = shift && ow->wssrc[i] >= 0 && ow->bside[ow->wssrc[i]] ? ow->bside[ow->wssrc[i]] : ow->bside[i];
-        if(!side) break;
+        if(!(side = multistage_bnb_side(ow, i, shift))) break;
         ow->bsave[2*j] = work->dlower[i]; ow->bsave[2*j+1] = work->dupper[i];
         if(side == 1) work->dupper[i] = work->dlower[i]; else work->dlower[i] = work->dupper[i];
     }
-    if(j == b->nb) exitflag = daqp_bnb(work); // (nothing to branch over)
+    if(j == b->nb){ // (nothing to branch over)
+        work->settings->fval_bound = fb;
+        exitflag = daqp_bnb(work);
+    }
     for(j--; j >= 0; j--){ i = b->bin_ids[j]; work->dlower[i] = ow->bsave[2*j]; work->dupper[i] = ow->bsave[2*j+1]; }
     if(exitflag <= 0) return 0;
-    *f = 0.5*work->fval; // (daqp_bnb bounds 0.5*fval = fval_bound + c)
-    if(work->v != NULL) for(i = 0; i < work->n; i++) *f -= 0.5*work->v[i]*work->v[i];
-    if(work->eq != NULL && work->eq->installed) *f += work->eq->fp;
+    *f = 0.5*work->fval - daqp_bnb_offset(work);
+    memcpy(ow->vcand, work->u, ow->nv*sizeof(c_float));
     return 1;
 }
 
@@ -2197,25 +2210,35 @@ static int multistage_solve_ldp(DAQPMultistageWork *ow){
     int exitflag;
     if(work->bnb != NULL && ow->eps > 0) return DAQP_EXIT_NONCONVEX;
     if(work->bnb != NULL){
-        // The better of the candidates (the binary assignment of the latest solution, and that one stage later) bounds
-        // the tree, with a margin so that the candidate itself is found (if nothing is, the tree is searched again
-        // without the bound)
+        // Candidates: the binary assignment of the latest solution, and that one stage later (if it differs). The better
+        // feasible one bounds the tree, and is the solution if the tree has nothing better or stops early
         const c_float fb = work->settings->fval_bound;
-        c_float fc = fb, f;
-        int iter = 0, shift;
+        c_float fc = fb;
+        int iter = 0, has_cand = 0, shift, j, n;
         for(shift = 0; shift < 2; shift++){
+            for(j = 0; shift && j < work->bnb->nb; j++){
+                const int i = work->bnb->bin_ids[j];
+                if(multistage_bnb_side(ow, i, 1) != multistage_bnb_side(ow, i, 0)) break;
+            }
+            if(shift && j == work->bnb->nb) break; // (the same assignment)
             work->iterations = 0;
-            if(multistage_bnb_candidate(ow, shift, &f) && f < fc) fc = f;
+            has_cand |= multistage_bnb_candidate(ow, shift, fc, &fc);
             iter += work->iterations;
         }
-        if(fc < fb) work->settings->fval_bound = fc + fabs(fc)*1e-9 + 1e-12;
+        // The root of the tree is warm started by the latest root working set (that of a candidate, for the current
+        // problem, if there was one), without the binary constraints, which a candidate fixed
+        for(j = 0, n = 0; j < work->bnb->n_root_WS; j++)
+            if(!(work->sense[DAQP_REMOVE_LOWER_FLAG(work->bnb->root_WS[j])] & DAQP_BINARY))
+                work->bnb->root_WS[n++] = work->bnb->root_WS[j];
+        work->bnb->n_root_WS = n;
+        work->settings->fval_bound = fc;
         exitflag = daqp_bnb(work);
-        if(exitflag == DAQP_EXIT_INFEASIBLE && work->settings->fval_bound < fb){
-            work->settings->fval_bound = fb;
-            exitflag = daqp_bnb(work);
-        }
         work->settings->fval_bound = fb;
         work->iterations += iter;
+        if(has_cand && exitflag <= 0){
+            memcpy(work->u, ow->vcand, ow->nv*sizeof(c_float));
+            exitflag = exitflag == DAQP_EXIT_INFEASIBLE ? DAQP_EXIT_OPTIMAL : DAQP_EXIT_FEASIBLE;
+        }
         if(exitflag > 0) multistage_bnb_record(ow);
         return exitflag;
     }

@@ -45,6 +45,8 @@ typedef struct{
 
 // Flags for daqp_multistage_update (changes of b, q, r and the bounds are detected: mask 0)
 #define DAQP_MULTISTAGE_UPDATE_MATRICES 1 // Matrices (refactorizes)
+#define DAQP_MULTISTAGE_UPDATE_SHIFT 8 // The problem moved by one stage, as in MPC: the warm start may be
+                                      // the working set and the multipliers of the latest solve one stage earlier
 
 // Set up a workspace for prob (referenced, not copied); frees it on failure
 int setup_daqp_multistage(DAQPMultistage *prob, DAQPWorkspace *work);

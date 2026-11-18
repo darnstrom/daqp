@@ -184,6 +184,15 @@ static c_float daqp_bnb_sing_tol(DAQPWorkspace* work){
     return tol;
 }
 
+// The offset c between the objective J and the scale 0.5*fval of daqp_ldp (0.5*fval = J + c), with c = 0.5*||v||^2 - fp,
+// where fp is the objective removed by equality elimination
+c_float daqp_bnb_offset(const DAQPWorkspace* work){
+    c_float c = 0;
+    if(work->v != NULL) for(int i=0; i < work->n; i++) c += 0.5*work->v[i]*work->v[i];
+    if(work->eq != NULL && work->eq->installed) c -= work->eq->fp;
+    return c;
+}
+
 int daqp_bnb(DAQPWorkspace* work){
     return daqp_bnb_lb(work,-DAQP_INF);
 }
@@ -204,13 +213,10 @@ int daqp_bnb_lb(DAQPWorkspace* work, const c_float lb){
     if(work->n_active == work->bnb->neq)
         daqp_bnb_load_ws(work->bnb->root_WS,work->bnb->n_root_WS,work);
 
-    // Objective J = 0.5*fval - c, with c = 0.5*||v||^2 - fp, where fp is the objective
-    // removed by equality elimination (only needed for rel_subopt, fval_bound and lb)
+    // Objective J = 0.5*fval - c (only needed for rel_subopt, fval_bound and lb)
     c_float fval_bound0 = work->settings->fval_bound, fval_best = 0, c = 0;
-    if(work->settings->rel_subopt > 0 || fval_bound0 < DAQP_INF || lb > -DAQP_INF){
-        if(work->v != NULL) for(int i=0; i < work->n; i++) c += 0.5*work->v[i]*work->v[i];
-        if(work->eq != NULL && work->eq->installed) c -= work->eq->fp;
-    }
+    if(work->settings->rel_subopt > 0 || fval_bound0 < DAQP_INF || lb > -DAQP_INF)
+        c = daqp_bnb_offset(work);
     work->settings->fval_bound = fval_bound0 + c;
 
     // Start from a user-provided integer-feasible solution

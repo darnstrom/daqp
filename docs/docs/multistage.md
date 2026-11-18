@@ -90,8 +90,9 @@ daqp_multistage_pack_free(&prob);
 | Flag | Meaning |
 |------|---------|
 | `DAQP_MULTISTAGE_UPDATE_MATRICES` | The matrices changed (including after `daqp_multistage_pack`) |
+| `DAQP_MULTISTAGE_UPDATE_SHIFT` | The problem moved one stage forward, as in MPC (in SQP: only at the first QP of a time step) |
 
-As in MPC, the working set is shifted one stage along with the problem if this fit the previous solve better than the unshifted one (no flag is needed). If the working sets alternate between solves (chattering), the one from two solves back is used instead. If $$x_0$$ was fixed at setup but no longer is, the update returns `DAQP_EXIT_UNSUPPORTED` and a new setup is needed.
+With `DAQP_MULTISTAGE_UPDATE_SHIFT`, the working set is shifted one stage along with the problem, if this fit the previous solve better than the unshifted one. If the working sets alternate between solves (chattering), the one from two solves back is used instead. If $$x_0$$ was fixed at setup but no longer is, the update returns `DAQP_EXIT_UNSUPPORTED` and a new setup is needed.
 
 ### Dual variables
 `res.lam` holds the multipliers of the working set, except those of eliminated equalities and of bounds fixing $$x_0$$, which are zero. `daqp_multistage_duals(&work, lam, pi)` (either pointer may be `NULL`) computes the complete `lam` and the costates $$\pi = [\pi_0; \dots; \pi_{N-1}]$$, with $$\pi_t \in \mathbb{R}^{n_{x,t+1}}$$ the multiplier of the dynamics $$x_{t+1} = \dots$$. They are valid until the next update or solve.
@@ -107,7 +108,7 @@ Binary constraints in `sense` are handled by DAQP's [branch and bound]({{ '/star
 * Proximal-point iterations are not supported (`DAQP_EXIT_NONCONVEX`).
 * Bounds on a fixed $$x_0$$ cannot be binary, and there can be at most as many binary constraints as inputs in total.
 * `binary_horizon` $$> 0$$ keeps only the binary constraints of stages $$t <$$ `binary_horizon` and relaxes the rest.
-* The binary assignment of the previous solution (at which bound each binary constraint was), as is and shifted by one stage, is fixed and solved, and the better feasible objective prunes the tree. The assignment does not depend on the coordinates of the problem (as the steps of an SQP iteration).
+* The binary assignment of the previous solution (at which bound each binary constraint was), as is and shifted by one stage, is fixed and solved: the better feasible one prunes the tree, and is the solution if the tree has nothing better or stops early. The assignment does not depend on the coordinates of the problem (as the steps of an SQP iteration).
 
 ## How it works
 DAQP solves QPs as least-distance problems $$\min \tfrac{1}{2}\|v\|^2$$ s.t. $$d_l \leq Mv \leq d_u$$. For a multistage problem, $$v$$ parametrizes perturbations from the unconstrained (LQR) optimum through the Riccati recursion:

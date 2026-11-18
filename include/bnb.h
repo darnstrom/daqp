@@ -10,6 +10,8 @@ extern "C" {
 #include "daqp.h"
 
 int daqp_bnb(DAQPWorkspace* work);
+// The offset c between the objective J and the scale 0.5*fval of daqp_ldp (0.5*fval = J + c)
+c_float daqp_bnb_offset(const DAQPWorkspace* work);
 // lb is a lower bound on the objective, or -DAQP_INF (see daqp_bnb_prox)
 int daqp_bnb_lb(DAQPWorkspace* work, const c_float lb);
 int daqp_process_node(DAQPNode* node, DAQPWorkspace* work);
