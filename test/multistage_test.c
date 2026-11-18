@@ -875,10 +875,11 @@ static int test_shift(void){
     return ok && it[1] < it[0];
 }
 
-// Branch and bound with the candidates of the latest solution (its binary assignment, and that one stage later; no
-// DAQP_MULTISTAGE_UPDATE_SHIFT needed): a closed loop of a double integrator with a forward and a backward thruster with a minimum thrust when on
-// (u in {0} U [0.6, 1]: binary d, 0.6 d <= u <= d, a cost on d), disturbed at every 5th step. Against a new setup at every
-// step (no candidate), the objectives must agree, and the candidate's bound must need fewer nodes (it only prunes)
+// Branch and bound with the candidates of the latest solution (its binary assignment, and that one stage later): a closed
+// loop of a double integrator with a forward and a backward thruster with a minimum thrust when on (u in {0} U [0.6, 1]:
+// binary d, 0.6 d <= u <= d, a cost on d), disturbed at every 5th step, updated with DAQP_MULTISTAGE_UPDATE_SHIFT at
+// every other step. Against a new setup at every step (no candidate), the objectives must agree, and the candidates
+// must need fewer nodes, counting those of the candidates themselves
 static int test_bnb_candidate(void){
     enum { N = 30, nx = 2, nu = 4, steps = 30 };
     const double dt = 0.2;
@@ -916,7 +917,7 @@ static int test_bnb_candidate(void){
     for(int k = 0; k < steps && ok; k++){
         DAQPResult res; memset(&res, 0, sizeof(res)); res.x = z;
         for(int i = 0; i < nx; i++) lb[0][nu+i] = ub[0][nu+i] = x[i];
-        daqp_multistage_update(&work, 0);
+        daqp_multistage_update(&work, k % 2 ? DAQP_MULTISTAGE_UPDATE_SHIFT : 0); // (the flag does not apply to BnB)
         daqp_multistage_solve(&res, &work);
         const double f = res.fval;
         ok &= res.exitflag > 0;
