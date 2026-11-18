@@ -705,7 +705,7 @@ static int test_binary_horizon(Gen* g){
     return ok;
 }
 
-static int test_chattering(const int refactor, const int extra){
+static int test_chattering(const int refactor){
     enum { N = 15, nx = 2, nu = 1, steps = 16 };
     double Ad[4] = {1, 0.1, 0, 1}, Bd[2] = {0.005, 0.1}, Qd[4] = {1, 0, 0, 1}, Rd[1] = {0.01};
     int nxs[N+1], nus[N+1], nbs[N+1], *idxb[N+1];
@@ -729,7 +729,7 @@ static int test_chattering(const int refactor, const int extra){
     if(es < 0) ok = 0;
     for(int st = 0; st < steps && ok; st++){
         lb[0][nu] = ub[0][nu] = st%2 ? -5 : 5;
-        daqp_multistage_update(&work, (refactor ? DAQP_MULTISTAGE_UPDATE_MATRICES : 0) | extra);
+        daqp_multistage_update(&work, refactor ? DAQP_MULTISTAGE_UPDATE_MATRICES : 0);
         DAQPResult res; memset(&res, 0, sizeof(res)); res.x = z; res.lam = NULL;
         daqp_multistage_solve(&res, &work);
         if(res.exitflag <= 0) ok = 0;
@@ -739,8 +739,7 @@ static int test_chattering(const int refactor, const int extra){
     }
     if(es >= 0) free_daqp_multistage(&work);
     daqp_multistage_pack_free(&o);
-    printf("chattering (%s%s): iterations of the last %d solves %ld\n",
-            refactor ? "refactorizations" : "x0 updates", extra ? ", flagged as shifts" : "", steps/2, it);
+    printf("chattering (%s): iterations of the last %d solves %ld\n", refactor ? "refactorizations" : "x0 updates", steps/2, it);
     for(int t = 0; t <= N; t++){ free(idxb[t]); free(lb[t]); free(ub[t]); }
     free(z); free(zs);
     return ok && it <= steps/2;
@@ -818,10 +817,10 @@ static int test_soft_warm(void){
     return ok && nfixed > 0 && nfree > 0 && k >= 16; // (else it would not test the activation at once)
 }
 
-// DAQP_MULTISTAGE_UPDATE_SHIFT: a closed loop of a double integrator (input bounds, soft position bounds with a linear
-// weight, a general constraint at stages 1..N, no input at the last stage) whose initial state is the next state of the
-// latest solution (and disturbed at every 5th step), solved with and without the shift of the warm start. The
-// solutions must agree, and the shifted warm starts need fewer iterations
+// Shifted warm starts: a closed loop of a double integrator (input bounds, soft position bounds with a linear weight, a
+// general constraint at stages 1..N, no input at the last stage) whose initial state is the next state of the latest
+// solution (and disturbed at every 5th step), solved with warm starts (shifted when that fits) and with cold starts.
+// The solutions must agree, and the warm starts need fewer iterations
 static int test_shift(void){
     enum { N = 25, nx = 2, nu = 1, steps = 40 };
     double Ad[4] = {1, 0.1, 0, 1}, Bd[2] = {0.005, 0.1}, Qd[4] = {1, 0, 0, 1}, Rd[1] = {0.01}, Cd[2] = {1, 0.5}, Dd[1] = {0.2};
@@ -858,7 +857,11 @@ static int test_shift(void){
         for(int i = 0; i < nx; i++) lb[0][nu+i] = ub[0][nu+i] = x[i];
         for(int v = 0; v < 2; v++){
             DAQPResult res; memset(&res, 0, sizeof(res)); res.x = z; res.lam = NULL;
-            daqp_multistage_update(ws+v, v && k > 0 ? DAQP_MULTISTAGE_UPDATE_SHIFT : 0);
+            if(v == 0) // (cold start: an empty working set, except the constraints DAQP keeps in it)
+                for(int i = 0; i < ws[v].m; i++)
+                    if(!(ws[v].sense[i] & DAQP_IMMUTABLE)) ws[v].sense[i] &= ~(DAQP_ACTIVE | DAQP_LOWER | DAQP_SLACK_FIXED);
+            daqp_multistage_update(ws+v, 0);
+            if(v == 0){ reset_daqp_workspace(ws+v); daqp_activate_constraints(ws+v); } // (as without a refactorization)
             daqp_multistage_solve(&res, ws+v);
             if(res.exitflag <= 0) ok = 0;
             if(k > 0) it[v] += res.iter;
@@ -869,14 +872,14 @@ static int test_shift(void){
     }
     for(int v = 0; v < 2; v++) free_daqp_multistage(ws+v);
     daqp_multistage_pack_free(&o);
-    printf("shifted warm starts (%d solves): iterations without the shift %ld, with DAQP_MULTISTAGE_UPDATE_SHIFT %ld\n", steps-1, it[0], it[1]);
+    printf("shifted warm starts (%d solves): iterations with cold starts %ld, with warm starts %ld\n", steps-1, it[0], it[1]);
     for(int t = 0; t <= N; t++){ free(idxb[t]); free(lb[t]); free(ub[t]); free(lg[t]); free(ug[t]); }
     free(sense); free(rho); free(w); free(z); free(zs);
     return ok && it[1] < it[0];
 }
 
-// Branch and bound with the candidates of the latest solution (its binary assignment, and that one stage later; no
-// DAQP_MULTISTAGE_UPDATE_SHIFT needed): a closed loop of a double integrator with a forward and a backward thruster with a minimum thrust when on
+// Branch and bound with the candidates of the latest solution (its binary assignment, and that one stage later): a
+// closed loop of a double integrator with a forward and a backward thruster with a minimum thrust when on
 // (u in {0} U [0.6, 1]: binary d, 0.6 d <= u <= d, a cost on d), disturbed at every 5th step. Against a new setup at every
 // step (no candidate), the objectives must agree, and the candidate's bound must need fewer nodes (it only prunes)
 static int test_bnb_candidate(void){
@@ -1210,8 +1213,8 @@ int main(int argc, char** argv){
         fails += !ok;
         free(zd); free(zo); free(lam);
     }
-    // (with DAQP_MULTISTAGE_UPDATE_SHIFT: the alternation still decides, the shifted working sets do not fit)
-    const int chat_ok = test_chattering(0, 0) & test_chattering(1, 0) & test_chattering(0, DAQP_MULTISTAGE_UPDATE_SHIFT);
+    // (the alternation decides: the shifted working sets do not fit)
+    const int chat_ok = test_chattering(0) & test_chattering(1);
     const int soft_ok = test_soft_warm();
     const int shift_ok = test_shift();
     const int bnb_ok = test_bnb_candidate();

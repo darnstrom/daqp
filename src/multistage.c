@@ -119,8 +119,8 @@ typedef struct{
     // Warm start (multistage_ws_record): final working sets of the latest solves (newest first), as the state of each
     // constraint (wsc: its DAQP_MULTISTAGE_WS_BITS, 0 if inactive) and the list of the active ones (wsh, wsl of them)
     int ws_n, ws_alt, ws_two;
-    // DAQP_MULTISTAGE_UPDATE_SHIFT: the constraint of the next stage whose state each constraint takes (-1: none; wsdst
-    // is the inverse), and whether the shifted working set fit the latest solution better
+    // Shifted warm start (as in MPC): the constraint of the next stage whose state each constraint takes (-1: none;
+    // wsdst is the inverse), and whether the shifted working set fit the latest solution better
     int *wssrc, *wsdst, ws_shift;
     unsigned char *wsc[3];
     int *wsh[3], wsl[3]; // (at most nvmax + nsmax + 1 constraints, as DAQP's WS)
@@ -1310,7 +1310,7 @@ static void multistage_normalize(DAQPMultistageWork *ow){
 static int multistage_ws_mutable(const DAQPMultistageWork *ow, const int i){
     return !(ow->work->sense[i] & DAQP_IMMUTABLE) && !(ow->eqf[i] & (DAQP_MULTISTAGE_EQ_X0 | DAQP_MULTISTAGE_EQ_ELIM));
 }
-// DAQP_MULTISTAGE_UPDATE_SHIFT, for a problem shifted by one stage: constraint d of stage t takes the state of the
+// The shift of the warm start, for a problem moved by one stage: constraint d of stage t takes the state of the
 // constraint wssrc[d] of stage t+1 on the same variables (a bound on the same entry of [u; x], one to one; the general
 // and coupling constraint with the same index, if the stages have as many); -1 for the others, and those of the last
 // stage. wsdst is the inverse
@@ -1379,8 +1379,8 @@ static void multistage_ws_record(DAQPMultistageWork *ow, const int ok){
     if(ow->ws_n < 3) ow->ws_n++;
     d1 = ow->ws_n >= 2 ? multistage_ws_diff(ow, 0, 1) : 0;
     d2 = ow->ws_n == 3 ? multistage_ws_diff(ow, 0, 2) : 0;
-    // The working set of the previous solve shifted by one stage (multistage_ws_shift): used at a shift if it fit the
-    // latest solution better than the previous one did (fewer differing constraints)
+    // The working set of the previous solve shifted by one stage (multistage_ws_shift): used at the next update if it
+    // fit the latest solution better than the previous one did (fewer differing constraints)
     // (over the constraints in either working set: the others are inactive in both)
     for(i = 0, ds = 0; ow->ws_n >= 2 && i < n; i++){
         const int src = multistage_ws_src(ow, l[i]);
@@ -1993,9 +1993,9 @@ int daqp_multistage_update(DAQPWorkspace *work, const int mask){
     // make the history of other problems
     if(reset) multistage_ws_forget(ow);
     ws_switch = multistage_ws_apply(ow);
-    // A shifted problem: the working set and the multipliers one stage earlier (if that fit the latest solutions
-    // better, and unless they alternate)
-    if(!ws_switch && (mask & DAQP_MULTISTAGE_UPDATE_SHIFT) && !reset && work->bnb == NULL && ow->ws_shift){
+    // A shifted problem (as in MPC): the working set and the multipliers one stage earlier, if that fit the latest
+    // solutions better (and unless they alternate)
+    if(!ws_switch && !reset && work->bnb == NULL && ow->ws_shift){
         multistage_ws_shift(ow);
         ws_switch = 1;
     }
