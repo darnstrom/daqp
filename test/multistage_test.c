@@ -875,10 +875,11 @@ static int test_shift(void){
     return ok && it[1] < it[0];
 }
 
-// Branch and bound with the candidate of the latest solution (DAQP_MULTISTAGE_UPDATE_SHIFT: its inputs one stage
-// earlier): a closed loop of a double integrator with a forward and a backward thruster with a minimum thrust when on
-// (u in {0} U [0.6, 1]: binary d, 0.6 d <= u <= d, a cost on d), disturbed at every 5th step. Against a new setup at every
-// step (no candidate), the objectives must agree, and the candidate's bound must need fewer nodes (it only prunes)
+// Branch and bound with the candidates of the latest solution (its binary assignment, and that one stage later): a closed
+// loop of a double integrator with a forward and a backward thruster with a minimum thrust when on (u in {0} U [0.6, 1]:
+// binary d, 0.6 d <= u <= d, a cost on d), disturbed at every 5th step, updated with DAQP_MULTISTAGE_UPDATE_SHIFT at
+// every other step. Against a new setup at every step (no candidate), the objectives must agree, and the candidates
+// must need fewer nodes, counting those of the candidates themselves
 static int test_bnb_candidate(void){
     enum { N = 30, nx = 2, nu = 4, steps = 30 };
     const double dt = 0.2;
@@ -916,7 +917,7 @@ static int test_bnb_candidate(void){
     for(int k = 0; k < steps && ok; k++){
         DAQPResult res; memset(&res, 0, sizeof(res)); res.x = z;
         for(int i = 0; i < nx; i++) lb[0][nu+i] = ub[0][nu+i] = x[i];
-        daqp_multistage_update(&work, DAQP_MULTISTAGE_UPDATE_SHIFT);
+        daqp_multistage_update(&work, k % 2 ? DAQP_MULTISTAGE_UPDATE_SHIFT : 0); // (the flag does not apply to BnB)
         daqp_multistage_solve(&res, &work);
         const double f = res.fval;
         ok &= res.exitflag > 0;
@@ -934,7 +935,7 @@ static int test_bnb_candidate(void){
     }
     free_daqp_multistage(&work);
     daqp_multistage_pack_free(&o);
-    printf("branch and bound (%d solves): nodes with the candidate of the shifted latest solution %ld, without %ld\n", steps, nodes[0], nodes[1]);
+    printf("branch and bound (%d solves): nodes with the candidates of the latest solution %ld, without %ld\n", steps, nodes[0], nodes[1]);
     for(int t = 0; t <= N; t++){ free(idxb[t]); free(lb[t]); free(ub[t]); free(lg[t]); free(ug[t]); }
     free(sense); free(z); free(zs);
     return ok && nodes[0] < nodes[1];

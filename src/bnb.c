@@ -184,14 +184,25 @@ static c_float daqp_bnb_sing_tol(DAQPWorkspace* work){
     return tol;
 }
 
+// The offset c between the objective J and the scale 0.5*fval of daqp_ldp (0.5*fval = J + c), with c = 0.5*||v||^2 - fp,
+// where fp is the objective removed by equality elimination
+c_float daqp_bnb_offset(const DAQPWorkspace* work){
+    c_float c = 0;
+    if(work->v != NULL) for(int i=0; i < work->n; i++) c += 0.5*work->v[i]*work->v[i];
+    if(work->eq != NULL && work->eq->installed) c -= work->eq->fp;
+    return c;
+}
+
 int daqp_bnb(DAQPWorkspace* work){
     return daqp_bnb_lb(work,-DAQP_INF);
 }
 
-int daqp_bnb_lb(DAQPWorkspace* work, const c_float lb){
+// Branch and bound; with u != NULL, the integer-feasible solution u of the LDP (with the objective fval in the scale
+// of work->fval, and the soft slack slack) is the incumbent
+static int daqp_bnb_run(DAQPWorkspace* work, const c_float lb, const c_float* u, const c_float fval, const c_float slack){
     int branch_id, exitflag;
     DAQPNode* node;
-    c_float *swp_ptr = NULL;
+    c_float *swp_ptr = NULL, slack_best = 0;
 
     exitflag = daqp_bnb_setup_root(work);
     if(exitflag < 0) return exitflag;
@@ -204,13 +215,10 @@ int daqp_bnb_lb(DAQPWorkspace* work, const c_float lb){
     if(work->n_active == work->bnb->neq)
         daqp_bnb_load_ws(work->bnb->root_WS,work->bnb->n_root_WS,work);
 
-    // Objective J = 0.5*fval - c, with c = 0.5*||v||^2 - fp, where fp is the objective
-    // removed by equality elimination (only needed for rel_subopt, fval_bound and lb)
+    // Objective J = 0.5*fval - c (only needed for rel_subopt, fval_bound and lb)
     c_float fval_bound0 = work->settings->fval_bound, fval_best = 0, c = 0;
-    if(work->settings->rel_subopt > 0 || fval_bound0 < DAQP_INF || lb > -DAQP_INF){
-        if(work->v != NULL) for(int i=0; i < work->n; i++) c += 0.5*work->v[i]*work->v[i];
-        if(work->eq != NULL && work->eq->installed) c -= work->eq->fp;
-    }
+    if(work->settings->rel_subopt > 0 || fval_bound0 < DAQP_INF || lb > -DAQP_INF)
+        c = daqp_bnb_offset(work);
     work->settings->fval_bound = fval_bound0 + c;
 
     // Start from a user-provided integer-feasible solution
@@ -222,6 +230,14 @@ int daqp_bnb_lb(DAQPWorkspace* work, const c_float lb){
                     lb,work->settings);
             swp_ptr = work->xold; // Marks that a feasible solution is stored in xold
         }
+    }
+    if(u != NULL && (swp_ptr == NULL || fval < fval_best) && 0.5*fval < work->settings->fval_bound){
+        for(int i = 0; i < work->n; i++) work->xold[i] = u[i];
+        fval_best = fval;
+        slack_best = slack;
+        work->settings->fval_bound = daqp_bnb_bound(fval_best,c+daqp_bnb_reg(work->xold,lb,work),
+                lb,work->settings);
+        swp_ptr = work->xold;
     }
 
     work->bnb->itercount=0;
@@ -264,6 +280,7 @@ int daqp_bnb_lb(DAQPWorkspace* work, const c_float lb){
         branch_id = daqp_get_branch_id(work);
         if(branch_id==DAQP_EMPTY_IND){// Nothing to branch over => integer feasible
             fval_best = work->fval;
+            slack_best = work->soft_slack;
             work->settings->fval_bound = daqp_bnb_bound(fval_best,c+daqp_bnb_reg(work->u,lb,work),
                     lb,work->settings);
             swp_ptr=work->xold; work->xold= work->u; work->u=swp_ptr; // Store feasible sol
@@ -286,11 +303,20 @@ int daqp_bnb_lb(DAQPWorkspace* work, const c_float lb){
     }
     else{
         work->fval = fval_best;
+        work->soft_slack = slack_best;
         // Let work->u point to the best feasible solution
         swp_ptr=work->u; work->u= work->xold; work->xold=swp_ptr;
         // Exploration ended early (time/iteration limit, cycling) => not proven optimal
         return exitflag < DAQP_EXIT_INFEASIBLE ? DAQP_EXIT_FEASIBLE : DAQP_EXIT_OPTIMAL;
     }
+}
+
+int daqp_bnb_lb(DAQPWorkspace* work, const c_float lb){
+    return daqp_bnb_run(work, lb, NULL, 0, 0);
+}
+
+int daqp_bnb_from(DAQPWorkspace* work, const c_float* u, const c_float fval, const c_float slack){
+    return daqp_bnb_run(work, -DAQP_INF, u, fval, slack);
 }
 
 int daqp_process_node(DAQPNode* node, DAQPWorkspace* work){

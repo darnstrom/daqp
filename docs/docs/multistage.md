@@ -108,7 +108,7 @@ Binary constraints in `sense` are handled by DAQP's [branch and bound]({{ '/star
 * Proximal-point iterations are not supported (`DAQP_EXIT_NONCONVEX`).
 * Bounds on a fixed $$x_0$$ cannot be binary, and there can be at most as many binary constraints as inputs in total.
 * `binary_horizon` $$> 0$$ keeps only the binary constraints of stages $$t <$$ `binary_horizon` and relaxes the rest.
-* The previous solution's inputs (shifted with `DAQP_MULTISTAGE_UPDATE_SHIFT`), simulated from the new $$x_0$$, are used as an incumbent to prune the tree, when feasible.
+* The binary assignment of the previous solution (at which bound each binary constraint was), as is and shifted by one stage, is fixed and solved: the better feasible one prunes the tree, and is the solution if the tree has nothing better or stops early. The assignment does not depend on the coordinates of the problem (as the steps of an SQP iteration).
 
 ## How it works
 DAQP solves QPs as least-distance problems $$\min \tfrac{1}{2}\|v\|^2$$ s.t. $$d_l \leq Mv \leq d_u$$. For a multistage problem, $$v$$ parametrizes perturbations from the unconstrained (LQR) optimum through the Riccati recursion:
