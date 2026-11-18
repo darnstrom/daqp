@@ -94,9 +94,10 @@ typedef struct{
     int ric_sqrt; // Square-root recursion (P_t = Lxx Lxx' in D)
     c_float eps; // Prox regularization of the Hessian (0: none)
     // Branch and bound: the bound each binary constraint is at in the latest solution (1: lower, 2: upper, 0: none),
-    // its bounds while a candidate fixes it, and the solution v of the best candidate (multistage_bnb_candidate)
+    // the other bound while a candidate fixes it at that one, and the best candidate (multistage_bnb_candidate): its
+    // solution v, objective (in the scale of work->fval) and soft slack
     unsigned char *bside;
-    c_float *bsave, *vcand, cand_slack; // (cand_slack: the soft slack of the best candidate)
+    c_float *bsave, *vcand, cand_fval, cand_slack;
     c_float *pic, *lamv; // Costates and multipliers of the latest solve
     int pi_valid, lam_valid;
     int lam_done; // lamv is complete (else: the eliminated equalities and the bounds fixing x_0 are missing)
@@ -1719,7 +1720,7 @@ static void multistage_memory(DAQPMultistageWork *ow, MultistageMem *M){
     ow->pic = multistage_take(M, ow->npi*sizeof(c_float));
     ow->vlast = multistage_take(M, nv*sizeof(c_float));
     ow->bside = multistage_take(M, m*sizeof(unsigned char));
-    ow->bsave = multistage_take(M, 2*nv*sizeof(c_float)); // (at most nv binary constraints)
+    ow->bsave = multistage_take(M, m*sizeof(c_float));
     ow->vcand = multistage_take(M, nv*sizeof(c_float));
     ow->dupper = multistage_take(M, m*sizeof(c_float));
     ow->dlower = multistage_take(M, m*sizeof(c_float));
@@ -2157,28 +2158,29 @@ static int multistage_bnb_side(const DAQPMultistageWork *ow, const int i, const 
 }
 
 // Branch and bound: solve the problem with the binary constraints fixed at their bounds in the latest solution (shift:
-// one stage later), bounded by fb. Returns whether it is feasible, with its objective (as fval_bound) in *f and its
-// solution in vcand
-static int multistage_bnb_candidate(DAQPMultistageWork *ow, const int shift, const c_float fb, c_float *f){
+// one stage later), bounded by fb (as fval_bound). Returns whether it is feasible; it is then the best candidate
+static int multistage_bnb_candidate(DAQPMultistageWork *ow, const int shift, const c_float fb){
     DAQPWorkspace *work = ow->work;
     DAQPBnB *b = work->bnb;
     int i, j, side, exitflag = -1;
-    if(b->nb > ow->nv) return 0; // (bsave)
-    // (the bounds of the binaries are fixed, and restored below; daqp_bnb leaves no constraint of them in the working set)
+    // (the other bound of each binary is saved and restored below; daqp_bnb leaves none of them in the working set)
     for(j = 0; j < b->nb; j++){
         i = b->bin_ids[j];
         if(!(side = multistage_bnb_side(ow, i, shift))) break;
-        ow->bsave[2*j] = work->dlower[i]; ow->bsave[2*j+1] = work->dupper[i];
-        if(side == 1) work->dupper[i] = work->dlower[i]; else work->dlower[i] = work->dupper[i];
+        if(side == 1){ ow->bsave[i] = work->dupper[i]; work->dupper[i] = work->dlower[i]; }
+        else{ ow->bsave[i] = work->dlower[i]; work->dlower[i] = work->dupper[i]; }
     }
     if(j == b->nb){ // (nothing to branch over)
         work->settings->fval_bound = fb;
         exitflag = daqp_bnb(work);
     }
-    for(j--; j >= 0; j--){ i = b->bin_ids[j]; work->dlower[i] = ow->bsave[2*j]; work->dupper[i] = ow->bsave[2*j+1]; }
+    for(j--; j >= 0; j--){
+        i = b->bin_ids[j];
+        if(multistage_bnb_side(ow, i, shift) == 1) work->dupper[i] = ow->bsave[i]; else work->dlower[i] = ow->bsave[i];
+    }
     if(exitflag <= 0) return 0;
-    *f = 0.5*work->fval - daqp_bnb_offset(work);
     memcpy(ow->vcand, work->u, ow->nv*sizeof(c_float));
+    ow->cand_fval = work->fval;
     ow->cand_slack = work->soft_slack;
     return 1;
 }
@@ -2216,11 +2218,8 @@ static int multistage_solve_ldp(DAQPMultistageWork *ow){
     if(work->bnb != NULL && ow->eps > 0) return DAQP_EXIT_NONCONVEX;
     if(work->bnb != NULL){
         // Candidates: the binary assignment of the latest solution, and that one stage later (if it differs). The better
-        // feasible one is the incumbent of the tree (with the tolerances abs_subopt and rel_subopt, as daqp_bnb's own),
-        // and the solution if the tree has nothing better or ends early
-        const DAQPSettings *st = work->settings;
-        const c_float fb = st->fval_bound;
-        c_float fc = fb;
+        // feasible one is the incumbent of the tree
+        const c_float fb = work->settings->fval_bound;
         int iter = 0, nodes = 0, has_cand = 0, shift, j, n;
         for(shift = 0; shift < 2; shift++){
             for(j = 0; shift && j < work->bnb->nb; j++){
@@ -2229,28 +2228,22 @@ static int multistage_solve_ldp(DAQPMultistageWork *ow){
             }
             if(shift && j == work->bnb->nb) break; // (the same assignment)
             work->iterations = work->bnb->nodecount = 0;
-            has_cand |= multistage_bnb_candidate(ow, shift, fc, &fc);
+            has_cand |= multistage_bnb_candidate(ow, shift, has_cand ? 0.5*ow->cand_fval - daqp_bnb_offset(work) : fb);
             iter += work->iterations;
             nodes += work->bnb->nodecount;
         }
-        // The root of the tree is warm started by the latest root working set (that of a candidate, for the current
-        // problem, if there was one), without the binary constraints (fixed by a candidate, else relaxed at the root)
-        for(j = 0, n = 0; j < work->bnb->n_root_WS; j++)
+        // The root of the tree is warm started by the working set of the candidate (for the current problem), without
+        // the binary constraints that it fixed
+        for(j = 0, n = 0; has_cand && j < work->bnb->n_root_WS; j++)
             if(!(work->sense[DAQP_REMOVE_LOWER_FLAG(work->bnb->root_WS[j])] & DAQP_BINARY))
                 work->bnb->root_WS[n++] = work->bnb->root_WS[j];
-        work->bnb->n_root_WS = n;
-        work->settings->fval_bound = has_cand ? fc - (st->abs_subopt + st->rel_subopt*fabs(fc)) : fb;
-        exitflag = daqp_bnb(work);
+        if(has_cand) work->bnb->n_root_WS = n;
         work->settings->fval_bound = fb;
+        exitflag = has_cand ? daqp_bnb_from(work, ow->vcand, ow->cand_fval, ow->cand_slack) : daqp_bnb(work);
         work->iterations += iter;
         work->bnb->nodecount += nodes;
-        if(has_cand && (exitflag == DAQP_EXIT_INFEASIBLE || exitflag == DAQP_EXIT_ITERLIMIT
-                    || exitflag == DAQP_EXIT_TIMELIMIT || exitflag == DAQP_EXIT_CYCLE)){ // (as daqp_bnb's incumbent)
-            memcpy(work->u, ow->vcand, ow->nv*sizeof(c_float));
-            work->soft_slack = ow->cand_slack;
-            exitflag = exitflag == DAQP_EXIT_INFEASIBLE ? DAQP_EXIT_OPTIMAL : DAQP_EXIT_FEASIBLE;
-        }
         if(exitflag > 0) multistage_bnb_record(ow);
+        else memset(ow->bside, 0, ow->m); // (no assignment older than the latest solve)
         return exitflag;
     }
     exitflag = ow->eps > 0 ? daqp_prox(work) : daqp_ldp(work);
