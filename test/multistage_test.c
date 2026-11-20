@@ -659,6 +659,52 @@ static void ms_solve(DAQPResult* res, DAQPWorkspace* w){
     elim_detected += d == 2;
 }
 
+// fval_bound and rel_subopt refer to the objective of the QP: the input v, at its bound 0 with a large linear term,
+// makes the objective of the LDP much larger than that of the QP
+static int test_bnb_objective(void){
+    enum { N = 20 };
+    double A[1] = {1}, B[2] = {1, 0}, b[1] = {-0.4}, Q[1] = {1}, R[4] = {1e-3, 0, 0, 1}, r[2] = {0, -100};
+    int nxs[N+1], nus[N+1], nbs[N+1], *idxb[N+1];
+    double *As[N+1], *Bs[N+1], *bs[N+1], *Qs[N+1], *Rs[N+1], *rs[N+1], *lb[N+1], *ub[N+1];
+    DAQPMultistage o; memset(&o, 0, sizeof(o));
+    for(int t = 0; t <= N; t++){ // (bounds: the binary input and v, at stage 0 also x_0)
+        nxs[t] = 1; nus[t] = t < N ? 2 : 0; nbs[t] = (t < N ? 2 : 0) + (t == 0);
+        As[t] = A; Bs[t] = B; bs[t] = b; Qs[t] = Q; Rs[t] = R; rs[t] = r;
+        idxb[t] = malloc(3*sizeof(int)); lb[t] = malloc(3*sizeof(double)); ub[t] = malloc(3*sizeof(double));
+        for(int i = 0; i < nbs[t]; i++){ idxb[t][i] = i; lb[t][i] = i == 1 ? -1 : 0; ub[t][i] = i == 0 ? 1 : 0; }
+    }
+    lb[0][2] = ub[0][2] = 1.3;
+    o.N = N; o.nx = nxs; o.nu = nus; o.nb = nbs; o.A = As; o.B = Bs; o.b = bs; o.Q = Qs; o.R = Rs; o.r = rs;
+    o.idxb = idxb; o.lb = lb; o.ub = ub;
+    const int m = daqp_multistage_m(&o);
+    int *sense = calloc(m, sizeof(int));
+    for(int t = 0, c = 0; t < N; c += nbs[t], t++) sense[c] = DAQP_BINARY;
+    o.sense = sense;
+    double *z = malloc(daqp_multistage_nz(&o)*sizeof(double)), f0 = 0, f = 0;
+    int ok = 1;
+    ext_mem = 0;
+    for(int k = 0; k < 3 && ok; k++){
+        DAQPWorkspace w; w.settings = NULL;
+        DAQPResult res; memset(&res, 0, sizeof(res)); res.x = z;
+        if(setup_daqp_multistage(&o, &w) < 0){ ok = 0; break; }
+        w.settings->rel_subopt = k == 1 ? 0.05 : 0;
+        if(k == 2) w.settings->fval_bound = f0 + 0.1;
+        daqp_multistage_solve(&res, &w);
+        free_daqp_multistage(&w);
+        packed = &o;
+        ok = res.exitflag > 0;
+        if(k == 0) f0 = res.fval;
+        else if(k == 1) f = res.fval;
+        else ok = fabs(res.fval - f0) <= 1e-9*(1 + fabs(f0));
+    }
+    ok &= f >= f0 - 1e-9 && f - f0 <= 0.05*fabs(f) + 1e-9;
+    if(!ok) printf("branch and bound with fval_bound or rel_subopt: failed\n");
+    daqp_multistage_pack_free(&o);
+    for(int t = 0; t <= N; t++){ free(idxb[t]); free(lb[t]); free(ub[t]); }
+    free(sense); free(z);
+    return ok;
+}
+
 // Chattering (working sets that alternate): a double integrator whose input saturates at its upper bound for one
 // initial state and at its lower bound for the next. The solutions alternate, and once the alternation is detected,
 // the warm start (the working set of two solves back) needs at most one iteration per solve
@@ -1216,6 +1262,7 @@ int main(int argc, char** argv){
     const int soft_ok = test_soft_warm();
     const int shift_ok = test_shift();
     const int bnb_ok = test_bnb_candidate();
+    const int bnbobj_ok = test_bnb_objective();
     printf("%d/%d passed (%d with optimal solutions compared)\n", ntests-fails, ntests, compared);
     if(infeas > 0)
         printf("not compared: %d solves with soft constraints and infeasible hard constraints"
@@ -1225,5 +1272,5 @@ int main(int argc, char** argv){
     if(ngain > 0) printf("F_EQ_GAIN: inaccurate elimination detected (and recovered) in %d of %d problems\n", ngain_det, ngain);
     if(dense_bin_wrong > 0) printf("not compared: %d solves where dense branch and bound left a binary between its bounds\n", dense_bin_wrong);
     printf("F_SHARED: %d problems, %d with a change of the sharing\n", nshared, nshared_realloc);
-    return fails > 0 || dual_mismatch > 0 || (ngain >= 20 && ngain_det == 0) || !chat_ok || !soft_ok || !shift_ok || !bnb_ok;
+    return fails > 0 || dual_mismatch > 0 || (ngain >= 20 && ngain_det == 0) || !chat_ok || !soft_ok || !shift_ok || !bnb_ok || !bnbobj_ok;
 }

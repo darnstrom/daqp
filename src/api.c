@@ -349,6 +349,7 @@ void init_daqp_workspace(DAQPWorkspace *work, int n){
     work->n_prox = 0;
     work->state = 0;
     work->soft_slack = 0;
+    work->fval_offset = 0;
     work->bnb = NULL;
     work->outer_iter = 1;
     work->hierarchy = NULL;

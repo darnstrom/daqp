@@ -150,6 +150,7 @@ struct Workspace
 
     u::Ptr{Cdouble}
     fval::Cdouble
+    fval_offset::Cdouble
 
     L::Ptr{Cdouble}
     D::Ptr{Cdouble}

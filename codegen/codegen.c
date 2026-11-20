@@ -256,7 +256,7 @@ void write_daqp_workspace_src(FILE* f, DAQPWorkspace* work, const char* prefix){
     fprintf(f, "NULL,\n"); // scaling
     fprintf(f, "%sRinvD,\n",prefix); // RinvD
     fprintf(f, "%sx, %sxold,\n", prefix, prefix);
-    fprintf(f, "%slam, %slam_star, %su, %d,\n", prefix, prefix, prefix, -1); // fval
+    fprintf(f, "%slam, %slam_star, %su, %d, %f,\n", prefix, prefix, prefix, -1, 0.0); // fval, fval_offset
     fprintf(f, "%sL, %sD, %sxldl,%szldl,%d,\n",
             prefix,prefix,prefix,prefix, 0); // reuse_ind
     fprintf(f, "%sWS, %d,\n", prefix, 0); //n_active

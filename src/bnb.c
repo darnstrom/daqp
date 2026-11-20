@@ -184,13 +184,13 @@ static c_float daqp_bnb_sing_tol(DAQPWorkspace* work){
     return tol;
 }
 
-// The offset c between the objective J and the scale 0.5*fval of daqp_ldp (0.5*fval = J + c), with c = 0.5*||v||^2 - fp,
-// where fp is the objective removed by equality elimination
+// The offset c between the objective J and the scale 0.5*fval of daqp_ldp (0.5*fval = J + c), with
+// c = 0.5*||v||^2 - fp - fval_offset, where fp is the objective removed by equality elimination
 c_float daqp_bnb_offset(const DAQPWorkspace* work){
     c_float c = 0;
     if(work->v != NULL) for(int i=0; i < work->n; i++) c += 0.5*work->v[i]*work->v[i];
     if(work->eq != NULL && work->eq->installed) c -= work->eq->fp;
-    return c;
+    return c - work->fval_offset;
 }
 
 int daqp_bnb(DAQPWorkspace* work){
