@@ -163,6 +163,7 @@ int setup_daqp_main(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time, i
 
     errorflag = setup_daqp_bnb(work, qp->sense, nb, ns);
     if(errorflag >= 0) errorflag = setup_daqp_ldp(work,qp,init_mask);
+    if(errorflag >= 0 && work->bnb != NULL && work->bnb->mark == NULL) work->bnb->mark = calloc(qp->m, sizeof(int));
     if(errorflag < 0){
         if(own_settings==0) work->settings = NULL;
         free_daqp_workspace(work);
@@ -258,6 +259,7 @@ int setup_daqp_bnb(DAQPWorkspace* work, int* sense, int nb, int ns){
         work->bnb->reg= malloc(work->n*sizeof(c_float));
         work->bnb->xtmp= malloc(work->n*sizeof(c_float));
         work->bnb->ps_qp = NULL; // Allocated by the first presolve
+        work->bnb->mark = NULL; // Allocated when m is known
     }
     return 1;
 }
@@ -307,6 +309,7 @@ void free_daqp_bnb(DAQPWorkspace* work){
         free(work->bnb->reg);
         free(work->bnb->xtmp);
         free(work->bnb->ps_qp);
+        free(work->bnb->mark);
         free(work->bnb);
         work->bnb = NULL;
     }
