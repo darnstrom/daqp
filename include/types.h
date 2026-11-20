@@ -305,6 +305,7 @@ typedef struct{
     c_float* lam_star; // Current constrained stationary point
     c_float* u; // Stores Mk' lam_star
     c_float fval;
+    c_float fval_offset; // Constant term of the objective (for branch and bound)
 
     // LDL factors (Mk Mk' = L D L')
     c_float *L;

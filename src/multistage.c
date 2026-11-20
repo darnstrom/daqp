@@ -822,6 +822,7 @@ static void multistage_lqr_forward(DAQPMultistageWork *ow){
         blasfeo_daxpy(S0->nx, 2.0, &S0->yp, S0->nn, &ow->wr, 0, &ow->wr, 0);
         ow->Jlqr += 0.5*blasfeo_ddot(S0->nx, &ow->wr, 0, &S0->z, S0->nu);
     }
+    work->fval_offset = ow->Jlqr;
     // Bounds of the LDP: d = b - a'z_lqr
     multistage_eval(ow, 0, work->Mu);
     for(i = 0; i < ow->m; i++){
