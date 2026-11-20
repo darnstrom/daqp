@@ -291,7 +291,8 @@ static void generate(Gen* g, int N, int nxb, int nub, int tv, int feat){
                 double *lo = NULL, *hi = NULL; int x0;
                 bound_ptr(o, k, &lo, &hi, &x0);
                 if(lo != o->lb[t] + g->ubase[t]) continue;
-                o->sense[k] |= DAQP_BINARY;
+                o->sense[k] = DAQP_BINARY; // (not soft)
+                if(g->rl != NULL) g->soft[k] = 0;
                 g->bin[g->nbin++] = k;
             }
         }
@@ -306,6 +307,7 @@ static int solve_dense(const Gen* g, double* z, double* fval, double* time);
 // Reference for binary constraints without branch and bound: the best of the
 // QPs with each binary constraint fixed at one of its bounds (all 2^nbin).
 // Returns whether one is feasible (with its objective in fbest)
+static double objective_soft(const Gen* g, const double* z);
 static int binaries_brute_force(Gen* g, double* fbest){
     DAQPMultistage* o = &g->prob;
     double *lo[8], *hi[8], l0[8], h0[8], *z = malloc(g->nz*sizeof(double)), f, t;
@@ -317,7 +319,7 @@ static int binaries_brute_force(Gen* g, double* fbest){
     }
     for(int c = 0; c < (1 << g->nbin); c++){
         for(int i = 0; i < g->nbin; i++) *lo[i] = *hi[i] = (c >> i) & 1 ? h0[i] : l0[i];
-        if(solve_dense(g, z, &f, &t) > 0 && (!found || f < *fbest)){ *fbest = f; found = 1; }
+        if(solve_dense(g, z, &f, &t) > 0 && (f = objective_soft(g, z), !found || f < *fbest)){ *fbest = f; found = 1; }
     }
     for(int i = 0; i < g->nbin; i++){ *lo[i] = l0[i]; *hi[i] = h0[i]; o->sense[g->bin[i]] |= DAQP_BINARY; }
     free(z);
@@ -583,6 +585,7 @@ static double kkt_full(const Gen* g, const double* z, const double* lam, const d
 
 // The objective with the penalties w*v + v^2/(2*rho) of the violations v of the soft constraints
 static double objective_soft(const Gen* g, const double* z){
+    if(g->rl == NULL) return objective(&g->prob, z);
     double *c = malloc(g->m*sizeof(double)), *lb = malloc(g->m*sizeof(double)), *ub = malloc(g->m*sizeof(double));
     double f = objective(&g->prob, z);
     constraints(&g->prob, z, c, lb, ub);
@@ -1009,9 +1012,9 @@ int main(int argc, char** argv){
     // it (a known issue of the dense reference, fixed separately): not compared
     int dense_bin_wrong = 0, nshared = 0, nshared_realloc = 0;
 #define DENSE_BIN_WRONG(ed) ((feat & F_BIN) && (ed) > 0 && !binaries_ok(&g, zd) ? (dense_bin_wrong++, 1) : 0)
-    // Dense DAQP can reach its iteration limit on an ill-conditioned condensed QP: not compared
+    // Dense DAQP can reach its iteration limit or cycle on an ill-conditioned condensed QP: not compared
     int dense_failed = 0;
-#define DENSE_FAILED(ed, eo) ((ed) == DAQP_EXIT_ITERLIMIT && (eo) > 0 ? (dense_failed++, 1) : 0)
+#define DENSE_FAILED(ed, eo) (((ed) == DAQP_EXIT_ITERLIMIT || (ed) == DAQP_EXIT_CYCLE) && (eo) > 0 ? (dense_failed++, 1) : 0)
     srand(argc > 2 ? atoi(argv[2]) : 1);
     for(int k = 0; k < ntests; k++){
         Gen g;
@@ -1029,6 +1032,7 @@ int main(int argc, char** argv){
         if(k%3 == 0) feat |= F_SOFT;
         if(k%12 == 4 || k%12 == 8) feat |= F_PSD; // (without soft constraints and a free x_0)
         if(k%12 == 2 || k%12 == 10) feat |= F_BIN; // (also)
+        if(k%24 == 2 || k%24 == 10) feat |= F_SOFT; // (with binaries)
         if(k%6 == 1 || k%6 == 4) feat |= F_GSPLIT;
         if(k%11 == 6) feat = F_EQ_GAIN; // (alone)
         if(k%8 == 6 && k%3 != 1 && !(feat & F_EQ_GAIN)) feat |= F_SHARED; // (equal dimensions)
@@ -1071,11 +1075,12 @@ int main(int argc, char** argv){
             double kktf = kkt_full(&g, zo, lam, pi);
             free(pi);
             if(feat & F_BIN){ // (no multipliers after branch and bound)
+                const double fo = objective_soft(&g, zo); // (the enumeration is of this objective)
                 ok = agree(&g, fd, res.fval, zd, zo) && viol < 1e-6 && binaries_ok(&g, zo)
-                    && bin_feasible && fabs(fbrute - res.fval) <= 1e-6*(1+fabs(fbrute));
+                    && bin_feasible && fabs(fbrute - fo) <= 1e-6*(1+fabs(fbrute));
                 if(!binaries_ok(&g, zo)) printf("test %d: binary constraints not at a bound\n", k);
-                if(!bin_feasible || fabs(fbrute - res.fval) > 1e-6*(1+fabs(fbrute)))
-                    printf("test %d: branch and bound %.10e, enumeration %.10e (%s)\n", k, res.fval, fbrute, bin_feasible ? "feasible" : "infeasible");
+                if(!bin_feasible || fabs(fbrute - fo) > 1e-6*(1+fabs(fbrute)))
+                    printf("test %d: branch and bound %.10e, enumeration %.10e (%s)\n", k, fo, fbrute, bin_feasible ? "feasible" : "infeasible");
             }
             else{
                 // (F_EQ_GAIN: the large multipliers of the equalities are accurate to a few digits less)
@@ -1288,7 +1293,7 @@ int main(int argc, char** argv){
     if(dual_mismatch > 0) printf("working-set multipliers changed by daqp_multistage_duals: %d\n", dual_mismatch);
     if(ngain > 0) printf("F_EQ_GAIN: inaccurate elimination detected (and recovered) in %d of %d problems\n", ngain_det, ngain);
     if(dense_bin_wrong > 0) printf("not compared: %d solves where dense branch and bound left a binary between its bounds\n", dense_bin_wrong);
-    if(dense_failed > 0) printf("not compared: %d solves where dense DAQP reached its iteration limit\n", dense_failed);
+    if(dense_failed > 0) printf("not compared: %d solves where dense DAQP reached its iteration limit or cycled\n", dense_failed);
     printf("F_SHARED: %d problems, %d with a change of the sharing\n", nshared, nshared_realloc);
     return fails > 0 || dual_mismatch > 0 || (ngain >= 20 && ngain_det == 0) || !chat_ok || !soft_ok || !shift_ok || !bnb_ok || !bnbobj_ok;
 }
