@@ -120,6 +120,7 @@ typedef struct{
     // Warm start (multistage_ws_record): final working sets of the latest solves (newest first), as the state of each
     // constraint (wsc: its DAQP_MULTISTAGE_WS_BITS, 0 if inactive) and the list of the active ones (wsh, wsl of them)
     int ws_n, ws_alt, ws_two;
+    int ws_cold; // The latest solve certified infeasibility: its working set is not a warm start
     // DAQP_MULTISTAGE_UPDATE_SHIFT: the constraint of the next stage whose state each constraint takes (-1: none; wsdst
     // is the inverse), and whether the shifted working set fit the latest solution better
     int *wssrc, *wsdst, ws_shift;
@@ -1999,6 +2000,11 @@ int daqp_multistage_update(DAQPWorkspace *work, const int mask){
         memset(ow->bside, 0, ow->m); // (and the binary assignment of branch and bound)
     }
     ws_switch = multistage_ws_apply(ow);
+    if(ow->ws_cold){ // Only the immutable constraints stay active
+        for(int i = 0; i < work->n_active; i++) if(multistage_ws_mutable(ow, work->WS[i])) DAQP_SET_INACTIVE(work->WS[i]);
+        ws_switch = 1;
+        ow->ws_cold = 0;
+    }
     // A shifted problem: the working set and the multipliers one stage earlier (if that fit the latest solutions
     // better, and unless they alternate)
     if(!ws_switch && (mask & DAQP_MULTISTAGE_UPDATE_SHIFT) && !reset && work->bnb == NULL && ow->ws_shift){
@@ -2331,6 +2337,7 @@ void daqp_multistage_solve(DAQPResult *res, DAQPWorkspace *work){
 #endif
     res->fval = multistage_solution(ow, res->x);
     multistage_multipliers(ow, res->exitflag, infeasible);
+    ow->ws_cold = res->exitflag == DAQP_EXIT_INFEASIBLE && !infeasible && work->bnb == NULL;
     if(res->lam != NULL) memcpy(res->lam, ow->lamv, work->m*sizeof(c_float));
     res->soft_slack = work->soft_slack;
     res->iter = work->iterations;
