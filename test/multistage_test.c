@@ -581,16 +581,26 @@ static double kkt_full(const Gen* g, const double* z, const double* lam, const d
     return res/scale;
 }
 
-// The solutions agree: in the objective, or in z with soft constraints (the
-// objective then also has the penalty of the slacks)
-static int agree(const Gen* g, double fd, double fo, const double* zd, const double* zo){
-    if(g->rl == NULL) return fabs(fd-fo) <= 1e-6*(1+fabs(fd));
-    double dz = 0, zmax = 0;
-    for(int i = 0; i < g->nz; i++){
-        if(fabs(zd[i]-zo[i]) > dz) dz = fabs(zd[i]-zo[i]);
-        if(fabs(zd[i]) > zmax) zmax = fabs(zd[i]);
+// The objective with the penalties w*v + v^2/(2*rho) of the violations v of the soft constraints
+static double objective_soft(const Gen* g, const double* z){
+    double *c = malloc(g->m*sizeof(double)), *lb = malloc(g->m*sizeof(double)), *ub = malloc(g->m*sizeof(double));
+    double f = objective(&g->prob, z);
+    constraints(&g->prob, z, c, lb, ub);
+    for(int i = 0; i < g->m; i++){
+        if(!(g->prob.sense[i] & DAQP_SOFT)) continue;
+        const double v = c[i] > ub[i] ? c[i]-ub[i] : c[i] < lb[i] ? lb[i]-c[i] : 0;
+        const double w = c[i] > ub[i] ? g->wu[i] : g->wl[i], rho = c[i] > ub[i] ? g->ru[i] : g->rl[i];
+        f += w*v + v*v/(2*rho);
     }
-    return dz <= 1e-6*(1+zmax);
+    free(c); free(lb); free(ub);
+    return f;
+}
+
+// The solutions agree: in the objective (with soft constraints, including the penalties of the slacks), or zo is
+// better (the dense reference of an ill-conditioned condensed QP can be suboptimal; zo is checked to be feasible)
+static int agree(const Gen* g, double fd, double fo, const double* zd, const double* zo){
+    if(g->rl != NULL){ fd = objective_soft(g, zd); fo = objective_soft(g, zo); }
+    return fabs(fd-fo) <= 1e-6*(1+fabs(fd)) || (g->rl != NULL ? fo : objective(&g->prob, zo)) < fd;
 }
 
 static double max_violation(const Gen* g, const double* z){
@@ -994,11 +1004,14 @@ int main(int argc, char** argv){
     // DAQP either), so only how often it is not is counted
     int infeas = 0, wrong_ocp = 0, wrong_dense = 0, cert = 0, ngain = 0, ngain_det = 0;
 #define SKIP_INFEASIBLE(ed, eo) (g.rl != NULL && !hf ? (infeas++, wrong_dense += (ed) > 0, wrong_ocp += (eo) > 0, 1) : \
-        DENSE_BIN_WRONG(ed))
+        DENSE_BIN_WRONG(ed) || DENSE_FAILED(ed, eo))
     // Dense DAQP's branch and bound can return a binary constraint strictly between its bounds when equalities fix
     // it (a known issue of the dense reference, fixed separately): not compared
     int dense_bin_wrong = 0, nshared = 0, nshared_realloc = 0;
 #define DENSE_BIN_WRONG(ed) ((feat & F_BIN) && (ed) > 0 && !binaries_ok(&g, zd) ? (dense_bin_wrong++, 1) : 0)
+    // Dense DAQP can reach its iteration limit on an ill-conditioned condensed QP: not compared
+    int dense_failed = 0;
+#define DENSE_FAILED(ed, eo) ((ed) == DAQP_EXIT_ITERLIMIT && (eo) > 0 ? (dense_failed++, 1) : 0)
     srand(argc > 2 ? atoi(argv[2]) : 1);
     for(int k = 0; k < ntests; k++){
         Gen g;
@@ -1184,6 +1197,8 @@ int main(int argc, char** argv){
                 }
                 else if(ed2 > 0 && res.exitflag > 0){
                     int ok2 = agree(&g, fd, res.fval, zd, zo) && max_violation(&g, zo) < 1e-6;
+                    // (an ill-conditioned condensed QP can make the dense reference inaccurate: certify by KKT)
+                    if(!ok2 && res.soft_slack == 0) ok2 = certified(&g, zo, lam);
                     if(!ok2){ ok = 0; printf("test %d relaxed: df=%.2e\n", k, fd-res.fval); }
                 }
                 else if((ed2 > 0) != (res.exitflag > 0)){
@@ -1206,6 +1221,8 @@ int main(int argc, char** argv){
                 }
                 else if(ed2 > 0 && res.exitflag > 0){
                     int ok2 = agree(&g, fd, res.fval, zd, zo) && max_violation(&g, zo) < 1e-6;
+                    // (an ill-conditioned condensed QP can make the dense reference inaccurate: certify by KKT)
+                    if(!ok2 && res.soft_slack == 0) ok2 = certified(&g, zo, lam);
                     if(!ok2){ ok = 0; printf("test %d equality change: df=%.2e\n", k, fd-res.fval); }
                 }
                 else if((ed2 > 0) != (res.exitflag > 0)){
@@ -1271,6 +1288,7 @@ int main(int argc, char** argv){
     if(dual_mismatch > 0) printf("working-set multipliers changed by daqp_multistage_duals: %d\n", dual_mismatch);
     if(ngain > 0) printf("F_EQ_GAIN: inaccurate elimination detected (and recovered) in %d of %d problems\n", ngain_det, ngain);
     if(dense_bin_wrong > 0) printf("not compared: %d solves where dense branch and bound left a binary between its bounds\n", dense_bin_wrong);
+    if(dense_failed > 0) printf("not compared: %d solves where dense DAQP reached its iteration limit\n", dense_failed);
     printf("F_SHARED: %d problems, %d with a change of the sharing\n", nshared, nshared_realloc);
     return fails > 0 || dual_mismatch > 0 || (ngain >= 20 && ngain_det == 0) || !chat_ok || !soft_ok || !shift_ok || !bnb_ok || !bnbobj_ok;
 }
