@@ -360,9 +360,10 @@ int daqp_remove_blocking(DAQPWorkspace *work){
                 target = w; // A zero slack is released
             }
             // Switching back at w without a primal step is rounding (avoids
-            // ping-pong, e.g. for duplicate soft constraints)
+            // ping-pong, e.g. for duplicate soft constraints) if the multiplier
+            // only falls below w by rounding
             if(!singular && w > 0 && target == w && (work->sense[ind] & DAQP_SLACK_SWITCHED) &&
-                    (lower ? -work->lam[i] : work->lam[i]) == w)
+                    (lower ? -work->lam[i] : work->lam[i]) == w && w-ystar <= 1e-6*(1+w))
                 continue;
         }
 
