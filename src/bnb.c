@@ -337,8 +337,23 @@ int daqp_process_node(DAQPNode* node, DAQPWorkspace* work){
         else{
             daqp_add_upper_lower(node->bin_id,work);
             work->sense[DAQP_REMOVE_LOWER_FLAG(node->bin_id)] |= DAQP_IMMUTABLE; //Equality
-            if(work->sing_ind != DAQP_EMPTY_IND){ // Need to cold start to not miss integer feasible
-                if(daqp_setup_cold_bnb(node,work) < 0) return DAQP_EXIT_INFEASIBLE;
+            if(work->sing_ind != DAQP_EMPTY_IND){
+                if(daqp_implied_last(work)){ // Need to cold start to not miss integer feasible
+                    if(daqp_setup_cold_bnb(node,work) < 0) return DAQP_EXIT_INFEASIBLE;
+                }
+                else{
+                    // Singular step along the dependency (in lam_star), oriented so that the dual objective
+                    // increases (the binary is an equality: its multiplier has no sign)
+                    int i;
+                    c_float r = 0, scale = 1, term;
+                    for(i = 0; i <= work->sing_ind; i++){
+                        term = work->lam_star[i]*(DAQP_IS_LOWER(work->WS[i]) ? work->dlower[work->WS[i]] : work->dupper[work->WS[i]]);
+                        r += term;
+                        scale += term < 0 ? -term : term;
+                    }
+                    if(r > work->settings->primal_tol*scale) for(i = 0; i <= work->sing_ind; i++) work->lam_star[i] = -work->lam_star[i];
+                    if(!daqp_remove_blocking(work)) return DAQP_EXIT_INFEASIBLE;
+                }
             }
         }
         // Add binary constraint
