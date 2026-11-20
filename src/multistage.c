@@ -1951,8 +1951,7 @@ static int multistage_setup(DAQPMultistage *user, DAQPWorkspace *work, void *mem
     // Binary constraints: branch and bound (sized for nvmax; allocated, also with given memory)
     for(i = 0, k = 0; i < ow->m; i++) k += (work->sense[i] & DAQP_BINARY) != 0;
     if(!own && k == 0) work->xold = NULL;
-    k = k == 0 ? 1 : !own && work->xold == NULL ? DAQP_EXIT_UNSUPPORTED : setup_daqp_bnb(work, work->sense, k, ns);
-    if(k >= 0 && work->bnb != NULL && work->bnb->mark == NULL) work->bnb->mark = calloc(work->m, sizeof(int));
+    k = k == 0 ? 1 : !own && work->xold == NULL ? DAQP_EXIT_UNSUPPORTED : setup_daqp_bnb(work, work->sense, k, ns, work->m);
 
     // The bounds on a fixed x_0 alone are left out of the LDP
     for(i = 0; !ow->x0free && i < DAQP_MULTISTAGE_NB(user,0); i++)

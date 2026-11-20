@@ -161,9 +161,8 @@ int setup_daqp_main(DAQPProblem* qp, DAQPWorkspace *work, c_float* setup_time, i
         allocate_daqp_avi(work->avi,qp->n);
     }
 
-    errorflag = setup_daqp_bnb(work, qp->sense, nb, ns);
+    errorflag = setup_daqp_bnb(work, qp->sense, nb, ns, qp->m);
     if(errorflag >= 0) errorflag = setup_daqp_ldp(work,qp,init_mask);
-    if(errorflag >= 0 && work->bnb != NULL && work->bnb->mark == NULL) work->bnb->mark = calloc(qp->m, sizeof(int));
     if(errorflag < 0){
         if(own_settings==0) work->settings = NULL;
         free_daqp_workspace(work);
@@ -233,7 +232,7 @@ void setup_daqp_hiqp(DAQPWorkspace* work, int* break_points, int nh){
     if(nh > 1) daqp_set_hierarchy(work,break_points,nh);
 }
 
-int setup_daqp_bnb(DAQPWorkspace* work, int* sense, int nb, int ns){
+int setup_daqp_bnb(DAQPWorkspace* work, int* sense, int nb, int ns, int m){
     int i, nadded;
     if(nb > work->n) return DAQP_EXIT_OVERDETERMINED_INITIAL;
     if((work->bnb == NULL) && (nb >0)){
@@ -259,7 +258,7 @@ int setup_daqp_bnb(DAQPWorkspace* work, int* sense, int nb, int ns){
         work->bnb->reg= malloc(work->n*sizeof(c_float));
         work->bnb->xtmp= malloc(work->n*sizeof(c_float));
         work->bnb->ps_qp = NULL; // Allocated by the first presolve
-        work->bnb->mark = NULL; // Allocated when m is known
+        work->bnb->mark = calloc(m, sizeof(int));
     }
     return 1;
 }
