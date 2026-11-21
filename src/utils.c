@@ -10,6 +10,12 @@
 #ifndef DAQP_AVI_PIVOT_TRIGGER
 #define DAQP_AVI_PIVOT_TRIGGER ((c_float)0.05)
 #endif
+#ifndef DAQP_AVI_RHO_SCALE
+#define DAQP_AVI_RHO_SCALE ((c_float)0.3)
+#endif
+#ifndef DAQP_AVI_KKT_EPS // H + DAQP_AVI_KKT_EPS*||H||_F*I is factored for a singular H
+#define DAQP_AVI_KKT_EPS ((c_float)1e-5)
+#endif
 #ifndef DAQP_AVI_RETRY_RHO_REDUCTION
 #define DAQP_AVI_RETRY_RHO_REDUCTION ((c_float)16.0)
 #endif
@@ -119,6 +125,7 @@ static void daqp_install_avi_rho(
         avi->Hs_rho[i*n+i] += rho;
         avi->H_rho[i*n+i] += rho;
     }
+    avi->H_rho_factored = 0;
 }
 
 int daqp_retry_avi_with_reduced_rho(DAQPWorkspace* work){
@@ -130,7 +137,6 @@ int daqp_retry_avi_with_reduced_rho(DAQPWorkspace* work){
     avi->retry_rho_needed = 0; // At most one retry per setup
     retry_rho = avi->rho/DAQP_AVI_RETRY_RHO_REDUCTION;
     daqp_install_avi_rho(avi,work->qp,retry_rho);
-    daqp_lu(avi->H_rho,avi->P_H2,work->n);
     error_flag = daqp_update_Rinv(work,avi->Hs_rho,0);
     if(error_flag < 0) return error_flag;
     daqp_update_v(work->qp->f,work);
@@ -218,7 +224,6 @@ static int daqp_update_ldp_core(int mask, DAQPWorkspace *work, DAQPProblem* qp){
                 // Early unconstrained check for AVI: skip Cholesky if x=-H^{-1}f is feasible
                 unconstrained_flag = daqp_check_unconstrained(work,mask);
                 if(unconstrained_flag == DAQP_UNCONSTRAINED_OPTIMAL) return 0;
-                daqp_lu(work->avi->H_rho, work->avi->P_H2, work->n);
                 error_flag = daqp_update_Rinv(work, work->avi->Hs_rho,0);
             }
         }
@@ -860,12 +865,7 @@ int daqp_check_unconstrained(DAQPWorkspace* work, const int mask){
         }
     }
     else if(work->avi != NULL && !work->avi->is_symmetric){
-        // AVI: unconstrained solution is x = -H^{-1} f
-        if(work->qp->f != NULL)
-            daqp_lu_solve(work->avi->LU_H, work->avi->P_H, work->qp->f, work->x, n);
-        else
-            for(i = 0; i < n; i++) work->x[i] = 0.0;
-        for(i = 0; i < n; i++) work->x[i] = -work->x[i];
+        if(!daqp_avi_unconstrained(work, work->x)) feasible = 0;
     }
     else if(work->v != NULL){ // x = -Rinv*v
         for(i = 0; i < n; i++) work->x[i] = -work->v[i];
@@ -946,6 +946,43 @@ void daqp_avi_reset_kkt_cache(DAQPAVI* avi, const int n, const int m){
     avi->kkt_nAS = -1;
 }
 
+// x = -H^{-1}f. For a singular H, by the proximal refinement x <-- -(H+eps*I)^{-1}(f-eps*x)
+// from x = 0, which converges if Hx = -f has a solution (returns 0 otherwise)
+int daqp_avi_unconstrained(DAQPWorkspace* work, c_float* x){
+    DAQPAVI* avi = work->avi;
+    const int n = work->n;
+    int i, it;
+    for(i = 0; i < n; i++) x[i] = 0;
+    if(work->qp->f == NULL) return 1;
+    for(it = 0; it < (avi->eps_kkt > 0 ? DAQP_AVI_KKT_REFINE : 1); it++){
+        c_float diff = 0, nx = 0;
+        for(i = 0; i < n; i++) avi->xtemp[i] = avi->eps_kkt*x[i] - work->qp->f[i];
+        daqp_lu_solve(avi->LU_H, avi->P_H, avi->xtemp, avi->Hx, n);
+        for(i = 0; i < n; i++){
+            if(fabs(avi->Hx[i]-x[i]) > diff) diff = fabs(avi->Hx[i]-x[i]);
+            if(fabs(avi->Hx[i]) > nx) nx = fabs(avi->Hx[i]);
+            x[i] = avi->Hx[i];
+        }
+        if(avi->eps_kkt == 0 || diff <= DAQP_AVI_KKT_REFINE_TOL*(1+nx)) return 1;
+    }
+    return 0;
+}
+
+// Estimate of ||(H-H')/2||_2 by power iterations
+static c_float daqp_avi_skew_norm(DAQPAVI* avi, const c_float* H, const int n){
+    int i, j, it;
+    c_float *v = avi->Hx, *w = avi->xtemp, nrm = 0;
+    for(i = 0; i < n; i++) v[i] = 1.0 + (c_float)(i%7)/7.0;
+    for(it = 0; it < 10; it++){
+        for(i = 0; i < n; i++)
+            for(j = 0, w[i] = 0; j < n; j++) w[i] += (H[i*n+j]-avi->Hsym[i*n+j])*v[j];
+        for(i = 0, nrm = 0; i < n; i++) nrm += w[i]*w[i];
+        if((nrm = sqrt(nrm)) == 0) return 0;
+        for(i = 0; i < n; i++) v[i] = w[i]/nrm;
+    }
+    return nrm;
+}
+
 int daqp_update_avi(DAQPAVI* avi, DAQPProblem* p, c_float zero_tol){
     const int n = p->n;
     // Setup matrices Hsym, Hs_rho, and H_rho, LU_H
@@ -983,7 +1020,16 @@ int daqp_update_avi(DAQPAVI* avi, DAQPProblem* p, c_float zero_tol){
     // Detect possible problematic rho from LU pivots
     int lu_status = daqp_lu(avi->LU_H, avi->P_H, n);
     daqp_avi_reset_kkt_cache(avi, n, p->m); // LU_H changed
-    if(lu_status == 0 && min_diag > 0.0){
+    for(i = 0; lu_status == 0 && i < n; i++)
+        if(fabs(avi->LU_H[i*n+i]) < 1e-10*sqrt(fro_norm_sq)) lu_status = -1;
+    avi->eps_kkt = 0;
+    if(lu_status != 0){ // Singular H
+        avi->eps_kkt = DAQP_AVI_KKT_EPS*(fro_norm_sq > 0 ? sqrt(fro_norm_sq) : 1);
+        for(i = 0, disp = 0; i < n; i++)
+            for(j = 0; j < n; j++, disp++) avi->LU_H[disp] = p->H[disp] + (i == j ? avi->eps_kkt : 0);
+        daqp_lu(avi->LU_H, avi->P_H, n);
+    }
+    else if(min_diag > 0.0){
         c_float min_lu_pivot = DAQP_INF;
         for(i = 0; i < n; i++){
             c_float pivot = fabs(avi->LU_H[i*n+i]);
@@ -998,12 +1044,14 @@ int daqp_update_avi(DAQPAVI* avi, DAQPProblem* p, c_float zero_tol){
         avi->rho = sqrt(min_diag * max_row_sum);
     else
         avi->rho = sqrt(fro_norm_sq)/2;
+    avi->rho *= DAQP_AVI_RHO_SCALE;
+    val = 1.2*daqp_avi_skew_norm(avi,p->H,n); // (DR is slow for rho < ||(H-H')/2||)
+    if(val > avi->rho) avi->rho = val;
     for(i = 0, disp = 0; i < n; i++, disp += n+1){
         avi->Hs_rho[disp] += avi->rho;
         avi->H_rho[disp] += avi->rho;
     }
-
-    // H_rho factorization deferred until needed (skipped if unconstrained optimal)
+    avi->H_rho_factored = 0; // (factored in daqp_solve_avi when first needed)
     return 1;
 }
 

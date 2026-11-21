@@ -124,6 +124,9 @@ typedef struct{
     c_float* Hsym;
     c_float* Hs_rho;
     c_float* H_rho;
+    int H_rho_factored;
+    c_float eps_kkt; // > 0: H is singular and LU_H factors H + eps_kkt*I
+    int kkt_inexact;
     int* P_H2;
 
     c_float* LU_H;
