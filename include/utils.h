@@ -26,6 +26,15 @@ void daqp_avi_reset_kkt_cache(DAQPAVI* avi, const int n, const int m);
 int daqp_retry_avi_with_reduced_rho(DAQPWorkspace *work);
 int daqp_lu(c_float* A, int* P, int n);
 void daqp_lu_solve(c_float* LU, int* P, c_float* b, c_float* x, int n);
+int daqp_avi_unconstrained(DAQPWorkspace* work, c_float* x);
+
+// Proximal refinement of KKT solves with a singular H: max steps and tolerance (relative change of x)
+#ifndef DAQP_AVI_KKT_REFINE
+#define DAQP_AVI_KKT_REFINE 50
+#endif
+#ifndef DAQP_AVI_KKT_REFINE_TOL
+#define DAQP_AVI_KKT_REFINE_TOL ((c_float)1e-8)
+#endif
 
 
 void daqp_minrep_work(int* is_redundant,DAQPWorkspace* work);
