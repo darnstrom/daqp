@@ -2001,7 +2001,8 @@ int daqp_multistage_update(DAQPWorkspace *work, const int mask){
     }
     ws_switch = multistage_ws_apply(ow);
     if(ow->ws_cold){ // Only the immutable constraints stay active
-        for(int i = 0; i < work->n_active; i++) if(multistage_ws_mutable(ow, work->WS[i])) DAQP_SET_INACTIVE(work->WS[i]);
+        for(int i = 0; i < work->n_active; i++)
+            if(multistage_ws_mutable(ow, work->WS[i])) work->sense[work->WS[i]] &= ~DAQP_MULTISTAGE_WS_BITS;
         ws_switch = 1;
         ow->ws_cold = 0;
     }
@@ -2337,6 +2338,7 @@ void daqp_multistage_solve(DAQPResult *res, DAQPWorkspace *work){
 #endif
     res->fval = multistage_solution(ow, res->x);
     multistage_multipliers(ow, res->exitflag, infeasible);
+    // (not after an iteration or time limit: that working set is still a valid warm start)
     ow->ws_cold = res->exitflag == DAQP_EXIT_INFEASIBLE && !infeasible && work->bnb == NULL;
     if(res->lam != NULL) memcpy(res->lam, ow->lamv, work->m*sizeof(c_float));
     res->soft_slack = work->soft_slack;
