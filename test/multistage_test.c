@@ -599,11 +599,14 @@ static double objective_soft(const Gen* g, const double* z){
     return f;
 }
 
+static double max_violation(const Gen* g, const double* z);
+
 // The solutions agree: in the objective (with soft constraints, including the penalties of the slacks), or zo is
-// better (the dense reference of an ill-conditioned condensed QP can be suboptimal; zo is checked to be feasible)
+// better and feasible (the dense reference of an ill-conditioned condensed QP can be suboptimal). fo is checked against zo
 static int agree(const Gen* g, double fd, double fo, const double* zd, const double* zo){
-    if(g->rl != NULL){ fd = objective_soft(g, zd); fo = objective_soft(g, zo); }
-    return fabs(fd-fo) <= 1e-6*(1+fabs(fd)) || (g->rl != NULL ? fo : objective(&g->prob, zo)) < fd;
+    const double fzd = g->rl != NULL ? objective_soft(g, zd) : fd, fzo = objective_soft(g, zo);
+    if(fabs(fo-objective(&g->prob, zo)) > 1e-6*(1+fabs(fo))) return 0;
+    return fabs(fzd-fzo) <= 1e-6*(1+fabs(fzd)) || (fzo < fzd && max_violation(g, zo) < 1e-6);
 }
 
 static double max_violation(const Gen* g, const double* z){
@@ -624,7 +627,7 @@ static double max_violation(const Gen* g, const double* z){
 // feasibility, stationarity, and signs and complementarity of lam (which certify
 // the solution of a convex QP without a reference; dense DAQP is unreliable for
 // F_PSD, where the condensed QP is often an LP)
-static int certified(const Gen* g, const double* z, const double* lam){
+static int certified(const Gen* g, const double* z, const double* lam, const double ktol){
     double *c = malloc(g->m*sizeof(double)), *lb = malloc(g->m*sizeof(double)), *ub = malloc(g->m*sizeof(double));
     double comp = 0, scale = 1;
     int sign_ok = 1;
@@ -641,16 +644,16 @@ static int certified(const Gen* g, const double* z, const double* lam){
         }
     }
     free(c); free(lb); free(ub);
-    // (the proximal-point iterations stop at a stationarity of 1e-6 in each
-    // component of z, which the condensed residual sums over the horizon)
-    return sign_ok && comp < 1e-6*scale && max_violation(g, z) < 1e-6 && kkt_residual(g, z, lam) < 1e-4;
+    return sign_ok && comp < 1e-6*scale && max_violation(g, z) < 1e-6 && kkt_residual(g, z, lam) < ktol;
 }
 
 // F_PSD: a solution of the multistage solver is judged by the KKT conditions alone
 // (dense DAQP can return an infeasible point as optimal); a failure only if
 // dense DAQP has found a feasible solution. Returns 0 on a mismatch
 static int psd_ok(const Gen* g, int ed, int eo, const double* zd, const double* zo, const double* lam){
-    if(eo > 0) return certified(g, zo, lam);
+    // (the proximal-point iterations stop at a stationarity of 1e-6 in each
+    // component of z, which the condensed residual sums over the horizon)
+    if(eo > 0) return certified(g, zo, lam, 1e-4);
     return !(ed > 0 && max_violation(g, zd) < 1e-6);
 }
 
@@ -1012,9 +1015,13 @@ int main(int argc, char** argv){
     // it (a known issue of the dense reference, fixed separately): not compared
     int dense_bin_wrong = 0, nshared = 0, nshared_realloc = 0;
 #define DENSE_BIN_WRONG(ed) ((feat & F_BIN) && (ed) > 0 && !binaries_ok(&g, zd) ? (dense_bin_wrong++, 1) : 0)
-    // Dense DAQP can reach its iteration limit or cycle on an ill-conditioned condensed QP: not compared
+    // Dense DAQP can reach its iteration limit or cycle on an ill-conditioned condensed QP: certified by KKT instead
     int dense_failed = 0;
-#define DENSE_FAILED(ed, eo) (((ed) == DAQP_EXIT_ITERLIMIT || (ed) == DAQP_EXIT_CYCLE) && (eo) > 0 ? (dense_failed++, 1) : 0)
+#define DENSE_FAILED(ed, eo) (((ed) == DAQP_EXIT_ITERLIMIT || (ed) == DAQP_EXIT_CYCLE) && (eo) > 0 ? \
+        (dense_failed++, !(feat & F_BIN) && res.soft_slack == 0 && !certified(&g, zo, lam, (feat & F_PSD) ? 1e-4 : KKT_TOL) \
+         ? (ok = 0, printf("test %d: dense DAQP failed (exitflag %d), solution not certified by KKT\n", k, (ed))) : 0, 1) : 0)
+    // (F_EQ_GAIN: the large multipliers of the equalities are accurate to a few digits less)
+#define KKT_TOL ((feat & F_EQ_GAIN) ? 1e-5 : 1e-6)
     srand(argc > 2 ? atoi(argv[2]) : 1);
     for(int k = 0; k < ntests; k++){
         Gen g;
@@ -1083,8 +1090,7 @@ int main(int argc, char** argv){
                     printf("test %d: branch and bound %.10e, enumeration %.10e (%s)\n", k, fo, fbrute, bin_feasible ? "feasible" : "infeasible");
             }
             else{
-                // (F_EQ_GAIN: the large multipliers of the equalities are accurate to a few digits less)
-                const double ktol = (feat & F_EQ_GAIN) ? 1e-5 : 1e-6;
+                const double ktol = KKT_TOL;
                 ok = agree(&g, fd, res.fval, zd, zo) && viol < 1e-6 && kkt < ktol && kktf < ktol;
                 if(kkt >= ktol) printf("test %d: KKT residual of the multipliers %.2e (feat %d)\n", k, kkt, feat);
                 if(kktf >= ktol) printf("test %d: full KKT residual with the costates %.2e (feat %d)\n", k, kktf, feat);
@@ -1203,7 +1209,7 @@ int main(int argc, char** argv){
                 else if(ed2 > 0 && res.exitflag > 0){
                     int ok2 = agree(&g, fd, res.fval, zd, zo) && max_violation(&g, zo) < 1e-6;
                     // (an ill-conditioned condensed QP can make the dense reference inaccurate: certify by KKT)
-                    if(!ok2 && res.soft_slack == 0) ok2 = certified(&g, zo, lam);
+                    if(!ok2 && res.soft_slack == 0) ok2 = certified(&g, zo, lam, KKT_TOL);
                     if(!ok2){ ok = 0; printf("test %d relaxed: df=%.2e\n", k, fd-res.fval); }
                 }
                 else if((ed2 > 0) != (res.exitflag > 0)){
@@ -1227,7 +1233,7 @@ int main(int argc, char** argv){
                 else if(ed2 > 0 && res.exitflag > 0){
                     int ok2 = agree(&g, fd, res.fval, zd, zo) && max_violation(&g, zo) < 1e-6;
                     // (an ill-conditioned condensed QP can make the dense reference inaccurate: certify by KKT)
-                    if(!ok2 && res.soft_slack == 0) ok2 = certified(&g, zo, lam);
+                    if(!ok2 && res.soft_slack == 0) ok2 = certified(&g, zo, lam, KKT_TOL);
                     if(!ok2){ ok = 0; printf("test %d equality change: df=%.2e\n", k, fd-res.fval); }
                 }
                 else if((ed2 > 0) != (res.exitflag > 0)){
