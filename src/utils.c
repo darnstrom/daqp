@@ -1023,11 +1023,12 @@ int daqp_update_avi(DAQPAVI* avi, DAQPProblem* p, c_float zero_tol){
     for(i = 0; lu_status == 0 && i < n; i++)
         if(fabs(avi->LU_H[i*n+i]) < 1e-10*sqrt(fro_norm_sq)) lu_status = -1;
     avi->eps_kkt = 0;
-    if(lu_status != 0){ // Singular H
+    if(lu_status != 0){ // Singular H (eps grows until H + eps*I is nonsingular)
         avi->eps_kkt = DAQP_AVI_KKT_EPS*(fro_norm_sq > 0 ? sqrt(fro_norm_sq) : 1);
-        for(i = 0, disp = 0; i < n; i++)
-            for(j = 0; j < n; j++, disp++) avi->LU_H[disp] = p->H[disp] + (i == j ? avi->eps_kkt : 0);
-        daqp_lu(avi->LU_H, avi->P_H, n);
+        do{
+            for(i = 0, disp = 0; i < n; i++)
+                for(j = 0; j < n; j++, disp++) avi->LU_H[disp] = p->H[disp] + (i == j ? avi->eps_kkt : 0);
+        } while(daqp_lu(avi->LU_H, avi->P_H, n) != 0 && (avi->eps_kkt *= 10) < DAQP_INF);
     }
     else if(min_diag > 0.0){
         c_float min_lu_pivot = DAQP_INF;

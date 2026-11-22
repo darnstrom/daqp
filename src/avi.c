@@ -41,6 +41,7 @@ static int daqp_avi_cold_start(DAQPWorkspace* work){
     const int n = work->n;
     int i, j, ok;
     c_float viol = 0, scale = 0;
+    if(work->sing_ind != DAQP_EMPTY_IND || work->n_active > n) return 0;
     for(i = 0; i < work->n_active; i++) if(!DAQP_IS_IMMUTABLE(work->WS[i])) return 0;
     if(work->n_active == 0) ok = daqp_avi_unconstrained(work, avi->x);
     else{
@@ -48,6 +49,7 @@ static int daqp_avi_cold_start(DAQPWorkspace* work){
         daqp_solve_avi_kkt(work);
         ok = !avi->kkt_inexact;
     }
+    for(i = 0; ok && i < n; i++) ok = isfinite(avi->x[i]);
     for(i = 0; ok && i < work->m; i++){
         c_float ax = i < work->ms ? avi->x[i] : 0, nrm = 1;
         const c_float bu = work->qp->bupper[i], bl = work->qp->blower[i];
@@ -66,7 +68,7 @@ static int daqp_avi_cold_start(DAQPWorkspace* work){
             if(!DAQP_IS_IMMUTABLE(i) && bl-ax > viol*nrm) viol = (bl-ax)/nrm;
         }
     }
-    return ok && viol <= DAQP_AVI_COLD_FAR*scale;
+    return ok && viol <= DAQP_AVI_COLD_FAR*scale + work->settings->primal_tol;
 }
 
 // Solve AVI
@@ -148,6 +150,8 @@ int daqp_solve_avi(DAQPWorkspace *work) {
                 }
                 terminate_limit += 5; // Increase terminate limit to give DR more time to converge
                 if(terminate_limit > 30) terminate_limit = 30;
+                counter = 0;
+                continue; // (Hx and y are from the rejected point: redo the step from xold)
             }
             else{
                 minimum_newton_residual = sum;
@@ -179,8 +183,7 @@ int daqp_solve_avi(DAQPWorkspace *work) {
             counter = 0;
         }
 
-        if(restart){
-            restart = 0;
+        if(restart && k == 0){
             for (i = 0; i < n; i++) avi->x[i] = avi->y[i];
             continue;
         }
