@@ -195,6 +195,37 @@ static DAQP_NOINLINE void eq_twoside(c_float* B, const int n, const c_float* V,
 }
 
 /*
+ * As eq_twoside, for a nonsymmetric B (full, row major): with p = Bv, q = B'v
+ * and c = v'Bv, P B P = B - v(tau q - tau^2 c v)' - tau p v'. w holds 3n elements.
+ */
+static DAQP_NOINLINE void eq_twoside_gen(c_float* B, const int n, const c_float* V,
+        const c_float* tau, const int nr, c_float* w){
+    int i, j, k;
+    c_float *vv = w, *p = w+n, *q = w+2*n;
+    for(k = 0; k < nr; k++){
+        const c_float tk = tau[k];
+        c_float c = 0;
+        vv[k] = 1;
+        for(i = k+1; i < n; i++) vv[i] = V[(size_t)k*n+i];
+        for(j = k; j < n; j++) q[j] = 0;
+        for(i = k; i < n; i++){
+            const c_float* Bi = B+(size_t)i*n;
+            const c_float vi = vv[i];
+            c_float s = 0;
+            for(j = k; j < n; j++){ s += Bi[j]*vv[j]; q[j] += vi*Bi[j]; }
+            p[i] = s;
+            c += vi*s;
+        }
+        for(j = k; j < n; j++) q[j] = tk*q[j] - tk*tk*c*vv[j];
+        for(i = k; i < n; i++){
+            c_float* Bi = B+(size_t)i*n;
+            const c_float vi = vv[i], pi = tk*p[i];
+            for(j = k; j < n; j++) Bi[j] -= vi*q[j] + pi*vv[j];
+        }
+    }
+}
+
+/*
  * Cholesky factorization A = L L' (lower, row major, in place), with the rows
  * in blocks of four. Returns 0 if A is not positive definite in the sense of
  * daqp_update_Rinv (a pivot below zero_tol, or relative to the largest pivot).
@@ -725,10 +756,10 @@ static int eq_build_reduction(DAQPWorkspace* work, DAQPProblem* qp){
      * Pick the kernels by their flop counts (multiply-adds). The two-sided
      * Householder product is memory bound, so its count is weighted.
      */
-    if(qp->H != NULL && !eq->metric && symmetric && !factored){
-        const c_float N = n, NZ = nz;
-        const c_float f_gemm = N*N*NZ + N*NZ*NZ/2;
-        const c_float f_two = 2.0/3.0*(N*N*N-NZ*NZ*NZ);
+    if(qp->H != NULL && !eq->metric && !factored){ // (twice the flops if nonsymmetric)
+        const c_float N = n, NZ = nz, s = symmetric ? 1 : 2;
+        const c_float f_gemm = N*N*NZ + s*N*NZ*NZ/2;
+        const c_float f_two = s*2.0/3.0*(N*N*N-NZ*NZ*NZ);
         use_twoside = 1.7*f_two < f_gemm;
     }
     {
@@ -776,12 +807,14 @@ static int eq_build_reduction(DAQPWorkspace* work, DAQPProblem* qp){
             use_refl = 0; // The rows (A Q)_2 refer to the unsplit Z
         }
         else if(use_twoside){
-            c_float* B = malloc((size_t)n*n*sizeof(c_float));
+            c_float* B = malloc(((size_t)n*n+3*n)*sizeof(c_float));
             for(i = 0; i < n*n; i++) B[i] = qp->H[i];
-            eq_twoside(B,n,eq->V,eq->tau,neq,eq->tmp);
+            if(symmetric) eq_twoside(B,n,eq->V,eq->tau,neq,eq->tmp);
+            else eq_twoside_gen(B,n,eq->V,eq->tau,neq,B+(size_t)n*n);
             for(i = 0; i < nz; i++)
-                for(j = 0; j <= i; j++)
-                    eq->Hr[(size_t)i*nz+j] = eq->Hr[(size_t)j*nz+i] = B[(size_t)(neq+i)*n+neq+j];
+                for(j = 0; j < nz; j++)
+                    eq->Hr[(size_t)i*nz+j] = (symmetric && j > i) ? // (eq_twoside: lower triangle)
+                        B[(size_t)(neq+j)*n+neq+i] : B[(size_t)(neq+i)*n+neq+j];
             free(B);
         }
         else{
