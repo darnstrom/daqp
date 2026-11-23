@@ -319,6 +319,44 @@ int daqp_bnb_from(DAQPWorkspace* work, const c_float* u, const c_float fval, con
     return daqp_bnb_run(work, -DAQP_INF, u, fval, slack);
 }
 
+// Restore the working set of node (its fixed binaries and the stored working set) from the current one: remove the
+// constraints that are not in it and add the missing ones. Returns 0 if it has to be rebuilt instead
+static int daqp_bnb_restore_ws(DAQPNode* node, DAQPWorkspace* work){
+    int i, id, ok = 1, *mark = work->bnb->mark;
+    const int *ws = work->bnb->tree_WS+node->WS_start, nws = node->WS_end-node->WS_start;
+    if(mark == NULL) return 0;
+    // mark: 1 (lower) or 2 (upper) for the stored constraints, +4 for the fixed binaries
+    for(i = 0; i < nws; i++) mark[DAQP_REMOVE_LOWER_FLAG(ws[i])] = DAQP_EXTRACT_LOWER_FLAG(ws[i]) ? 1 : 2;
+    for(i = 0; i <= node->depth; i++)
+        mark[DAQP_REMOVE_LOWER_FLAG(work->bnb->fixed_ids[i])] = DAQP_EXTRACT_LOWER_FLAG(work->bnb->fixed_ids[i]) ? 5 : 6;
+    for(i = work->n_active-1; ok && i >= work->bnb->neq; i--){
+        id = work->WS[i];
+        if(DAQP_IS_BINARY(id)) work->sense[id] &= ~DAQP_IMMUTABLE;
+        if((mark[id]&3) == (DAQP_IS_LOWER(id) ? 1 : 2)){
+            if(mark[id]&4) DAQP_SET_IMMUTABLE(id);
+            work->lam[i] = DAQP_IS_LOWER(id) ? -1 : 1;
+        }
+        else{
+            daqp_remove_constraint(work,i);
+            ok = work->sing_ind == DAQP_EMPTY_IND;
+        }
+    }
+    // A missing fixed binary that is dependent is not decided here (free constraints are active) => rebuild
+    for(i = 0; ok && i <= node->depth; i++){
+        id = work->bnb->fixed_ids[i];
+        if(DAQP_IS_ACTIVE(DAQP_REMOVE_LOWER_FLAG(id))) continue;
+        daqp_add_upper_lower(id,work);
+        ok = work->sing_ind == DAQP_EMPTY_IND;
+        if(ok) DAQP_SET_IMMUTABLE(DAQP_REMOVE_LOWER_FLAG(id));
+    }
+    if(ok) daqp_bnb_load_ws(ws,nws,work);
+    for(i = 0; i < nws; i++) mark[DAQP_REMOVE_LOWER_FLAG(ws[i])] = 0;
+    for(i = 0; i <= node->depth; i++) mark[DAQP_REMOVE_LOWER_FLAG(work->bnb->fixed_ids[i])] = 0;
+    work->bnb->n_clean = work->bnb->neq; // (the fixed binaries are no longer a prefix)
+    if(ok) work->bnb->nWS = node->WS_start;
+    return ok;
+}
+
 int daqp_process_node(DAQPNode* node, DAQPWorkspace* work){
     int exitflag;
     work->bnb->nodecount+=1;
@@ -328,11 +366,13 @@ int daqp_process_node(DAQPNode* node, DAQPWorkspace* work){
         // Setup relaxation
         if(work->bnb->n_nodes==0 || (node-1)->depth!=node->depth){
             // Sibling has been processed => need to fix workspace state
-            // Retain only fixed constraints of common ancestors (robust to pruned nodes)
-            if(work->bnb->n_clean > work->bnb->neq+node->depth)
-                work->bnb->n_clean = work->bnb->neq+node->depth;
-            daqp_node_cleanup_workspace(work->bnb->n_clean,work);
-            if(daqp_warmstart_node(node,work) < 0) return DAQP_EXIT_INFEASIBLE;
+            if(!daqp_bnb_restore_ws(node,work)){
+                // Retain only fixed constraints of common ancestors (robust to pruned nodes)
+                if(work->bnb->n_clean > work->bnb->neq+node->depth)
+                    work->bnb->n_clean = work->bnb->neq+node->depth;
+                daqp_node_cleanup_workspace(work->bnb->n_clean,work);
+                if(daqp_warmstart_node(node,work) < 0) return DAQP_EXIT_INFEASIBLE;
+            }
         }
         else{
             daqp_add_upper_lower(node->bin_id,work);

@@ -114,6 +114,7 @@ typedef struct{
     c_float* reg; // eps_j of the regularization eps_j/2*x_j^2 in daqp_bnb_prox
     c_float* xtmp; // Workspace for x
     DAQPProblem* ps_qp; // Presolved copy of the problem (see daqp_presolve)
+    int* mark; // Workspace for daqp_bnb_restore_ws, one per constraint (NULL: working sets are rebuilt)
 }DAQPBnB;
 
 typedef struct{
@@ -123,6 +124,9 @@ typedef struct{
     c_float* Hsym;
     c_float* Hs_rho;
     c_float* H_rho;
+    int H_rho_factored;
+    c_float eps_kkt; // > 0: H is singular and LU_H factors H + eps_kkt*I
+    int kkt_inexact;
     int* P_H2;
 
     c_float* LU_H;

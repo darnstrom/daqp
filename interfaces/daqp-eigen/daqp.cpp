@@ -228,7 +228,7 @@ int DAQP::update_bnb(int const* sense, int n, int m) {
     // Allocate for the largest problem, like the other buffers
     const int n_work = work_.n;
     work_.n = max_variables_;
-    const int status = setup_daqp_bnb(&work_, const_cast<int*>(sense), nb, max_constraints_in_level_);
+    const int status = setup_daqp_bnb(&work_, const_cast<int*>(sense), nb, max_constraints_in_level_, max_constraints_);
     work_.n = n_work;
     return status;
 }
