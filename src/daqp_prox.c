@@ -102,6 +102,15 @@ int daqp_prox(DAQPWorkspace *work){
     }
 
     while(total_iter < work->settings->iter_limit){
+#ifdef PROFILING
+        if(work->timer != NULL){
+            toc((DAQPtimer*)work->timer);
+            if(get_time((DAQPtimer*)work->timer) > work->settings->time_limit){
+                exitflag = DAQP_EXIT_TIMELIMIT;
+                break;
+            }
+        }
+#endif
         /* ----------------------------------------------------------------
          * Perturb the problem: form v = R'\(f - eps_mask * x_old)
          * ----------------------------------------------------------------*/
