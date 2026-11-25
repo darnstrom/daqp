@@ -55,6 +55,31 @@ DAQP.settings(d, Dict(:iter_limit =>2000))
 
 A full list of available settings is provided [here](/daqp/parameters/#settings)
 
+## Using a locally built library
+
+`DAQPBase` normally loads the shared library supplied by `DAQP_jll`. To use C changes from a DAQP checkout, build the library and its matching Julia wrapper together. Run these commands from the checkout root.
+
+```shell
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DJULIA=ON
+cmake --build build --config Release
+```
+
+On Windows, put MinGW-w64 and Ninja on your `PATH` and add `-G Ninja -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++` to the first command.
+
+CMake stages the wrapper and shared library in `build/interfaces/daqp-julia`. Start Julia from the checkout root with your application's project active, then develop the staged `DAQPBase` package in that project. The active project must allow the `DAQPBase` version listed in the staged `Project.toml`.
+
+```julia
+using Pkg
+Pkg.develop(path=abspath("build", "interfaces", "daqp-julia"))
+```
+
+After switching or rebuilding the library, start a fresh Julia session with the same project active. Verify that Julia selects the library in `build/interfaces/daqp-julia`.
+
+```julia
+using DAQPBase
+println(realpath(DAQPBase.libdaqp))
+```
+
 ## Using DAQP in JuMP
 DAQP can also be interfaced to [JuMP](https://jump.dev/). The following code sets up and solves the problem considered above
 
