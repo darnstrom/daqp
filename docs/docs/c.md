@@ -41,6 +41,49 @@ The last argument is a pointer to a `DAQPSettings` struct, but passing a null-po
 
 The optimal solution can be found in `result.x`, the optimal function value in `result.fval`, and the exit flag in `result.exitflag`. The struct `result` also contains some profiling information such as solve time and number of iterations.
 
+## Warm-starting a one-shot solve
+
+For a continuous QP, `daqp_dual_init_active()` uses dual multipliers to select an initial working set. Outside the helper's numerical tolerance, positive multipliers select upper bounds and negative multipliers select lower bounds. Pass one multiplier per constraint in the current constraint order. The helper updates the writable `qp.sense` array. Restore the current problem's original constraint classifications before applying each fresh guess.
+
+This example constrains `x` to `[-1, 1]`. It changes the linear cost and uses the first solution's multiplier to warm-start the second solve.
+
+```c
+#include "api.h"
+#include <stdio.h>
+
+int main(void) {
+    c_float H[] = {1}, f[] = {-2};
+    c_float blower[] = {-1}, bupper[] = {1};
+    int sense[] = {0};
+    DAQPProblem qp = {
+        .n = 1, .m = 1, .ms = 1, .H = H, .f = f,
+        .bupper = bupper, .blower = blower, .sense = sense
+    };
+    c_float x[1], lam[1];
+    DAQPResult result = {.x = x, .lam = lam};
+
+    daqp_quadprog(&result, &qp, NULL);
+    if (result.exitflag != DAQP_EXIT_OPTIMAL) {
+        fprintf(stderr, "First solve failed: %d\n", result.exitflag);
+        return 1;
+    }
+
+    f[0] = -3;
+    sense[0] = 0;
+    daqp_dual_init_active(&qp, lam);
+    daqp_quadprog(&result, &qp, NULL);
+    if (result.exitflag != DAQP_EXIT_OPTIMAL) {
+        fprintf(stderr, "Second solve failed: %d\n", result.exitflag);
+        return 1;
+    }
+
+    printf("x = %.1f, lambda = %.1f\n", (double)x[0], (double)lam[0]);
+    return 0;
+}
+```
+
+The program prints `x = 1.0, lambda = 2.0`. If you have a primal guess, replace `daqp_dual_init_active(&qp, lam)` with `daqp_primal_init_active(&qp, x)`. That helper selects constraints whose current bounds are close to the supplied point. To reuse allocations and solver state across repeated solves, use the [workspace interface](#using-a-workspace).
+
 ## Using a Workspace
 The `daqp_quadprog` function above allocates memory on every call, which may be undesirable in
 real-time or embedded applications. To avoid this, DAQP provides a workspace-based interface where
