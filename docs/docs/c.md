@@ -41,6 +41,16 @@ The last argument is a pointer to a `DAQPSettings` struct, but passing a null-po
 
 The optimal solution can be found in `result.x`, the optimal function value in `result.fval`, and the exit flag in `result.exitflag`. The struct `result` also contains some profiling information such as solve time and number of iterations.
 
+## Warm starting
+An initial working set can be set from a guess of the dual or primal solution, e.g., from a previously solved, similar problem:
+```c
+daqp_dual_init_active(&qp, lam); // lam[i] > 0 -> upper bound active, lam[i] < 0 -> lower bound active
+// or
+daqp_primal_init_active(&qp, x); // constraints that hold with equality at x are active
+daqp_quadprog(&result, &qp, NULL);
+```
+Both functions only add constraints to the working set by modifying `qp.sense`, so reset `sense` before applying a new guess. For repeated solves, see also the [workspace interface](#using-a-workspace).
+
 ## Using a Workspace
 The `daqp_quadprog` function above allocates memory on every call, which may be undesirable in
 real-time or embedded applications. To avoid this, DAQP provides a workspace-based interface where
